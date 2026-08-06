@@ -17,6 +17,7 @@ export type VectorFieldPurpose =
   | "y samples"
   | "grid x coordinates"
   | "grid y coordinates"
+  | "scalar function"
   | "x component function"
   | "y component function"
   | "actual x components"
@@ -69,12 +70,39 @@ export function namespaceForField(config: VectorFieldConfig): string {
   return `vector_tools_vf_${config.id}`;
 }
 
-export type ComponentSlot = "p" | "q";
+export type ComponentSlot = "p" | "q" | "f";
 
 /**
- * IDs of the two expressions that hold the field's components. They are
- * ordinary expressions in the generated folder, so the components can be edited
- * either in the panel or directly in the expression list.
+ * The slots the user types into for a given source. In gradient mode P and Q
+ * are derived from f, so they are generated but never adopted back: editing
+ * them by hand would silently break the link to the function they came from.
+ */
+export function editableSlots(
+  config: VectorFieldConfig
+): readonly ComponentSlot[] {
+  return config.source === "gradient" ? ["f"] : ["p", "q"];
+}
+
+/** The config field a slot reads from and writes back to. */
+export function slotBody(config: VectorFieldConfig, slot: ComponentSlot) {
+  if (slot === "f") return config.scalar.fLatex;
+  return slot === "p" ? config.components.xLatex : config.components.yLatex;
+}
+
+export function setSlotBody(
+  config: VectorFieldConfig,
+  slot: ComponentSlot,
+  body: string
+) {
+  if (slot === "f") config.scalar.fLatex = body;
+  else if (slot === "p") config.components.xLatex = body;
+  else config.components.yLatex = body;
+}
+
+/**
+ * IDs of the expressions that hold the field's definitions. They are ordinary
+ * expressions in the generated folder, so they can be edited either in the
+ * panel or directly in the expression list.
  */
 export function componentExpressionID(
   config: VectorFieldConfig,
@@ -83,16 +111,47 @@ export function componentExpressionID(
   return `${namespaceForField(config)}_${slot}_function`;
 }
 
-/** The full `v_{tfdp}\left(x,y\right)=...` definition for one component. */
+/** The full `v_{tfdp}\left(x,y\right)=...` definition for one slot. */
 export function componentFunctionLatex(
   config: VectorFieldConfig,
   slot: ComponentSlot
 ) {
   const symbols = createSymbols(config.id);
-  const body =
-    slot === "p" ? config.components.xLatex : config.components.yLatex;
-  const symbol = slot === "p" ? symbols.xFunction : symbols.yFunction;
-  return `${symbol}\\left(x,y\\right)=\\left(${body}\\right)`;
+  return `${slotSymbol(symbols, slot)}\\left(x,y\\right)=\\left(${componentBodyLatex(
+    config,
+    slot,
+    symbols
+  )}\\right)`;
+}
+
+function slotSymbol(
+  symbols: ReturnType<typeof createSymbols>,
+  slot: ComponentSlot
+) {
+  if (slot === "f") return symbols.scalarFunction;
+  return slot === "p" ? symbols.xFunction : symbols.yFunction;
+}
+
+/**
+ * The right-hand side of a slot's definition. In gradient mode P and Q are
+ * Desmos's own partial derivatives of the scalar function.
+ *
+ * `\frac{d}{dx}` applied to a two-argument function is the partial with respect
+ * to x, holding y — verified against a real Desmos, where it is exact rather
+ * than approximated. `\frac{\partial}{\partial x}` and `\partial_{x}` both
+ * error, so this is the only spelling that works.
+ */
+function componentBodyLatex(
+  config: VectorFieldConfig,
+  slot: ComponentSlot,
+  symbols: ReturnType<typeof createSymbols>
+) {
+  if (slot === "f") return config.scalar.fLatex;
+  if (config.source === "gradient") {
+    const variable = slot === "p" ? "dx" : "dy";
+    return `\\frac{d}{${variable}}${symbols.scalarFunction}\\left(x,y\\right)`;
+  }
+  return slot === "p" ? config.components.xLatex : config.components.yLatex;
 }
 
 /**
@@ -110,7 +169,7 @@ export function parseComponentFromLatex(
 ): string | undefined {
   if (latex === undefined) return undefined;
   const symbols = createSymbols(config.id);
-  const symbol = slot === "p" ? symbols.xFunction : symbols.yFunction;
+  const symbol = slotSymbol(symbols, slot);
   const normalized = latex.replace(/\s+/g, "");
   const prefixes = [
     `${symbol}\\left(x,y\\right)=`,
@@ -229,12 +288,26 @@ export function createVectorFieldPlan(
   );
   const zeroLatex = `\\left(${symbols.gridX},${symbols.gridY}\\right)${zeroRestriction}`;
 
+  // Only gradient fields carry the scalar function; a component field would
+  // have nothing to put in it.
+  const scalarExpressions =
+    config.source === "gradient"
+      ? [
+          expression(
+            "f_function",
+            "scalar function",
+            componentFunctionLatex(config, "f")
+          ),
+        ]
+      : [];
+
   return {
     namespace,
     folder,
     expressions: [
       expression("x_samples", "x samples", xSamples),
       expression("y_samples", "y samples", ySamples),
+      ...scalarExpressions,
       expression(
         "grid_x",
         "grid x coordinates",
@@ -248,12 +321,12 @@ export function createVectorFieldPlan(
       expression(
         "p_function",
         "x component function",
-        `${symbols.xFunction}\\left(x,y\\right)=\\left(${config.components.xLatex}\\right)`
+        componentFunctionLatex(config, "p")
       ),
       expression(
         "q_function",
         "y component function",
-        `${symbols.yFunction}\\left(x,y\\right)=\\left(${config.components.yLatex}\\right)`
+        componentFunctionLatex(config, "q")
       ),
       expression(
         "u",
@@ -386,6 +459,7 @@ function createSymbols(instanceID: string) {
     ySamples: symbol("ys"),
     gridX: symbol("gx"),
     gridY: symbol("gy"),
+    scalarFunction: symbol("f"),
     xFunction: symbol("p"),
     yFunction: symbol("q"),
     u: symbol("u"),

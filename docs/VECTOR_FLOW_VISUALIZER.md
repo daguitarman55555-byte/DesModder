@@ -59,6 +59,13 @@ compiles the component LaTeX into a GLSL expression. It supports numbers, `x`,
 (trig and inverse trig, hyperbolics, `\exp`, `\ln`, `\log`, `\operatorname{mod}`,
 `\operatorname{sign}`, `\min`, `\max`, floor/ceil/round).
 
+A gradient field is compiled differently: its scalar f goes to the GPU as a
+function, and the shader central-differences it, because the GPU cannot
+differentiate symbolically the way the generated Desmos expressions do. The step
+size follows the viewport, so the gradient stays smooth at any zoom, and it is
+exact for the quadratics most potentials are built from. The arrows on the graph
+remain Desmos's exact partials either way — only the animation samples.
+
 Anything else is refused **by name** before the button is enabled, rather than
 producing a plausible-looking animation of the wrong field. The common cases:
 

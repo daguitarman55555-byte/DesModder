@@ -189,6 +189,12 @@
     grid-template-columns: 1fr 1fr;
   }
 
+  // A gradient field has one input, not two, so it gets the full width rather
+  // than sitting in half a two-column grid.
+  .dsm-vector-tools-scalar-row {
+    grid-template-columns: 1fr;
+  }
+
   .dsm-vector-tools-math-input {
     border: 1px solid #bcbcbc;
     border-radius: 3px;

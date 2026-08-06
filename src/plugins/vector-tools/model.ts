@@ -1,9 +1,14 @@
-export const VECTOR_FIELD_SCHEMA_VERSION = 2;
+export const VECTOR_FIELD_SCHEMA_VERSION = 3;
 export const VECTOR_COUNT_WARNING = 2_500;
 export const VECTOR_COUNT_HARD_MAXIMUM = 10_000;
 export const ZERO_VECTOR_TOLERANCE = 1e-9;
 
 export type SamplingMode = "step" | "count";
+/**
+ * Where the field's two components come from. `gradient` derives them from one
+ * scalar function, so the same arrows, colors, and flow describe ∇f.
+ */
+export type FieldSource = "components" | "gradient";
 export type VectorLengthMode =
   | "actual"
   | "normalized"
@@ -107,9 +112,14 @@ export interface VectorFieldConfig {
   schemaVersion: number;
   id: string;
   name: string;
+  source: FieldSource;
   components: {
     xLatex: string;
     yLatex: string;
+  };
+  /** The potential whose gradient is the field, used when source is gradient. */
+  scalar: {
+    fLatex: string;
   };
   domain: {
     x: SamplingAxisConfig;
@@ -185,7 +195,11 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
   schemaVersion: VECTOR_FIELD_SCHEMA_VERSION,
   id: "default",
   name: "Vector Field",
+  source: "components",
   components: { xLatex: "-y", yLatex: "x" },
+  // ∇(x²+y²) = (2x, 2y): a radial field that is obviously the gradient of the
+  // bowl it comes from, so switching to gradient mode shows something legible.
+  scalar: { fLatex: "x^{2}+y^{2}" },
   domain: { x: DEFAULT_AXIS_X, y: DEFAULT_AXIS_Y },
   length: {
     mode: "normalized",
@@ -322,6 +336,7 @@ export function cloneDefaultConfig(): VectorFieldConfig {
   return {
     ...DEFAULT_VECTOR_FIELD_CONFIG,
     components: { ...DEFAULT_VECTOR_FIELD_CONFIG.components },
+    scalar: { ...DEFAULT_VECTOR_FIELD_CONFIG.scalar },
     domain: {
       x: { ...DEFAULT_VECTOR_FIELD_CONFIG.domain.x },
       y: { ...DEFAULT_VECTOR_FIELD_CONFIG.domain.y },
@@ -358,8 +373,14 @@ export function validateVectorFieldConfig(
   config: VectorFieldConfig
 ): VectorFieldValidation {
   const issues: ValidationIssue[] = [];
-  validateComponent(config.components.xLatex, "P(x,y)", issues);
-  validateComponent(config.components.yLatex, "Q(x,y)", issues);
+  // Only the source in use is validated, so an unused P or f cannot block
+  // generating the field the user is actually looking at.
+  if (config.source === "gradient") {
+    validateComponent(config.scalar.fLatex, "f(x,y)", issues);
+  } else {
+    validateComponent(config.components.xLatex, "P(x,y)", issues);
+    validateComponent(config.components.yLatex, "Q(x,y)", issues);
+  }
   validateAxis(config.domain.x, "x", issues);
   validateAxis(config.domain.y, "y", issues);
   validateFinitePositive(config.length.targetLength, "Target length", issues);
@@ -427,6 +448,7 @@ export function normalizeVectorFieldConfig(value: unknown): VectorFieldConfig {
   const fallback = cloneDefaultConfig();
   if (!isRecord(value)) return fallback;
   const components = asRecord(value.components);
+  const scalar = asRecord(value.scalar);
   const domain = asRecord(value.domain);
   const length = asRecord(value.length);
   const arrowhead = asRecord(value.arrowhead);
@@ -436,6 +458,15 @@ export function normalizeVectorFieldConfig(value: unknown): VectorFieldConfig {
     schemaVersion: VECTOR_FIELD_SCHEMA_VERSION,
     id: validID(value.id) ? value.id : fallback.id,
     name: validString(value.name) ? value.name : fallback.name,
+    // Schema 2 and earlier had no source; those configs are all component
+    // fields, which is exactly what the fallback says.
+    source: value.source === "gradient" ? "gradient" : fallback.source,
+    scalar: {
+      fLatex:
+        typeof scalar?.fLatex === "string"
+          ? scalar.fLatex
+          : fallback.scalar.fLatex,
+    },
     components: {
       xLatex:
         typeof components?.xLatex === "string"

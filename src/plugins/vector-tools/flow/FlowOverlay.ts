@@ -12,6 +12,7 @@ import {
   FlowRenderer,
   FlowRendererError,
   type FlowBounds,
+  type FlowField,
   type FlowOptions,
 } from "./FlowRenderer";
 import type { Calc } from "#globals";
@@ -47,12 +48,12 @@ export class FlowOverlay {
    * failures through `onError` instead of throwing, because every caller is a
    * UI event handler.
    */
-  start(pGLSL: string, qGLSL: string, options: FlowOptions) {
+  start(field: FlowField, options: FlowOptions) {
     this.options = { ...options };
     try {
       if (this.renderer === undefined) this.mount();
       this.renderer!.setOptions(this.options);
-      this.renderer!.setField(pGLSL, qGLSL);
+      this.renderer!.setField(field);
       this.syncBounds(true);
       this.scheduleFrame();
     } catch (error) {

@@ -4,8 +4,11 @@ import {
   componentExpressionID,
   componentFunctionLatex,
   createVectorFieldPlan,
+  editableSlots,
   namespaceForField,
   parseComponentFromLatex,
+  setSlotBody,
+  slotBody,
 } from "./generator";
 import { TEST_FOLDER_ID, TEST_LINE_ID, TEST_NAMESPACE } from "./ids";
 import {
@@ -258,13 +261,32 @@ describe("Vector Tools field configuration", () => {
     });
 
     expect(config).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       id: "saved_field",
       name: "Saved field",
       components: { xLatex: "", yLatex: "x+y" },
       domain: { x: { mode: "count", count: 5 }, y: { min: -6, max: 6 } },
       color: { fixedColor: "not-a-color" },
+      // Schema 2 and earlier had no source. Those are all component fields,
+      // and reading one as a gradient would silently replace the user's field.
+      source: "components",
     });
+    expect(config.scalar.fLatex).toBe(cloneDefaultConfig().scalar.fLatex);
+  });
+
+  test("keeps a saved gradient field a gradient field", () => {
+    const config = normalizeVectorFieldConfig({
+      schemaVersion: 3,
+      source: "gradient",
+      scalar: { fLatex: "\\sin(x)+y^{2}" },
+    });
+    expect(config.source).toBe("gradient");
+    expect(config.scalar.fLatex).toBe("\\sin(x)+y^{2}");
+
+    // Anything else in `source` is not a field the plugin knows how to build.
+    expect(normalizeVectorFieldConfig({ source: "curl" }).source).toBe(
+      "components"
+    );
   });
 
   test("fills in and clamps flow settings saved by an older schema", () => {
@@ -390,6 +412,74 @@ describe("Vector Tools Desmos expression plans", () => {
       plan.expressions.find((expression) => expression.purpose === "color list")
         ?.latex
     ).toContain("rgb");
+  });
+
+  test("derives P and Q from f for a gradient field", () => {
+    const config = cloneDefaultConfig();
+    config.source = "gradient";
+    config.scalar.fLatex = "x^{2}+y^{2}";
+    const plan = createVectorFieldPlan(config);
+    const latexFor = (purpose: string) =>
+      plan.expressions.find((expression) => expression.purpose === purpose)
+        ?.latex;
+
+    // The scalar is an ordinary expression in the folder, and the components
+    // are Desmos's own partials of it — `\frac{d}{dx}` of a two-argument
+    // function, which is the only spelling a real Desmos accepts.
+    expect(latexFor("scalar function")).toBe(
+      "v_{tfdf}\\left(x,y\\right)=\\left(x^{2}+y^{2}\\right)"
+    );
+    expect(latexFor("x component function")).toBe(
+      "v_{tfdp}\\left(x,y\\right)=\\left(\\frac{d}{dx}v_{tfdf}\\left(x,y\\right)\\right)"
+    );
+    expect(latexFor("y component function")).toBe(
+      "v_{tfdq}\\left(x,y\\right)=\\left(\\frac{d}{dy}v_{tfdf}\\left(x,y\\right)\\right)"
+    );
+    // Everything downstream is unchanged: the arrows do not know or care that
+    // the components were derived.
+    expect(latexFor("shafts")).toBe(
+      createVectorFieldPlan(cloneDefaultConfig()).expressions.find(
+        (expression) => expression.purpose === "shafts"
+      )?.latex
+    );
+    expect(
+      new Set(plan.expressions.map((expression) => expression.id)).size
+    ).toBe(plan.expressions.length);
+  });
+
+  test("carries the scalar function only for a gradient field", () => {
+    const components = createVectorFieldPlan(cloneDefaultConfig());
+    const gradient = cloneDefaultConfig();
+    gradient.source = "gradient";
+
+    expect(
+      components.expressions.some(
+        (expression) => expression.purpose === "scalar function"
+      )
+    ).toBe(false);
+    expect(createVectorFieldPlan(gradient).expressions).toHaveLength(
+      components.expressions.length + 1
+    );
+  });
+
+  test("mirrors only the slots the user types into", () => {
+    const config = cloneDefaultConfig();
+    expect(editableSlots(config)).toEqual(["p", "q"]);
+    config.source = "gradient";
+    // P and Q are derived, so adopting an edit to them would overwrite the
+    // derivative the generator owns.
+    expect(editableSlots(config)).toEqual(["f"]);
+
+    expect(componentExpressionID(config, "f")).toBe(
+      "vector_tools_vf_default_f_function"
+    );
+    expect(
+      parseComponentFromLatex(config, "f", componentFunctionLatex(config, "f"))
+    ).toBe(config.scalar.fLatex);
+
+    setSlotBody(config, "f", "\\sin(xy)");
+    expect(slotBody(config, "f")).toBe("\\sin(xy)");
+    expect(config.scalar.fLatex).toBe("\\sin(xy)");
   });
 
   test.each([

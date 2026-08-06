@@ -353,6 +353,118 @@ testWithPage(
 );
 
 testWithPage(
+  "Vector Tools generates a gradient field Desmos differentiates itself",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+    await openTab(driver, 0);
+
+    await driver.click('[aria-label="Field from"] [data-value="gradient"]');
+    await driver.waitForSync();
+    expect((await storedConfig(driver)).source).toBe("gradient");
+
+    await driver.click(GENERATE);
+    await driver.waitForSync();
+
+    const items = (await driver.getState()).expressions.list;
+    // The scalar joins the folder, and P and Q become its partials.
+    expect(
+      items.find((item) => item.id === `${NAMESPACE}_f_function`)
+    ).toMatchObject({
+      latex: "v_{tfdf}\\left(x,y\\right)=\\left(x^{2}+y^{2}\\right)",
+      hidden: true,
+    });
+    expect(
+      items.find((item) => item.id === `${NAMESPACE}_p_function`)
+    ).toMatchObject({
+      latex:
+        "v_{tfdp}\\left(x,y\\right)=\\left(\\frac{d}{dx}v_{tfdf}\\left(x,y\\right)\\right)",
+    });
+    expect(
+      items.filter((item) => item.id?.startsWith(`${NAMESPACE}_`))
+    ).toHaveLength(21);
+
+    // Nothing errors, and the derivative is Desmos's own, so it is exact
+    // rather than approximated: ∇(x²+y²) = (2x, 2y).
+    const evaluated = await driver.evaluate(async () => {
+      const read = async (latex: string) => {
+        const helper = Calc.HelperExpression({ latex });
+        return await new Promise<number>((resolve) => {
+          const timer = setTimeout(() => resolve(Number.NaN), 3000);
+          helper.observe("numericValue", () => {
+            clearTimeout(timer);
+            resolve(helper.numericValue);
+          });
+        });
+      };
+      return {
+        p: await read("v_{tfdp}\\left(3,4\\right)"),
+        q: await read("v_{tfdq}\\left(3,4\\right)"),
+        errors: Calc.controller
+          .getAllItemModels()
+          .filter(
+            (item) =>
+              item.id.startsWith("vector_tools_vf_default_") &&
+              (item as { error?: unknown }).error !== undefined
+          )
+          .map((item) => item.id),
+      };
+    });
+    expect(evaluated.p).toBe(6);
+    expect(evaluated.q).toBe(8);
+    expect(evaluated.errors).toEqual([]);
+
+    // Editing f in the panel has to rewrite the derived components too, or the
+    // graph keeps the old gradient.
+    await driver.evaluate(() => {
+      // The panel calls this from its math input; reaching it directly keeps
+      // the test off MathQuill's keystroke handling.
+      (
+        DSM.enabledPlugins["vector-tools"] as unknown as {
+          setSlot: (slot: string, latex: string) => void;
+        }
+      ).setSlot("f", "x^{3}");
+    });
+    await driver.waitForSync();
+    expect(
+      (await driver.getState()).expressions.list.find(
+        (item) => item.id === `${NAMESPACE}_f_function`
+      )
+    ).toMatchObject({
+      latex: "v_{tfdf}\\left(x,y\\right)=\\left(x^{3}\\right)",
+    });
+    expect(
+      await driver.evaluate(async () => {
+        const helper = Calc.HelperExpression({
+          latex: "v_{tfdp}\\left(2,0\\right)",
+        });
+        return await new Promise<number>((resolve) => {
+          const timer = setTimeout(() => resolve(Number.NaN), 3000);
+          helper.observe("numericValue", () => {
+            clearTimeout(timer);
+            resolve(helper.numericValue);
+          });
+        });
+      })
+    ).toBe(12);
+
+    await driver.click(REMOVE);
+    await driver.waitForSync();
+    await driver.click('[aria-label="Field from"] [data-value="components"]');
+    await driver.waitForSync();
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+    // Plugin settings are written to extension storage on a delay, and every
+    // later test opens a fresh page that reads them back. Without this the
+    // source would still be `gradient` for the rest of the run.
+    await driver.page.waitForFunction(() => !DSM.delaySetPluginSettings);
+  },
+  90000
+);
+
+testWithPage(
   "Vector Tools fills the sampling domain from the visible graph",
   async (driver) => {
     await driver.enablePlugin("vector-tools");

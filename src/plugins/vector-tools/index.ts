@@ -12,6 +12,7 @@ import {
   type ColorPalette,
   type ColorRangeMode,
   type DensityPreset,
+  type FieldSource,
   type FlowConfig,
   type PanelTab,
   type SamplingAxisConfig,
@@ -30,13 +31,17 @@ import {
   componentExpressionID,
   componentFunctionLatex,
   createVectorFieldPlan,
+  editableSlots,
   parseComponentFromLatex,
+  setSlotBody,
+  slotBody,
   type ComponentSlot,
   type ExpressionAudit,
   type VectorFieldPlan,
 } from "./generator";
 import { FlowOverlay } from "./flow/FlowOverlay";
 import { compileFieldComponentToGLSL } from "./flow/latexToGLSL";
+import type { FlowField } from "./flow/FlowRenderer";
 import type { ConfigItem } from "..";
 import type { FocusLocation } from "#globals";
 
@@ -51,7 +56,7 @@ type TestChecklistID = "visual" | "zero" | "colors" | "responsiveness";
 
 /** The compiled shader field, or the reason it could not be put on the GPU. */
 type FlowCompilation =
-  | { ok: true; p: string; q: string }
+  | { ok: true; field: FlowField }
   | { ok: false; error: string };
 
 const FLOW_REFRESH_DELAY_MS = 300;
@@ -66,12 +71,17 @@ function round(value: number) {
   return Math.round(value * 1000) / 1000;
 }
 
-function compileFlowField(xLatex: string, yLatex: string): FlowCompilation {
-  const p = compileFieldComponentToGLSL(xLatex);
+function compileFlowField(config: VectorFieldConfig): FlowCompilation {
+  if (config.source === "gradient") {
+    const f = compileFieldComponentToGLSL(config.scalar.fLatex);
+    if (!f.ok) return { ok: false, error: `f(x, y): ${f.error}` };
+    return { ok: true, field: { kind: "gradient", f: f.glsl } };
+  }
+  const p = compileFieldComponentToGLSL(config.components.xLatex);
   if (!p.ok) return { ok: false, error: `P(x, y): ${p.error}` };
-  const q = compileFieldComponentToGLSL(yLatex);
+  const q = compileFieldComponentToGLSL(config.components.yLatex);
   if (!q.ok) return { ok: false, error: `Q(x, y): ${q.error}` };
-  return { ok: true, p: p.glsl, q: q.glsl };
+  return { ok: true, field: { kind: "components", p: p.glsl, q: q.glsl } };
 }
 
 const TEST_CHECKLIST: readonly {
@@ -173,7 +183,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.util.tick();
   }
 
-  isFocused(id: "p" | "q") {
+  isFocused(id: ComponentSlot) {
     const focused = this.cc.getFocusLocation();
     return (
       focused?.type === "dsm-focus" &&
@@ -182,7 +192,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     );
   }
 
-  updateFocus(id: "p" | "q", isFocused: boolean) {
+  updateFocus(id: ComponentSlot, isFocused: boolean) {
     const location: FocusLocation = {
       type: "dsm-focus",
       plugin: "vector-tools",
@@ -227,15 +237,42 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.lastActionMessage = "Restored the default rotational field settings.";
   }
 
-  setComponent(component: "xLatex" | "yLatex", latex: string) {
+  /** The definitions the user types into for the current source. */
+  get editableSlots() {
+    return editableSlots(this.getConfig());
+  }
+
+  slotLatex(slot: ComponentSlot) {
+    return slotBody(this.getConfig(), slot);
+  }
+
+  setSlot(slot: ComponentSlot, latex: string) {
     const config = this.getConfig();
-    if (config.components[component] === latex) return;
+    if (slotBody(config, slot) === latex) return;
     this.updateConfig((next) => {
-      next.components[component] = latex;
+      setSlotBody(next, slot, latex);
     });
     // Keep the expression-list copy in step, so the arrows already on the graph
     // follow the panel without a full regeneration.
-    this.writeComponentExpression(component === "xLatex" ? "p" : "q");
+    this.writeComponentExpression(slot);
+    // In gradient mode P and Q are derived from f, so they have to be rewritten
+    // too or the graph keeps the old gradient.
+    if (slot === "f") {
+      this.writeComponentExpression("p");
+      this.writeComponentExpression("q");
+    }
+    this.refreshFlow();
+  }
+
+  setSource(source: FieldSource) {
+    if (this.getConfig().source === source) return;
+    this.updateConfig((config) => {
+      config.source = source;
+    });
+    // The definitions in the list belong to the old source; rewrite whichever
+    // of them still exist so the graph matches the panel.
+    for (const slot of ["p", "q"] as const) this.writeComponentExpression(slot);
+    this.componentLinkNote = "";
     this.refreshFlow();
   }
 
@@ -243,7 +280,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
 
   get hasComponentExpressions() {
     const config = this.getConfig();
-    return (["p", "q"] as const).every(
+    return editableSlots(config).every(
       (slot) =>
         this.cc.getItemModel(componentExpressionID(config, slot))?.type ===
         "expression"
@@ -252,31 +289,33 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
 
   get componentLinkStatus() {
     if (this.componentLinkNote !== "") return this.componentLinkNote;
+    const gradient = this.getConfig().source === "gradient";
+    const subject = gradient ? "f is" : "P and Q are";
+    const object = gradient ? "f" : "P and Q";
     return this.hasComponentExpressions
-      ? "P and Q are live in the expression list — edit them in either place."
-      : "Put P and Q in the expression list to edit them with the full math editor.";
+      ? `${subject} live in the expression list — edit in either place.`
+      : `Put ${object} in the expression list to edit with the full math editor.`;
   }
 
   /**
-   * Write the two component definitions into the expression list (creating the
+   * Write the editable definitions into the expression list (creating the
    * field's folder if needed) and scroll to them.
    */
   addComponentExpressions() {
     const config = this.getConfig();
+    const slots = editableSlots(config);
     try {
       if (!this.hasComponentExpressions) {
         const plan = createVectorFieldPlan(config);
         const componentIDs = new Set(
-          (["p", "q"] as const).map((slot) =>
-            componentExpressionID(config, slot)
-          )
+          slots.map((slot) => componentExpressionID(config, slot))
         );
         const existing = new Set(
           this.expressions
             .getGeneratedItems(plan.namespace)
             .map((item) => item.id)
         );
-        // Only the folder and the two definitions: pressing this must not
+        // Only the folder and the editable definitions: pressing this must not
         // conjure a whole field the user did not ask to generate.
         const wanted = plan.expressions.filter(
           (expression) =>
@@ -285,7 +324,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
         this.expressions.applyGeneratedSet(plan.namespace, plan.folder, wanted);
       }
       this.componentLinkNote = "";
-      this.scrollToComponent("p");
+      this.scrollToComponent(slots[0]);
     } catch (error) {
       this.componentLinkNote = `Could not add the definitions: ${
         error instanceof Error ? error.message : "unknown error"
@@ -320,8 +359,11 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     const config = this.getConfig();
     let changed = false;
     let detached = false;
-    const next = { ...config.components };
-    for (const slot of ["p", "q"] as const) {
+    const adopted = new Map<ComponentSlot, string>();
+    // Only the editable slots are read back. In gradient mode P and Q are
+    // derived from f, so adopting an edit there would overwrite the derivative
+    // the generator owns with whatever it had been changed into.
+    for (const slot of editableSlots(config)) {
       const id = componentExpressionID(config, slot);
       const model = this.cc.getItemModel(id);
       if (model?.type !== "expression") continue;
@@ -330,9 +372,8 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
         detached = true;
         continue;
       }
-      const key = slot === "p" ? "xLatex" : "yLatex";
-      if (next[key] !== body) {
-        next[key] = body;
+      if (slotBody(config, slot) !== body) {
+        adopted.set(slot, body);
         changed = true;
       }
     }
@@ -345,8 +386,14 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     }
     if (!changed) return;
     this.updateConfig((target) => {
-      target.components = next;
+      for (const [slot, body] of adopted) setSlotBody(target, slot, body);
     });
+    // An adopted f changes the gradient, so the derived definitions on the
+    // graph have to follow it.
+    if (adopted.has("f")) {
+      this.writeComponentExpression("p");
+      this.writeComponentExpression("q");
+    }
     this.refreshFlow();
   }
 
@@ -526,14 +573,19 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   }
 
   get flowCompilation(): FlowCompilation {
-    const { components } = this.getConfig();
-    const key = JSON.stringify([components.xLatex, components.yLatex]);
+    const config = this.getConfig();
+    const key = JSON.stringify([
+      config.source,
+      config.components.xLatex,
+      config.components.yLatex,
+      config.scalar.fLatex,
+    ]);
     // The panel reads this several times per render pass, so compile once per
-    // distinct pair of components rather than once per read.
+    // distinct field rather than once per read.
     if (this.flowCompilationCache?.key === key) {
       return this.flowCompilationCache.result;
     }
-    const result = compileFlowField(components.xLatex, components.yLatex);
+    const result = compileFlowField(config);
     this.flowCompilationCache = { key, result };
     return result;
   }
@@ -571,7 +623,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       return;
     }
     this.flowMessage = "";
-    this.flowOverlay.start(compiled.p, compiled.q, this.flowOptions);
+    this.flowOverlay.start(compiled.field, this.flowOptions);
     this.util.tick();
   }
 

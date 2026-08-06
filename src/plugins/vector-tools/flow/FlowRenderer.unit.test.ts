@@ -46,7 +46,7 @@ describe("Vector Tools flow renderer allocation", () => {
   it("does not reallocate while the count sweeps its whole range", () => {
     const gl = fakeGL();
     const renderer = new FlowRenderer(fakeCanvas(gl));
-    renderer.setField("p.x", "p.y");
+    renderer.setField({ kind: "components", p: "p.x", q: "p.y" });
     const allocationsAtStart = gl.counts.createTexture;
 
     for (let position = 0; position <= 1000; position++) {
@@ -63,7 +63,7 @@ describe("Vector Tools flow renderer allocation", () => {
   it("reallocates nothing at all when the count shrinks within capacity", () => {
     const gl = fakeGL();
     const renderer = new FlowRenderer(fakeCanvas(gl));
-    renderer.setField("p.x", "p.y");
+    renderer.setField({ kind: "components", p: "p.x", q: "p.y" });
     renderer.setOptions(optionsWithCount(400_000));
     const allocationsAtStart = gl.counts.createTexture;
 
@@ -79,7 +79,7 @@ describe("Vector Tools flow renderer allocation", () => {
   it("hands memory back once the count falls well below capacity", () => {
     const gl = fakeGL();
     const renderer = new FlowRenderer(fakeCanvas(gl));
-    renderer.setField("p.x", "p.y");
+    renderer.setField({ kind: "components", p: "p.x", q: "p.y" });
     renderer.setOptions(optionsWithCount(400_000));
     const allocationsAtStart = gl.counts.createTexture;
 
@@ -91,7 +91,7 @@ describe("Vector Tools flow renderer allocation", () => {
   it("draws exactly the requested count", () => {
     const gl = fakeGL();
     const renderer = new FlowRenderer(fakeCanvas(gl));
-    renderer.setField("p.x", "p.y");
+    renderer.setField({ kind: "components", p: "p.x", q: "p.y" });
     renderer.resize(400, 300, 1);
 
     for (const count of [500, 1_000, 16_000, 120_000, 400_000, 2_000]) {
@@ -105,7 +105,7 @@ describe("Vector Tools flow renderer allocation", () => {
   it("steps only the texture rows that hold live particles", () => {
     const gl = fakeGL();
     const renderer = new FlowRenderer(fakeCanvas(gl));
-    renderer.setField("p.x", "p.y");
+    renderer.setField({ kind: "components", p: "p.x", q: "p.y" });
     renderer.resize(400, 300, 1);
     // 1,000 particles allocates a 1,024 capacity in a 32x32 texture; dropping
     // to 600 keeps that texture, so only the first 19 rows are still live.

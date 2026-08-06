@@ -21,6 +21,7 @@ import {
   PANEL_TABS,
   type ColorPalette,
   type ColorRangeMode,
+  type FieldSource,
   type FlowColorMode,
   type SamplingMode,
   type VectorColorMode,
@@ -28,6 +29,7 @@ import {
   type VectorLengthMode,
   type ZeroVectorMode,
 } from "../model";
+import type { ComponentSlot } from "../generator";
 import "./VectorToolsPanel.less";
 
 interface Choice<T extends string> {
@@ -69,6 +71,11 @@ const RANGE_MODES: readonly Choice<ColorRangeMode>[] = [
 const ZERO_MODES: readonly Choice<ZeroVectorMode>[] = [
   { value: "hide", label: "Hide" },
   { value: "point", label: "Show as points" },
+];
+
+const FIELD_SOURCES: readonly Choice<FieldSource>[] = [
+  { value: "components", label: "Components P, Q" },
+  { value: "gradient", label: "Gradient of f" },
 ];
 
 const SAMPLING_MODES: readonly Choice<SamplingMode>[] = [
@@ -151,21 +158,44 @@ function fieldTab(
               field.name = value;
             })
         )}
-        <div class="dsm-vector-tools-math-row">
-          {componentInput(vectorTools, config, validation, "p")}
-          {componentInput(vectorTools, config, validation, "q")}
-        </div>
+        {chipGroup(
+          "Field from",
+          () => config().source,
+          FIELD_SOURCES,
+          (value) => vectorTools.setSource(value),
+          "dsm-vector-tools-source"
+        )}
+        {IfElse(() => config().source === "gradient", {
+          true: () => (
+            <div>
+              <div class="dsm-vector-tools-math-row dsm-vector-tools-scalar-row">
+                {componentInput(vectorTools, validation, "f")}
+              </div>
+              <div class="dsm-vector-tools-hint">
+                P and Q are generated as Desmos's own partial derivatives of f,
+                so the arrows are ∇f and stay exact.
+              </div>
+            </div>
+          ),
+          false: () => (
+            <div class="dsm-vector-tools-math-row">
+              {componentInput(vectorTools, validation, "p")}
+              {componentInput(vectorTools, validation, "q")}
+            </div>
+          ),
+        })}
         <div class="dsm-vector-tools-link-row">
           <Button
             color="light-gray"
             class="dsm-vector-tools-link-components"
             onTap={() => vectorTools.addComponentExpressions()}
           >
-            {() =>
-              vectorTools.hasComponentExpressions
-                ? "Show P and Q in the expression list"
-                : "Edit P and Q in the expression list"
-            }
+            {() => {
+              const names = config().source === "gradient" ? "f" : "P and Q";
+              return vectorTools.hasComponentExpressions
+                ? `Show ${names} in the expression list`
+                : `Edit ${names} in the expression list`;
+            }}
           </Button>
           <div class="dsm-vector-tools-hint">
             {() => vectorTools.componentLinkStatus}
@@ -491,26 +521,40 @@ function footer(
 
 // ---- pieces --------------------------------------------------------------
 
+const SLOT_LABELS: Record<ComponentSlot, string> = {
+  p: "P(x, y)",
+  q: "Q(x, y)",
+  f: "f(x, y)",
+};
+
+const SLOT_PLACEHOLDERS: Record<ComponentSlot, string> = {
+  p: "-y",
+  q: "x",
+  f: "x^2+y^2",
+};
+
+/** The name validation issues use for a slot, which has no spaces in it. */
+const SLOT_ISSUE_NAMES: Record<ComponentSlot, string> = {
+  p: "P(x,y)",
+  q: "Q(x,y)",
+  f: "f(x,y)",
+};
+
 function componentInput(
   vectorTools: VectorTools,
-  config: ConfigGetter,
   validation: () => VectorTools["validation"],
-  which: "p" | "q"
+  which: ComponentSlot
 ) {
-  const key = which === "p" ? "xLatex" : "yLatex";
-  const label = which === "p" ? "P(x, y)" : "Q(x, y)";
   return (
     <div>
-      <label class="dsm-vector-tools-label">{label}</label>
+      <label class="dsm-vector-tools-label">{SLOT_LABELS[which]}</label>
       <InlineMathInputViewGeneral
         containerClass={() => ({ "dsm-vector-tools-math-input": true })}
-        placeholder={which === "p" ? "-y" : "x"}
-        ariaLabel={`${which === "p" ? "P" : "Q"} of x and y`}
-        latex={() => config().components[key]}
-        handleLatexChanged={(latex) => vectorTools.setComponent(key, latex)}
-        hasError={() =>
-          hasIssue(validation().issues, which === "p" ? "P(x,y)" : "Q(x,y)")
-        }
+        placeholder={SLOT_PLACEHOLDERS[which]}
+        ariaLabel={`${which === "f" ? "f" : which.toUpperCase()} of x and y`}
+        latex={() => vectorTools.slotLatex(which)}
+        handleLatexChanged={(latex) => vectorTools.setSlot(which, latex)}
+        hasError={() => hasIssue(validation().issues, SLOT_ISSUE_NAMES[which])}
         handleFocusChanged={(focused) =>
           vectorTools.updateFocus(which, focused)
         }

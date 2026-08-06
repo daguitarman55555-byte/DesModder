@@ -25,6 +25,18 @@ If you rename one of those functions or change its parameters, the panel says so
 and stops reading it, rather than adopting an expression that is no longer this
 field's component.
 
+**Field from** chooses where the components come from:
+
+- **Components P, Q** — type the two components directly, as before.
+- **Gradient of f** — type one scalar f(x, y) and the arrows become ∇f. The
+  generated folder gains an `f` definition, and P and Q are written as
+  `\frac{d}{dx}f(x,y)` and `\frac{d}{dy}f(x,y)`, which Desmos evaluates as exact
+  partial derivatives. Everything downstream — arrow lengths, colors, the flow
+  visualizer — is unchanged, because a gradient field is still a vector field.
+
+In gradient mode only f is mirrored to and from the expression list. P and Q are
+derived, so editing them there would break the link to the f they came from.
+
 Set the x and y domain endpoints, then sample each axis by either step or an
 inclusive count. **Match viewport** fills all four endpoints from the visible
 graph, rounded to three decimals; it leaves the sampling mode, step, and count

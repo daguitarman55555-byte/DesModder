@@ -41,6 +41,23 @@ grid, component functions, magnitudes, directions, display components, and
 color list, plus visible restricted parametric curves for shafts and arrowhead
 wings.
 
+A field's components come from one of two sources, chosen by `config.source`.
+`components` embeds the configured P(x, y) and Q(x, y) directly. `gradient`
+embeds a scalar f(x, y) as one more expression in the folder and defines the
+components as Desmos's own partial derivatives of it, so the arrows are ∇f and
+stay exact rather than approximated.
+
+That relies on a Desmos behaviour worth stating plainly, because the obvious
+spellings do not work: `\frac{d}{dx}` applied to a **two-argument** function is
+the partial with respect to x, holding y. `\frac{\partial}{\partial x}` and
+`\partial_{x}` both error. This was verified against a real Desmos, exactly, for
+first partials, divergence, curl, and nested second partials.
+
+Only the slots the user types into are mirrored back from the expression list
+(`editableSlots`). In gradient mode that is f alone: P and Q are derived, and
+adopting a hand-edit to one of them would overwrite the derivative the generator
+owns with something that no longer follows f.
+
 The grid is a Desmos Cartesian list comprehension. The configurable P(x, y)
 and Q(x, y) fields are embedded only in namespaced helper functions. Arrow
 length modes are calculated in expressions, including an epsilon-protected

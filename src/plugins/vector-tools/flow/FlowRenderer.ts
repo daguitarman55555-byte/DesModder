@@ -25,6 +25,17 @@ export interface FlowBounds {
   yMax: number;
 }
 
+/**
+ * The field to advect by, as compiled GLSL.
+ *
+ * A gradient field arrives as its scalar function rather than as two
+ * components, because the GPU cannot differentiate symbolically the way the
+ * generated Desmos expressions do — it has to sample instead.
+ */
+export type FlowField =
+  | { kind: "components"; p: string; q: string }
+  | { kind: "gradient"; f: string };
+
 export interface FlowOptions {
   /**
    * Exact number of particles. Storage is allocated in coarser steps (see
@@ -123,7 +134,7 @@ export class FlowRenderer {
 
   private options: FlowOptions = { ...DEFAULT_FLOW_OPTIONS };
   private bounds: FlowBounds = { xMin: -10, xMax: 10, yMin: -6, yMax: 6 };
-  private fieldSource?: { p: string; q: string };
+  private fieldSource?: string;
   private frameSeed = 1;
   private destroyed = false;
 
@@ -172,21 +183,22 @@ export class FlowRenderer {
    * Swaps in a new field. Throws {@link FlowRendererError} if the GLSL will not
    * compile, which is the last line of defence behind the LaTeX compiler.
    */
-  setField(pGLSL: string, qGLSL: string) {
-    if (this.fieldSource?.p === pGLSL && this.fieldSource.q === qGLSL) return;
+  setField(field: FlowField) {
+    const key = JSON.stringify(field);
+    if (this.fieldSource === key) return;
     const updateProgram = this.createProgram(
       QUAD_VERTEX_SHADER,
-      updateFragmentShader(pGLSL, qGLSL)
+      updateFragmentShader(field)
     );
     const drawProgram = this.createProgram(
-      drawVertexShader(pGLSL, qGLSL),
+      drawVertexShader(field),
       DRAW_FRAGMENT_SHADER
     );
     this.deleteProgram(this.updateProgram);
     this.deleteProgram(this.drawProgram);
     this.updateProgram = updateProgram;
     this.drawProgram = drawProgram;
-    this.fieldSource = { p: pGLSL, q: qGLSL };
+    this.fieldSource = key;
     this.seedParticles();
   }
 
@@ -686,12 +698,31 @@ out vec4 outColor;
 void main() { outColor = texture(u_screen, v_uv); }
 `;
 
-function fieldFunctions(pGLSL: string, qGLSL: string) {
+/**
+ * Both shaders that evaluate the field include this, and both declare `u_min`
+ * and `u_max` before it — which is what lets the gradient step size follow the
+ * viewport without an extra uniform.
+ */
+function fieldFunctions(field: FlowField) {
+  const body =
+    field.kind === "gradient"
+      ? `
+float vtScalar(vec2 p) { return ${field.f}; }
+vec2 vtField(vec2 p) {
+  // The generated Desmos arrows differentiate symbolically; the GPU cannot, so
+  // it central-differences instead. The step follows the viewport so the
+  // gradient stays smooth at any zoom, and it is exact for the quadratics that
+  // most potentials are built from.
+  float h = 1.0e-3 * max(u_max.x - u_min.x, u_max.y - u_min.y);
+  float u = (vtScalar(p + vec2(h, 0.0)) - vtScalar(p - vec2(h, 0.0))) / (2.0 * h);
+  float v = (vtScalar(p + vec2(0.0, h)) - vtScalar(p - vec2(0.0, h))) / (2.0 * h);`
+      : `
+vec2 vtField(vec2 p) {
+  float u = ${field.p};
+  float v = ${field.q};`;
   return `
 ${GLSL_PRELUDE}
-vec2 vtField(vec2 p) {
-  float u = ${pGLSL};
-  float v = ${qGLSL};
+${body}
   if (isnan(u) || isinf(u)) u = 0.0;
   if (isnan(v) || isinf(v)) v = 0.0;
   return vec2(u, v);
@@ -699,7 +730,7 @@ vec2 vtField(vec2 p) {
 `;
 }
 
-function updateFragmentShader(pGLSL: string, qGLSL: string) {
+function updateFragmentShader(field: FlowField) {
   return `#version 300 es
 precision highp float;
 uniform sampler2D u_particles;
@@ -711,7 +742,7 @@ uniform float u_dropRate;
 uniform float u_normalize;
 out vec4 outState;
 
-${fieldFunctions(pGLSL, qGLSL)}
+${fieldFunctions(field)}
 
 float vtRand(vec2 co) {
   return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
@@ -761,7 +792,7 @@ void main() {
 `;
 }
 
-function drawVertexShader(pGLSL: string, qGLSL: string) {
+function drawVertexShader(field: FlowField) {
   return `#version 300 es
 precision highp float;
 in float a_index;
@@ -776,7 +807,7 @@ uniform vec3 u_fixedColor;
 uniform float u_speedScale;
 out vec4 v_color;
 
-${fieldFunctions(pGLSL, qGLSL)}
+${fieldFunctions(field)}
 
 vec3 vtHueToRGB(float hue) {
   vec3 k = mod(hue * 6.0 + vec3(0.0, 4.0, 2.0), 6.0);
