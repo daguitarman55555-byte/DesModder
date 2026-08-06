@@ -39,6 +39,8 @@ import {
   type ExpressionAudit,
   type VectorFieldPlan,
 } from "./generator";
+import { differentiate, identifiersIn, toLatex } from "./symbolic";
+import { buildConfigFromGlobals, parseLatex } from "../../../text-mode-core";
 import { FlowOverlay } from "./flow/FlowOverlay";
 import { compileFieldComponentToGLSL } from "./flow/latexToGLSL";
 import type { FlowField } from "./flow/FlowRenderer";
@@ -531,6 +533,72 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.updateConfig((config) => {
       config.flow[key] = value;
     });
+  }
+
+  // ---- symbolic differentiation ------------------------------------------
+
+  /**
+   * The simplified symbolic partial derivative of an expression, as LaTeX.
+   *
+   * Desmos evaluates `\frac{d}{dx}f(x,y)` exactly but never shows a simplified
+   * form, so this is what turns `2xy` into a readable `2y` rather than a number
+   * at a point. Parsing uses Desmos's own parser, so anything Desmos accepts is
+   * understood; anything the differentiator cannot do exactly is refused with a
+   * reason instead of guessed at.
+   */
+  partialDerivative(
+    latex: string,
+    variable: string
+  ): { ok: true; latex: string } | { ok: false; error: string } {
+    try {
+      const cfg = buildConfigFromGlobals(Desmos, this.calc);
+      const derivative = differentiate(parseLatex(cfg, latex), variable);
+      return { ok: true, latex: toLatex(cfg, derivative) };
+    } catch (error) {
+      return {
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "This expression could not be differentiated.",
+      };
+    }
+  }
+
+  /**
+   * The gradient of an expression, as the list of partials in the order the
+   * variables appear. The caller decides how to present it; two variables make
+   * an ordinary Desmos point.
+   */
+  gradient(
+    latex: string,
+    variables?: readonly string[]
+  ):
+    | { ok: true; variables: string[]; latex: string[] }
+    | { ok: false; error: string } {
+    try {
+      const cfg = buildConfigFromGlobals(Desmos, this.calc);
+      const tree = parseLatex(cfg, latex);
+      // With no argument list given, the gradient adapts to whatever variables
+      // the expression actually uses.
+      const names = [...(variables ?? identifiersIn(tree))];
+      if (names.length === 0) {
+        return { ok: false, error: "This expression has no variables." };
+      }
+      return {
+        ok: true,
+        variables: names,
+        latex: names.map((name) => toLatex(cfg, differentiate(tree, name))),
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "This expression could not be differentiated.",
+      };
+    }
   }
 
   // ---- flow visualizer ---------------------------------------------------
