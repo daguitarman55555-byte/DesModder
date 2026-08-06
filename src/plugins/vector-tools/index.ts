@@ -58,6 +58,14 @@ const FLOW_REFRESH_DELAY_MS = 300;
 const PANEL_SIZE_SAVE_DELAY_MS = 400;
 const POPOVER_CLASS = "dsm-vector-tools-popover";
 
+/**
+ * Graph bounds carry a pan's worth of noise digits, and the panel's number
+ * fields show them all. Three decimals is finer than anyone samples on.
+ */
+function round(value: number) {
+  return Math.round(value * 1000) / 1000;
+}
+
 function compileFlowField(xLatex: string, yLatex: string): FlowCompilation {
   const p = compileFieldComponentToGLSL(xLatex);
   if (!p.ok) return { ok: false, error: `P(x, y): ${p.error}` };
@@ -411,6 +419,37 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     });
   }
 
+  /**
+   * Fills the sampling domain from the visible graph paper, so "sample what I
+   * am looking at" is one press instead of four numbers read off the axes.
+   *
+   * The sampling mode is left alone: in `step` mode the vector count follows
+   * the new span, and the footer's estimate and warnings already cover that.
+   */
+  matchDomainToViewport() {
+    const math = this.calc.graphpaperBounds.mathCoordinates;
+    const x = { min: round(math.left), max: round(math.right) };
+    const y = { min: round(math.bottom), max: round(math.top) };
+    if (
+      !Number.isFinite(x.min) ||
+      !Number.isFinite(x.max) ||
+      !Number.isFinite(y.min) ||
+      !Number.isFinite(y.max) ||
+      x.max <= x.min ||
+      y.max <= y.min
+    ) {
+      this.lastActionMessage = "Could not read the current graph bounds.";
+      this.util.tick();
+      return;
+    }
+    this.lastActionMessage = `Sampling domain matched to the visible graph: x in [${x.min}, ${x.max}], y in [${y.min}, ${y.max}].`;
+    // Saving the config re-renders the panel, so the message is set first.
+    this.updateConfig((config) => {
+      config.domain.x = { ...config.domain.x, ...x };
+      config.domain.y = { ...config.domain.y, ...y };
+    });
+  }
+
   setLength(
     key: keyof VectorFieldConfig["length"],
     value: number | boolean | VectorLengthMode
@@ -465,6 +504,27 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
    * put on the GPU. The panel uses this to disable the button with a specific
    * explanation instead of failing on click.
    */
+  /**
+   * Whether the visualizer can run here at all, checked before the field is.
+   *
+   * The overlay maps math coordinates linearly onto the graph paper's rect,
+   * which is only true of the 2D graph paper. On the 3D product
+   * `graphpaperBounds.mathCoordinates` is a rotatable x/y/z box with no
+   * screen-space meaning, so a flat overlay cannot stay registered with what is
+   * underneath it — and it is painted over by the 3D canvas anyway. Geometry is
+   * the same 2D graph paper and works unchanged.
+   */
+  get flowAvailability(): FlowCompilation {
+    if (this.cc.is3dProduct()) {
+      return {
+        ok: false,
+        error:
+          "The flow visualizer draws on the 2D graph paper, so it is unavailable in the 3D calculator. Generating the field still works.",
+      };
+    }
+    return this.flowCompilation;
+  }
+
   get flowCompilation(): FlowCompilation {
     const { components } = this.getConfig();
     const key = JSON.stringify([components.xLatex, components.yLatex]);
@@ -504,7 +564,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   }
 
   private startFlow() {
-    const compiled = this.flowCompilation;
+    const compiled = this.flowAvailability;
     if (!compiled.ok) {
       this.flowMessage = compiled.error;
       this.util.tick();

@@ -128,6 +128,14 @@ constrained so it cannot affect the graph it draws over: it owns one
 state, and is torn down when it is stopped or the plugin is disabled. See
 [VECTOR_FLOW_VISUALIZER.md](VECTOR_FLOW_VISUALIZER.md).
 
+Two of its constraints come from what it draws on rather than from what it
+draws. It only registers with the 2D graph paper, so `flowAvailability` refuses
+the 3D product before the field is even compiled; `/geometry` is the same graph
+paper and needs nothing special. And particle _capacity_ is separated from
+particle _count_: the count slider fires per pointermove, and the count owning
+an allocation meant deleting and rebuilding two float textures once a frame for
+the length of a drag.
+
 ## Development Test Lab
 
 The Test Lab is compiled into watch/development builds only through the

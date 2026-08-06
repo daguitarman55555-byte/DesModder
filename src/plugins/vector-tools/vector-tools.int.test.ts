@@ -1,4 +1,9 @@
-import { clean, Driver, testWithPage } from "../../tests/puppeteer-utils";
+import {
+  clean,
+  Driver,
+  testWithPage,
+  testWithPageAndOpts,
+} from "../../tests/puppeteer-utils";
 import type { Calc as CalcType } from "#globals";
 
 declare let Calc: CalcType;
@@ -345,6 +350,144 @@ testWithPage(
     await driver.waitForSync();
   },
   90000
+);
+
+testWithPage(
+  "Vector Tools fills the sampling domain from the visible graph",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+    // The open tab is persisted, so this test cannot assume the panel opens on
+    // the tab that holds the sampling domain.
+    await openTab(driver, 0);
+
+    await driver.evaluate(() =>
+      Calc.setMathBounds({ left: -3, right: 7, bottom: -2, top: 5 })
+    );
+    await driver.waitForSync();
+    await driver.click(".dsm-vector-tools-match-viewport");
+    await driver.waitForSync();
+
+    // Desmos adjusts the requested bounds to the graph paper's aspect ratio, so
+    // the check is against what the viewport actually became.
+    const { domain, bounds } = await driver.evaluate(() => ({
+      domain: JSON.parse(
+        DSM.pluginSettings["vector-tools"]!.serializedFieldConfig as string
+      ).domain,
+      bounds: Calc.graphpaperBounds.mathCoordinates,
+    }));
+    const round = (value: number) => Math.round(value * 1000) / 1000;
+    expect(domain.x.min).toBe(round(bounds.left));
+    expect(domain.x.max).toBe(round(bounds.right));
+    expect(domain.y.min).toBe(round(bounds.bottom));
+    expect(domain.y.max).toBe(round(bounds.top));
+    expect(domain.x.min).toBe(-3);
+    expect(domain.x.max).toBe(7);
+    // Only the four bounds move: the sampling mode and step are the user's.
+    expect(domain.x.mode).toBe("step");
+    expect(domain.x.step).toBe(1);
+
+    // The panel's own number fields have to show the new bounds too.
+    expect(
+      await driver.evaluate(
+        () =>
+          document.querySelector<HTMLInputElement>(
+            "#dsm-vector-tools-x-maximum"
+          )?.value
+      )
+    ).toBe("7");
+
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);
+
+testWithPageAndOpts(
+  "Vector Tools flow visualizer runs on the geometry graph paper",
+  { path: "/geometry", timeout: 90000 },
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+    await openTab(driver, 3);
+
+    await driver.click(VISUALIZE);
+    await driver.assertSelectorEventually(FLOW_CANVAS);
+
+    // Geometry is the same 2D graph paper, so the overlay registers with it
+    // exactly as it does in the calculator.
+    const geometry = await driver.evaluate(() => {
+      const overlay = document.querySelector<HTMLCanvasElement>(
+        "#dsm-vector-tools-flow-canvas"
+      )!;
+      const graph = document.querySelector<HTMLCanvasElement>(
+        "canvas.dcg-graph-inner"
+      )!;
+      const a = overlay.getBoundingClientRect();
+      const b = graph.getBoundingClientRect();
+      return {
+        aligned:
+          Math.abs(a.x - b.x) < 1 &&
+          Math.abs(a.y - b.y) < 1 &&
+          Math.abs(a.width - b.width) < 1 &&
+          Math.abs(a.height - b.height) < 1,
+        pointerEvents: getComputedStyle(overlay).pointerEvents,
+        hasBuffer: overlay.width > 0 && overlay.height > 0,
+      };
+    });
+    expect(geometry.aligned).toBe(true);
+    expect(geometry.pointerEvents).toBe("none");
+    expect(geometry.hasBuffer).toBe(true);
+
+    await driver.disablePlugin("vector-tools");
+    await driver.assertSelectorNot(FLOW_CANVAS);
+  }
+);
+
+testWithPageAndOpts(
+  "Vector Tools refuses to flow over the 3D calculator",
+  { path: "/3d", timeout: 90000 },
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+    await openTab(driver, 3);
+
+    // The overlay maps math coordinates linearly onto the graph paper's rect,
+    // which the 3D product's rotatable x/y/z box does not support — and the 3D
+    // canvas paints over the overlay anyway. Say so instead of animating a
+    // wrong, invisible field.
+    const state = await driver.evaluate(() => ({
+      disabled: document
+        .querySelector(".dsm-vector-tools-visualize")
+        ?.classList.contains("dsm-btn-disabled"),
+      warning: document.querySelector(
+        ".dsm-vector-tools-flow .dsm-vector-tools-warning"
+      )?.textContent,
+    }));
+    expect(state.disabled).toBe(true);
+    expect(state.warning).toContain("3D calculator");
+
+    await driver.click(VISUALIZE);
+    await driver.assertSelectorNot(FLOW_CANVAS);
+    // Generation is unaffected: the field is ordinary Desmos expressions.
+    await driver.click(GENERATE);
+    await driver.waitForSync();
+    expect(
+      (await driver.getState()).expressions.list.filter((item) =>
+        item.id?.startsWith(`${NAMESPACE}_`)
+      )
+    ).toHaveLength(20);
+
+    await driver.click(REMOVE);
+    await driver.waitForSync();
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  }
 );
 
 testWithPage(

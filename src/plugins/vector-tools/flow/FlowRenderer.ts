@@ -27,8 +27,9 @@ export interface FlowBounds {
 
 export interface FlowOptions {
   /**
-   * Exact number of particles. They are stored in the smallest square texture
-   * that holds them, but only this many are ever drawn, so any value works.
+   * Exact number of particles. Storage is allocated in coarser steps (see
+   * {@link particleCapacityFor}), but only this many are ever advanced or
+   * drawn, so any value works and the count you ask for is the count you get.
    */
   particleCount: number;
   /** Relative step size for the integrator. */
@@ -67,6 +68,37 @@ interface ProgramInfo {
 
 const QUAD = new Float32Array([0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1]);
 
+/**
+ * The smallest capacity ever allocated. Below this the textures are too small
+ * for the allocation to be worth avoiding.
+ */
+const MINIMUM_PARTICLE_CAPACITY = 512;
+
+/**
+ * Storage capacity for a requested particle count, rounded up to a power of
+ * two.
+ *
+ * The count slider fires on every pointermove, so the count itself cannot own
+ * an allocation: at the 400,000 maximum, reallocating per move would delete and
+ * recreate two float textures and upload a fresh multi-megabyte seed array
+ * every frame of the drag. Capacity is what owns the textures, and it only
+ * changes at the ~10 power-of-two boundaries across the whole slider range.
+ * Everywhere else a count change is one field assignment.
+ */
+export function particleCapacityFor(count: number) {
+  const wanted = Number.isFinite(count) ? Math.ceil(count) : 0;
+  let capacity = MINIMUM_PARTICLE_CAPACITY;
+  // Doubling rather than 2 ** ceil(log2(n)) so an exact power of two cannot
+  // round up through a floating-point logarithm.
+  while (capacity < wanted) capacity *= 2;
+  return capacity;
+}
+
+/** Side of the square texture that holds `capacity` particles. */
+export function particleResolutionFor(capacity: number) {
+  return Math.max(1, Math.ceil(Math.sqrt(capacity)));
+}
+
 export class FlowRenderer {
   private readonly gl: WebGL2RenderingContext;
   private readonly quadBuffer: WebGLBuffer;
@@ -81,6 +113,7 @@ export class FlowRenderer {
   private particleWrite?: WebGLTexture;
   private indexBuffer?: WebGLBuffer;
   private particleResolution = 0;
+  private particleCapacity = 0;
   private particleCount = 0;
 
   private trailFront?: WebGLTexture;
@@ -132,7 +165,7 @@ export class FlowRenderer {
       SCREEN_VERTEX_SHADER,
       BLIT_FRAGMENT_SHADER
     );
-    this.allocateParticles(this.options.particleCount);
+    this.setParticleCount(this.options.particleCount);
   }
 
   /**
@@ -162,9 +195,8 @@ export class FlowRenderer {
   }
 
   setOptions(options: FlowOptions) {
-    const countChanged = options.particleCount !== this.particleCount;
     this.options = { ...options };
-    if (countChanged) this.allocateParticles(options.particleCount);
+    this.setParticleCount(options.particleCount);
   }
 
   /** Matches the drawing buffer to the CSS box. Returns true if it changed. */
@@ -243,6 +275,19 @@ export class FlowRenderer {
 
   // ---- internals ---------------------------------------------------------
 
+  /**
+   * Rows of the particle texture that the draw pass can reach. The last drawn
+   * index is `particleCount - 1`, which the draw shader reads from row
+   * `(particleCount - 1) / resolution`.
+   */
+  private get liveParticleRows() {
+    if (this.particleResolution === 0) return 0;
+    return Math.min(
+      this.particleResolution,
+      Math.max(1, Math.ceil(this.particleCount / this.particleResolution))
+    );
+  }
+
   private stepParticles() {
     const { gl } = this;
     const program = this.updateProgram!;
@@ -279,7 +324,10 @@ export class FlowRenderer {
       this.particleWrite!,
       0
     );
-    gl.viewport(0, 0, this.particleResolution, this.particleResolution);
+    // Only the rows that hold live particles are integrated. Capacity can be up
+    // to twice the count, and the texels past it are never drawn, so stepping
+    // them would be work nobody sees.
+    gl.viewport(0, 0, this.particleResolution, this.liveParticleRows);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
@@ -390,22 +438,42 @@ export class FlowRenderer {
   }
 
   /**
-   * Particle state lives in the smallest square texture that holds `count`
-   * particles. Only `count` points are drawn, so the leftover texels in the
-   * last row are simply never read and the user gets the exact count they
-   * asked for rather than the nearest square.
+   * Points the renderer at a new particle count, reallocating only when the
+   * count no longer fits the current capacity — or has fallen far enough below
+   * it to be worth giving the memory back.
+   */
+  private setParticleCount(count: number) {
+    const wanted = Math.max(1, Math.round(count));
+    if (wanted === this.particleCount) return;
+    const outgrown = wanted > this.particleCapacity;
+    // Only shrink once the capacity is mostly idle, so a count hovering around
+    // a power of two cannot reallocate on every step.
+    const oversized =
+      wanted * 4 <= this.particleCapacity &&
+      particleCapacityFor(wanted) < this.particleCapacity;
+    if (outgrown || oversized) this.allocateParticles(wanted);
+    else this.particleCount = wanted;
+  }
+
+  /**
+   * Particle state lives in the smallest square texture that holds the current
+   * capacity. Only `particleCount` points are advanced and drawn, so the
+   * leftover texels are simply never read and the user gets the exact count
+   * they asked for rather than the nearest square.
    */
   private allocateParticles(count: number) {
     const { gl } = this;
     if (this.particleRead !== undefined) gl.deleteTexture(this.particleRead);
     if (this.particleWrite !== undefined) gl.deleteTexture(this.particleWrite);
     if (this.indexBuffer !== undefined) gl.deleteBuffer(this.indexBuffer);
-    const resolution = Math.max(1, Math.ceil(Math.sqrt(count)));
+    const capacity = particleCapacityFor(count);
+    const resolution = particleResolutionFor(capacity);
+    this.particleCapacity = capacity;
     this.particleResolution = resolution;
     this.particleCount = count;
 
-    const indices = new Float32Array(count);
-    for (let i = 0; i < count; i++) indices[i] = i;
+    const indices = new Float32Array(capacity);
+    for (let i = 0; i < capacity; i++) indices[i] = i;
     const indexBuffer = gl.createBuffer();
     if (indexBuffer === null)
       throw new FlowRendererError("Could not allocate particles.");

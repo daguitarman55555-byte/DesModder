@@ -33,9 +33,14 @@ space.
 - **Particles** is any count from 500 to 400,000 — type an exact number or drag
   the slider, which is logarithmic so the useful low end is not crushed into the
   first centimetre of the track. 16,000 is the default; above 120,000 the panel
-  warns that an integrated GPU may drop frames. Particle state lives in the
-  smallest square texture that holds the count, but only that many are drawn, so
-  the number you ask for is the number you get.
+  warns that an integrated GPU may drop frames. Particle state lives in a square
+  float texture, but only the requested count is ever advanced or drawn, so the
+  number you ask for is the number you get. The texture is sized to a
+  power-of-two _capacity_ rather than to the count itself, because the slider
+  fires on every pointermove and reallocating there would rebuild both textures
+  and re-upload a multi-megabyte seed array once a frame for the whole drag.
+  Dragging the full track reallocates about ten times; it shrinks back only once
+  the count falls under a quarter of the capacity.
 - **Particle color** — _Speed_ shades by the field's magnitude, _Direction_ by
   its angle, _Fixed color_ uses the field's fixed color.
 - **Constant speed** integrates the normalized field, so every streamline is
@@ -82,3 +87,14 @@ they are compiled from the same two LaTeX strings.
 
 WebGL2 with `EXT_color_buffer_float`. If either is missing, the panel says so
 and the visualizer stays off; the generator is unaffected.
+
+It runs anywhere Desmos draws the ordinary 2D graph paper, which includes
+`/geometry` — verified against a real page, where the overlay registers with
+`canvas.dcg-graph-inner` exactly as it does in `/calculator`.
+
+It is refused on `/3d`, and the Visualize button is disabled with that reason.
+The overlay maps math coordinates linearly onto the graph paper's rect, and on
+the 3D product `graphpaperBounds.mathCoordinates` is a rotatable x/y/z box with
+no screen-space meaning, so nothing it drew could stay registered with the scene
+underneath — which the 3D canvas paints over regardless. Generating the field
+still works there.

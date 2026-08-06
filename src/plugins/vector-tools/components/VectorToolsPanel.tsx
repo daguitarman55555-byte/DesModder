@@ -174,7 +174,16 @@ function fieldTab(
       </section>
 
       <section class="dsm-vector-tools-section">
-        <h3>Sampling domain</h3>
+        <div class="dsm-vector-tools-section-head">
+          <h3>Sampling domain</h3>
+          <Button
+            color="light-gray"
+            class="dsm-vector-tools-match-viewport"
+            onTap={() => vectorTools.matchDomainToViewport()}
+          >
+            Match viewport
+          </Button>
+        </div>
         {axisControls(vectorTools, "x", config)}
         {axisControls(vectorTools, "y", config)}
         <div class="dsm-vector-tools-count">
@@ -335,7 +344,7 @@ function colorTab(vectorTools: VectorTools, config: ConfigGetter) {
 
 function flowTab(vectorTools: VectorTools, config: ConfigGetter) {
   const flow = () => config().flow;
-  const compilation = () => vectorTools.flowCompilation;
+  const compilation = () => vectorTools.flowAvailability;
   return (
     <div>
       <section class="dsm-vector-tools-section dsm-vector-tools-flow">

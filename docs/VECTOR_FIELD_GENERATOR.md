@@ -26,8 +26,11 @@ and stops reading it, rather than adopting an expression that is no longer this
 field's component.
 
 Set the x and y domain endpoints, then sample each axis by either step or an
-inclusive count. The panel shows the resulting vector estimate before it adds
-anything to the graph. A typical rotational field is `P=-y`, `Q=x`.
+inclusive count. **Match viewport** fills all four endpoints from the visible
+graph, rounded to three decimals; it leaves the sampling mode, step, and count
+alone, so in step mode the vector count follows the new span and the estimate
+below updates with it. The panel shows the resulting vector estimate before it
+adds anything to the graph. A typical rotational field is `P=-y`, `Q=x`.
 
 Choose an arrow-length behavior appropriate to the field:
 
