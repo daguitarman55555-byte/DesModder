@@ -61,7 +61,11 @@ function resolve(filename: string, source: string): string | undefined {
   if (source.startsWith(".")) {
     return path.resolve(path.dirname(filename), source);
   } else if (source.startsWith("#")) {
-    const [hashRef, ...parts] = source.split(path.sep);
+    // Import specifiers are always "/"-separated, whatever the host platform
+    // uses for paths. Splitting on `path.sep` made every subpath import look
+    // like a single unknown key on Windows, and the rule threw instead of
+    // resolving it.
+    const [hashRef, ...parts] = source.split("/");
     const packageName = packageFilename(filename);
     const imports = packageImports(packageName);
     const packageDir = path.dirname(packageName);
@@ -82,7 +86,7 @@ function resolve(filename: string, source: string): string | undefined {
       return path.resolve(
         packageDir,
         value.slice(0, -"/*".length),
-        parts.join(path.sep)
+        parts.join("/")
       );
     } else {
       throw new Error(
