@@ -1,0 +1,719 @@
+export const VECTOR_FIELD_SCHEMA_VERSION = 2;
+export const VECTOR_COUNT_WARNING = 2_500;
+export const VECTOR_COUNT_HARD_MAXIMUM = 10_000;
+export const ZERO_VECTOR_TOLERANCE = 1e-9;
+
+export type SamplingMode = "step" | "count";
+export type VectorLengthMode =
+  | "actual"
+  | "normalized"
+  | "scaled"
+  | "clamped"
+  | "compressed"
+  | "direction-only";
+export type VectorColorMode =
+  | "fixed"
+  | "magnitude"
+  | "log-magnitude"
+  | "direction"
+  | "x-component"
+  | "y-component";
+export type ColorPalette =
+  | "sequential-a"
+  | "sequential-b"
+  | "blue-red"
+  | "grayscale"
+  | "direction-hue";
+export type ColorRangeMode = "automatic" | "manual";
+export type ZeroVectorMode = "hide" | "point";
+export type FlowColorMode = "fixed" | "speed" | "direction";
+
+/**
+ * Settings for the GPU flow visualizer. Persisted alongside the field so a
+ * graph reopened later animates the way it did when it was set up.
+ */
+export interface FlowConfig {
+  /** Particle count is the square of this; see FLOW_DENSITY_CHOICES. */
+  particleResolution: number;
+  speed: number;
+  trailPersistence: number;
+  dropRate: number;
+  opacity: number;
+  pointSize: number;
+  colorMode: FlowColorMode;
+  /** Draw streamlines at a constant pace instead of the field's magnitude. */
+  normalizeSpeed: boolean;
+}
+
+export const FLOW_DENSITY_CHOICES: readonly {
+  resolution: number;
+  label: string;
+}[] = [
+  { resolution: 64, label: "Light (4k)" },
+  { resolution: 128, label: "Normal (16k)" },
+  { resolution: 192, label: "Dense (37k)" },
+  { resolution: 256, label: "Very dense (65k)" },
+];
+
+export interface SamplingAxisConfig {
+  min: number;
+  max: number;
+  mode: SamplingMode;
+  step: number;
+  count: number;
+}
+
+export interface VectorLengthConfig {
+  mode: VectorLengthMode;
+  autoLength: boolean;
+  targetLength: number;
+  scale: number;
+  maximumLength: number;
+  compression: number;
+}
+
+export interface ArrowheadConfig {
+  size: number;
+  angleRadians: number;
+}
+
+export interface VectorColorConfig {
+  mode: VectorColorMode;
+  palette: ColorPalette;
+  rangeMode: ColorRangeMode;
+  minimum: number;
+  maximum: number;
+  fixedColor: string;
+}
+
+export interface VectorFieldConfig {
+  schemaVersion: number;
+  id: string;
+  name: string;
+  components: {
+    xLatex: string;
+    yLatex: string;
+  };
+  domain: {
+    x: SamplingAxisConfig;
+    y: SamplingAxisConfig;
+  };
+  length: VectorLengthConfig;
+  arrowhead: ArrowheadConfig;
+  color: VectorColorConfig;
+  zeroVectorMode: ZeroVectorMode;
+  flow: FlowConfig;
+}
+
+export interface ValidationIssue {
+  level: "error" | "warning";
+  message: string;
+}
+
+export interface VectorFieldValidation {
+  estimatedVectorCount: number;
+  issues: ValidationIssue[];
+  canGenerate: boolean;
+  requiresConfirmation: boolean;
+}
+
+export interface DensityPreset {
+  id: "small" | "medium" | "large" | "warning";
+  name: string;
+  xCount: number;
+  yCount: number;
+}
+
+export interface ProbeDefinition {
+  point: readonly [number, number];
+  expected: readonly [number, number];
+}
+
+export interface VectorFieldPreset {
+  id:
+    | "rotational"
+    | "radial"
+    | "inward-radial"
+    | "saddle"
+    | "uniform"
+    | "vertical-uniform"
+    | "nonlinear-trigonometric"
+    | "zero"
+    | "vortex-decay"
+    | "mixed-magnitude";
+  name: string;
+  xLatex: string;
+  yLatex: string;
+  probes: readonly ProbeDefinition[];
+}
+
+const DEFAULT_AXIS_X: SamplingAxisConfig = {
+  min: -10,
+  max: 10,
+  mode: "step",
+  step: 1,
+  count: 21,
+};
+
+const DEFAULT_AXIS_Y: SamplingAxisConfig = {
+  min: -6,
+  max: 6,
+  mode: "step",
+  step: 1,
+  count: 13,
+};
+
+export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
+  schemaVersion: VECTOR_FIELD_SCHEMA_VERSION,
+  id: "default",
+  name: "Vector Field",
+  components: { xLatex: "-y", yLatex: "x" },
+  domain: { x: DEFAULT_AXIS_X, y: DEFAULT_AXIS_Y },
+  length: {
+    mode: "normalized",
+    autoLength: true,
+    targetLength: 0.7,
+    scale: 0.25,
+    maximumLength: 1.25,
+    compression: 1,
+  },
+  arrowhead: { size: 0.18, angleRadians: 0.55 },
+  color: {
+    mode: "fixed",
+    palette: "sequential-a",
+    rangeMode: "automatic",
+    minimum: 0,
+    maximum: 1,
+    fixedColor: "#6042a6",
+  },
+  zeroVectorMode: "hide",
+  // Deliberately restrained: the flow is drawn on top of the graph paper, so
+  // the defaults have to leave the axes and expressions legible underneath.
+  flow: {
+    particleResolution: 128,
+    speed: 1,
+    trailPersistence: 0.9,
+    dropRate: 0.008,
+    opacity: 0.42,
+    pointSize: 1.4,
+    colorMode: "speed",
+    normalizeSpeed: true,
+  },
+};
+
+export const DENSITY_PRESETS: readonly DensityPreset[] = [
+  { id: "small", name: "Small", xCount: 20, yCount: 12 },
+  { id: "medium", name: "Medium", xCount: 40, yCount: 24 },
+  { id: "large", name: "Large", xCount: 50, yCount: 30 },
+  { id: "warning", name: "Warning", xCount: 52, yCount: 50 },
+];
+
+export const VECTOR_FIELD_PRESETS: readonly VectorFieldPreset[] = [
+  {
+    id: "rotational",
+    name: "Rotational",
+    xLatex: "-y",
+    yLatex: "x",
+    probes: [
+      { point: [1, 0], expected: [0, 1] },
+      { point: [0, 1], expected: [-1, 0] },
+      { point: [-1, 0], expected: [0, -1] },
+      { point: [0, -1], expected: [1, 0] },
+    ],
+  },
+  {
+    id: "radial",
+    name: "Radial",
+    xLatex: "x",
+    yLatex: "y",
+    probes: [
+      { point: [1, 0], expected: [1, 0] },
+      { point: [0, 1], expected: [0, 1] },
+      { point: [-1, 0], expected: [-1, 0] },
+    ],
+  },
+  {
+    id: "inward-radial",
+    name: "Inward Radial",
+    xLatex: "-x",
+    yLatex: "-y",
+    probes: [
+      { point: [1, 0], expected: [-1, 0] },
+      { point: [0, 1], expected: [0, -1] },
+    ],
+  },
+  {
+    id: "saddle",
+    name: "Saddle",
+    xLatex: "x",
+    yLatex: "-y",
+    probes: [
+      { point: [1, 0], expected: [1, 0] },
+      { point: [0, 1], expected: [0, -1] },
+    ],
+  },
+  {
+    id: "uniform",
+    name: "Uniform",
+    xLatex: "1",
+    yLatex: "0",
+    probes: [
+      { point: [0, 0], expected: [1, 0] },
+      { point: [5, -3], expected: [1, 0] },
+    ],
+  },
+  {
+    id: "vertical-uniform",
+    name: "Vertical Uniform",
+    xLatex: "0",
+    yLatex: "1",
+    probes: [{ point: [0, 0], expected: [0, 1] }],
+  },
+  {
+    id: "nonlinear-trigonometric",
+    name: "Nonlinear Trigonometric",
+    xLatex: "\\sin(y)",
+    yLatex: "\\cos(x)",
+    probes: [{ point: [0, 0], expected: [0, 1] }],
+  },
+  {
+    id: "zero",
+    name: "Zero",
+    xLatex: "0",
+    yLatex: "0",
+    probes: [{ point: [0, 0], expected: [0, 0] }],
+  },
+  {
+    id: "vortex-decay",
+    name: "Vortex With Decay",
+    xLatex: "-y/(1+x^2+y^2)",
+    yLatex: "x/(1+x^2+y^2)",
+    probes: [{ point: [1, 0], expected: [0, 0.5] }],
+  },
+  {
+    id: "mixed-magnitude",
+    name: "Mixed Magnitude",
+    xLatex: "10x",
+    yLatex: "y",
+    probes: [{ point: [1, 0], expected: [10, 0] }],
+  },
+];
+
+export function cloneDefaultConfig(): VectorFieldConfig {
+  return {
+    ...DEFAULT_VECTOR_FIELD_CONFIG,
+    components: { ...DEFAULT_VECTOR_FIELD_CONFIG.components },
+    domain: {
+      x: { ...DEFAULT_VECTOR_FIELD_CONFIG.domain.x },
+      y: { ...DEFAULT_VECTOR_FIELD_CONFIG.domain.y },
+    },
+    length: { ...DEFAULT_VECTOR_FIELD_CONFIG.length },
+    arrowhead: { ...DEFAULT_VECTOR_FIELD_CONFIG.arrowhead },
+    color: { ...DEFAULT_VECTOR_FIELD_CONFIG.color },
+    flow: { ...DEFAULT_VECTOR_FIELD_CONFIG.flow },
+  };
+}
+
+export function getAxisSampleCount(axis: SamplingAxisConfig): number {
+  if (axis.mode === "count") return axis.count;
+  if (!Number.isFinite(axis.step) || axis.step <= 0) return 0;
+  const span = axis.max - axis.min;
+  if (!Number.isFinite(span) || span < 0) return 0;
+  return Math.floor(span / axis.step + 1e-10) + 1;
+}
+
+export function getAxisSpacing(axis: SamplingAxisConfig): number {
+  return axis.mode === "count"
+    ? (axis.max - axis.min) / (axis.count - 1)
+    : axis.step;
+}
+
+export function estimateVectorCount(config: VectorFieldConfig): number {
+  return (
+    getAxisSampleCount(config.domain.x) * getAxisSampleCount(config.domain.y)
+  );
+}
+
+export function validateVectorFieldConfig(
+  config: VectorFieldConfig
+): VectorFieldValidation {
+  const issues: ValidationIssue[] = [];
+  validateComponent(config.components.xLatex, "P(x,y)", issues);
+  validateComponent(config.components.yLatex, "Q(x,y)", issues);
+  validateAxis(config.domain.x, "x", issues);
+  validateAxis(config.domain.y, "y", issues);
+  validateFinitePositive(config.length.targetLength, "Target length", issues);
+  validateFinitePositive(config.length.scale, "Length scale", issues);
+  validateFinitePositive(config.length.maximumLength, "Maximum length", issues);
+  validateFinitePositive(config.length.compression, "Compression", issues);
+  validateFinitePositive(config.arrowhead.size, "Arrowhead size", issues);
+  if (
+    !Number.isFinite(config.arrowhead.angleRadians) ||
+    config.arrowhead.angleRadians <= 0 ||
+    config.arrowhead.angleRadians >= Math.PI / 2
+  ) {
+    issues.push({
+      level: "error",
+      message: "Arrowhead angle must be between 0 and π/2.",
+    });
+  }
+  if (!/^#(?:[\dA-Fa-f]{3}|[\dA-Fa-f]{6})$/.test(config.color.fixedColor)) {
+    issues.push({
+      level: "error",
+      message: "Fixed color must be a hex color.",
+    });
+  }
+  if (
+    config.color.rangeMode === "manual" &&
+    (!Number.isFinite(config.color.minimum) ||
+      !Number.isFinite(config.color.maximum) ||
+      config.color.maximum <= config.color.minimum)
+  ) {
+    issues.push({
+      level: "error",
+      message: "Manual color maximum must be greater than the minimum.",
+    });
+  }
+
+  const estimatedVectorCount = estimateVectorCount(config);
+  if (estimatedVectorCount > VECTOR_COUNT_HARD_MAXIMUM) {
+    issues.push({
+      level: "error",
+      message: `Vector count exceeds the hard maximum of ${VECTOR_COUNT_HARD_MAXIMUM.toLocaleString()}.`,
+    });
+  } else if (estimatedVectorCount > VECTOR_COUNT_WARNING) {
+    issues.push({
+      level: "warning",
+      message: `Generating ${estimatedVectorCount.toLocaleString()} vectors requires confirmation.`,
+    });
+  } else if (estimatedVectorCount > 1_000) {
+    issues.push({
+      level: "warning",
+      message: "Large fields can reduce Desmos responsiveness.",
+    });
+  }
+
+  return {
+    estimatedVectorCount,
+    issues,
+    canGenerate: issues.every((issue) => issue.level !== "error"),
+    requiresConfirmation:
+      estimatedVectorCount > VECTOR_COUNT_WARNING &&
+      estimatedVectorCount <= VECTOR_COUNT_HARD_MAXIMUM,
+  };
+}
+
+export function normalizeVectorFieldConfig(value: unknown): VectorFieldConfig {
+  const fallback = cloneDefaultConfig();
+  if (!isRecord(value)) return fallback;
+  const components = asRecord(value.components);
+  const domain = asRecord(value.domain);
+  const length = asRecord(value.length);
+  const arrowhead = asRecord(value.arrowhead);
+  const color = asRecord(value.color);
+  const config: VectorFieldConfig = {
+    ...fallback,
+    schemaVersion: VECTOR_FIELD_SCHEMA_VERSION,
+    id: validID(value.id) ? value.id : fallback.id,
+    name: validString(value.name) ? value.name : fallback.name,
+    components: {
+      xLatex:
+        typeof components?.xLatex === "string"
+          ? components.xLatex
+          : fallback.components.xLatex,
+      yLatex:
+        typeof components?.yLatex === "string"
+          ? components.yLatex
+          : fallback.components.yLatex,
+    },
+    domain: {
+      x: normalizeAxis(domain?.x, fallback.domain.x),
+      y: normalizeAxis(domain?.y, fallback.domain.y),
+    },
+    length: {
+      mode: isLengthMode(length?.mode) ? length.mode : fallback.length.mode,
+      autoLength:
+        typeof length?.autoLength === "boolean"
+          ? length.autoLength
+          : fallback.length.autoLength,
+      targetLength: finiteOr(
+        length?.targetLength,
+        fallback.length.targetLength
+      ),
+      scale: finiteOr(length?.scale, fallback.length.scale),
+      maximumLength: finiteOr(
+        length?.maximumLength,
+        fallback.length.maximumLength
+      ),
+      compression: finiteOr(length?.compression, fallback.length.compression),
+    },
+    arrowhead: {
+      size: finiteOr(arrowhead?.size, fallback.arrowhead.size),
+      angleRadians: finiteOr(
+        arrowhead?.angleRadians,
+        fallback.arrowhead.angleRadians
+      ),
+    },
+    color: {
+      mode: isColorMode(color?.mode) ? color.mode : fallback.color.mode,
+      palette: isPalette(color?.palette)
+        ? color.palette
+        : fallback.color.palette,
+      rangeMode: color?.rangeMode === "manual" ? "manual" : "automatic",
+      minimum: finiteOr(color?.minimum, fallback.color.minimum),
+      maximum: finiteOr(color?.maximum, fallback.color.maximum),
+      fixedColor:
+        typeof color?.fixedColor === "string"
+          ? color.fixedColor
+          : fallback.color.fixedColor,
+    },
+    zeroVectorMode: value.zeroVectorMode === "point" ? "point" : "hide",
+    flow: normalizeFlow(value.flow, fallback.flow),
+  };
+  return config;
+}
+
+function normalizeFlow(value: unknown, fallback: FlowConfig): FlowConfig {
+  const flow = asRecord(value);
+  const resolutions = FLOW_DENSITY_CHOICES.map((choice) => choice.resolution);
+  const resolution = finiteOr(
+    flow?.particleResolution,
+    fallback.particleResolution
+  );
+  return {
+    particleResolution: resolutions.includes(resolution)
+      ? resolution
+      : fallback.particleResolution,
+    speed: clampNumber(flow?.speed, fallback.speed, 0.05, 8),
+    trailPersistence: clampNumber(
+      flow?.trailPersistence,
+      fallback.trailPersistence,
+      0,
+      0.995
+    ),
+    dropRate: clampNumber(flow?.dropRate, fallback.dropRate, 0, 0.2),
+    opacity: clampNumber(flow?.opacity, fallback.opacity, 0.05, 1),
+    pointSize: clampNumber(flow?.pointSize, fallback.pointSize, 0.5, 6),
+    colorMode: isFlowColorMode(flow?.colorMode)
+      ? flow.colorMode
+      : fallback.colorMode,
+    normalizeSpeed:
+      typeof flow?.normalizeSpeed === "boolean"
+        ? flow.normalizeSpeed
+        : fallback.normalizeSpeed,
+  };
+}
+
+function clampNumber(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number
+) {
+  return Math.min(max, Math.max(min, finiteOr(value, fallback)));
+}
+
+function isFlowColorMode(value: unknown): value is FlowColorMode {
+  return ["fixed", "speed", "direction"].includes(value as string);
+}
+
+export function configForPreset(
+  preset: VectorFieldPreset,
+  density: DensityPreset,
+  lengthMode: VectorLengthMode,
+  colorMode: VectorColorMode
+): VectorFieldConfig {
+  const config = cloneDefaultConfig();
+  config.id = "test";
+  config.name = `Test — ${preset.name}`;
+  config.components = { xLatex: preset.xLatex, yLatex: preset.yLatex };
+  config.domain.x = {
+    ...config.domain.x,
+    mode: "count",
+    count: density.xCount,
+  };
+  config.domain.y = {
+    ...config.domain.y,
+    mode: "count",
+    count: density.yCount,
+  };
+  config.length.mode = lengthMode;
+  config.color.mode = colorMode;
+  if (colorMode === "direction") config.color.palette = "direction-hue";
+  return config;
+}
+
+export function isDevelopmentBuild(value: boolean = DEV_BUILD): boolean {
+  return value;
+}
+
+function validateComponent(
+  latex: string,
+  name: string,
+  issues: ValidationIssue[]
+) {
+  const trimmed = latex.trim();
+  if (trimmed.length === 0) {
+    issues.push({ level: "error", message: `${name} cannot be empty.` });
+  } else if (isClearlyIncomplete(trimmed)) {
+    issues.push({ level: "error", message: `${name} appears incomplete.` });
+  } else if (containsTopLevelAssignment(trimmed)) {
+    issues.push({
+      level: "error",
+      message: `${name} must be a scalar component, not an assignment.`,
+    });
+  } else if (isTopLevelVector(trimmed)) {
+    issues.push({
+      level: "error",
+      message: `${name} must be scalar, not a vector.`,
+    });
+  }
+}
+
+function validateAxis(
+  axis: SamplingAxisConfig,
+  label: string,
+  issues: ValidationIssue[]
+) {
+  if (
+    !Number.isFinite(axis.min) ||
+    !Number.isFinite(axis.max) ||
+    axis.max <= axis.min
+  ) {
+    issues.push({
+      level: "error",
+      message: `${label} maximum must exceed minimum.`,
+    });
+  }
+  if (axis.mode === "step") {
+    if (!Number.isFinite(axis.step) || axis.step <= 0) {
+      issues.push({
+        level: "error",
+        message: `${label} step must be finite and greater than zero.`,
+      });
+    }
+  } else if (!Number.isInteger(axis.count) || axis.count < 2) {
+    issues.push({
+      level: "error",
+      message: `${label} count must be an integer of at least 2.`,
+    });
+  }
+}
+
+function validateFinitePositive(
+  value: number,
+  label: string,
+  issues: ValidationIssue[]
+) {
+  if (!Number.isFinite(value) || value <= 0) {
+    issues.push({
+      level: "error",
+      message: `${label} must be finite and greater than zero.`,
+    });
+  }
+}
+
+function isClearlyIncomplete(latex: string) {
+  return (
+    /[=+\-*/^,(]$/.test(latex) ||
+    !balanced(latex, "(", ")") ||
+    !balanced(latex, "{", "}")
+  );
+}
+
+function balanced(value: string, opening: string, closing: string) {
+  let depth = 0;
+  for (const char of value) {
+    if (char === opening) depth++;
+    if (char === closing) depth--;
+    if (depth < 0) return false;
+  }
+  return depth === 0;
+}
+
+function containsTopLevelAssignment(value: string) {
+  return containsTopLevel(value, "=");
+}
+
+function isTopLevelVector(value: string) {
+  return (
+    value.startsWith("(") &&
+    value.endsWith(")") &&
+    containsTopLevel(value.slice(1, -1), ",")
+  );
+}
+
+function containsTopLevel(value: string, needle: string) {
+  let depth = 0;
+  for (const char of value) {
+    if (char === "(" || char === "{") depth++;
+    if (char === ")" || char === "}") depth--;
+    if (char === needle && depth === 0) return true;
+  }
+  return false;
+}
+
+function normalizeAxis(
+  value: unknown,
+  fallback: SamplingAxisConfig
+): SamplingAxisConfig {
+  return {
+    min: finiteOr(asRecord(value)?.min, fallback.min),
+    max: finiteOr(asRecord(value)?.max, fallback.max),
+    mode: asRecord(value)?.mode === "count" ? "count" : "step",
+    step: finiteOr(asRecord(value)?.step, fallback.step),
+    count: finiteOr(asRecord(value)?.count, fallback.count),
+  };
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return isRecord(value) ? value : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function finiteOr(value: unknown, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function validString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+function validID(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z][A-Za-z0-9_]*$/.test(value);
+}
+
+function isLengthMode(value: unknown): value is VectorLengthMode {
+  return [
+    "actual",
+    "normalized",
+    "scaled",
+    "clamped",
+    "compressed",
+    "direction-only",
+  ].includes(value as string);
+}
+
+function isColorMode(value: unknown): value is VectorColorMode {
+  return [
+    "fixed",
+    "magnitude",
+    "log-magnitude",
+    "direction",
+    "x-component",
+    "y-component",
+  ].includes(value as string);
+}
+
+function isPalette(value: unknown): value is ColorPalette {
+  return [
+    "sequential-a",
+    "sequential-b",
+    "blue-red",
+    "grayscale",
+    "direction-hue",
+  ].includes(value as string);
+}

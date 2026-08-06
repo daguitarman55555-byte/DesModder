@@ -370,6 +370,8 @@ export default class DSM extends TransparentPlugins {
         return this.videoCreator?.isMenuOpen();
       case "find-and-replace":
         return this.cc.getExpressionSearchOpen();
+      case "vector-tools":
+        return this.vectorTools?.isFocused(location.id) ?? false;
       default:
         location satisfies never;
         return false;

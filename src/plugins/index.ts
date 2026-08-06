@@ -26,6 +26,7 @@ import ShowTips from "./show-tips";
 import SyntaxHighlighting from "./syntax-highlighting";
 import TextMode from "./text-mode";
 import VideoCreator from "./video-creator";
+import VectorTools from "./vector-tools";
 import Wakatime from "./wakatime";
 import WolframToDesmos from "./wolfram2desmos";
 import BetterNavigation from "./better-navigation";
@@ -143,6 +144,7 @@ export const keyToPlugin = {
   wolframToDesmos: WolframToDesmos,
   pinExpressions: PinExpressions,
   videoCreator: VideoCreator,
+  vectorTools: VectorTools,
   wakatime: Wakatime,
   findReplace: FindReplace,
   showTips: ShowTips,
@@ -200,6 +202,7 @@ export class TransparentPlugins implements KeyToPluginInstance {
   get wolframToDesmos () { return this.ep["wolfram2desmos"]; }
   get pinExpressions () { return this.ep["pin-expressions"]; }
   get videoCreator () { return this.ep["video-creator"]; }
+  get vectorTools () { return this.ep["vector-tools"]; }
   get wakatime () { return this.ep["wakatime"]; }
   get findReplace () { return this.ep["find-and-replace"]; }
   get showTips () { return this.ep["show-tips"]; }

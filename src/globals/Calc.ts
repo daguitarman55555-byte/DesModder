@@ -10,6 +10,7 @@ export type FocusLocation =
   | { type: "expression"; id: string }
   | { type: "dsm-focus"; plugin: "video-creator"; id: string }
   | { type: "dsm-focus"; plugin: "find-and-replace"; id: "replace-bar" }
+  | { type: "dsm-focus"; plugin: "vector-tools"; id: "p" | "q" }
   | { type: "search-expressions" }
   | {
       /**

@@ -1,0 +1,77 @@
+# Flow visualizer
+
+## What it does
+
+**Visualize** in the Vector Tools panel animates the field you typed into
+`P(x, y)` and `Q(x, y)` as particles carried along it, drawn on a transparent
+canvas over the Desmos graph paper. It is a picture of the field's flow, not a
+graph object: it adds no expressions, changes no calculator state, and leaves
+nothing behind when it is stopped.
+
+The technique is adapted from [fieldplay](https://github.com/anvaka/fieldplay)
+by Andrei Kashcha (MIT; the notice is in
+`src/plugins/vector-tools/flow/LICENSE-fieldplay.md`). Particle positions live
+in a texture, a fragment shader advances each one by a Runge–Kutta step every
+frame, particles are drawn into a trail texture that fades slightly per frame,
+and a small fraction respawn at random positions so the field does not collapse
+onto its attractors.
+
+The port targets WebGL2 and stores positions in a float texture, so fieldplay's
+RGBA float packing is gone; it takes its bounds from Desmos's graph paper rather
+than owning pan and zoom; and it composites over the graph rather than owning
+the screen.
+
+## Using it
+
+Press **Visualize** to start and **Stop visualization** to stop. It reads the
+current `P` and `Q` immediately, so editing either while it runs restarts it
+with the new field. Panning or zooming the graph re-registers the flow and
+clears the trails, because trails are stored in screen space.
+
+- **Particle density** trades smoothness for GPU cost; 16k is the default.
+- **Particle color** — _Speed_ shades by the field's magnitude, _Direction_ by
+  its angle, _Fixed color_ uses the field's fixed color.
+- **Constant speed** integrates the normalized field, so every streamline is
+  traced at the same pace. Turn it off to let fast regions actually move fast;
+  fields with a wide magnitude range look much better with it on.
+- **Speed**, **Trail persistence**, **Opacity**, and **Particle size** are the
+  visual dials. The defaults are deliberately restrained so the axes,
+  expressions, and generated arrows stay readable underneath.
+
+## What it can and cannot evaluate
+
+The GPU cannot call back into Desmos's evaluator, so `flow/latexToGLSL.ts`
+compiles the component LaTeX into a GLSL expression. It supports numbers, `x`,
+`y`, `e`, `\pi`, the arithmetic operators, implicit multiplication, `\frac`,
+`\sqrt` (including `\sqrt[n]`), powers, `|...|`, and the usual named functions
+(trig and inverse trig, hyperbolics, `\exp`, `\ln`, `\log`, `\operatorname{mod}`,
+`\operatorname{sign}`, `\min`, `\max`, floor/ceil/round).
+
+Anything else is refused **by name** before the button is enabled, rather than
+producing a plausible-looking animation of the wrong field. The common cases:
+
+- A reference to another expression (`a_{1}`), which only Desmos can resolve.
+- Lists, piecewises, restrictions, integrals, derivatives, and sums.
+- Any variable other than `x` and `y`.
+
+Divisions and singularities are guarded rather than allowed to produce
+infinities, and a particle that escapes the viewport, stalls, or goes non-finite
+is respawned.
+
+## Differences from the generated arrows
+
+The arrows and the flow are two views of the same field, but they are not
+pixel-consistent, and they are not meant to be:
+
+- The arrows are sampled on the configured grid; the flow samples continuously
+  wherever particles happen to be.
+- _Speed_ coloring uses a scale-free ramp based on the current viewport rather
+  than the arrow color range, so it needs no reduction pass over the field.
+
+If the two disagree about direction anywhere, that is a bug worth reporting —
+they are compiled from the same two LaTeX strings.
+
+## Requirements
+
+WebGL2 with `EXT_color_buffer_float`. If either is missing, the panel says so
+and the visualizer stays off; the generator is unaffected.

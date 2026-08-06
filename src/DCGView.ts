@@ -136,6 +136,14 @@ declare global {
       td: any;
       button: any;
       br: any;
+      details: any;
+      h3: any;
+      option: any;
+      section: any;
+      select: any;
+      summary: any;
+      tbody: any;
+      thead: any;
     }
   }
 }
