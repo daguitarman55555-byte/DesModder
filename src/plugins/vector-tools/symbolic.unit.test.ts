@@ -1,6 +1,7 @@
 import {
   differentiate,
   identifiersIn,
+  implicitDerivative,
   simplify,
   SymbolicError,
   toLatex,
@@ -119,6 +120,47 @@ describe("Vector Tools symbolic differentiation", () => {
     expect(emit(simplify(add(number(2), number(3))))).toBe("5");
     // A number that ends up on the right reads better on the left.
     expect(emit(simplify(mul(y, number(2))))).toBe("2y");
+  });
+
+  test("differentiates implicitly, which Desmos cannot do at all", () => {
+    // The circle x² + y² = 25 has dy/dx = -x/y.
+    expect(
+      emit(
+        implicitDerivative(
+          add(pow(x, number(2)), pow(y, number(2))),
+          number(25),
+          "x",
+          "y"
+        )
+      )
+    ).toBe("-\\frac{x}{y}");
+
+    // A shifted circle keeps its centre in the answer: (x-1)² + y² = 4.
+    expect(
+      emit(
+        implicitDerivative(
+          add(pow(sub(x, number(1)), number(2)), pow(y, number(2))),
+          number(4),
+          "x",
+          "y"
+        )
+      )
+    ).toBe("-\\frac{x-1}{y}");
+
+    // The folium xy = 1 gives dy/dx = -y/x.
+    expect(emit(implicitDerivative(mul(x, y), number(1), "x", "y"))).toBe(
+      "-\\frac{y}{x}"
+    );
+  });
+
+  test("cancels a shared numeric factor but does not invent cancellations", () => {
+    // 2x/2y reduces; 4x/2y is left alone rather than half-reduced wrongly.
+    expect(emit(simplify(div(mul(number(2), x), mul(number(2), y))))).toBe(
+      "\\frac{x}{y}"
+    );
+    expect(emit(simplify(div(mul(number(4), x), mul(number(2), y))))).toBe(
+      "\\frac{4x}{2y}"
+    );
   });
 
   test("lists the identifiers an expression uses, in order", () => {

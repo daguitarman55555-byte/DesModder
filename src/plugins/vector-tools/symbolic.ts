@@ -182,6 +182,28 @@ function functionCallDerivative(
   return multiply(rule(arg), derivative(arg, variable));
 }
 
+/**
+ * `dy/dx` for an equation that defines y implicitly, like `x^2+y^2=25`.
+ *
+ * This is the implicit function theorem and nothing more: for `F(x,y)=0`,
+ * `dy/dx = -F_x / F_y`. Both partials are already available, so implicit
+ * differentiation costs almost nothing on top of the explicit kind.
+ *
+ * The result is undefined wherever `F_y` is zero — the points with a vertical
+ * tangent — which is a property of the curve rather than a failure here.
+ */
+export function implicitDerivative(
+  left: Node,
+  right: Node,
+  independent: string,
+  dependent: string
+): Node {
+  const f = binop("Subtract", left, right);
+  return simplify(
+    negative(divide(derivative(f, independent), derivative(f, dependent)))
+  );
+}
+
 /** Whether `variable` appears anywhere in the tree. */
 export function dependsOn(node: Node, variable: string): boolean {
   let found = false;
@@ -277,12 +299,15 @@ function simplifyBinary(node: Aug.Latex.BinaryOperator): Node {
       if (rc !== undefined && lc === undefined)
         return binop("Multiply", right, left);
       break;
-    case "Divide":
+    case "Divide": {
       if (lc === 0) return number(0);
       if (rc === 1) return left;
       if (lc !== undefined && rc !== undefined && rc !== 0)
         return number(lc / rc);
+      const reduced = cancelSharedCoefficient(left, right);
+      if (reduced !== undefined) return reduced;
       break;
+    }
     case "Exponent":
       if (rc === 1) return left;
       if (rc === 0) return number(1);
@@ -293,6 +318,35 @@ function simplifyBinary(node: Aug.Latex.BinaryOperator): Node {
   return node.name === "CrossMultiply"
     ? { ...node, left, right }
     : binop(node.name, left, right);
+}
+
+/**
+ * Cancels a numeric factor the two sides of a fraction share, so the implicit
+ * derivative of `x²+y²=25` reads as `-x/y` rather than `-2x/2y`.
+ *
+ * Only an exactly equal factor is cancelled. Full common-factor reduction is a
+ * computer algebra problem, and a half-done version that cancels the wrong
+ * thing would be worse than leaving the fraction as it is.
+ */
+function cancelSharedCoefficient(left: Node, right: Node): Node | undefined {
+  const [leftFactor, leftRest] = splitCoefficient(left);
+  const [rightFactor, rightRest] = splitCoefficient(right);
+  if (leftRest === undefined || rightRest === undefined) return undefined;
+  if (leftFactor !== rightFactor || leftFactor === 1) return undefined;
+  return binop("Divide", leftRest, rightRest);
+}
+
+/** Splits a leading numeric factor off a product: `2x` becomes `[2, x]`. */
+function splitCoefficient(node: Node): [number, Node | undefined] {
+  if (node.type === "Constant") return [node.value, undefined];
+  if (
+    node.type === "BinaryOperator" &&
+    (node.name === "Multiply" || node.name === "CrossMultiply")
+  ) {
+    const factor = constantValue(node.left);
+    if (factor !== undefined) return [factor, node.right];
+  }
+  return [1, node];
 }
 
 function constantValue(node: Node): number | undefined {
