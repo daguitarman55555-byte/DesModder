@@ -2,11 +2,28 @@
 
 ## Using the production panel
 
-Enable **Vector Tools** in DesModder, open its compass button, and enter the
-two scalar components of the field:
+Enable **Vector Tools** in DesModder and open its compass button. The panel has
+four tabs — **Field**, **Arrows**, **Color**, **Flow** — over a footer that
+always shows the validation state and the Generate / Remove / Reset buttons, so
+those never scroll out of reach. Drag the bottom-right corner to resize it; the
+size and the open tab are remembered.
+
+On the **Field** tab, enter the two scalar components:
 
 - `P(x, y)` is the horizontal component.
 - `Q(x, y)` is the vertical component.
+
+**Edit P and Q in the expression list** puts the two definitions into the
+generated folder as ordinary expressions and selects the first one. From then on
+the two views are mirrors: editing `v_{tfdp}\left(x,y\right)=...` in the
+expression list updates the panel (and the flow visualizer), and editing the
+panel rewrites the definition. Because the generated arrows are defined in terms
+of those functions, an edit in the list also updates the arrows already on the
+graph without regenerating anything.
+
+If you rename one of those functions or change its parameters, the panel says so
+and stops reading it, rather than adopting an expression that is no longer this
+field's component.
 
 Set the x and y domain endpoints, then sample each axis by either step or an
 inclusive count. The panel shows the resulting vector estimate before it adds

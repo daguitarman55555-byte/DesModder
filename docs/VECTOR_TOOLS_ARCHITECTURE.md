@@ -77,19 +77,47 @@ a guessed evaluation result.
 
 ## Panel
 
-`components/VectorToolsPanel.tsx` is a DCGView component, and DCGView only
-re-reads a prop that was passed as a function—a bare value is wrapped in
-`DCGView.const` and frozen at first render. Every control therefore takes
-getters, and controls whose DOM state cannot be expressed as an attribute use
-`onUpdate` to push the stored value back into the element on each render pass:
+`components/VectorToolsPanel.tsx` is a DCGView component. Three DCGView
+behaviours shape how its controls are written, and each of them silently broke a
+control before it was accounted for:
 
-- `<select>` has no working `value` attribute at all, so its selection is set
-  imperatively.
-- Number and text inputs are only re-synced when they do not hold focus, so a
-  render triggered mid-edit does not fight the user's typing.
+- DCGView only re-reads a prop that was passed as a **function**; a bare value is
+  wrapped in `DCGView.const` and frozen at first render. Every control therefore
+  takes getters, and anything whose DOM state cannot be expressed as an
+  attribute is pushed back into the element from `onUpdate` on each render pass.
+- DCGView writes props as **attributes**, and `disabled="false"` is still a
+  disabled input in HTML. `disabled` is therefore never passed as a prop; the
+  property is assigned in `onUpdate` instead. Passing it as a prop disabled every
+  number field in the panel.
+- Inputs are only re-synced while they do **not** hold focus, so a render
+  triggered mid-edit cannot fight the user's typing.
+
+The panel has no `<select>` elements. A native dropdown inside a scrolling
+popover is awkward to hit and DCGView cannot drive its selection through props
+anyway, so option lists are wrapping rows of one-click chips instead, and the
+tab bar is DesModder's existing `SegmentedControl`.
+
+Layout is a fixed title and tab bar, a scrolling body, and a fixed footer, so the
+validation state and the Generate/Remove/Reset buttons never scroll away. The
+panel itself is CSS-resizable; the pillbox popover is a fixed 290px wide, so the
+plugin tags its own popover with a class that lets it size to the panel. Size is
+persisted by reading the **inline** width and height, because a corner drag
+writes those while a short window merely clamps the rendered box through
+`max-height` — persisting the clamp would shrink the panel permanently.
 
 Element IDs are namespaced per axis (`dsm-vector-tools-x-minimum`), because
 duplicate IDs point `<label for>` at the wrong input.
+
+## Components in the expression list
+
+The two component definitions are ordinary expressions in the generated folder,
+and the panel keeps them in sync in both directions. A dispatcher listener
+watches `set-item-latex`, `undo`, `redo`, and `set-state`, and adopts a changed
+definition only if its left-hand side still matches the function this field owns;
+otherwise it reports that the link is broken rather than adopting an expression
+that is no longer the field's component. Writes in the other direction use
+`setExpression`, which merges into an existing expression and so leaves
+`folderId` and `colorLatex` on the rest of the field alone.
 
 ## Flow visualizer
 

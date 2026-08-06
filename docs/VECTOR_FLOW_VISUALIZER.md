@@ -23,12 +23,19 @@ the screen.
 
 ## Using it
 
-Press **Visualize** to start and **Stop visualization** to stop. It reads the
-current `P` and `Q` immediately, so editing either while it runs restarts it
-with the new field. Panning or zooming the graph re-registers the flow and
-clears the trails, because trails are stored in screen space.
+Press **Visualize** on the panel's **Flow** tab to start, and **Stop
+visualization** to stop. It reads the current `P` and `Q` immediately, so
+editing either — in the panel or in the expression list — restarts it with the
+new field shortly after you stop typing. Panning or zooming the graph
+re-registers the flow and clears the trails, because trails are stored in screen
+space.
 
-- **Particle density** trades smoothness for GPU cost; 16k is the default.
+- **Particles** is any count from 500 to 400,000 — type an exact number or drag
+  the slider, which is logarithmic so the useful low end is not crushed into the
+  first centimetre of the track. 16,000 is the default; above 120,000 the panel
+  warns that an integrated GPU may drop frames. Particle state lives in the
+  smallest square texture that holds the count, but only that many are drawn, so
+  the number you ask for is the number you get.
 - **Particle color** — _Speed_ shades by the field's magnitude, _Direction_ by
   its angle, _Fixed color_ uses the field's fixed color.
 - **Constant speed** integrates the normalized field, so every streamline is

@@ -1,7 +1,8 @@
-import { clean, testWithPage } from "../../tests/puppeteer-utils";
+import { clean, Driver, testWithPage } from "../../tests/puppeteer-utils";
 import type { Calc as CalcType } from "#globals";
 
 declare let Calc: CalcType;
+declare let DSM: Window["DSM"];
 
 const BUTTON = ".dsm-action-menu .dsm-icon-compass2";
 const PANEL = ".dsm-vector-tools-menu";
@@ -117,6 +118,31 @@ testWithPage(
   90000
 );
 
+/** Chips replaced the panel's dropdowns; this is how one is read and pressed. */
+const selectedChip = (label: string) =>
+  [
+    ...document.querySelectorAll<HTMLElement>(
+      `.dsm-vector-tools-menu [aria-label="${label}"] .dsm-vector-tools-chip`
+    ),
+  ].find((chip) => chip.getAttribute("aria-pressed") === "true")?.dataset.value;
+
+/**
+ * `evaluate` stringifies its callback, so nothing from module scope is in
+ * scope inside one. Read the stored config through its own round trip.
+ */
+const storedConfig = async (driver: Driver) =>
+  await driver.evaluate(() =>
+    JSON.parse(
+      DSM.pluginSettings["vector-tools"]!.serializedFieldConfig as string
+    )
+  );
+
+async function openTab(driver: Driver, index: number) {
+  await driver.click(
+    `.dsm-vector-tools-tabs .dcg-segmented-control-btn:nth-child(${index + 1})`
+  );
+}
+
 testWithPage(
   "Vector Tools panel controls show the stored configuration",
   async (driver) => {
@@ -124,19 +150,8 @@ testWithPage(
     await driver.assertSelectorEventually(BUTTON);
     await driver.click(BUTTON);
 
-    // Every select is populated from persisted state; DCGView only re-reads a
-    // prop passed as a function, and a `value` attribute never moves a
-    // `<select>`'s selection at all.
-    const initial = await driver.evaluate(() =>
-      Object.fromEntries(
-        [...document.querySelectorAll(".dsm-vector-tools-menu select")].map(
-          (select) => [select.id, (select as HTMLSelectElement).value]
-        )
-      )
-    );
-    expect(initial["dsm-vector-tools-length-mode"]).toBe("normalized");
-    expect(initial["dsm-vector-tools-color-mode"]).toBe("fixed");
-    expect(initial["dsm-vector-tools-x-sampling"]).toBe("step");
+    // The panel opens on Field, and its sampling chips reflect stored state.
+    expect(await driver.evaluate(selectedChip, "Sampling by")).toBe("step");
 
     // Number inputs must be unique per axis, or the labels point at the wrong
     // field and the y axis mirrors the x axis.
@@ -151,41 +166,179 @@ testWithPage(
     expect(numberIDs).toContain("dsm-vector-tools-x-minimum");
     expect(numberIDs).toContain("dsm-vector-tools-y-minimum");
 
-    await driver.evaluate(() => {
-      const select = document.getElementById(
-        "dsm-vector-tools-color-mode"
-      ) as HTMLSelectElement;
-      select.value = "magnitude";
-      select.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    // DCGView writes props as attributes, and `disabled="false"` still
+    // disables an input, so every number field used to be unusable.
+    const disabled = await driver.evaluate(() =>
+      [
+        ...document.querySelectorAll<HTMLInputElement>(
+          ".dsm-vector-tools-menu input[type=number]"
+        ),
+      ].map((input) => input.disabled)
+    );
+    expect(disabled).not.toContain(true);
+
+    // Typing must actually reach the stored configuration.
+    await driver.page.click("#dsm-vector-tools-x-minimum", { clickCount: 3 });
+    await driver.page.keyboard.type("-4");
     await driver.waitForSync();
-    expect(
-      await driver.evaluate(
-        () =>
-          (
-            document.getElementById(
-              "dsm-vector-tools-color-mode"
-            ) as HTMLSelectElement
-          ).value
-      )
-    ).toBe("magnitude");
+    expect((await storedConfig(driver)).domain.x.min).toBe(-4);
+
+    await openTab(driver, 1);
+    expect(await driver.evaluate(selectedChip, "Length mode")).toBe(
+      "normalized"
+    );
+    await driver.click('[aria-label="Length mode"] [data-value="compressed"]');
+    await driver.waitForSync();
+    expect(await driver.evaluate(selectedChip, "Length mode")).toBe(
+      "compressed"
+    );
 
     await driver.click(RESET);
     await driver.waitForSync();
+    expect(await driver.evaluate(selectedChip, "Length mode")).toBe(
+      "normalized"
+    );
+
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);
+
+testWithPage(
+  "Vector Tools panel is resizable and its popover grows with it",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+
+    // Resizing is a corner drag on the panel itself, so the size has to be
+    // read back off the element and persisted.
+    await driver.evaluate(() => {
+      const menu = document.querySelector<HTMLElement>(
+        ".dsm-vector-tools-menu"
+      )!;
+      menu.style.width = "470px";
+    });
+    // The size is debounced before it is written, and writing a plugin setting
+    // is itself deferred, so wait for the value rather than for a duration.
+    await driver.page.waitForFunction(
+      () =>
+        JSON.parse(
+          (window as unknown as { DSM: { pluginSettings: any } }).DSM
+            .pluginSettings["vector-tools"].serializedFieldConfig
+        ).panel.width === 470
+    );
+
+    const geometry = await driver.evaluate(() => {
+      const menu = document.querySelector<HTMLElement>(
+        ".dsm-vector-tools-menu"
+      )!;
+      const popover = menu.closest<HTMLElement>(".dsm-pillbox-popover")!;
+      const body = menu.querySelector<HTMLElement>(".dsm-vector-tools-body")!;
+      return {
+        resize: getComputedStyle(menu).resize,
+        menuWidth: Math.round(menu.getBoundingClientRect().width),
+        // A fixed-width pillbox popover would clip the resized panel.
+        popoverWidth: Math.round(popover.getBoundingClientRect().width),
+        // The body scrolls so the tabs and action buttons stay put.
+        bodyScrolls: body.scrollHeight > body.clientHeight,
+        footerPresent: menu.querySelector(".dsm-vector-tools-footer") !== null,
+        storedWidth: JSON.parse(
+          DSM.pluginSettings["vector-tools"]!.serializedFieldConfig as string
+        ).panel.width,
+      };
+    });
+    expect(geometry.resize).toBe("both");
+    expect(geometry.menuWidth).toBe(470);
+    expect(geometry.popoverWidth).toBe(470);
+    expect(geometry.bodyScrolls).toBe(true);
+    expect(geometry.footerPresent).toBe(true);
+    expect(geometry.storedWidth).toBe(470);
+
+    // Closing and reopening must bring the panel back at the chosen size.
+    await driver.click(BUTTON);
+    await driver.assertSelectorNot(PANEL);
+    await driver.click(BUTTON);
     expect(
-      await driver.evaluate(() => ({
-        colorMode: (
-          document.getElementById(
-            "dsm-vector-tools-color-mode"
-          ) as HTMLSelectElement
-        ).value,
-        xMin: (
-          document.getElementById(
-            "dsm-vector-tools-x-minimum"
-          ) as HTMLInputElement
-        ).value,
-      }))
-    ).toEqual({ colorMode: "fixed", xMin: "-10" });
+      await driver.evaluate(() =>
+        Math.round(
+          document
+            .querySelector(".dsm-vector-tools-menu")!
+            .getBoundingClientRect().width
+        )
+      )
+    ).toBe(470);
+
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);
+
+testWithPage(
+  "Vector Tools mirrors P and Q through the expression list",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+
+    await driver.click(".dsm-vector-tools-link-components");
+    await driver.waitForSync();
+
+    // Only the folder and the two definitions: this must not conjure a whole
+    // field the user did not ask to generate.
+    expect(
+      await driver.evaluate(() =>
+        Calc.getState()
+          .expressions.list.filter((item) =>
+            item.id?.startsWith("vector_tools_vf_default")
+          )
+          .map((item) => item.id)
+      )
+    ).toEqual([
+      FOLDER_ID,
+      `${NAMESPACE}_p_function`,
+      `${NAMESPACE}_q_function`,
+    ]);
+
+    // Editing the definition in the expression list reaches the panel.
+    await driver.evaluate(() =>
+      Calc.controller.dispatch({
+        type: "set-item-latex",
+        id: "vector_tools_vf_default_p_function",
+        latex: "v_{tfdp}\\left(x,y\\right)=\\left(-3y\\right)",
+      })
+    );
+    await driver.waitForSync();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect((await storedConfig(driver)).components).toEqual({
+      xLatex: "-3y",
+      yLatex: "x",
+    });
+
+    // A definition renamed out from under the plugin is reported, not adopted.
+    await driver.evaluate(() =>
+      Calc.controller.dispatch({
+        type: "set-item-latex",
+        id: "vector_tools_vf_default_q_function",
+        latex: "g\\left(x,y\\right)=x",
+      })
+    );
+    await driver.waitForSync();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const afterRename = await driver.evaluate(() => ({
+      hint: document.querySelector(
+        ".dsm-vector-tools-link-row .dsm-vector-tools-hint"
+      )?.textContent,
+      components: JSON.parse(
+        DSM.pluginSettings["vector-tools"]!.serializedFieldConfig as string
+      ).components,
+    }));
+    expect(afterRename.hint).toContain("no longer matches");
+    expect(afterRename.components.yLatex).toBe("x");
 
     await driver.disablePlugin("vector-tools");
     await driver.setBlank();
@@ -200,6 +353,7 @@ testWithPage(
     await driver.enablePlugin("vector-tools");
     await driver.assertSelectorEventually(BUTTON);
     await driver.click(BUTTON);
+    await openTab(driver, 3);
 
     await driver.assertSelectorNot(FLOW_CANVAS);
     await driver.click(VISUALIZE);
@@ -233,33 +387,37 @@ testWithPage(
     expect(geometry.hasBuffer).toBe(true);
     expect(geometry.drawnAfterGraph).toBeGreaterThan(0);
 
+    // Particle count is a free number, not a menu of fixed sizes.
+    await driver.page.click("#dsm-vector-tools-particle-count", {
+      clickCount: 3,
+    });
+    await driver.page.keyboard.type("37500");
+    await driver.page.keyboard.press("Tab");
+    await driver.waitForSync();
+    expect((await storedConfig(driver)).flow.particleCount).toBe(37500);
+
     // A component the GPU cannot evaluate must disable the button with a
     // reason rather than failing when it is pressed.
     await driver.evaluate(() => {
-      const dsm = (window as any).DSM;
       const config = JSON.parse(
-        dsm.pluginSettings["vector-tools"].serializedFieldConfig
+        DSM.pluginSettings["vector-tools"]!.serializedFieldConfig as string
       );
       config.components.xLatex = "a_{1}";
-      dsm.setPluginSetting(
+      DSM.setPluginSetting(
         "vector-tools",
         "serializedFieldConfig",
         JSON.stringify(config)
       );
     });
     await driver.waitForSync();
-    const blocked = await driver.evaluate(() => {
-      const button = document.querySelector<HTMLElement>(
-        ".dsm-vector-tools-visualize"
-      )!;
-      return {
-        disabled: button.classList.contains("dsm-btn-disabled"),
-        warning: document.querySelector(
-          ".dsm-vector-tools-flow .dsm-vector-tools-warning"
-        )?.textContent,
-      };
-    });
-    expect(blocked.warning).toContain("refers to another expression");
+    expect(
+      await driver.evaluate(
+        () =>
+          document.querySelector(
+            ".dsm-vector-tools-flow .dsm-vector-tools-warning"
+          )?.textContent
+      )
+    ).toContain("refers to another expression");
 
     await driver.disablePlugin("vector-tools");
     await driver.assertSelectorNot(FLOW_CANVAS);

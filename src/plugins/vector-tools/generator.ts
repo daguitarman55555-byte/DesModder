@@ -69,6 +69,82 @@ export function namespaceForField(config: VectorFieldConfig): string {
   return `vector_tools_vf_${config.id}`;
 }
 
+export type ComponentSlot = "p" | "q";
+
+/**
+ * IDs of the two expressions that hold the field's components. They are
+ * ordinary expressions in the generated folder, so the components can be edited
+ * either in the panel or directly in the expression list.
+ */
+export function componentExpressionID(
+  config: VectorFieldConfig,
+  slot: ComponentSlot
+) {
+  return `${namespaceForField(config)}_${slot}_function`;
+}
+
+/** The full `v_{tfdp}\left(x,y\right)=...` definition for one component. */
+export function componentFunctionLatex(
+  config: VectorFieldConfig,
+  slot: ComponentSlot
+) {
+  const symbols = createSymbols(config.id);
+  const body =
+    slot === "p" ? config.components.xLatex : config.components.yLatex;
+  const symbol = slot === "p" ? symbols.xFunction : symbols.yFunction;
+  return `${symbol}\\left(x,y\\right)=\\left(${body}\\right)`;
+}
+
+/**
+ * Recover a component body from a definition the user may have edited.
+ *
+ * Returns undefined if the left-hand side no longer matches what the generator
+ * owns — renaming the function or changing its parameters means the expression
+ * is no longer this field's component, and silently adopting it would rewrite
+ * the wrong thing.
+ */
+export function parseComponentFromLatex(
+  config: VectorFieldConfig,
+  slot: ComponentSlot,
+  latex: string | undefined
+): string | undefined {
+  if (latex === undefined) return undefined;
+  const symbols = createSymbols(config.id);
+  const symbol = slot === "p" ? symbols.xFunction : symbols.yFunction;
+  const normalized = latex.replace(/\s+/g, "");
+  const prefixes = [
+    `${symbol}\\left(x,y\\right)=`,
+    `${symbol}\\left(x,y\\right)\\to`,
+    `${symbol}(x,y)=`,
+  ];
+  const prefix = prefixes.find((candidate) => normalized.startsWith(candidate));
+  if (prefix === undefined) return undefined;
+  return stripOuterParens(normalized.slice(prefix.length));
+}
+
+/** Remove one layer of `\left(...\right)` or `(...)` wrapping the whole value. */
+function stripOuterParens(value: string): string {
+  for (const [open, close] of [
+    ["\\left(", "\\right)"],
+    ["(", ")"],
+  ] as const) {
+    if (!value.startsWith(open) || !value.endsWith(close)) continue;
+    const inner = value.slice(open.length, value.length - close.length);
+    // Only strip if those two delimiters are actually paired with each other,
+    // so `\left(a\right)+\left(b\right)` is left alone.
+    let depth = 0;
+    for (let i = 0; i < inner.length; i++) {
+      if (inner.startsWith("\\left(", i)) depth++;
+      else if (inner.startsWith("\\right)", i)) depth--;
+      else if (inner[i] === "(") depth++;
+      else if (inner[i] === ")") depth--;
+      if (depth < 0) return value;
+    }
+    if (depth === 0) return inner;
+  }
+  return value;
+}
+
 export function createVectorFieldPlan(
   config: VectorFieldConfig
 ): VectorFieldPlan {

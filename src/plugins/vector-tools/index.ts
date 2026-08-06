@@ -13,6 +13,7 @@ import {
   type ColorRangeMode,
   type DensityPreset,
   type FlowConfig,
+  type PanelTab,
   type SamplingAxisConfig,
   type SamplingMode,
   type VectorColorMode,
@@ -26,7 +27,11 @@ import {
 } from "./model";
 import {
   auditVectorFieldPlan,
+  componentExpressionID,
+  componentFunctionLatex,
   createVectorFieldPlan,
+  parseComponentFromLatex,
+  type ComponentSlot,
   type ExpressionAudit,
   type VectorFieldPlan,
 } from "./generator";
@@ -50,6 +55,8 @@ type FlowCompilation =
   | { ok: false; error: string };
 
 const FLOW_REFRESH_DELAY_MS = 300;
+const PANEL_SIZE_SAVE_DELAY_MS = 400;
+const POPOVER_CLASS = "dsm-vector-tools-popover";
 
 function compileFlowField(xLatex: string, yLatex: string): FlowCompilation {
   const p = compileFieldComponentToGLSL(xLatex);
@@ -112,6 +119,11 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
    * pass costs one parse rather than dozens.
    */
   private configCache?: { serialized: string; config: VectorFieldConfig };
+  private dispatcherID?: string;
+  private panelElement?: HTMLElement;
+  private panelResizeObserver?: ResizeObserver;
+  private panelSizeTimer?: ReturnType<typeof setTimeout>;
+  private componentLinkNote = "";
 
   afterEnable() {
     this.ensureStoredConfigIsCurrent();
@@ -121,11 +133,28 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       iconClass: "dsm-icon-compass2",
       popup: () => VectorToolsPanelFunc(this),
     });
+    // Components live in the expression list once the field is generated, so
+    // an edit there has to flow back into the panel and the visualizer.
+    this.dispatcherID = this.cc.dispatcher.register((event) => {
+      if (
+        event.type === "set-item-latex" ||
+        event.type === "undo" ||
+        event.type === "redo" ||
+        event.type === "set-state"
+      ) {
+        this.syncComponentsFromExpressions();
+      }
+    });
   }
 
   afterDisable() {
     if (this.flowRefreshTimer !== undefined)
       clearTimeout(this.flowRefreshTimer);
+    if (this.panelSizeTimer !== undefined) clearTimeout(this.panelSizeTimer);
+    if (this.dispatcherID !== undefined)
+      this.cc.dispatcher.unregister(this.dispatcherID);
+    this.dispatcherID = undefined;
+    this.detachPanelElement();
     this.flowOverlay.stop();
     this.dsm.pillboxMenus?.removePillboxButton("dsm-vector-tools-menu");
   }
@@ -182,14 +211,192 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   }
 
   resetConfig() {
-    this.saveConfig(cloneDefaultConfig());
+    const next = cloneDefaultConfig();
+    // Panel size and the open tab are chrome, not field settings. Resetting the
+    // field should not also resize the panel or throw the user to another tab.
+    next.panel = { ...this.getConfig().panel };
+    this.saveConfig(next);
     this.lastActionMessage = "Restored the default rotational field settings.";
   }
 
   setComponent(component: "xLatex" | "yLatex", latex: string) {
-    this.updateConfig((config) => {
-      config.components[component] = latex;
+    const config = this.getConfig();
+    if (config.components[component] === latex) return;
+    this.updateConfig((next) => {
+      next.components[component] = latex;
     });
+    // Keep the expression-list copy in step, so the arrows already on the graph
+    // follow the panel without a full regeneration.
+    this.writeComponentExpression(component === "xLatex" ? "p" : "q");
+    this.refreshFlow();
+  }
+
+  // ---- components in the expression list ---------------------------------
+
+  get hasComponentExpressions() {
+    const config = this.getConfig();
+    return (["p", "q"] as const).every(
+      (slot) =>
+        this.cc.getItemModel(componentExpressionID(config, slot))?.type ===
+        "expression"
+    );
+  }
+
+  get componentLinkStatus() {
+    if (this.componentLinkNote !== "") return this.componentLinkNote;
+    return this.hasComponentExpressions
+      ? "P and Q are live in the expression list — edit them in either place."
+      : "Put P and Q in the expression list to edit them with the full math editor.";
+  }
+
+  /**
+   * Write the two component definitions into the expression list (creating the
+   * field's folder if needed) and scroll to them.
+   */
+  addComponentExpressions() {
+    const config = this.getConfig();
+    try {
+      if (!this.hasComponentExpressions) {
+        const plan = createVectorFieldPlan(config);
+        const componentIDs = new Set(
+          (["p", "q"] as const).map((slot) =>
+            componentExpressionID(config, slot)
+          )
+        );
+        const existing = new Set(
+          this.expressions
+            .getGeneratedItems(plan.namespace)
+            .map((item) => item.id)
+        );
+        // Only the folder and the two definitions: pressing this must not
+        // conjure a whole field the user did not ask to generate.
+        const wanted = plan.expressions.filter(
+          (expression) =>
+            componentIDs.has(expression.id) || existing.has(expression.id)
+        );
+        this.expressions.applyGeneratedSet(plan.namespace, plan.folder, wanted);
+      }
+      this.componentLinkNote = "";
+      this.scrollToComponent("p");
+    } catch (error) {
+      this.componentLinkNote = `Could not add the definitions: ${
+        error instanceof Error ? error.message : "unknown error"
+      }`;
+    }
+    this.util.tick();
+  }
+
+  private scrollToComponent(slot: ComponentSlot) {
+    const id = componentExpressionID(this.getConfig(), slot);
+    if (this.cc.getItemModel(id)?.type !== "expression") return;
+    this.cc.dispatch({ type: "set-selected-id", id });
+  }
+
+  private writeComponentExpression(slot: ComponentSlot) {
+    const config = this.getConfig();
+    const id = componentExpressionID(config, slot);
+    if (this.cc.getItemModel(id)?.type !== "expression") return;
+    // setExpression merges into an existing expression, so folderId and
+    // colorLatex on the rest of the field are untouched.
+    this.calc.setExpression({
+      id,
+      latex: componentFunctionLatex(config, slot),
+    });
+  }
+
+  /**
+   * Adopt component edits made directly in the expression list. Runs on every
+   * latex change in the graph, so it exits early unless something differs.
+   */
+  private syncComponentsFromExpressions() {
+    const config = this.getConfig();
+    let changed = false;
+    let detached = false;
+    const next = { ...config.components };
+    for (const slot of ["p", "q"] as const) {
+      const id = componentExpressionID(config, slot);
+      const model = this.cc.getItemModel(id);
+      if (model?.type !== "expression") continue;
+      const body = parseComponentFromLatex(config, slot, model.latex);
+      if (body === undefined) {
+        detached = true;
+        continue;
+      }
+      const key = slot === "p" ? "xLatex" : "yLatex";
+      if (next[key] !== body) {
+        next[key] = body;
+        changed = true;
+      }
+    }
+    const note = detached
+      ? "One definition no longer matches this field's function name, so it is not being read."
+      : "";
+    if (note !== this.componentLinkNote) {
+      this.componentLinkNote = note;
+      this.util.tick();
+    }
+    if (!changed) return;
+    this.updateConfig((target) => {
+      target.components = next;
+    });
+    this.refreshFlow();
+  }
+
+  // ---- panel chrome ------------------------------------------------------
+
+  setPanelTab(tab: PanelTab) {
+    this.updateConfig((config) => {
+      config.panel.tab = tab;
+    });
+  }
+
+  attachPanelElement(element: HTMLElement) {
+    this.detachPanelElement();
+    this.panelElement = element;
+    // Pillbox popovers are a fixed 290px wide. Tag ours so it can size to the
+    // panel instead of clipping it.
+    element.closest(".dsm-pillbox-popover")?.classList.add(POPOVER_CLASS);
+    const { width, height } = this.getConfig().panel;
+    element.style.width = `${width}px`;
+    element.style.height = `${height}px`;
+    // The panel is resized by dragging its corner, so the size has to be read
+    // back off the element rather than set through a control.
+    this.panelResizeObserver = new ResizeObserver(() =>
+      this.persistPanelSize()
+    );
+    this.panelResizeObserver.observe(element);
+  }
+
+  detachPanelElement() {
+    this.panelResizeObserver?.disconnect();
+    this.panelResizeObserver = undefined;
+    this.panelElement
+      ?.closest(`.${POPOVER_CLASS}`)
+      ?.classList.remove(POPOVER_CLASS);
+    this.panelElement = undefined;
+  }
+
+  private persistPanelSize() {
+    if (this.panelSizeTimer !== undefined) clearTimeout(this.panelSizeTimer);
+    this.panelSizeTimer = setTimeout(() => {
+      this.panelSizeTimer = undefined;
+      const element = this.panelElement;
+      if (element === undefined) return;
+      // Read the inline style, not the rendered box. A corner drag writes the
+      // inline width/height, whereas a small window merely clamps the rendered
+      // size through max-height — and remembering the clamp would shrink the
+      // panel permanently.
+      const width = Math.round(Number.parseFloat(element.style.width));
+      const height = Math.round(Number.parseFloat(element.style.height));
+      if (!Number.isFinite(width) || !Number.isFinite(height)) return;
+      const { panel } = this.getConfig();
+      if (width === panel.width && height === panel.height) return;
+      if (width === 0 || height === 0) return;
+      this.updateConfig((config) => {
+        config.panel.width = width;
+        config.panel.height = height;
+      });
+    }, PANEL_SIZE_SAVE_DELAY_MS);
   }
 
   setAxis(

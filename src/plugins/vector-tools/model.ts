@@ -33,8 +33,8 @@ export type FlowColorMode = "fixed" | "speed" | "direction";
  * graph reopened later animates the way it did when it was set up.
  */
 export interface FlowConfig {
-  /** Particle count is the square of this; see FLOW_DENSITY_CHOICES. */
-  particleResolution: number;
+  /** Exact number of particles. Any value in the supported range works. */
+  particleCount: number;
   speed: number;
   trailPersistence: number;
   dropRate: number;
@@ -45,15 +45,32 @@ export interface FlowConfig {
   normalizeSpeed: boolean;
 }
 
-export const FLOW_DENSITY_CHOICES: readonly {
-  resolution: number;
-  label: string;
-}[] = [
-  { resolution: 64, label: "Light (4k)" },
-  { resolution: 128, label: "Normal (16k)" },
-  { resolution: 192, label: "Dense (37k)" },
-  { resolution: 256, label: "Very dense (65k)" },
+export const FLOW_PARTICLE_MINIMUM = 500;
+export const FLOW_PARTICLE_MAXIMUM = 400_000;
+/** Above this, a mid-range GPU starts dropping frames on a large viewport. */
+export const FLOW_PARTICLE_HEAVY = 120_000;
+
+/** Persisted panel geometry, so a resized panel stays resized. */
+export interface PanelConfig {
+  width: number;
+  height: number;
+  /** Section the panel opens on. */
+  tab: PanelTab;
+}
+
+export type PanelTab = "field" | "arrows" | "color" | "flow";
+
+export const PANEL_TABS: readonly { id: PanelTab; label: string }[] = [
+  { id: "field", label: "Field" },
+  { id: "arrows", label: "Arrows" },
+  { id: "color", label: "Color" },
+  { id: "flow", label: "Flow" },
 ];
+
+export const PANEL_MIN_WIDTH = 320;
+export const PANEL_MAX_WIDTH = 720;
+export const PANEL_MIN_HEIGHT = 260;
+export const PANEL_MAX_HEIGHT = 900;
 
 export interface SamplingAxisConfig {
   min: number;
@@ -103,6 +120,7 @@ export interface VectorFieldConfig {
   color: VectorColorConfig;
   zeroVectorMode: ZeroVectorMode;
   flow: FlowConfig;
+  panel: PanelConfig;
 }
 
 export interface ValidationIssue {
@@ -190,7 +208,7 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
   // Deliberately restrained: the flow is drawn on top of the graph paper, so
   // the defaults have to leave the axes and expressions legible underneath.
   flow: {
-    particleResolution: 128,
+    particleCount: 16_000,
     speed: 1,
     trailPersistence: 0.9,
     dropRate: 0.008,
@@ -199,6 +217,7 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
     colorMode: "speed",
     normalizeSpeed: true,
   },
+  panel: { width: 360, height: 520, tab: "field" },
 };
 
 export const DENSITY_PRESETS: readonly DensityPreset[] = [
@@ -311,6 +330,7 @@ export function cloneDefaultConfig(): VectorFieldConfig {
     arrowhead: { ...DEFAULT_VECTOR_FIELD_CONFIG.arrowhead },
     color: { ...DEFAULT_VECTOR_FIELD_CONFIG.color },
     flow: { ...DEFAULT_VECTOR_FIELD_CONFIG.flow },
+    panel: { ...DEFAULT_VECTOR_FIELD_CONFIG.panel },
   };
 }
 
@@ -469,21 +489,53 @@ export function normalizeVectorFieldConfig(value: unknown): VectorFieldConfig {
     },
     zeroVectorMode: value.zeroVectorMode === "point" ? "point" : "hide",
     flow: normalizeFlow(value.flow, fallback.flow),
+    panel: normalizePanel(value.panel, fallback.panel),
   };
   return config;
 }
 
+function normalizePanel(value: unknown, fallback: PanelConfig): PanelConfig {
+  const panel = asRecord(value);
+  return {
+    width: Math.round(
+      clampNumber(
+        panel?.width,
+        fallback.width,
+        PANEL_MIN_WIDTH,
+        PANEL_MAX_WIDTH
+      )
+    ),
+    height: Math.round(
+      clampNumber(
+        panel?.height,
+        fallback.height,
+        PANEL_MIN_HEIGHT,
+        PANEL_MAX_HEIGHT
+      )
+    ),
+    tab: PANEL_TABS.some((tab) => tab.id === panel?.tab)
+      ? (panel?.tab as PanelTab)
+      : fallback.tab,
+  };
+}
+
 function normalizeFlow(value: unknown, fallback: FlowConfig): FlowConfig {
   const flow = asRecord(value);
-  const resolutions = FLOW_DENSITY_CHOICES.map((choice) => choice.resolution);
-  const resolution = finiteOr(
-    flow?.particleResolution,
-    fallback.particleResolution
-  );
+  // Schema 2 stored a texture edge length rather than a count.
+  const legacyResolution = flow?.particleResolution;
+  const legacyCount =
+    typeof legacyResolution === "number" && Number.isFinite(legacyResolution)
+      ? legacyResolution * legacyResolution
+      : undefined;
   return {
-    particleResolution: resolutions.includes(resolution)
-      ? resolution
-      : fallback.particleResolution,
+    particleCount: Math.round(
+      clampNumber(
+        flow?.particleCount ?? legacyCount,
+        fallback.particleCount,
+        FLOW_PARTICLE_MINIMUM,
+        FLOW_PARTICLE_MAXIMUM
+      )
+    ),
     speed: clampNumber(flow?.speed, fallback.speed, 0.05, 8),
     trailPersistence: clampNumber(
       flow?.trailPersistence,

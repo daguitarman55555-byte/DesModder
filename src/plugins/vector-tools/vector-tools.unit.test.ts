@@ -1,16 +1,23 @@
 import { CalculatorExpressionAdapter } from "./desmos/ExpressionAdapter";
 import {
   auditVectorFieldPlan,
+  componentExpressionID,
+  componentFunctionLatex,
   createVectorFieldPlan,
   namespaceForField,
+  parseComponentFromLatex,
 } from "./generator";
 import { TEST_FOLDER_ID, TEST_LINE_ID, TEST_NAMESPACE } from "./ids";
 import {
   cloneDefaultConfig,
   configForPreset,
   DENSITY_PRESETS,
+  FLOW_PARTICLE_MAXIMUM,
+  FLOW_PARTICLE_MINIMUM,
   isDevelopmentBuild,
   normalizeVectorFieldConfig,
+  PANEL_MAX_WIDTH,
+  PANEL_MIN_HEIGHT,
   validateVectorFieldConfig,
   VECTOR_FIELD_PRESETS,
 } from "./model";
@@ -267,9 +274,15 @@ describe("Vector Tools field configuration", () => {
     });
     expect(upgraded.flow).toEqual(cloneDefaultConfig().flow);
 
+    // Schema 2 stored a texture edge length instead of a particle count.
+    expect(
+      normalizeVectorFieldConfig({ flow: { particleResolution: 192 } }).flow
+        .particleCount
+    ).toBe(192 * 192);
+
     const clamped = normalizeVectorFieldConfig({
       flow: {
-        particleResolution: 999,
+        particleCount: 1e9,
         speed: 1e9,
         trailPersistence: 5,
         dropRate: -1,
@@ -280,7 +293,7 @@ describe("Vector Tools field configuration", () => {
       },
     });
     expect(clamped.flow).toEqual({
-      particleResolution: 128,
+      particleCount: FLOW_PARTICLE_MAXIMUM,
       speed: 8,
       trailPersistence: 0.995,
       dropRate: 0,
@@ -289,6 +302,25 @@ describe("Vector Tools field configuration", () => {
       colorMode: "speed",
       normalizeSpeed: true,
     });
+    expect(
+      normalizeVectorFieldConfig({ flow: { particleCount: 1 } }).flow
+        .particleCount
+    ).toBe(FLOW_PARTICLE_MINIMUM);
+  });
+
+  test("clamps persisted panel geometry and falls back to a known tab", () => {
+    expect(
+      normalizeVectorFieldConfig({
+        panel: { width: 10_000, height: 4, tab: "nope" },
+      }).panel
+    ).toEqual({
+      width: PANEL_MAX_WIDTH,
+      height: PANEL_MIN_HEIGHT,
+      tab: "field",
+    });
+    expect(
+      normalizeVectorFieldConfig({ panel: { width: 460, tab: "flow" } }).panel
+    ).toMatchObject({ width: 460, tab: "flow" });
   });
 
   test("rejects incomplete fields and unsafe sampling while requiring a warning confirmation", () => {
@@ -375,6 +407,39 @@ describe("Vector Tools Desmos expression plans", () => {
       (expression) => expression.purpose === "displayed x components"
     );
     expect(display?.latex).toContain("v_{tfddu}");
+  });
+
+  test("round-trips components through their expression-list definitions", () => {
+    const config = cloneDefaultConfig();
+    expect(componentExpressionID(config, "p")).toBe(
+      "vector_tools_vf_default_p_function"
+    );
+    expect(componentFunctionLatex(config, "p")).toBe(
+      "v_{tfdp}\\left(x,y\\right)=\\left(-y\\right)"
+    );
+    expect(
+      parseComponentFromLatex(config, "p", componentFunctionLatex(config, "p"))
+    ).toBe("-y");
+    // Bodies a person would type by hand, with and without wrapping.
+    expect(
+      parseComponentFromLatex(config, "q", "v_{tfdq}\\left(x,y\\right)=3x")
+    ).toBe("3x");
+    // Only a paired outer group is stripped, never two adjacent ones.
+    expect(
+      parseComponentFromLatex(
+        config,
+        "q",
+        "v_{tfdq}\\left(x,y\\right)=\\left(x\\right)+\\left(y\\right)"
+      )
+    ).toBe("\\left(x\\right)+\\left(y\\right)");
+    // A renamed or re-signatured definition is no longer this field's.
+    expect(
+      parseComponentFromLatex(config, "p", "g\\left(x,y\\right)=-y")
+    ).toBeUndefined();
+    expect(
+      parseComponentFromLatex(config, "p", "v_{tfdp}\\left(t\\right)=-y")
+    ).toBeUndefined();
+    expect(parseComponentFromLatex(config, "p", undefined)).toBeUndefined();
   });
 
   test("audits missing and unexpected expressions without treating a manual probe as a pass", () => {

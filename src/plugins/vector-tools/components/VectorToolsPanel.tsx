@@ -6,10 +6,19 @@ import {
   If,
   IfElse,
   InlineMathInputViewGeneral,
+  SegmentedControl,
+  SwitchUnion,
 } from "#components";
 import { format } from "#i18n";
 import {
-  FLOW_DENSITY_CHOICES,
+  FLOW_PARTICLE_HEAVY,
+  FLOW_PARTICLE_MAXIMUM,
+  FLOW_PARTICLE_MINIMUM,
+  PANEL_MAX_HEIGHT,
+  PANEL_MAX_WIDTH,
+  PANEL_MIN_HEIGHT,
+  PANEL_MIN_WIDTH,
+  PANEL_TABS,
   type ColorPalette,
   type ColorRangeMode,
   type FlowColorMode,
@@ -45,8 +54,8 @@ const COLOR_MODES: readonly Choice<VectorColorMode>[] = [
 ];
 
 const PALETTES: readonly Choice<ColorPalette>[] = [
-  { value: "sequential-a", label: "Sequential (indigo)" },
-  { value: "sequential-b", label: "Sequential (blue)" },
+  { value: "sequential-a", label: "Indigo" },
+  { value: "sequential-b", label: "Blue" },
   { value: "blue-red", label: "Blue to red" },
   { value: "grayscale", label: "Grayscale" },
   { value: "direction-hue", label: "Hue wheel" },
@@ -84,189 +93,184 @@ export class VectorToolsPanel extends Component<{
     const validation = () => vectorTools.validation;
 
     return (
-      <div class="dcg-popover-interior dsm-vector-tools-menu">
+      <div
+        class="dcg-popover-interior dsm-vector-tools-menu"
+        didMount={(element: HTMLElement) =>
+          vectorTools.attachPanelElement(element)
+        }
+        willUnmount={() => vectorTools.detachPanelElement()}
+      >
         <div class="dcg-popover-title">{format("vector-tools-name")}</div>
-        <p class="dsm-vector-tools-intro">
-          Build a 2D vector field from standard Desmos expressions. Generated
-          arrows stay editable in the expression list.
-        </p>
+        <div class="dsm-vector-tools-tabs">
+          <SegmentedControl
+            ariaGroupLabel="Vector Tools section"
+            names={() => PANEL_TABS.map((tab) => tab.label)}
+            selectedIndex={() =>
+              PANEL_TABS.findIndex((tab) => tab.id === config().panel.tab)
+            }
+            setSelectedIndex={(index: number) =>
+              vectorTools.setPanelTab(PANEL_TABS[index].id)
+            }
+          />
+        </div>
 
-        {fieldSection(vectorTools, config, validation)}
-        {samplingSection(vectorTools, config, validation)}
-        {appearanceSection(vectorTools, config)}
-        {colorSection(vectorTools, config)}
-        {flowSection(vectorTools, config)}
-        {actionsSection(vectorTools, validation)}
+        <div class="dsm-vector-tools-body">
+          {SwitchUnion(() => config().panel.tab, {
+            field: () => fieldTab(vectorTools, config, validation),
+            arrows: () => arrowsTab(vectorTools, config),
+            color: () => colorTab(vectorTools, config),
+            flow: () => flowTab(vectorTools, config),
+          })}
+          <If predicate={() => vectorTools.isTestLabVisible}>
+            {() => testLab(vectorTools)}
+          </If>
+        </div>
 
-        <If predicate={() => vectorTools.isTestLabVisible}>
-          {() => testLab(vectorTools)}
-        </If>
+        {footer(vectorTools, validation)}
       </div>
     );
   }
 }
 
-function fieldSection(
+// ---- tabs ----------------------------------------------------------------
+
+function fieldTab(
   vectorTools: VectorTools,
   config: ConfigGetter,
   validation: () => VectorTools["validation"]
 ) {
   return (
-    <section class="dsm-vector-tools-section">
-      <h3>Field</h3>
-      {textControl(
-        "dsm-vector-tools-name",
-        "Field name",
-        () => config().name,
-        (value) =>
-          vectorTools.updateConfig((field) => {
-            field.name = value;
-          })
-      )}
-      <div class="dsm-vector-tools-math-row">
-        <div>
-          <label class="dsm-vector-tools-label">P(x, y)</label>
-          <InlineMathInputViewGeneral
-            containerClass={() => ({ "dsm-vector-tools-math-input": true })}
-            placeholder="-y"
-            ariaLabel="P of x and y"
-            latex={() => config().components.xLatex}
-            handleLatexChanged={(latex) => {
-              vectorTools.setComponent("xLatex", latex);
-              vectorTools.refreshFlow();
-            }}
-            hasError={() => hasIssue(validation().issues, "P(x,y)")}
-            handleFocusChanged={(focused) =>
-              vectorTools.updateFocus("p", focused)
-            }
-            isFocused={() => vectorTools.isFocused("p")}
-            controller={vectorTools.cc}
-            readonly={false}
-          />
+    <div>
+      <section class="dsm-vector-tools-section">
+        {textControl(
+          "dsm-vector-tools-name",
+          "Field name",
+          () => config().name,
+          (value) =>
+            vectorTools.updateConfig((field) => {
+              field.name = value;
+            })
+        )}
+        <div class="dsm-vector-tools-math-row">
+          {componentInput(vectorTools, config, validation, "p")}
+          {componentInput(vectorTools, config, validation, "q")}
         </div>
-        <div>
-          <label class="dsm-vector-tools-label">Q(x, y)</label>
-          <InlineMathInputViewGeneral
-            containerClass={() => ({ "dsm-vector-tools-math-input": true })}
-            placeholder="x"
-            ariaLabel="Q of x and y"
-            latex={() => config().components.yLatex}
-            handleLatexChanged={(latex) => {
-              vectorTools.setComponent("yLatex", latex);
-              vectorTools.refreshFlow();
-            }}
-            hasError={() => hasIssue(validation().issues, "Q(x,y)")}
-            handleFocusChanged={(focused) =>
-              vectorTools.updateFocus("q", focused)
+        <div class="dsm-vector-tools-link-row">
+          <Button
+            color="light-gray"
+            class="dsm-vector-tools-link-components"
+            onTap={() => vectorTools.addComponentExpressions()}
+          >
+            {() =>
+              vectorTools.hasComponentExpressions
+                ? "Show P and Q in the expression list"
+                : "Edit P and Q in the expression list"
             }
-            isFocused={() => vectorTools.isFocused("q")}
-            controller={vectorTools.cc}
-            readonly={false}
-          />
+          </Button>
+          <div class="dsm-vector-tools-hint">
+            {() => vectorTools.componentLinkStatus}
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+
+      <section class="dsm-vector-tools-section">
+        <h3>Sampling domain</h3>
+        {axisControls(vectorTools, "x", config)}
+        {axisControls(vectorTools, "y", config)}
+        <div class="dsm-vector-tools-count">
+          Estimated vectors:{" "}
+          {() => validation().estimatedVectorCount.toLocaleString()}
+        </div>
+      </section>
+    </div>
   );
 }
 
-function samplingSection(
-  vectorTools: VectorTools,
-  config: ConfigGetter,
-  validation: () => VectorTools["validation"]
-) {
-  return (
-    <section class="dsm-vector-tools-section">
-      <h3>Sampling domain</h3>
-      {axisControls(vectorTools, "x", config)}
-      {axisControls(vectorTools, "y", config)}
-      <div class="dsm-vector-tools-count">
-        Estimated vectors:{" "}
-        {() => validation().estimatedVectorCount.toLocaleString()}
-      </div>
-    </section>
-  );
-}
-
-function appearanceSection(vectorTools: VectorTools, config: ConfigGetter) {
+function arrowsTab(vectorTools: VectorTools, config: ConfigGetter) {
   const length = () => config().length;
   return (
-    <section class="dsm-vector-tools-section">
-      <h3>Arrow appearance</h3>
-      {selectControl(
-        "dsm-vector-tools-length-mode",
-        "Length mode",
-        () => length().mode,
-        LENGTH_MODES,
-        (value) => vectorTools.setLength("mode", value)
-      )}
-      {checkboxControl(
-        "Auto target length from sampling spacing",
-        () => length().autoLength,
-        (checked) => vectorTools.setLength("autoLength", checked)
-      )}
-      <div class="dsm-vector-tools-number-grid">
-        {numberControl(
-          "dsm-vector-tools-target-length",
-          "Target length",
-          () => length().targetLength,
-          (value) => vectorTools.setLength("targetLength", value),
-          () => length().autoLength
+    <div>
+      <section class="dsm-vector-tools-section">
+        {chipGroup(
+          "Length mode",
+          () => length().mode,
+          LENGTH_MODES,
+          (value) => vectorTools.setLength("mode", value)
         )}
-        {numberControl(
-          "dsm-vector-tools-scale",
-          "Scale",
-          () => length().scale,
-          (value) => vectorTools.setLength("scale", value)
+        {checkboxControl(
+          "Auto target length from sampling spacing",
+          () => length().autoLength,
+          (checked) => vectorTools.setLength("autoLength", checked)
         )}
-        {numberControl(
-          "dsm-vector-tools-clamp-maximum",
-          "Clamp maximum",
-          () => length().maximumLength,
-          (value) => vectorTools.setLength("maximumLength", value)
-        )}
-        {numberControl(
-          "dsm-vector-tools-compression",
-          "Compression",
-          () => length().compression,
-          (value) => vectorTools.setLength("compression", value)
-        )}
-        {numberControl(
+        <div class="dsm-vector-tools-number-grid">
+          {numberControl(
+            "dsm-vector-tools-target-length",
+            "Target length",
+            () => length().targetLength,
+            (value) => vectorTools.setLength("targetLength", value),
+            () => length().autoLength
+          )}
+          {numberControl(
+            "dsm-vector-tools-scale",
+            "Scale",
+            () => length().scale,
+            (value) => vectorTools.setLength("scale", value)
+          )}
+          {numberControl(
+            "dsm-vector-tools-clamp-maximum",
+            "Clamp maximum",
+            () => length().maximumLength,
+            (value) => vectorTools.setLength("maximumLength", value)
+          )}
+          {numberControl(
+            "dsm-vector-tools-compression",
+            "Compression",
+            () => length().compression,
+            (value) => vectorTools.setLength("compression", value)
+          )}
+        </div>
+      </section>
+
+      <section class="dsm-vector-tools-section">
+        <h3>Arrowhead</h3>
+        {sliderControl(
           "dsm-vector-tools-arrowhead-size",
-          "Arrowhead size",
+          "Size",
           () => config().arrowhead.size,
+          { minimum: 0.02, maximum: 1, step: 0.01, decimals: 2 },
           (value) => vectorTools.setArrowhead("size", value)
         )}
-        {numberControl(
+        {sliderControl(
           "dsm-vector-tools-arrowhead-angle",
-          "Arrowhead angle (rad)",
+          "Angle (rad)",
           () => config().arrowhead.angleRadians,
+          { minimum: 0.05, maximum: 1.5, step: 0.01, decimals: 2 },
           (value) => vectorTools.setArrowhead("angleRadians", value)
         )}
-      </div>
-      {selectControl(
-        "dsm-vector-tools-zero-mode",
-        "Zero vectors",
-        () => config().zeroVectorMode,
-        ZERO_MODES,
-        (value) => vectorTools.setZeroVectorMode(value)
-      )}
-    </section>
+        {chipGroup(
+          "Zero vectors",
+          () => config().zeroVectorMode,
+          ZERO_MODES,
+          (value) => vectorTools.setZeroVectorMode(value)
+        )}
+      </section>
+    </div>
   );
 }
 
-function colorSection(vectorTools: VectorTools, config: ConfigGetter) {
+function colorTab(vectorTools: VectorTools, config: ConfigGetter) {
   const color = () => config().color;
+  const usesPalette = () =>
+    color().mode === "magnitude" || color().mode === "log-magnitude";
   return (
-    <section class="dsm-vector-tools-section">
-      <h3>Color</h3>
-      {selectControl(
-        "dsm-vector-tools-color-mode",
-        "Color mode",
-        () => color().mode,
-        COLOR_MODES,
-        (value) => vectorTools.setColor("mode", value)
-      )}
-      <div class="dsm-vector-tools-color-options">
+    <div>
+      <section class="dsm-vector-tools-section">
+        {chipGroup(
+          "Color mode",
+          () => color().mode,
+          COLOR_MODES,
+          (value) => vectorTools.setColor("mode", value)
+        )}
         <label
           class="dsm-vector-tools-label"
           for="dsm-vector-tools-fixed-color"
@@ -276,7 +280,6 @@ function colorSection(vectorTools: VectorTools, config: ConfigGetter) {
         <input
           id="dsm-vector-tools-fixed-color"
           type="color"
-          value={() => color().fixedColor}
           onUpdate={(element: HTMLInputElement) => {
             if (document.activeElement !== element)
               element.value = color().fixedColor;
@@ -288,142 +291,150 @@ function colorSection(vectorTools: VectorTools, config: ConfigGetter) {
             )
           }
         />
-        {selectControl(
-          "dsm-vector-tools-palette",
-          "Palette",
-          () => color().palette,
-          PALETTES,
-          (value) => vectorTools.setColor("palette", value)
-        )}
-        {selectControl(
-          "dsm-vector-tools-range-mode",
-          "Color range",
-          () => color().rangeMode,
-          RANGE_MODES,
-          (value) => vectorTools.setColor("rangeMode", value)
-        )}
-        <If predicate={() => color().rangeMode === "manual"}>
-          {() => (
-            <div class="dsm-vector-tools-number-grid">
-              {numberControl(
-                "dsm-vector-tools-range-minimum",
-                "Range minimum",
-                () => color().minimum,
-                (value) => vectorTools.setColor("minimum", value)
+      </section>
+
+      <If predicate={usesPalette}>
+        {() => (
+          <section class="dsm-vector-tools-section">
+            {chipGroup(
+              "Palette",
+              () => color().palette,
+              PALETTES,
+              (value) => vectorTools.setColor("palette", value)
+            )}
+            {chipGroup(
+              "Color range",
+              () => color().rangeMode,
+              RANGE_MODES,
+              (value) => vectorTools.setColor("rangeMode", value)
+            )}
+            <If predicate={() => color().rangeMode === "manual"}>
+              {() => (
+                <div class="dsm-vector-tools-number-grid">
+                  {numberControl(
+                    "dsm-vector-tools-range-minimum",
+                    "Range minimum",
+                    () => color().minimum,
+                    (value) => vectorTools.setColor("minimum", value)
+                  )}
+                  {numberControl(
+                    "dsm-vector-tools-range-maximum",
+                    "Range maximum",
+                    () => color().maximum,
+                    (value) => vectorTools.setColor("maximum", value)
+                  )}
+                </div>
               )}
-              {numberControl(
-                "dsm-vector-tools-range-maximum",
-                "Range maximum",
-                () => color().maximum,
-                (value) => vectorTools.setColor("maximum", value)
-              )}
-            </div>
-          )}
-        </If>
-      </div>
-    </section>
+            </If>
+          </section>
+        )}
+      </If>
+    </div>
   );
 }
 
-function flowSection(vectorTools: VectorTools, config: ConfigGetter) {
+function flowTab(vectorTools: VectorTools, config: ConfigGetter) {
   const flow = () => config().flow;
   const compilation = () => vectorTools.flowCompilation;
   return (
-    <section class="dsm-vector-tools-section dsm-vector-tools-flow">
-      <h3>Flow visualization</h3>
-      <p class="dsm-vector-tools-intro">
-        Animates particles carried by the field, drawn over the graph paper. It
-        reads the same P and Q you typed above, but it does not add expressions.
-      </p>
-      <div class="dsm-vector-tools-actions">
-        <Button
-          color={() => (vectorTools.isFlowRunning ? "light-gray" : "blue")}
-          class="dsm-vector-tools-visualize"
-          disabled={() => !compilation().ok}
-          onTap={() => vectorTools.toggleFlow()}
-        >
-          {() =>
-            vectorTools.isFlowRunning ? "Stop visualization" : "Visualize"
-          }
-        </Button>
-      </div>
-      <If predicate={() => !compilation().ok}>
-        {() => (
-          <div class="dsm-vector-tools-warning">
-            {() => {
-              const result = compilation();
-              return result.ok ? "" : result.error;
-            }}
-          </div>
+    <div>
+      <section class="dsm-vector-tools-section dsm-vector-tools-flow">
+        <p class="dsm-vector-tools-hint">
+          Animates particles carried by the field, drawn over the graph paper.
+          It reads the same P and Q, and adds no expressions.
+        </p>
+        <div class="dsm-vector-tools-actions">
+          <Button
+            color={() => (vectorTools.isFlowRunning ? "light-gray" : "blue")}
+            class="dsm-vector-tools-visualize"
+            disabled={() => !compilation().ok}
+            onTap={() => vectorTools.toggleFlow()}
+          >
+            {() =>
+              vectorTools.isFlowRunning ? "Stop visualization" : "Visualize"
+            }
+          </Button>
+        </div>
+        <If predicate={() => !compilation().ok}>
+          {() => (
+            <div class="dsm-vector-tools-warning">
+              {() => {
+                const result = compilation();
+                return result.ok ? "" : result.error;
+              }}
+            </div>
+          )}
+        </If>
+        <div class="dsm-vector-tools-status dsm-vector-tools-flow-status">
+          {() => vectorTools.flowStatus}
+        </div>
+      </section>
+
+      <section class="dsm-vector-tools-section">
+        {particleCountControl(vectorTools, flow)}
+        {chipGroup(
+          "Particle color",
+          () => flow().colorMode,
+          FLOW_COLOR_MODES,
+          (value) => vectorTools.setFlow("colorMode", value)
         )}
-      </If>
-      {selectControl(
-        "dsm-vector-tools-flow-density",
-        "Particle density",
-        () => String(flow().particleResolution),
-        FLOW_DENSITY_CHOICES.map((choice) => ({
-          value: String(choice.resolution),
-          label: choice.label,
-        })),
-        (value) => vectorTools.setFlow("particleResolution", Number(value))
-      )}
-      {selectControl(
-        "dsm-vector-tools-flow-color",
-        "Particle color",
-        () => flow().colorMode,
-        FLOW_COLOR_MODES,
-        (value) => vectorTools.setFlow("colorMode", value)
-      )}
-      {checkboxControl(
-        "Constant speed (follow streamlines evenly)",
-        () => flow().normalizeSpeed,
-        (checked) => vectorTools.setFlow("normalizeSpeed", checked)
-      )}
-      <div class="dsm-vector-tools-number-grid">
-        {numberControl(
+        {checkboxControl(
+          "Constant speed (follow streamlines evenly)",
+          () => flow().normalizeSpeed,
+          (checked) => vectorTools.setFlow("normalizeSpeed", checked)
+        )}
+        {sliderControl(
           "dsm-vector-tools-flow-speed",
           "Speed",
           () => flow().speed,
+          { minimum: 0.05, maximum: 8, step: 0.05, decimals: 2 },
           (value) => vectorTools.setFlow("speed", value)
         )}
-        {numberControl(
+        {sliderControl(
           "dsm-vector-tools-flow-trail",
-          "Trail persistence",
+          "Trail length",
           () => flow().trailPersistence,
+          { minimum: 0, maximum: 0.995, step: 0.005, decimals: 3 },
           (value) => vectorTools.setFlow("trailPersistence", value)
         )}
-        {numberControl(
+        {sliderControl(
           "dsm-vector-tools-flow-opacity",
           "Opacity",
           () => flow().opacity,
+          { minimum: 0.05, maximum: 1, step: 0.01, decimals: 2 },
           (value) => vectorTools.setFlow("opacity", value)
         )}
-        {numberControl(
+        {sliderControl(
           "dsm-vector-tools-flow-point-size",
           "Particle size",
           () => flow().pointSize,
+          { minimum: 0.5, maximum: 6, step: 0.1, decimals: 1 },
           (value) => vectorTools.setFlow("pointSize", value)
         )}
-      </div>
-      <div class="dsm-vector-tools-status dsm-vector-tools-flow-status">
-        {() => vectorTools.flowStatus}
-      </div>
-    </section>
+        {sliderControl(
+          "dsm-vector-tools-flow-drop-rate",
+          "Respawn rate",
+          () => flow().dropRate,
+          { minimum: 0, maximum: 0.2, step: 0.001, decimals: 3 },
+          (value) => vectorTools.setFlow("dropRate", value)
+        )}
+      </section>
+    </div>
   );
 }
 
-function actionsSection(
+function footer(
   vectorTools: VectorTools,
   validation: () => VectorTools["validation"]
 ) {
   return (
-    <section class="dsm-vector-tools-section dsm-vector-tools-validation">
+    <div class="dsm-vector-tools-footer dsm-vector-tools-validation">
       {IfElse(() => validation().issues.length === 0, {
         true: () => (
           <div class="dsm-vector-tools-valid">Ready to generate.</div>
         ),
         false: () => (
-          <div>
+          <div class="dsm-vector-tools-issues">
             <For
               each={() =>
                 validation().issues.map((issue, index) => ({ ...issue, index }))
@@ -453,7 +464,7 @@ function actionsSection(
           class="dsm-vector-tools-remove"
           onTap={() => vectorTools.removeProductionField()}
         >
-          Remove field
+          Remove
         </Button>
         <Button
           color="light-gray"
@@ -465,7 +476,40 @@ function actionsSection(
       </div>
       {confirmationControls(vectorTools)}
       <div class="dsm-vector-tools-status">{() => vectorTools.message}</div>
-    </section>
+    </div>
+  );
+}
+
+// ---- pieces --------------------------------------------------------------
+
+function componentInput(
+  vectorTools: VectorTools,
+  config: ConfigGetter,
+  validation: () => VectorTools["validation"],
+  which: "p" | "q"
+) {
+  const key = which === "p" ? "xLatex" : "yLatex";
+  const label = which === "p" ? "P(x, y)" : "Q(x, y)";
+  return (
+    <div>
+      <label class="dsm-vector-tools-label">{label}</label>
+      <InlineMathInputViewGeneral
+        containerClass={() => ({ "dsm-vector-tools-math-input": true })}
+        placeholder={which === "p" ? "-y" : "x"}
+        ariaLabel={`${which === "p" ? "P" : "Q"} of x and y`}
+        latex={() => config().components[key]}
+        handleLatexChanged={(latex) => vectorTools.setComponent(key, latex)}
+        hasError={() =>
+          hasIssue(validation().issues, which === "p" ? "P(x,y)" : "Q(x,y)")
+        }
+        handleFocusChanged={(focused) =>
+          vectorTools.updateFocus(which, focused)
+        }
+        isFocused={() => vectorTools.isFocused(which)}
+        controller={vectorTools.cc}
+        readonly={false}
+      />
+    </div>
   );
 }
 
@@ -492,12 +536,12 @@ function axisControls(
           (value) => vectorTools.setAxis(axisName, "max", value)
         )}
       </div>
-      {selectControl(
-        `dsm-vector-tools-${axisName}-sampling`,
+      {chipGroup(
         "Sampling by",
         () => axis().mode,
         SAMPLING_MODES,
-        (value) => vectorTools.setAxis(axisName, "mode", value)
+        (value) => vectorTools.setAxis(axisName, "mode", value),
+        `dsm-vector-tools-${axisName}-sampling`
       )}
       {IfElse(() => axis().mode === "step", {
         true: () =>
@@ -519,46 +563,179 @@ function axisControls(
   );
 }
 
-/**
- * DCGView only re-reads a prop if it was passed as a function, and a `value`
- * attribute does not move a `<select>`'s selection anyway. `onUpdate` runs on
- * every render pass, which is the one place a control can be pushed back into
- * sync with the stored configuration.
- */
-function selectControl<T extends string>(
-  id: string,
-  label: string,
-  value: () => T,
-  choices: readonly Choice<T>[],
-  onChange: (value: T) => void
+function particleCountControl(
+  vectorTools: VectorTools,
+  flow: () => VectorFieldConfig["flow"]
 ) {
+  const set = (value: number) =>
+    vectorTools.setFlow(
+      "particleCount",
+      Math.round(
+        Math.min(FLOW_PARTICLE_MAXIMUM, Math.max(FLOW_PARTICLE_MINIMUM, value))
+      )
+    );
   return (
-    <div class="dsm-vector-tools-control">
-      <label class="dsm-vector-tools-label" for={id}>
-        {label}
-      </label>
-      <select
-        id={id}
-        onUpdate={(element: HTMLSelectElement) => {
-          if (element.value !== value()) element.value = value();
+    <div class="dsm-vector-tools-particles">
+      <div class="dsm-vector-tools-slider-head">
+        <label class="dsm-vector-tools-label" for="dsm-vector-tools-particles">
+          Particles
+        </label>
+        <input
+          id="dsm-vector-tools-particle-count"
+          class="dsm-vector-tools-particle-count"
+          type="number"
+          min={FLOW_PARTICLE_MINIMUM}
+          max={FLOW_PARTICLE_MAXIMUM}
+          step="500"
+          onUpdate={(element: HTMLInputElement) => {
+            if (document.activeElement !== element)
+              element.value = String(flow().particleCount);
+          }}
+          onChange={(event: Event) => commitNumber(event, set)}
+        />
+      </div>
+      {/*
+        The slider is exponential: the interesting range is 500-40,000, and a
+        linear slider would bury all of it in the first tenth of the track.
+      */}
+      <input
+        id="dsm-vector-tools-particles"
+        class="dsm-vector-tools-slider"
+        type="range"
+        min="0"
+        max="1000"
+        step="1"
+        onUpdate={(element: HTMLInputElement) => {
+          if (document.activeElement !== element)
+            element.value = String(countToSlider(flow().particleCount));
         }}
-        onChange={(event: Event) =>
-          onChange((event.target as HTMLSelectElement).value as T)
+        onInput={(event: Event) =>
+          set(sliderToCount(Number((event.target as HTMLInputElement).value)))
         }
-      >
-        {choices.map((choice) => (
-          <option
-            value={choice.value}
-            selected={() => choice.value === value()}
-          >
-            {choice.label}
-          </option>
-        ))}
-      </select>
+      />
+      <If predicate={() => flow().particleCount > FLOW_PARTICLE_HEAVY}>
+        {() => (
+          <div class="dsm-vector-tools-warning">
+            Above {FLOW_PARTICLE_HEAVY.toLocaleString()} particles the animation
+            may drop frames on an integrated GPU.
+          </div>
+        )}
+      </If>
     </div>
   );
 }
 
+function countToSlider(count: number) {
+  const t =
+    (Math.log(count) - Math.log(FLOW_PARTICLE_MINIMUM)) /
+    (Math.log(FLOW_PARTICLE_MAXIMUM) - Math.log(FLOW_PARTICLE_MINIMUM));
+  return Math.round(1000 * Math.min(1, Math.max(0, t)));
+}
+
+function sliderToCount(position: number) {
+  const t = Math.min(1, Math.max(0, position / 1000));
+  const value = Math.exp(
+    Math.log(FLOW_PARTICLE_MINIMUM) +
+      t * (Math.log(FLOW_PARTICLE_MAXIMUM) - Math.log(FLOW_PARTICLE_MINIMUM))
+  );
+  // Round to something a person would type.
+  const magnitude = Math.pow(
+    10,
+    Math.max(2, Math.floor(Math.log10(value)) - 1)
+  );
+  return Math.round(value / magnitude) * magnitude;
+}
+
+interface SliderRange {
+  minimum: number;
+  maximum: number;
+  step: number;
+  decimals: number;
+}
+
+/**
+ * A slider paired with its exact value. The slider is for feel and the number
+ * is for precision; both write the same setting.
+ */
+function sliderControl(
+  id: string,
+  label: string,
+  value: () => number,
+  range: SliderRange,
+  onChange: (value: number) => void
+) {
+  const clamp = (raw: number) =>
+    Math.min(range.maximum, Math.max(range.minimum, raw));
+  return (
+    <div class="dsm-vector-tools-slider-row">
+      <div class="dsm-vector-tools-slider-head">
+        <label class="dsm-vector-tools-label" for={id}>
+          {label}
+        </label>
+        <span class="dsm-vector-tools-slider-value">
+          {() => value().toFixed(range.decimals)}
+        </span>
+      </div>
+      <input
+        id={id}
+        class="dsm-vector-tools-slider"
+        type="range"
+        min={range.minimum}
+        max={range.maximum}
+        step={range.step}
+        onUpdate={(element: HTMLInputElement) => {
+          if (document.activeElement !== element)
+            element.value = String(value());
+        }}
+        onInput={(event: Event) =>
+          onChange(clamp(Number((event.target as HTMLInputElement).value)))
+        }
+      />
+    </div>
+  );
+}
+
+/**
+ * A wrapping row of one-click options. This replaces the `<select>` elements
+ * the panel used to use: a native dropdown inside a scrolling popover is
+ * awkward to hit, and DCGView cannot drive its selection through props anyway.
+ */
+function chipGroup<T extends string>(
+  label: string,
+  value: () => T,
+  choices: readonly Choice<T>[],
+  onChange: (value: T) => void,
+  id?: string
+) {
+  return (
+    <div class="dsm-vector-tools-chips" id={id} role="group" aria-label={label}>
+      <div class="dsm-vector-tools-label">{label}</div>
+      <div class="dsm-vector-tools-chip-row">
+        {choices.map((choice) => (
+          <span
+            role="button"
+            tabIndex={0}
+            data-value={choice.value}
+            class={() => ({
+              "dsm-vector-tools-chip": true,
+              "dsm-vector-tools-chip-selected": value() === choice.value,
+            })}
+            aria-pressed={() => (value() === choice.value ? "true" : "false")}
+            onTap={() => onChange(choice.value)}
+          >
+            {choice.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * `disabled` is deliberately never passed as a prop: DCGView writes props as
+ * attributes, and `disabled="false"` is still a disabled input in HTML. Setting
+ * the property in `onUpdate` is the only spelling that actually toggles.
+ */
 function numberControl(
   id: string,
   label: string,
@@ -573,8 +750,8 @@ function numberControl(
         id={id}
         type="number"
         step="any"
-        disabled={disabled}
         onUpdate={(element: HTMLInputElement) => {
+          element.disabled = disabled();
           // Never fight the user mid-edit; only re-sync a field they left.
           if (document.activeElement !== element)
             element.value = String(value());
@@ -643,27 +820,25 @@ function checkboxControl(
 
 function confirmationControls(vectorTools: VectorTools) {
   return (
-    <div class="dsm-vector-tools-confirmation">
-      <If predicate={() => vectorTools.needsGenerationConfirmation}>
-        {() => (
-          <span>
-            <span>High-density field:</span>
-            <Button
-              color="red"
-              onTap={() => vectorTools.confirmPendingGeneration()}
-            >
-              Generate anyway
-            </Button>
-            <Button
-              color="light-gray"
-              onTap={() => vectorTools.cancelPendingGeneration()}
-            >
-              Cancel
-            </Button>
-          </span>
-        )}
-      </If>
-    </div>
+    <If predicate={() => vectorTools.needsGenerationConfirmation}>
+      {() => (
+        <div class="dsm-vector-tools-confirmation">
+          <span>High-density field:</span>
+          <Button
+            color="red"
+            onTap={() => vectorTools.confirmPendingGeneration()}
+          >
+            Generate anyway
+          </Button>
+          <Button
+            color="light-gray"
+            onTap={() => vectorTools.cancelPendingGeneration()}
+          >
+            Cancel
+          </Button>
+        </div>
+      )}
+    </If>
   );
 }
 
@@ -671,43 +846,43 @@ function testLab(vectorTools: VectorTools) {
   return (
     <details class="dsm-vector-tools-test-lab">
       <summary>Developer Test Lab</summary>
-      <p>
+      <p class="dsm-vector-tools-hint">
         Development-build only. Test expressions use their own namespace and are
         not stored as production settings.
       </p>
-      {selectControl(
-        "dsm-vector-tools-test-preset",
+      {chipGroup(
         "Preset field",
         () => vectorTools.selectedTestPreset.id,
         vectorTools.testPresets.map((preset) => ({
           value: preset.id,
           label: preset.name,
         })),
-        (value) => vectorTools.setTestPreset(value)
+        (value) => vectorTools.setTestPreset(value),
+        "dsm-vector-tools-test-preset"
       )}
-      {selectControl(
-        "dsm-vector-tools-test-density",
+      {chipGroup(
         "Density",
         () => vectorTools.selectedDensityPreset.id,
         vectorTools.densityPresets.map((density) => ({
           value: density.id,
-          label: `${density.name} (${density.xCount} × ${density.yCount})`,
+          label: `${density.name} (${density.xCount}×${density.yCount})`,
         })),
-        (value) => vectorTools.setTestDensity(value)
+        (value) => vectorTools.setTestDensity(value),
+        "dsm-vector-tools-test-density"
       )}
-      {selectControl(
-        "dsm-vector-tools-test-length",
+      {chipGroup(
         "Length mode",
         () => vectorTools.currentTestLengthMode,
         LENGTH_MODES,
-        (value) => vectorTools.setTestLengthMode(value)
+        (value) => vectorTools.setTestLengthMode(value),
+        "dsm-vector-tools-test-length"
       )}
-      {selectControl(
-        "dsm-vector-tools-test-color",
+      {chipGroup(
         "Color mode",
         () => vectorTools.currentTestColorMode,
         COLOR_MODES,
-        (value) => vectorTools.setTestColorMode(value)
+        (value) => vectorTools.setTestColorMode(value),
+        "dsm-vector-tools-test-color"
       )}
       <div class="dsm-vector-tools-actions">
         <Button color="blue" onTap={() => vectorTools.generateTestField()}>
@@ -827,6 +1002,13 @@ function auditTable(vectorTools: VectorTools) {
 function hasIssue(issues: readonly { message: string }[], startsWith: string) {
   return issues.some((issue) => issue.message.startsWith(startsWith));
 }
+
+export const PANEL_SIZE_LIMITS = {
+  minWidth: PANEL_MIN_WIDTH,
+  maxWidth: PANEL_MAX_WIDTH,
+  minHeight: PANEL_MIN_HEIGHT,
+  maxHeight: PANEL_MAX_HEIGHT,
+};
 
 export function VectorToolsPanelFunc(vectorTools: VectorTools) {
   return <VectorToolsPanel vectorTools={() => vectorTools} />;

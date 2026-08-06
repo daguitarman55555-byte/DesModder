@@ -26,8 +26,11 @@ export interface FlowBounds {
 }
 
 export interface FlowOptions {
-  /** Particles are laid out on a square texture; count is the square of this. */
-  particleResolution: number;
+  /**
+   * Exact number of particles. They are stored in the smallest square texture
+   * that holds them, but only this many are ever drawn, so any value works.
+   */
+  particleCount: number;
   /** Relative step size for the integrator. */
   speed: number;
   /** How much of the previous frame survives, 0..1. Higher means longer trails. */
@@ -44,7 +47,7 @@ export interface FlowOptions {
 }
 
 export const DEFAULT_FLOW_OPTIONS: FlowOptions = {
-  particleResolution: 128,
+  particleCount: 16_000,
   speed: 1,
   trailPersistence: 0.9,
   dropRate: 0.008,
@@ -78,6 +81,7 @@ export class FlowRenderer {
   private particleWrite?: WebGLTexture;
   private indexBuffer?: WebGLBuffer;
   private particleResolution = 0;
+  private particleCount = 0;
 
   private trailFront?: WebGLTexture;
   private trailBack?: WebGLTexture;
@@ -128,7 +132,7 @@ export class FlowRenderer {
       SCREEN_VERTEX_SHADER,
       BLIT_FRAGMENT_SHADER
     );
-    this.allocateParticles(this.options.particleResolution);
+    this.allocateParticles(this.options.particleCount);
   }
 
   /**
@@ -158,10 +162,9 @@ export class FlowRenderer {
   }
 
   setOptions(options: FlowOptions) {
-    const resolutionChanged =
-      options.particleResolution !== this.options.particleResolution;
+    const countChanged = options.particleCount !== this.particleCount;
     this.options = { ...options };
-    if (resolutionChanged) this.allocateParticles(options.particleResolution);
+    if (countChanged) this.allocateParticles(options.particleCount);
   }
 
   /** Matches the drawing buffer to the CSS box. Returns true if it changed. */
@@ -344,11 +347,7 @@ export class FlowRenderer {
       Math.max(1e-6, (xMax - xMin) / 3)
     );
 
-    gl.drawArrays(
-      gl.POINTS,
-      0,
-      this.particleResolution * this.particleResolution
-    );
+    gl.drawArrays(gl.POINTS, 0, this.particleCount);
     gl.disable(gl.BLEND);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
@@ -390,14 +389,21 @@ export class FlowRenderer {
     gl.vertexAttribPointer(location, 2, gl.FLOAT, false, 0, 0);
   }
 
-  private allocateParticles(resolution: number) {
+  /**
+   * Particle state lives in the smallest square texture that holds `count`
+   * particles. Only `count` points are drawn, so the leftover texels in the
+   * last row are simply never read and the user gets the exact count they
+   * asked for rather than the nearest square.
+   */
+  private allocateParticles(count: number) {
     const { gl } = this;
     if (this.particleRead !== undefined) gl.deleteTexture(this.particleRead);
     if (this.particleWrite !== undefined) gl.deleteTexture(this.particleWrite);
     if (this.indexBuffer !== undefined) gl.deleteBuffer(this.indexBuffer);
+    const resolution = Math.max(1, Math.ceil(Math.sqrt(count)));
     this.particleResolution = resolution;
+    this.particleCount = count;
 
-    const count = resolution * resolution;
     const indices = new Float32Array(count);
     for (let i = 0; i < count; i++) indices[i] = i;
     const indexBuffer = gl.createBuffer();
