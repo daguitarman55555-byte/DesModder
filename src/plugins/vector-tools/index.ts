@@ -181,6 +181,11 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   >();
   /** Answers for recognized derivative rows, keyed by expression id. */
   private readonly derivativeResults = new Map<string, DerivativeResultState>();
+  /** Rows whose glyphs need repainting after every render. */
+  private readonly paintedRows = new Map<string, DerivativeRow>();
+  /** Rows waiting to be rewritten until the user has left them. */
+  private readonly pendingSubstitution = new Set<string>();
+  private paintFrame?: ReturnType<typeof requestAnimationFrame>;
 
   afterEnable() {
     this.ensureStoredConfigIsCurrent();
@@ -207,6 +212,12 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       if (event.type === "set-item-latex" && typeof event.id === "string") {
         this.scheduleNotationRewrite(event.id);
       }
+      // Any event can be the one where focus moved off a row that was waiting
+      // to be rewritten, and any render can have wiped the painted glyphs.
+      // The rewrite dispatches, and a dispatch raised from inside a dispatcher
+      // callback is dropped, so it has to wait for this one to finish.
+      setTimeout(() => this.flushPendingSubstitutions(), 0);
+      this.schedulePaint();
     });
   }
 
@@ -220,6 +231,9 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     for (const timer of this.notationTimers.values()) clearTimeout(timer);
     this.notationTimers.clear();
     this.derivativeResults.clear();
+    this.paintedRows.clear();
+    this.pendingSubstitution.clear();
+    if (this.paintFrame !== undefined) cancelAnimationFrame(this.paintFrame);
     this.removeNotationTriggers();
     this.detachPanelElement();
     this.flowOverlay.stop();
@@ -639,6 +653,14 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     if (model?.type !== "expression" || typeof model.latex !== "string") return;
 
     const substituted = substituteGlyphs(model.latex);
+    if (substituted !== undefined && this.isRowFocused(id)) {
+      // Replacing the content of a field being typed in resets the cursor to
+      // the end, which throws the user out of the fraction denominator they
+      // were half way through filling. Wait until they leave the row.
+      this.pendingSubstitution.add(id);
+      return;
+    }
+    this.pendingSubstitution.delete(id);
     if (substituted !== undefined) {
       // While a row is being typed in, MathQuill owns its content and rewrites
       // the model back from its own DOM, so `setExpression` is silently undone.
@@ -660,6 +682,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
    */
   private readDerivativeRow(id: string, latex: string) {
     if (!mightBeDerivativeNotation(latex)) {
+      this.paintedRows.delete(id);
       if (this.derivativeResults.delete(id)) {
         this.dsm.hideErrors?.hideError(id);
         this.util.tick();
@@ -672,18 +695,24 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       // A fraction starting with `d` that is not a derivative is an
       // ordinary expression; claiming it, and hiding its error, would be
       // worse than saying nothing at all.
+      this.paintedRows.delete(id);
       if (this.derivativeResults.delete(id)) this.util.tick();
       return;
     }
     const result = this.answerDerivativeRow(row);
     this.derivativeResults.set(id, result);
-    this.paintPartialGlyphs(id, row);
+    this.paintedRows.set(id, row);
+    // The tick below re-renders the row and discards any class put on its
+    // elements, so the paint has to be re-applied after it, not before.
+    this.schedulePaint();
     // Recognized rows keep their error hidden. A `∂` or `∇` row cannot parse at
     // all; a real `d/dx` row parses fine but usually still errors, because a
     // partial derivative like `2y` depends on the other variable and so is not
     // a graphable equation on its own. Either way the answer is in the box, and
     // the triangle is noise.
-    if (this.dsm.hideErrors?.isErrorHidden(id) !== true) {
+    const hasError =
+      (this.cc.getItemModel(id) as { error?: unknown })?.error !== undefined;
+    if (hasError && this.dsm.hideErrors?.isErrorHidden(id) !== true) {
       this.dsm.hideErrors?.hideError(id);
     }
     this.util.tick();
@@ -746,6 +775,38 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     for (const glyph of partialGlyphSpans(root)) {
       glyph.classList.add(PARTIAL_GLYPH_CLASS);
     }
+  }
+
+  /** Whether the user is currently typing in this row. */
+  private isRowFocused(id: string) {
+    return (
+      this.calc.focusedMathQuill !== undefined &&
+      this.cc.getSelectedItem()?.id === id
+    );
+  }
+
+  /** Rewrites any row the user has now left. */
+  private flushPendingSubstitutions() {
+    for (const id of [...this.pendingSubstitution]) {
+      if (this.isRowFocused(id)) continue;
+      this.pendingSubstitution.delete(id);
+      this.rewriteNotationIn(id);
+    }
+  }
+
+  /**
+   * Re-applies the `∂` paint after the render that follows a change.
+   *
+   * The classes live on elements MathQuill owns and rebuilds, so they cannot be
+   * set once. A frame later the row exists again and the paint sticks.
+   */
+  private schedulePaint() {
+    if (this.paintFrame !== undefined) return;
+    this.paintFrame = requestAnimationFrame(() => {
+      this.paintFrame = undefined;
+      for (const [id, row] of this.paintedRows)
+        this.paintPartialGlyphs(id, row);
+    });
   }
 
   private isMultivariable(body: string) {

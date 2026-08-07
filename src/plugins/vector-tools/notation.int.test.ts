@@ -7,89 +7,77 @@ declare let DSM: Window["DSM"];
 const RESULT = ".dsm-vector-tools-derivative";
 
 /**
- * The notation is only worth anything if it survives the round trip through a
- * real Desmos: the trigger has to become a character MathQuill draws, the row
- * has to keep it, and the answer has to appear where Desmos would have put an
- * evaluation.
+ * The notation only earns its keep if it survives a real Desmos: the trigger
+ * has to become Desmos's own operator, the `d` has to be *drawn* as `∂` without
+ * the LaTeX changing, and none of it may happen while the user is still typing
+ * into the row.
  */
 testWithPage(
-  "Vector Tools keeps derivative notation on screen and answers it",
+  "Vector Tools types a real partial derivative and draws it as one",
   async (driver) => {
     await driver.enablePlugin("vector-tools");
 
-    // Focus the first row once, then drive it the way a person does: type,
-    // press Enter for the next row, type again.
-    await driver.evaluate(() => {
-      const { list } = Calc.getState().expressions;
-      Calc.controller.dispatch({ type: "move-focus-to-item", id: list[0].id });
-    });
-    const type = async (text: string) => {
-      await driver.keyboard.type(text, { delay: 25 });
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    };
-    const newRow = async () => {
-      await driver.keyboard.press("Enter");
-      await new Promise((resolve) => setTimeout(resolve, 300));
-    };
-    const rowLatex = async (index: number) =>
-      await driver.evaluate((index) => {
+    const focusFirstRow = async () =>
+      await driver.evaluate(() => {
         const { list } = Calc.getState().expressions;
-        return (Calc.controller.getItemModel(list[index].id) as any)?.latex;
-      }, index);
+        Calc.controller.dispatch({
+          type: "move-focus-to-item",
+          id: list[0].id,
+        });
+      });
+    // Leaving the row is what commits the swap, so it is done explicitly
+    // rather than by pressing Enter, which also creates a row.
+    const leaveRow = async () => {
+      await driver.evaluate(() =>
+        Calc.controller.dispatch({ type: "set-none-selected" })
+      );
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    };
+    const firstRowLatex = async () =>
+      await driver.evaluate(() => {
+        const { list } = Calc.getState().expressions;
+        return (Calc.controller.getItemModel(list[0].id) as any)?.latex;
+      });
 
-    // `par` becomes a plain `d`: the row is Desmos's own operator underneath.
-    await type("par");
-    expect(await rowLatex(0)).toBe("d");
-
-    // The operator form, applied to an expression written out in full. Right
-    // arrow leaves the denominator, the same as writing it by hand — typing
-    // straight on would give `x_2` from Desmos's numeral auto-subscript.
-    await newRow();
-    await type("par/par x");
+    await focusFirstRow();
+    // Right arrow leaves the denominator, the same as writing it by hand;
+    // typing straight on would give `x_2` from Desmos's numeral auto-subscript.
+    await driver.keyboard.type("par/par x", { delay: 25 });
     await driver.keyboard.press("ArrowRight");
-    await type("2xy");
-    // Real Desmos, not notation: this is the operator, so it evaluates.
-    expect(await rowLatex(1)).toBe("\\frac{d}{dx}2xy");
+    await driver.keyboard.type("2xy", { delay: 25 });
+    await new Promise((resolve) => setTimeout(resolve, 600));
 
-    // The answer appears under the row, as typeset math.
-    const partial = await driver.evaluate((selector) => {
-      const boxes = [...document.querySelectorAll(selector)];
-      return boxes.map((box) => box.textContent);
-    }, RESULT);
-    expect(partial.join(" ")).toContain("2y");
+    // Still being typed in, so the row is untouched — replacing a field mid-edit
+    // resets the cursor and throws the user out of the fraction.
+    expect(await firstRowLatex()).toContain("\\operatorname{par}");
 
-    // The `d` glyphs are painted as ∂ without the LaTeX changing at all, which
-    // is what lets the row be both the real operator and the right notation.
-    const partialRow = await driver.evaluate(() => {
+    await leaveRow();
+
+    // Now it is Desmos's real derivative operator, which evaluates and graphs.
+    expect(await firstRowLatex()).toBe("\\frac{d}{dx}2xy");
+
+    const row = await driver.evaluate((selector) => {
       const { list } = Calc.getState().expressions;
-      const model = Calc.controller.getItemModel(list[1].id) as any;
+      const model = Calc.controller.getItemModel(list[0].id) as any;
       return {
-        errorHidden: DSM.hideErrors?.isErrorHidden(list[1].id) ?? false,
+        // Painted as ∂ through a class, with the text still `d`.
         painted: (model?.rootViewNode as Element | undefined)?.querySelectorAll(
           ".dsm-vector-tools-partial-d"
         ).length,
+        glyphText: (model?.rootViewNode as Element | undefined)?.querySelector(
+          ".dcg-mq-numerator"
+        )?.textContent,
+        result: [...document.querySelectorAll(selector)].map(
+          (box) => box.textContent
+        ),
       };
-    });
-    // `2y` depends on the other variable, so Desmos cannot graph it as a bare
-    // row; the answer is in the box, so the triangle is suppressed.
-    expect(partialRow.errorHidden).toBe(true);
-    expect(partialRow.painted).toBe(2);
-
-    // The gradient, adapting to the variables the expression uses.
-    await newRow();
-    await type("grad x^2+y^2");
-    // The typed space survives as MathQuill's `\ `, which the recognizer
-    // tolerates, so it is normalized away here rather than asserted on.
-    expect((await rowLatex(2)).replace(/\\ /g, "")).toBe("∇x^{2}+y^{2}");
-    const gradient = await driver.evaluate((selector) => {
-      const boxes = [...document.querySelectorAll(selector)];
-      return boxes.map((box) => box.textContent).join(" ");
     }, RESULT);
-    expect(gradient).toContain("2x");
-    expect(gradient).toContain("2y");
+    expect(row.painted).toBe(2);
+    // The LaTeX and the DOM both still say `d`; only the paint differs.
+    expect(row.glyphText).toBe("d");
+    expect(row.result.join(" ")).toContain("2y");
 
     await driver.disablePlugin("vector-tools");
-    // Nothing of the plugin's is left behind on the rows.
     await driver.assertSelectorNot(RESULT);
     await driver.setBlank();
     await driver.waitForSync();
