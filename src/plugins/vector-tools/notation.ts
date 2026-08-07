@@ -49,10 +49,18 @@ const SPACE = String.raw`(?:\\ |\s)*`;
  */
 export function substituteGlyphs(latex: string): string | undefined {
   const next = latex
-    .replace(/\\operatorname\{par\}(?:\\ )?/g, PARTIAL)
+    // `par` becomes an ordinary `d`, so `par/par x` is literally
+    // `\frac{d}{dx}` — Desmos's real derivative operator, which evaluates,
+    // graphs, and composes. It is only *drawn* as `∂`; see `partialGlyphSpans`.
+    .replace(/\\operatorname\{par\}(?:\\ )?/g, "d")
     .replace(/\\operatorname\{grad\}(?:\\ )?/g, NABLA);
   return next === latex ? undefined : next;
 }
+
+/** `d/dx <body>` — the real operator, which is drawn as `∂/∂x`. */
+const REAL_PARTIAL_OPERATOR = new RegExp(
+  String.raw`^${SPACE}\\frac\{${SPACE}d${SPACE}\}\{${SPACE}d${NAME}${SPACE}\}(.+)$`
+);
 
 /** What a recognized row is asking for. */
 export type DerivativeRow =
@@ -93,6 +101,13 @@ export function recognizeRow(
   latex: string,
   lookupArguments: ArgumentLookup
 ): DerivativeRow | undefined {
+  const real = REAL_PARTIAL_OPERATOR.exec(latex);
+  if (real !== null) {
+    return { kind: "partial", variable: real[1], body: real[2] };
+  }
+
+  // The `∂` spelling is still read, so a row written before this became a real
+  // operator, or pasted from elsewhere, is still understood.
   const operator = PARTIAL_OPERATOR.exec(latex);
   if (operator !== null) {
     return { kind: "partial", variable: operator[1], body: operator[2] };
@@ -134,4 +149,35 @@ export function hasNotationGlyph(latex: string) {
  */
 export function mightBeDerivativeNotation(latex: string) {
   return hasNotationGlyph(latex) || /^\s*\\frac\{\s*d/.test(latex);
+}
+
+/** The class that makes a `d` glyph draw as `∂`. */
+export const PARTIAL_GLYPH_CLASS = "dsm-vector-tools-partial-d";
+
+/**
+ * The `d` glyphs of a `d/dx` fraction inside a rendered row, so they can be
+ * drawn as `∂`.
+ *
+ * The row's LaTeX stays `\frac{d}{dx}`, which is what makes it a real Desmos
+ * operator; only the paint changes. CSS cannot do this alone because it cannot
+ * match on text content, and rewriting the text would leave MathQuill and the
+ * model disagreeing — so the elements are found here and the drawing is left to
+ * a stylesheet.
+ */
+export function partialGlyphSpans(root: Element): Element[] {
+  const found: Element[] = [];
+  for (const fraction of root.querySelectorAll(".dcg-mq-fraction")) {
+    const numerator = fraction.querySelector(".dcg-mq-numerator");
+    const denominator = fraction.querySelector(".dcg-mq-denominator");
+    if (numerator === null || denominator === null) continue;
+    // Exactly `d` over `d<something>` is the derivative shape. Anything else is
+    // an ordinary fraction that must keep its own letters.
+    if (numerator.textContent?.trim() !== "d") continue;
+    if (!/^d\S/.test(denominator.textContent?.trim() ?? "")) continue;
+    const numeratorGlyph = numerator.querySelector("var");
+    const denominatorGlyph = denominator.querySelector("var");
+    if (numeratorGlyph !== null) found.push(numeratorGlyph);
+    if (denominatorGlyph?.textContent === "d") found.push(denominatorGlyph);
+  }
+  return found;
 }

@@ -37,9 +37,9 @@ testWithPage(
         return (Calc.controller.getItemModel(list[index].id) as any)?.latex;
       }, index);
 
-    // `par` has to become the character, because \partial renders as nothing.
+    // `par` becomes a plain `d`: the row is Desmos's own operator underneath.
     await type("par");
-    expect(await rowLatex(0)).toBe("∂");
+    expect(await rowLatex(0)).toBe("d");
 
     // The operator form, applied to an expression written out in full. Right
     // arrow leaves the denominator, the same as writing it by hand — typing
@@ -48,7 +48,8 @@ testWithPage(
     await type("par/par x");
     await driver.keyboard.press("ArrowRight");
     await type("2xy");
-    expect(await rowLatex(1)).toBe("\\frac{∂}{∂x}2xy");
+    // Real Desmos, not notation: this is the operator, so it evaluates.
+    expect(await rowLatex(1)).toBe("\\frac{d}{dx}2xy");
 
     // The answer appears under the row, as typeset math.
     const partial = await driver.evaluate((selector) => {
@@ -57,14 +58,22 @@ testWithPage(
     }, RESULT);
     expect(partial.join(" ")).toContain("2y");
 
-    // Desmos cannot parse ∂, so the row is an error to it — hidden, because
-    // this row is one the plugin understands.
-    expect(
-      await driver.evaluate(() => {
-        const { list } = Calc.getState().expressions;
-        return DSM.hideErrors?.isErrorHidden(list[1].id);
-      })
-    ).toBe(true);
+    // The `d` glyphs are painted as ∂ without the LaTeX changing at all, which
+    // is what lets the row be both the real operator and the right notation.
+    const partialRow = await driver.evaluate(() => {
+      const { list } = Calc.getState().expressions;
+      const model = Calc.controller.getItemModel(list[1].id) as any;
+      return {
+        errorHidden: DSM.hideErrors?.isErrorHidden(list[1].id) ?? false,
+        painted: (model?.rootViewNode as Element | undefined)?.querySelectorAll(
+          ".dsm-vector-tools-partial-d"
+        ).length,
+      };
+    });
+    // `2y` depends on the other variable, so Desmos cannot graph it as a bare
+    // row; the answer is in the box, so the triangle is suppressed.
+    expect(partialRow.errorHidden).toBe(true);
+    expect(partialRow.painted).toBe(2);
 
     // The gradient, adapting to the variables the expression uses.
     await newRow();

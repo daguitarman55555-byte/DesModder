@@ -19,18 +19,36 @@ describe("Vector Tools derivative notation", () => {
     expect(NOTATION_TRIGGERS).toContain("par");
   });
 
-  test("substitutes the typed trigger for the character it stands for", () => {
-    // MathQuill renders \partial and \nabla as literally nothing, so the
-    // characters are the only spelling that shows up on screen.
-    expect(substituteGlyphs("\\operatorname{par}")).toBe("∂");
-    expect(substituteGlyphs("\\operatorname{grad}")).toBe("∇");
+  test("turns the partial trigger into Desmos's real derivative operator", () => {
+    // `par` becomes a plain `d`, so the row is literally \frac{d}{dx} — the
+    // operator Desmos evaluates, graphs, and lets other expressions use. It is
+    // only *drawn* as ∂.
+    expect(substituteGlyphs("\\operatorname{par}")).toBe("d");
     // The escaped space MathQuill leaves behind goes with it.
-    expect(substituteGlyphs("\\operatorname{par}\\ x")).toBe("∂x");
+    expect(substituteGlyphs("\\operatorname{par}\\ x")).toBe("dx");
     expect(
       substituteGlyphs(
         "\\frac{\\operatorname{par}}{\\operatorname{par}\\ x}f\\left(x,y\\right)"
       )
-    ).toBe("\\frac{∂}{∂x}f\\left(x,y\\right)");
+    ).toBe("\\frac{d}{dx}f\\left(x,y\\right)");
+  });
+
+  test("keeps the gradient as a character, having no real operator to be", () => {
+    // Desmos has no gradient operator, so ∇ cannot be made real the way ∂ can.
+    expect(substituteGlyphs("\\operatorname{grad}")).toBe("∇");
+  });
+
+  test("reads the real operator form", () => {
+    expect(read("\\frac{d}{dx}f\\left(x,y\\right)")).toEqual({
+      kind: "partial",
+      variable: "x",
+      body: "f\\left(x,y\\right)",
+    });
+    expect(read("\\frac{d}{dy}2xy")).toEqual({
+      kind: "partial",
+      variable: "y",
+      body: "2xy",
+    });
   });
 
   test("leaves alone what has no trigger in it", () => {
@@ -85,7 +103,6 @@ describe("Vector Tools derivative notation", () => {
   test("is not fooled by ordinary expressions", () => {
     expect(read("x^{2}+y^{2}")).toBeUndefined();
     expect(read("\\frac{a}{b}")).toBeUndefined();
-    expect(read("\\frac{d}{dx}f\\left(x\\right)")).toBeUndefined();
   });
 
   test("spots a row carrying notation Desmos cannot evaluate", () => {

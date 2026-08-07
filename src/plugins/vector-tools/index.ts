@@ -43,6 +43,8 @@ import { differentiate, identifiersIn, toLatex } from "./symbolic";
 import {
   mightBeDerivativeNotation,
   NOTATION_TRIGGERS,
+  partialGlyphSpans,
+  PARTIAL_GLYPH_CLASS,
   recognizeRow,
   substituteGlyphs,
   type DerivativeRow,
@@ -675,7 +677,12 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     }
     const result = this.answerDerivativeRow(row);
     this.derivativeResults.set(id, result);
-    // The row cannot evaluate in Desmos by construction, so its error is noise.
+    this.paintPartialGlyphs(id, row);
+    // Recognized rows keep their error hidden. A `∂` or `∇` row cannot parse at
+    // all; a real `d/dx` row parses fine but usually still errors, because a
+    // partial derivative like `2y` depends on the other variable and so is not
+    // a graphable equation on its own. Either way the answer is in the box, and
+    // the triangle is noise.
     if (this.dsm.hideErrors?.isErrorHidden(id) !== true) {
       this.dsm.hideErrors?.hideError(id);
     }
@@ -720,6 +727,36 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
         ? ["\\left(", "\\right)"]
         : ["\\left[", "\\right]"];
     return { ok: true, latex: `${open}${gradient.latex.join(",")}${close}` };
+  }
+
+  /**
+   * Draws the `d` of a recognized `d/dx` as `∂`.
+   *
+   * Only for a body with more than one variable: on a single-variable function
+   * `d/dx` is an ordinary derivative and `∂` would be wrong notation.
+   */
+  private paintPartialGlyphs(id: string, row: DerivativeRow) {
+    const root = (this.cc.getItemModel(id) as { rootViewNode?: Element })
+      ?.rootViewNode;
+    if (root === undefined || row.kind !== "partial") return;
+    for (const glyph of root.querySelectorAll(`.${PARTIAL_GLYPH_CLASS}`)) {
+      glyph.classList.remove(PARTIAL_GLYPH_CLASS);
+    }
+    if (!this.isMultivariable(row.body)) return;
+    for (const glyph of partialGlyphSpans(root)) {
+      glyph.classList.add(PARTIAL_GLYPH_CLASS);
+    }
+  }
+
+  private isMultivariable(body: string) {
+    try {
+      const cfg = buildConfigFromGlobals(Desmos, this.calc);
+      return (
+        identifiersIn(parseLatex(cfg, this.inlineFunctionCall(body))).length > 1
+      );
+    } catch {
+      return false;
+    }
   }
 
   /** The answer to show under a row, if it is one this plugin recognized. */
