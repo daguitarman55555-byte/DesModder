@@ -40,7 +40,12 @@ import {
   type VectorFieldPlan,
 } from "./generator";
 import { differentiate, identifiersIn, toLatex } from "./symbolic";
-import { buildConfigFromGlobals, parseLatex } from "../../../text-mode-core";
+import { NOTATION_TRIGGERS, rewriteNotation } from "./notation";
+import {
+  buildConfigFromGlobals,
+  parseLatex,
+  parseRootLatex,
+} from "../../../text-mode-core";
 import { FlowOverlay } from "./flow/FlowOverlay";
 import { compileFieldComponentToGLSL } from "./flow/latexToGLSL";
 import type { FlowField } from "./flow/FlowRenderer";
@@ -62,6 +67,8 @@ type FlowCompilation =
   | { ok: false; error: string };
 
 const FLOW_REFRESH_DELAY_MS = 300;
+/** One turn of the event loop, so MathQuill has settled after the keystroke. */
+const NOTATION_REWRITE_DELAY_MS = 0;
 const PANEL_SIZE_SAVE_DELAY_MS = 400;
 const POPOVER_CLASS = "dsm-vector-tools-popover";
 
@@ -144,9 +151,15 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   private panelResizeObserver?: ResizeObserver;
   private panelSizeTimer?: ReturnType<typeof setTimeout>;
   private componentLinkNote = "";
+  private oldMathquillConfig?: typeof this.cc.getMathquillConfig;
+  private readonly notationTimers = new Map<
+    string,
+    ReturnType<typeof setTimeout>
+  >();
 
   afterEnable() {
     this.ensureStoredConfigIsCurrent();
+    this.installNotationTriggers();
     this.dsm.pillboxMenus?.addPillboxButton({
       id: "dsm-vector-tools-menu",
       tooltip: "vector-tools-name",
@@ -164,6 +177,11 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       ) {
         this.syncComponentsFromExpressions();
       }
+      // Only a fresh edit can introduce notation; rewriting on undo would put
+      // back what the user just undid.
+      if (event.type === "set-item-latex" && typeof event.id === "string") {
+        this.scheduleNotationRewrite(event.id);
+      }
     });
   }
 
@@ -174,6 +192,9 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     if (this.dispatcherID !== undefined)
       this.cc.dispatcher.unregister(this.dispatcherID);
     this.dispatcherID = undefined;
+    for (const timer of this.notationTimers.values()) clearTimeout(timer);
+    this.notationTimers.clear();
+    this.removeNotationTriggers();
     this.detachPanelElement();
     this.flowOverlay.stop();
     this.dsm.pillboxMenus?.removePillboxButton("dsm-vector-tools-menu");
@@ -533,6 +554,100 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.updateConfig((config) => {
       config.flow[key] = value;
     });
+  }
+
+  // ---- derivative notation -----------------------------------------------
+
+  /**
+   * Widens MathQuill's operator names so the trigger words become single
+   * tokens as they are typed, rather than a run of loose variables.
+   *
+   * The hook is wrapped rather than replaced, so whatever
+   * `custom-mathquill-config` and Desmos put there survives.
+   */
+  private installNotationTriggers() {
+    if (this.oldMathquillConfig !== undefined) return;
+    const { cc } = this;
+    this.oldMathquillConfig = cc.getMathquillConfig;
+    cc.getMathquillConfig = (options) => {
+      const config = this.oldMathquillConfig!.call(cc, options);
+      config.autoOperatorNames += ` ${NOTATION_TRIGGERS.join(" ")}`;
+      return config;
+    };
+  }
+
+  private removeNotationTriggers() {
+    if (this.oldMathquillConfig === undefined) return;
+    this.cc.getMathquillConfig = this.oldMathquillConfig;
+    this.oldMathquillConfig = undefined;
+  }
+
+  /**
+   * Queues a rewrite for just after the keystroke that triggered it.
+   *
+   * The dispatch arrives while MathQuill is still mid-edit: the model already
+   * holds the new latex, but the focused field is not settled, so a rewrite
+   * issued here goes to the wrong place and is overwritten. One turn later
+   * everything agrees.
+   */
+  private scheduleNotationRewrite(id: string) {
+    const existing = this.notationTimers.get(id);
+    if (existing !== undefined) clearTimeout(existing);
+    this.notationTimers.set(
+      id,
+      setTimeout(() => {
+        this.notationTimers.delete(id);
+        this.rewriteNotationIn(id);
+      }, NOTATION_REWRITE_DELAY_MS)
+    );
+  }
+
+  /**
+   * Rewrites derivative notation in an expression the moment it is complete.
+   *
+   * The rewritten form no longer matches, so a rewrite cannot trigger another
+   * one. The pattern only completes once the variable has been typed, so this
+   * cannot fire halfway through a word.
+   */
+  private rewriteNotationIn(id: string) {
+    const model = this.cc.getItemModel(id);
+    if (model?.type !== "expression" || typeof model.latex !== "string") return;
+    const rewritten = rewriteNotation(model.latex, (name) =>
+      this.functionArguments(name)
+    );
+    if (rewritten === undefined) return;
+    // While a row is being typed in, MathQuill owns its content and rewrites
+    // the model back from its own DOM, so `setExpression` is silently undone.
+    // Writing the field alone has the opposite problem: the glyphs change but
+    // the model, which is what Desmos evaluates, does not. Both have to move,
+    // and the dispatch is what Desmos itself uses to do that.
+    this.calc.focusedMathQuill?.mq.latex(rewritten.latex);
+    this.cc.dispatch({ type: "set-item-latex", id, latex: rewritten.latex });
+    this.lastActionMessage = rewritten.description;
+    this.util.tick();
+  }
+
+  /**
+   * The parameter names a function was defined with, so `df/dx` can expand to
+   * a call with the arguments the user actually wrote.
+   */
+  private functionArguments(name: string): string[] | undefined {
+    const cfg = buildConfigFromGlobals(Desmos, this.calc);
+    for (const item of this.cc.getAllItemModels()) {
+      if (item.type !== "expression" || typeof item.latex !== "string")
+        continue;
+      // Cheap reject before parsing: a definition of `f` has to mention it.
+      if (!item.latex.startsWith(name)) continue;
+      try {
+        const root = parseRootLatex(cfg, item.latex);
+        if (root.type === "FunctionDefinition" && root.symbol.symbol === name) {
+          return root.argSymbols.map((arg) => arg.symbol);
+        }
+      } catch {
+        // An expression that does not parse is simply not the definition.
+      }
+    }
+    return undefined;
   }
 
   // ---- symbolic differentiation ------------------------------------------

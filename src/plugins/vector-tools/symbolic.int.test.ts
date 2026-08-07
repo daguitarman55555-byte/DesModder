@@ -119,3 +119,93 @@ testWithPage(
   },
   90000
 );
+
+testWithPage(
+  "Vector Tools rewrites typed derivative notation into what Desmos evaluates",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+
+    const typeInto = async (index: number, text: string) => {
+      await driver.evaluate((index) => {
+        const { list } = Calc.getState().expressions;
+        Calc.controller.dispatch({
+          type: "move-focus-to-item",
+          id: list[index].id,
+        });
+      }, index);
+      await driver.keyboard.type(text, { delay: 25 });
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      return await driver.evaluate((index) => {
+        const { list } = Calc.getState().expressions;
+        const model = Calc.controller.getItemModel(list[index].id) as any;
+        return {
+          latex: model?.latex as string,
+          hasError: model?.error !== undefined,
+        };
+      }, index);
+    };
+    const newRow = async () =>
+      await driver.evaluate(() =>
+        Calc.controller.dispatch({ type: "new-expression-at-end" })
+      );
+
+    // The Greek letter has to survive: a `del` trigger would have eaten it.
+    await driver.evaluate(() =>
+      DSM.setPluginSetting("custom-mathquill-config", "extendedGreek", true)
+    );
+    await driver.enablePlugin("custom-mathquill-config");
+    const greek = await typeInto(0, "delta");
+    expect(greek.latex).toBe("\\delta");
+    await driver.disablePlugin("custom-mathquill-config");
+
+    // par/par x becomes the form Desmos evaluates, and stops being an error.
+    await newRow();
+    const partial = await typeInto(1, "par/par x");
+    expect(partial.latex).toBe("\\frac{d}{dx}");
+
+    // df/dx expands using f's own argument list.
+    await newRow();
+    await typeInto(2, "f(x,y)=2xy");
+    await newRow();
+    const leibniz = await typeInto(3, "df/dx");
+    expect(leibniz.latex).toBe("\\frac{d}{dx}f\\left(x,y\\right)");
+    await driver.waitForSync();
+    const definition = await driver.evaluate(() => {
+      const { list } = Calc.getState().expressions;
+      return (Calc.controller.getItemModel(list[2].id) as any)?.latex;
+    });
+    expect(definition).toBe("f\\left(x,y\\right)=2xy");
+
+    // And it is real math, not just the right string: ∂(2xy)/∂x is 2y, so at
+    // y=4 it is 8. Desmos will not graph `2y` as a bare row — an expression in
+    // y alone is not a graphable equation — so it is evaluated as a call, the
+    // way it would actually be used.
+    const value = await driver.evaluate(async () => {
+      Calc.setExpression({
+        id: "probe",
+        latex: "p_{1}\\left(x,y\\right)=\\frac{d}{dx}f\\left(x,y\\right)",
+      });
+      const helper = Calc.HelperExpression({
+        latex: "p_{1}\\left(1,4\\right)",
+      });
+      return await new Promise<number>((resolve) => {
+        const timer = setTimeout(() => resolve(Number.NaN), 3000);
+        helper.observe("numericValue", () => {
+          clearTimeout(timer);
+          resolve(helper.numericValue);
+        });
+      });
+    });
+    expect(value).toBeCloseTo(8, 9);
+
+    // An undefined function is left exactly as typed rather than guessed at.
+    await newRow();
+    const unknown = await typeInto(5, "dh/dx");
+    expect(unknown.latex).toBe("\\frac{dh}{dx}");
+
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);
