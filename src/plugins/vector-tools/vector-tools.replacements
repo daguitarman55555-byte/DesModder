@@ -1,0 +1,46 @@
+# Replacements for Vector Tools
+
+*plugin* `vector-tools`
+
+## Show the symbolic derivative under a recognized expression
+
+*Description* `Show the result of derivative notation under the expression`
+
+Desmos renders no evaluation for a row it cannot parse, and `∂/∂x 2xy` is an
+unrecognized symbol to it, so there is no existing element to replace — the
+result has to be inserted.
+
+The anchor is the item's own children, immediately **after** the fade
+container, rather than inside it. Code Golf inserts its character count inside
+that container, and the replacement engine rejects two replacements whose
+replaced spans overlap, so sharing that anchor breaks the whole extension at
+load. Replacing what follows the container instead keeps the two spans
+disjoint.
+
+*Find* => `math_item`
+```js
+$createElement("div", {
+    class: ()=>({
+        ____$
+        "dcg-highlighted-expressionitem"
+        ____$
+        "dcg-mathitem"
+        ____
+    })
+    ____
+})
+```
+
+*Find* inside `math_item`
+```js
+children: [$createElement2("div", {
+    class: "dcg-fade-container",
+    ____
+}), __rest__]
+```
+
+*Replace* `rest` with
+```js
+DesModder.insertElement(() => DSM.vectorTools?.derivativeResult(this.model?.id)),
+__rest__
+```

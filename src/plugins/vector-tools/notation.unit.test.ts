@@ -1,10 +1,15 @@
-import { NOTATION_TRIGGERS, rewriteNotation } from "./notation";
+import {
+  hasNotationGlyph,
+  NOTATION_TRIGGERS,
+  recognizeRow,
+  substituteGlyphs,
+} from "./notation";
 
 /** f(x,y) and g(t) are defined; h is not. */
 const lookup = (name: string) =>
   ({ f: ["x", "y"], g: ["t"] })[name] as string[] | undefined;
 
-const rewrite = (latex: string) => rewriteNotation(latex, lookup)?.latex;
+const read = (latex: string) => recognizeRow(latex, lookup);
 
 describe("Vector Tools derivative notation", () => {
   test("never uses a trigger that shadows something typeable", () => {
@@ -14,66 +19,79 @@ describe("Vector Tools derivative notation", () => {
     expect(NOTATION_TRIGGERS).toContain("par");
   });
 
-  test("turns the partial operator into the form Desmos evaluates", () => {
-    // par/par x, once MathQuill has made it a fraction.
+  test("substitutes the typed trigger for the character it stands for", () => {
+    // MathQuill renders \partial and \nabla as literally nothing, so the
+    // characters are the only spelling that shows up on screen.
+    expect(substituteGlyphs("\\operatorname{par}")).toBe("∂");
+    expect(substituteGlyphs("\\operatorname{grad}")).toBe("∇");
+    // The escaped space MathQuill leaves behind goes with it.
+    expect(substituteGlyphs("\\operatorname{par}\\ x")).toBe("∂x");
     expect(
-      rewrite(
+      substituteGlyphs(
         "\\frac{\\operatorname{par}}{\\operatorname{par}\\ x}f\\left(x,y\\right)"
       )
-    ).toBe("\\frac{d}{dx}f\\left(x,y\\right)");
-    // The escaped space MathQuill inserts is optional.
-    expect(
-      rewrite("\\frac{\\operatorname{par}}{\\operatorname{par}y}x^{2}y")
-    ).toBe("\\frac{d}{dy}x^{2}y");
+    ).toBe("\\frac{∂}{∂x}f\\left(x,y\\right)");
   });
 
-  test("expands df/dx into a call, using the function's own arguments", () => {
-    // Desmos reads df/dx as (d*f)/(d*x) and errors; this is the whole point.
-    expect(rewrite("\\frac{df}{dx}")).toBe("\\frac{d}{dx}f\\left(x,y\\right)");
+  test("leaves alone what has no trigger in it", () => {
+    expect(substituteGlyphs("x^{2}+y^{2}")).toBeUndefined();
+    expect(substituteGlyphs("\\frac{d}{dx}f\\left(x\\right)")).toBeUndefined();
+  });
+
+  test("reads the operator form and keeps the body it applies to", () => {
+    expect(read("\\frac{∂}{∂x}f\\left(x,y\\right)")).toEqual({
+      kind: "partial",
+      variable: "x",
+      body: "f\\left(x,y\\right)",
+    });
+    expect(read("\\frac{∂}{∂y}2xy")).toEqual({
+      kind: "partial",
+      variable: "y",
+      body: "2xy",
+    });
+  });
+
+  test("reads both Leibniz spellings, using the function's own arguments", () => {
     // The argument list comes from the definition, not from an assumption.
-    expect(rewrite("\\frac{dg}{dt}")).toBe("\\frac{d}{dt}g\\left(t\\right)");
-    // A partial spelled the same way means the same thing.
-    expect(
-      rewrite("\\frac{\\operatorname{par}f}{\\operatorname{par}\\ y}")
-    ).toBe("\\frac{d}{dy}f\\left(x,y\\right)");
+    expect(read("\\frac{∂f}{∂x}")).toEqual({
+      kind: "partial",
+      variable: "x",
+      body: "f\\left(x,y\\right)",
+    });
+    expect(read("\\frac{dg}{dt}")).toEqual({
+      kind: "partial",
+      variable: "t",
+      body: "g\\left(t\\right)",
+    });
   });
 
-  test("leaves an undefined function alone rather than guessing its arguments", () => {
-    // h is not defined, so there is no argument list to call it with. Guessing
-    // would turn a typo into a different, wrong expression.
-    expect(rewrite("\\frac{dh}{dx}")).toBeUndefined();
+  test("does not recognize a derivative of an undefined function", () => {
+    // h has no argument list, and guessing one would answer a different
+    // question than the one asked.
+    expect(read("\\frac{dh}{dx}")).toBeUndefined();
   });
 
-  test("handles subscripted names", () => {
-    expect(
-      rewrite("\\frac{\\operatorname{par}}{\\operatorname{par}x_{1}}x_{1}^{2}")
-    ).toBe("\\frac{d}{dx_{1}}x_{1}^{2}");
+  test("reads the gradient and what it applies to", () => {
+    expect(read("∇f\\left(x,y\\right)")).toEqual({
+      kind: "gradient",
+      body: "f\\left(x,y\\right)",
+    });
+    expect(read("∇x^{2}+y^{2}")).toEqual({
+      kind: "gradient",
+      body: "x^{2}+y^{2}",
+    });
   });
 
-  test("rewrites every occurrence, including a nested second derivative", () => {
-    const twice =
-      "\\frac{\\operatorname{par}}{\\operatorname{par}x}\\frac{\\operatorname{par}}{\\operatorname{par}y}f\\left(x,y\\right)";
-    expect(rewrite(twice)).toBe(
-      "\\frac{d}{dx}\\frac{d}{dy}f\\left(x,y\\right)"
-    );
+  test("is not fooled by ordinary expressions", () => {
+    expect(read("x^{2}+y^{2}")).toBeUndefined();
+    expect(read("\\frac{a}{b}")).toBeUndefined();
+    expect(read("\\frac{d}{dx}f\\left(x\\right)")).toBeUndefined();
   });
 
-  test("reports nothing when there is no notation to rewrite", () => {
-    expect(rewrite("x^{2}+y^{2}")).toBeUndefined();
-    expect(rewrite("\\frac{d}{dx}f\\left(x,y\\right)")).toBeUndefined();
-    // A plain fraction of variables is not derivative notation.
-    expect(rewrite("\\frac{a}{b}")).toBeUndefined();
-  });
-
-  test("says what it recognized", () => {
-    expect(
-      rewriteNotation(
-        "\\frac{\\operatorname{par}}{\\operatorname{par}x}f\\left(x,y\\right)",
-        lookup
-      )?.description
-    ).toContain("∂/∂x");
-    expect(rewriteNotation("\\frac{df}{dx}", lookup)?.description).toContain(
-      "df/dx"
-    );
+  test("spots a row carrying notation Desmos cannot evaluate", () => {
+    // This is what decides whose error gets suppressed.
+    expect(hasNotationGlyph("\\frac{∂}{∂x}2xy")).toBe(true);
+    expect(hasNotationGlyph("∇f\\left(x,y\\right)")).toBe(true);
+    expect(hasNotationGlyph("x^{2}")).toBe(false);
   });
 });

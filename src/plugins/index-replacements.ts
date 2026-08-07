@@ -14,6 +14,7 @@ import syntaxHighlighting from "#plugins/syntax-highlighting/syntax-highlighting
 import textMode from "#plugins/text-mode/text-mode.replacements";
 import insertPanels from "../preload/moduleOverrides/insert-panels.replacements";
 import quakePro from "#plugins/quake-pro/quake-pro.replacements";
+import vectorTools from "#plugins/vector-tools/vector-tools.replacements";
 import videoCreator from "#plugins/video-creator/video-creator.replacements";
 
 export default [
@@ -31,6 +32,9 @@ export default [
   showTips,
   rightClickTray,
   codeGolf,
+  // After codeGolf: both insert into the same math-item children, and this one
+  // captures whatever is already there.
+  vectorTools,
   syntaxHighlighting,
   quakePro,
   videoCreator,
