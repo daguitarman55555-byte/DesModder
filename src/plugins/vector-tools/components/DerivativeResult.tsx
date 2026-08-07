@@ -25,13 +25,22 @@ export class DerivativeResult extends Component<{
           <div class="dsm-vector-tools-derivative">
             {IfElse(() => result()?.ok === true, {
               true: () => (
-                <span class="dsm-vector-tools-derivative-value">
-                  <StaticMathQuillView
-                    latex={() => {
-                      const value = result();
-                      return value?.ok === true ? `=${value.latex}` : "";
-                    }}
-                  />
+                <span class="dsm-vector-tools-derivative-pair">
+                  {/*
+                    The equals sign is its own element so it can be faded to
+                    0.55 independently, exactly as Desmos fades its own.
+                  */}
+                  <span class="dsm-vector-tools-derivative-equals">
+                    <StaticMathQuillView latex={() => "="} />
+                  </span>
+                  <span class="dsm-vector-tools-derivative-value">
+                    <StaticMathQuillView
+                      latex={() => {
+                        const value = result();
+                        return value?.ok === true ? value.latex : "";
+                      }}
+                    />
+                  </span>
                 </span>
               ),
               false: () => (
