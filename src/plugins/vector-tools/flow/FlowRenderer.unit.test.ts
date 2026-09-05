@@ -4,6 +4,7 @@ import {
   hexToUnitRGB,
   particleCapacityFor,
   particleResolutionFor,
+  trailReprojection,
   type FlowOptions,
 } from "./FlowRenderer";
 
@@ -227,3 +228,53 @@ function fakeGL(): FakeGL {
     },
   });
 }
+
+describe("Vector Tools flow trail reprojection", () => {
+  const view = (xMin: number, xMax: number, yMin: number, yMax: number) => ({
+    xMin,
+    xMax,
+    yMin,
+    yMax,
+  });
+
+  it("leaves an unchanged view exactly where it is", () => {
+    // The identity has to be exact, or every frame of a stationary graph would
+    // resample the trail and blur it away.
+    expect(
+      trailReprojection(view(-10, 10, -6, 6), view(-10, 10, -6, 6))
+    ).toEqual({ scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0 });
+  });
+
+  it("shifts by the fraction of the view that was panned", () => {
+    // Panning right by a quarter of the width means each new texel reads a
+    // quarter of a screen further along the old one.
+    const mapping = trailReprojection(view(0, 20, 0, 10), view(5, 25, 0, 10))!;
+    expect(mapping.offsetX).toBeCloseTo(0.25);
+    expect(mapping.offsetY).toBe(0);
+    expect(mapping.scaleX).toBe(1);
+  });
+
+  it("spreads the old view across the new one when zooming out", () => {
+    // Twice the width in view means the old trail covers half of it.
+    const mapping = trailReprojection(
+      view(-10, 10, -6, 6),
+      view(-20, 20, -12, 12)
+    )!;
+    expect(mapping.scaleX).toBe(2);
+    expect(mapping.scaleY).toBe(2);
+    expect(mapping.offsetX).toBeCloseTo(-0.5);
+    expect(mapping.offsetY).toBeCloseTo(-0.5);
+  });
+
+  it("refuses bounds with no extent, which carry nothing", () => {
+    expect(
+      trailReprojection(view(3, 3, 0, 10), view(0, 10, 0, 10))
+    ).toBeUndefined();
+    expect(
+      trailReprojection(view(0, 10, 4, 4), view(0, 10, 0, 10))
+    ).toBeUndefined();
+    expect(
+      trailReprojection(view(0, Number.NaN, 0, 10), view(0, 10, 0, 10))
+    ).toBeUndefined();
+  });
+});

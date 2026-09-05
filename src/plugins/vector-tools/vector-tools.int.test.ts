@@ -681,3 +681,115 @@ testWithPage(
   },
   90000
 );
+
+/**
+ * The parts of the frame that only a GPU can answer for: that the pipeline
+ * still paints after the vertex arrays were shared between programs, that
+ * render scale really does shrink the buffer being filled, and that a drag —
+ * which arrives as a burst of bounds changes — reprojects the trails instead of
+ * erroring or wiping them.
+ */
+testWithPage(
+  "Vector Tools flow visualizer paints, scales, and survives a drag",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.evaluate(() => {
+      (DSM.enabledPlugins["vector-tools"] as any).toggleFlow();
+    });
+    await driver.assertSelectorEventually(FLOW_CANVAS);
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+
+    /**
+     * Opaque pixels in the drawing buffer, read inside a frame callback.
+     * `preserveDrawingBuffer` is off, so this is only valid before the frame
+     * is composited away.
+     */
+    const litPixels = async () =>
+      await driver.evaluate(
+        async () =>
+          await new Promise<number>((resolve) => {
+            requestAnimationFrame(() => {
+              const canvas = document.querySelector<HTMLCanvasElement>(
+                "#dsm-vector-tools-flow-canvas"
+              )!;
+              const gl = canvas.getContext("webgl2")!;
+              const pixels = new Uint8Array(canvas.width * canvas.height * 4);
+              gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+              gl.readPixels(
+                0,
+                0,
+                canvas.width,
+                canvas.height,
+                gl.RGBA,
+                gl.UNSIGNED_BYTE,
+                pixels
+              );
+              let lit = 0;
+              for (let i = 3; i < pixels.length; i += 4) {
+                if (pixels[i] > 8) lit++;
+              }
+              resolve(lit);
+            });
+          })
+      );
+    const canvasSize = async () =>
+      await driver.evaluate(() => {
+        const canvas = document.querySelector<HTMLCanvasElement>(
+          "#dsm-vector-tools-flow-canvas"
+        )!;
+        const gl = canvas.getContext("webgl2")!;
+        return {
+          buffer: canvas.width,
+          css: canvas.clientWidth,
+          error: gl.getError(),
+        };
+      });
+
+    const full = await canvasSize();
+    expect(full.error, "the flow reported a WebGL error").toBe(0);
+    // Something has to actually be on the canvas; a broken vertex binding
+    // would leave it perfectly empty while everything else still looked fine.
+    expect(await litPixels()).toBeGreaterThan(full.buffer * 4);
+
+    // Half the render scale is a quarter of the pixels, with the element and
+    // its layout untouched.
+    await driver.evaluate(() => {
+      (DSM.enabledPlugins["vector-tools"] as any).setFlow("renderScale", 0.5);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const halved = await canvasSize();
+    expect(halved.buffer).toBe(Math.round(full.buffer / 2));
+    expect(halved.css).toBe(full.css);
+    expect(await litPixels()).toBeGreaterThan(halved.buffer * 4);
+
+    // A drag is a burst of bounds changes, not one. Reprojecting on each has
+    // to leave the visualizer running and error-free.
+    await driver.evaluate(() => {
+      for (let i = 1; i <= 20; i++) {
+        Calc.setMathBounds({
+          left: -10 + i * 0.1,
+          right: 10 + i * 0.1,
+          bottom: -6,
+          top: 6,
+        });
+      }
+    });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const panned = await canvasSize();
+    expect(panned.error, "panning left the flow in a WebGL error state").toBe(
+      0
+    );
+    expect(
+      await driver.evaluate(
+        () => (DSM.enabledPlugins["vector-tools"] as any).flowStatus
+      )
+    ).toContain("Streaming");
+    expect(await litPixels()).toBeGreaterThan(panned.buffer * 4);
+
+    await driver.disablePlugin("vector-tools");
+    await driver.assertSelectorNot(FLOW_CANVAS);
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);

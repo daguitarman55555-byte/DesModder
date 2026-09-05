@@ -48,8 +48,18 @@ export interface FlowConfig {
   colorMode: FlowColorMode;
   /** Draw streamlines at a constant pace instead of the field's magnitude. */
   normalizeSpeed: boolean;
+  /**
+   * Fraction of the display's own pixels the flow is drawn at, 0.25..1.
+   *
+   * Below 1 the visualizer renders into a smaller buffer and the browser scales
+   * it up. Most of a frame's cost is the whole-canvas passes, so this is the
+   * cheapest way to buy back frame rate on a dense display.
+   */
+  renderScale: number;
 }
 
+/** Below this the flow is too soft to read, whatever it buys back. */
+export const FLOW_RENDER_SCALE_MINIMUM = 0.25;
 export const FLOW_PARTICLE_MINIMUM = 500;
 export const FLOW_PARTICLE_MAXIMUM = 400_000;
 /** Above this, a mid-range GPU starts dropping frames on a large viewport. */
@@ -230,6 +240,7 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
     pointSize: 1.4,
     colorMode: "speed",
     normalizeSpeed: true,
+    renderScale: 1,
   },
   panel: { width: 360, height: 520, tab: "field" },
 };
@@ -584,6 +595,12 @@ function normalizeFlow(value: unknown, fallback: FlowConfig): FlowConfig {
       typeof flow?.normalizeSpeed === "boolean"
         ? flow.normalizeSpeed
         : fallback.normalizeSpeed,
+    renderScale: clampNumber(
+      flow?.renderScale,
+      fallback.renderScale,
+      FLOW_RENDER_SCALE_MINIMUM,
+      1
+    ),
   };
 }
 

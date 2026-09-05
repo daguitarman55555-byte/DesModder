@@ -14,6 +14,7 @@ import {
   FLOW_PARTICLE_HEAVY,
   FLOW_PARTICLE_MAXIMUM,
   FLOW_PARTICLE_MINIMUM,
+  FLOW_RENDER_SCALE_MINIMUM,
   PANEL_MAX_HEIGHT,
   PANEL_MAX_WIDTH,
   PANEL_MIN_HEIGHT,
@@ -456,6 +457,18 @@ function flowTab(vectorTools: VectorTools, config: ConfigGetter) {
           () => flow().dropRate,
           { minimum: 0, maximum: 0.2, step: 0.001, decimals: 3 },
           (value) => vectorTools.setFlow("dropRate", value)
+        )}
+        {sliderControl(
+          "dsm-vector-tools-flow-render-scale",
+          "Render detail (lower is faster)",
+          () => flow().renderScale,
+          {
+            minimum: FLOW_RENDER_SCALE_MINIMUM,
+            maximum: 1,
+            step: 0.05,
+            decimals: 2,
+          },
+          (value) => vectorTools.setFlow("renderScale", value)
         )}
       </section>
     </div>

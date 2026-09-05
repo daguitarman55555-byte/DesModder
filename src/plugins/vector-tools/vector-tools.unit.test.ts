@@ -16,6 +16,7 @@ import {
   configForPreset,
   DENSITY_PRESETS,
   FLOW_PARTICLE_MAXIMUM,
+  FLOW_RENDER_SCALE_MINIMUM,
   FLOW_PARTICLE_MINIMUM,
   isDevelopmentBuild,
   normalizeVectorFieldConfig,
@@ -312,6 +313,7 @@ describe("Vector Tools field configuration", () => {
         pointSize: 100,
         colorMode: "nonsense",
         normalizeSpeed: "yes",
+        renderScale: 0,
       },
     });
     expect(clamped.flow).toEqual({
@@ -321,6 +323,7 @@ describe("Vector Tools field configuration", () => {
       dropRate: 0,
       opacity: 0.05,
       pointSize: 6,
+      renderScale: FLOW_RENDER_SCALE_MINIMUM,
       colorMode: "speed",
       normalizeSpeed: true,
     });

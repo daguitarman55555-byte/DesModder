@@ -30,9 +30,12 @@ export class FlowOverlay {
   private renderer?: FlowRenderer;
   private animationFrame?: number;
   private resizeObserver?: ResizeObserver;
+  private visibilityObserver?: IntersectionObserver;
   private unobserveBounds?: () => void;
   private options: FlowOptions = { ...DEFAULT_FLOW_OPTIONS };
   private lastBounds?: FlowBounds;
+  /** Whether any of the canvas is on screen. Off screen, frames are skipped. */
+  private onScreen = true;
 
   constructor(
     private readonly calc: Calc,
@@ -67,8 +70,12 @@ export class FlowOverlay {
   }
 
   setOptions(options: FlowOptions) {
+    const scaleChanged = options.renderScale !== this.options.renderScale;
     this.options = { ...options };
     this.renderer?.setOptions(this.options);
+    // Render scale is the one option that changes the size of the drawing
+    // buffer, and nothing else will notice on its own — no element resized.
+    if (scaleChanged) this.resizeToBox();
   }
 
   stop() {
@@ -78,6 +85,9 @@ export class FlowOverlay {
     }
     this.resizeObserver?.disconnect();
     this.resizeObserver = undefined;
+    this.visibilityObserver?.disconnect();
+    this.visibilityObserver = undefined;
+    this.onScreen = true;
     this.unobserveBounds?.();
     this.unobserveBounds = undefined;
     this.renderer?.destroy();
@@ -115,6 +125,17 @@ export class FlowOverlay {
     this.resizeObserver = new ResizeObserver(() => this.resizeToBox());
     this.resizeObserver.observe(parent);
 
+    // requestAnimationFrame already stops for a hidden tab, but not for a graph
+    // that has been scrolled out of view in an article or a notebook, which is
+    // a whole GPU's worth of work nobody can see.
+    this.visibilityObserver = new IntersectionObserver(
+      ([entry]) => {
+        this.onScreen = entry?.isIntersecting ?? true;
+      },
+      { threshold: 0 }
+    );
+    this.visibilityObserver.observe(canvas);
+
     // Desmos reports pan/zoom through this observable; the trail texture is in
     // screen space, so it has to be dropped whenever the mapping changes. The
     // key is namespaced so unobserving cannot detach another plugin's handler.
@@ -128,7 +149,7 @@ export class FlowOverlay {
     const changed = this.renderer.resize(
       rect.width,
       rect.height,
-      window.devicePixelRatio || 1
+      (window.devicePixelRatio || 1) * this.options.renderScale
     );
     if (changed) this.renderer.clearTrails();
   }
@@ -150,8 +171,10 @@ export class FlowOverlay {
       return;
     }
     this.lastBounds = bounds;
-    this.renderer.setBounds(bounds);
-    this.renderer.clearTrails();
+    // A forced sync is a fresh start, where there is nothing worth carrying
+    // over. Every other one is a pan or zoom, and the trails move with it.
+    if (force) this.renderer.resetBounds(bounds);
+    else this.renderer.setBounds(bounds);
   }
 
   private scheduleFrame() {
@@ -160,7 +183,7 @@ export class FlowOverlay {
       this.animationFrame = undefined;
       if (this.renderer === undefined) return;
       try {
-        this.renderer.frame();
+        if (this.onScreen) this.renderer.frame();
       } catch (error) {
         const message =
           error instanceof Error

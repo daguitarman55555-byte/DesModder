@@ -56,6 +56,17 @@ export interface FlowOptions {
   fixedColor: string;
   /** Draw streamlines at a constant speed instead of the field's own magnitude. */
   normalizeSpeed: boolean;
+  /**
+   * Fraction of the display's own pixels to render at, 0..1.
+   *
+   * Three of the four passes in a frame cover the whole canvas, so their cost
+   * is the drawing buffer's area — which on a high-density display is four
+   * times the area of the CSS box. Trails are soft and faded, so halving this
+   * quarters that work for very little visible difference. It scales the
+   * device pixel ratio rather than replacing it, so the setting means the same
+   * thing on every screen.
+   */
+  renderScale: number;
 }
 
 export const DEFAULT_FLOW_OPTIONS: FlowOptions = {
@@ -68,6 +79,7 @@ export const DEFAULT_FLOW_OPTIONS: FlowOptions = {
   colorMode: "speed",
   fixedColor: "#6042a6",
   normalizeSpeed: true,
+  renderScale: 1,
 };
 
 export class FlowRendererError extends Error {}
@@ -78,6 +90,16 @@ interface ProgramInfo {
 }
 
 const QUAD = new Float32Array([0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1]);
+
+/**
+ * The per-vertex attribute slot every program uses.
+ *
+ * Each program has exactly one vertex attribute — the screen quad's `a_pos` or
+ * the draw pass's `a_index` — and both are bound here before linking. Pinning
+ * the slot is what lets one vertex array object per buffer be shared by every
+ * program that reads it, instead of re-pointing the attribute each frame.
+ */
+const VERTEX_ATTRIBUTE_SLOT = 0;
 
 /**
  * The smallest capacity ever allocated. Below this the textures are too small
@@ -110,6 +132,37 @@ export function particleResolutionFor(capacity: number) {
   return Math.max(1, Math.ceil(Math.sqrt(capacity)));
 }
 
+/** Where in the old trail texture each texel of the new view came from. */
+export interface TrailReprojection {
+  scaleX: number;
+  scaleY: number;
+  offsetX: number;
+  offsetY: number;
+}
+
+/**
+ * Reads the old trail under new bounds: a texel at `uv` in the new view held
+ * whatever sat at `offset + uv * scale` in the old one.
+ *
+ * Returns undefined for bounds with no extent, which nothing can be carried
+ * across — the caller clears instead.
+ */
+export function trailReprojection(
+  from: FlowBounds,
+  to: FlowBounds
+): TrailReprojection | undefined {
+  const width = from.xMax - from.xMin;
+  const height = from.yMax - from.yMin;
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return undefined;
+  if (width === 0 || height === 0) return undefined;
+  return {
+    scaleX: (to.xMax - to.xMin) / width,
+    scaleY: (to.yMax - to.yMin) / height,
+    offsetX: (to.xMin - from.xMin) / width,
+    offsetY: (to.yMin - from.yMin) / height,
+  };
+}
+
 export class FlowRenderer {
   private readonly gl: WebGL2RenderingContext;
   private readonly quadBuffer: WebGLBuffer;
@@ -119,6 +172,10 @@ export class FlowRenderer {
   private drawProgram?: ProgramInfo;
   private readonly fadeProgram: ProgramInfo;
   private readonly blitProgram: ProgramInfo;
+  private readonly reprojectProgram: ProgramInfo;
+
+  private readonly quadArray: WebGLVertexArrayObject;
+  private indexArray?: WebGLVertexArrayObject;
 
   private particleRead?: WebGLTexture;
   private particleWrite?: WebGLTexture;
@@ -167,6 +224,7 @@ export class FlowRenderer {
     this.framebuffer = framebuffer;
     gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, QUAD, gl.STATIC_DRAW);
+    this.quadArray = this.createVertexArray(quadBuffer, 2);
 
     this.fadeProgram = this.createProgram(
       SCREEN_VERTEX_SHADER,
@@ -175,6 +233,10 @@ export class FlowRenderer {
     this.blitProgram = this.createProgram(
       SCREEN_VERTEX_SHADER,
       BLIT_FRAGMENT_SHADER
+    );
+    this.reprojectProgram = this.createProgram(
+      SCREEN_VERTEX_SHADER,
+      REPROJECT_FRAGMENT_SHADER
     );
     this.setParticleCount(this.options.particleCount);
   }
@@ -202,8 +264,52 @@ export class FlowRenderer {
     this.seedParticles();
   }
 
+  /**
+   * Moves the view, carrying the trails with it.
+   *
+   * The trail texture is in screen space, so a pan or zoom invalidates every
+   * pixel in it. Clearing was the obvious answer and the wrong one: Desmos
+   * reports bounds on every pointermove, so dragging the graph wiped the trails
+   * sixty times a second and the flow blinked out for the whole gesture.
+   * Redrawing the old trail into its new place instead costs one screen pass
+   * and keeps the motion continuous; whatever pans in from off-screen is
+   * transparent and fills in over the next few frames.
+   */
   setBounds(bounds: FlowBounds) {
+    const previous = this.bounds;
     this.bounds = bounds;
+    if (this.trailFront === undefined || this.trailBack === undefined) return;
+    this.reprojectTrails(previous, bounds);
+  }
+
+  /** Moves the view without carrying anything over, e.g. when starting. */
+  resetBounds(bounds: FlowBounds) {
+    this.bounds = bounds;
+    this.clearTrails();
+  }
+
+  private reprojectTrails(from: FlowBounds, to: FlowBounds) {
+    const mapping = trailReprojection(from, to);
+    if (mapping === undefined) {
+      this.clearTrails();
+      return;
+    }
+    const { gl } = this;
+    const program = this.reprojectProgram;
+    gl.useProgram(program.program);
+    gl.disable(gl.BLEND);
+    gl.bindVertexArray(this.quadArray);
+    gl.activeTexture(gl.TEXTURE0);
+    // The newest trail is in the back texture between frames, matching the
+    // swap at the end of `frame`.
+    gl.bindTexture(gl.TEXTURE_2D, this.trailBack!);
+    gl.uniform1i(program.uniforms.u_screen, 0);
+    gl.uniform2f(program.uniforms.u_scale, mapping.scaleX, mapping.scaleY);
+    gl.uniform2f(program.uniforms.u_offset, mapping.offsetX, mapping.offsetY);
+    this.bindTrailTarget(this.trailFront!);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    [this.trailFront, this.trailBack] = [this.trailBack, this.trailFront];
   }
 
   setOptions(options: FlowOptions) {
@@ -271,6 +377,7 @@ export class FlowRenderer {
     this.deleteProgram(this.drawProgram);
     this.deleteProgram(this.fadeProgram);
     this.deleteProgram(this.blitProgram);
+    this.deleteProgram(this.reprojectProgram);
     for (const texture of [
       this.particleRead,
       this.particleWrite,
@@ -280,6 +387,8 @@ export class FlowRenderer {
       if (texture !== undefined) gl.deleteTexture(texture);
     }
     if (this.indexBuffer !== undefined) gl.deleteBuffer(this.indexBuffer);
+    if (this.indexArray !== undefined) gl.deleteVertexArray(this.indexArray);
+    gl.deleteVertexArray(this.quadArray);
     gl.deleteBuffer(this.quadBuffer);
     gl.deleteFramebuffer(this.framebuffer);
     gl.getExtension("WEBGL_lose_context")?.loseContext();
@@ -305,7 +414,7 @@ export class FlowRenderer {
     const program = this.updateProgram!;
     gl.useProgram(program.program);
     gl.disable(gl.BLEND);
-    this.bindQuad(program);
+    gl.bindVertexArray(this.quadArray);
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.particleRead!);
@@ -354,7 +463,7 @@ export class FlowRenderer {
     const program = this.fadeProgram;
     gl.useProgram(program.program);
     gl.disable(gl.BLEND);
-    this.bindQuad(program);
+    gl.bindVertexArray(this.quadArray);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.trailBack!);
     gl.uniform1i(program.uniforms.u_screen, 0);
@@ -374,10 +483,7 @@ export class FlowRenderer {
     // into the trail texture from washing out toward white.
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-    const location = gl.getAttribLocation(program.program, "a_index");
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.indexBuffer!);
-    gl.enableVertexAttribArray(location);
-    gl.vertexAttribPointer(location, 1, gl.FLOAT, false, 0, 0);
+    gl.bindVertexArray(this.indexArray!);
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.particleRead!);
@@ -419,7 +525,7 @@ export class FlowRenderer {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, this.trailWidth, this.trailHeight);
     gl.disable(gl.BLEND);
-    this.bindQuad(program);
+    gl.bindVertexArray(this.quadArray);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.trailFront!);
     gl.uniform1i(program.uniforms.u_screen, 0);
@@ -441,12 +547,23 @@ export class FlowRenderer {
     gl.viewport(0, 0, this.trailWidth, this.trailHeight);
   }
 
-  private bindQuad(program: ProgramInfo) {
+  /**
+   * A vertex array holding one float attribute in {@link VERTEX_ATTRIBUTE_SLOT}.
+   *
+   * The pointer state lives in the object rather than being re-established per
+   * draw, which is the whole reason WebGL2 has these.
+   */
+  private createVertexArray(buffer: WebGLBuffer, size: number) {
     const { gl } = this;
-    const location = gl.getAttribLocation(program.program, "a_pos");
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
-    gl.enableVertexAttribArray(location);
-    gl.vertexAttribPointer(location, 2, gl.FLOAT, false, 0, 0);
+    const array = gl.createVertexArray();
+    if (array === null)
+      throw new FlowRendererError("Could not allocate a vertex array.");
+    gl.bindVertexArray(array);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.enableVertexAttribArray(VERTEX_ATTRIBUTE_SLOT);
+    gl.vertexAttribPointer(VERTEX_ATTRIBUTE_SLOT, size, gl.FLOAT, false, 0, 0);
+    gl.bindVertexArray(null);
+    return array;
   }
 
   /**
@@ -478,6 +595,7 @@ export class FlowRenderer {
     if (this.particleRead !== undefined) gl.deleteTexture(this.particleRead);
     if (this.particleWrite !== undefined) gl.deleteTexture(this.particleWrite);
     if (this.indexBuffer !== undefined) gl.deleteBuffer(this.indexBuffer);
+    if (this.indexArray !== undefined) gl.deleteVertexArray(this.indexArray);
     const capacity = particleCapacityFor(count);
     const resolution = particleResolutionFor(capacity);
     this.particleCapacity = capacity;
@@ -492,6 +610,7 @@ export class FlowRenderer {
     gl.bindBuffer(gl.ARRAY_BUFFER, indexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, indices, gl.STATIC_DRAW);
     this.indexBuffer = indexBuffer;
+    this.indexArray = this.createVertexArray(indexBuffer, 1);
 
     this.particleRead = this.createFloatTexture(resolution);
     this.particleWrite = this.createFloatTexture(resolution);
@@ -561,14 +680,20 @@ export class FlowRenderer {
     return texture;
   }
 
+  /**
+   * A trail texture. Filtered linearly, unlike the particle state, because
+   * reprojecting it across a zoom samples between texels; the fade and blit
+   * passes read it one-to-one, where linear filtering lands on texel centres
+   * and returns exactly what nearest would.
+   */
   private createByteTexture(width: number, height: number) {
     const { gl } = this;
     const texture = gl.createTexture();
     if (texture === null)
       throw new FlowRendererError("Could not allocate a texture.");
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texImage2D(
@@ -597,6 +722,10 @@ export class FlowRenderer {
       throw new FlowRendererError("Could not create a shader program.");
     gl.attachShader(program, vertex);
     gl.attachShader(program, fragment);
+    // Naming a slot for both attributes is harmless in a program that declares
+    // only one of them, and it is what makes the shared vertex arrays valid.
+    gl.bindAttribLocation(program, VERTEX_ATTRIBUTE_SLOT, "a_pos");
+    gl.bindAttribLocation(program, VERTEX_ATTRIBUTE_SLOT, "a_index");
     gl.linkProgram(program);
     gl.deleteShader(vertex);
     gl.deleteShader(fragment);
@@ -696,6 +825,30 @@ uniform sampler2D u_screen;
 in vec2 v_uv;
 out vec4 outColor;
 void main() { outColor = texture(u_screen, v_uv); }
+`;
+
+/**
+ * Redraws the trail texture under a new view.
+ *
+ * Sampling outside the old view has to come out transparent rather than
+ * clamped: the edge texel would otherwise smear across everything that panned
+ * in from off-screen.
+ */
+const REPROJECT_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+uniform sampler2D u_screen;
+uniform vec2 u_scale;
+uniform vec2 u_offset;
+in vec2 v_uv;
+out vec4 outColor;
+void main() {
+  vec2 uv = u_offset + v_uv * u_scale;
+  if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) {
+    outColor = vec4(0.0);
+    return;
+  }
+  outColor = texture(u_screen, uv);
+}
 `;
 
 /**

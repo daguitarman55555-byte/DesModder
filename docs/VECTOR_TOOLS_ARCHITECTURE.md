@@ -153,6 +153,32 @@ particle _count_: the count slider fires per pointermove, and the count owning
 an allocation meant deleting and rebuilding two float textures once a frame for
 the length of a drag.
 
+A frame is four passes: integrate the particles, fade the trail, draw the
+particles into it, blit it to the canvas. Three of those cover the whole canvas,
+so their cost is the drawing buffer's area, and three decisions follow from
+that:
+
+- **Render scale.** The buffer is sized at the device pixel ratio times a
+  configurable `renderScale`, so on a dense display the user can trade detail
+  the trails barely show for the frame rate they do. Point size is already
+  expressed against the buffer, so the particles stay the same visual size.
+- **Trails move with the view.** Pan and zoom invalidate a screen-space trail
+  texture, and clearing it was the obvious answer and the wrong one — Desmos
+  reports bounds on every pointermove, so a drag wiped the trails sixty times a
+  second and the flow blinked out for the whole gesture. `setBounds` redraws the
+  old trail into its new place instead, one screen pass, with whatever pans in
+  from off-screen left transparent. Only an explicit `resetBounds`, on starting,
+  clears.
+- **Nothing is drawn that nobody can see.** `requestAnimationFrame` already
+  stops for a hidden tab but not for a graph scrolled out of view, so an
+  `IntersectionObserver` on the canvas skips the frame body while it is off
+  screen.
+
+Every program's single vertex attribute is bound to slot 0 before linking, which
+lets one vertex array object per buffer be shared by all of them. The attribute
+pointers are then set once at creation rather than re-established, along with an
+attribute-location query, on every pass of every frame.
+
 ## Development Test Lab
 
 The Test Lab is compiled into watch/development builds only through the
