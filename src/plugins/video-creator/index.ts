@@ -9,7 +9,7 @@ import {
 import { OutFileType, exportFrames, initFFmpeg } from "./backend/export";
 import { escapeRegex } from "./backend/utils";
 import { MainPopupFunc } from "./components/MainPopup";
-import { ExpressionModel, FocusLocation, ValueType } from "#globals";
+import { ExpressionModel, mathquillFocusHelper, ValueType } from "#globals";
 import { keys } from "#utils/depUtils.ts";
 import {
   ManagedNumberInputModel,
@@ -17,7 +17,28 @@ import {
 } from "./components/ManagedNumberInput";
 import { Orientation } from "./orientation";
 
-type FocusedMQ = string;
+export type VcFocusedMq =
+  | "export-fps"
+  | "capture-width"
+  | "capture-height"
+  | "capture-slider-var"
+  | "capture-slider-min"
+  | "capture-slider-max"
+  | "capture-slider-step"
+  | "capture-tick-time-step"
+  | "mosaic-ratio-x"
+  | "mosaic-ratio-y"
+  | "capture-tick-count"
+  | "capture-frame-count"
+  | "to-z-tip"
+  | "from-z-tip"
+  | "step-z-tip"
+  | "to-xy-rot"
+  | "from-xy-rot"
+  | "step-xy-rot"
+  | "speed-rot"
+  | "current-xy-rot"
+  | "current-z-tip";
 
 const DEFAULT_FILENAME = "DesModder_Video_Creator";
 
@@ -142,7 +163,10 @@ export default class VideoCreator extends PluginController {
   }
 
   async tryInitFFmpeg() {
-    await initFFmpeg(this);
+    const skipInit = new URLSearchParams(window.location.search).has(
+      "skipInitFFmpeg"
+    );
+    if (!skipInit) await initFFmpeg(this);
     this.ffmpegLoaded = true;
     this.updateView();
   }
@@ -247,7 +271,10 @@ export default class VideoCreator extends PluginController {
       case "action":
         return this.hasAction();
       case "ticks":
-        return this.cc.getPlayingSliders().length > 0 || this.cc.is3dProduct();
+        return (
+          this.cc.getPlayingSliders().length > 0 ||
+          (this.cc.is3dProduct() && this.or.isSpinning())
+        );
       case "slider":
         return true;
       case "once":
@@ -326,7 +353,7 @@ export default class VideoCreator extends PluginController {
 
   isTickTimeStepValid() {
     const ts = this.getTickTimeStepNumber();
-    return !isNaN(ts) && ts > 0;
+    return isFinite(ts) && ts > 0;
   }
 
   getMatchingSlider() {
@@ -545,32 +572,15 @@ export default class VideoCreator extends PluginController {
     this.updateView();
   }
 
-  updateFocus(location: FocusedMQ, isFocused: boolean) {
-    const dsmLocation: FocusLocation = {
-      type: "dsm-focus",
-      plugin: "video-creator",
-      id: location,
-    };
-    if (isFocused) {
-      this.cc.dispatch({
-        type: "set-focus-location",
-        location: dsmLocation,
-      });
-    } else {
-      this.cc.dispatch({
-        type: "blur-focus-location",
-        location: dsmLocation,
-      });
-    }
-  }
-
-  isFocused(location: FocusedMQ) {
-    const focused = this.cc.getFocusLocation();
-    return (
-      focused?.type === "dsm-focus" &&
-      focused.plugin === "video-creator" &&
-      focused.id === location
-    );
+  getMathquillFocus(location: VcFocusedMq) {
+    return mathquillFocusHelper({
+      location: {
+        type: "dsm-focus",
+        plugin: "video-creator",
+        kind: location,
+      },
+      controller: this.cc,
+    });
   }
 
   cancelCapture() {

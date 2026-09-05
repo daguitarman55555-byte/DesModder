@@ -1,18 +1,19 @@
-import { Component, jsx } from "#DCGView";
-import { InlineMathInputViewGeneral } from "#components";
-import VideoCreator from "..";
+import { Component, DCGView, jsx } from "#DCGView";
+import { InlineMathInputViewGeneral, MathQuillView } from "#components";
+import VideoCreator, { VcFocusedMq } from "..";
 import { Calc } from "#globals";
 import { EvaluateSingleExpression } from "#utils/depUtils.ts";
 import "./ManagedNumberInput.less";
 
 interface ManagedNumberInputParams {
-  focusID: string;
+  focusID: VcFocusedMq;
   ariaLabel: string;
   readonly?: boolean;
   hasError: (val: number) => boolean;
   vc: VideoCreator;
   data: ManagedNumberInputModel;
   numberUnits?: "rad" | "°" | "rad/s" | "°/s" | undefined;
+  handlePressedKey?: (key: string, evt: KeyboardEvent) => void;
 }
 
 export interface ManagedNumberInputModelOpts {
@@ -82,18 +83,27 @@ export default class ManagedNumberInput extends Component<ManagedNumberInputPara
         })}
         placeholder={() => this.props.data().getDefaultLatex() ?? ""}
         ariaLabel={() => this.props.ariaLabel()}
-        handleLatexChanged={(latex) => {
-          this.props.data().setLatexWithCallbacks(latex);
-          // TODO-updateView: this should be a tick
-          this.vc.updateView();
-        }}
+        handleLatexChanged={(latex) => this.handleLatexChanged(latex)}
         latex={() => this.props.data().getLatex()}
         hasError={() => this.props.hasError(this.props.data().getValue())}
-        handleFocusChanged={(b) => this.vc.updateFocus(this.props.focusID(), b)}
-        isFocused={() => this.vc.isFocused(this.props.focusID())}
+        manageFocus={DCGView.const(
+          this.vc.getMathquillFocus(this.props.focusID())
+        )}
         controller={this.vc.cc}
         readonly={() => this.props.readonly?.() ?? false}
+        handlePressedKey={(key, e) => {
+          if (!this.props.handlePressedKey) return;
+          const mq = MathQuillView.getFocusedMathquill();
+          this.props.handlePressedKey(key, e);
+          if (mq) this.handleLatexChanged(mq.latex());
+        }}
       />
     );
+  }
+
+  private handleLatexChanged(latex: string) {
+    this.props.data().setLatexWithCallbacks(latex);
+    // TODO-updateView: this should be a tick
+    this.vc.updateView();
   }
 }

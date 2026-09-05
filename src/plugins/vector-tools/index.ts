@@ -45,7 +45,6 @@ import { FlowOverlay } from "./flow/FlowOverlay";
 import { compileFieldComponentToGLSL } from "./flow/latexToGLSL";
 import type { FlowField } from "./flow/FlowRenderer";
 import type { ConfigItem } from "..";
-import type { FocusLocation } from "#globals";
 
 export { TEST_FOLDER_ID, TEST_LINE_ID, TEST_NAMESPACE } from "./ids";
 
@@ -190,20 +189,8 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     return (
       focused?.type === "dsm-focus" &&
       focused.plugin === "vector-tools" &&
-      focused.id === id
+      focused.kind === id
     );
-  }
-
-  updateFocus(id: ComponentSlot, isFocused: boolean) {
-    const location: FocusLocation = {
-      type: "dsm-focus",
-      plugin: "vector-tools",
-      id,
-    };
-    this.cc.dispatch({
-      type: isFocused ? "set-focus-location" : "blur-focus-location",
-      location,
-    });
   }
 
   getConfig(): VectorFieldConfig {

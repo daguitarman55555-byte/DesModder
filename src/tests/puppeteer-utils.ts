@@ -18,7 +18,11 @@ const defaultUrl =
   process.env.DSM_TESTING_URL ?? "https://desmos.com/calculator";
 
 export function urlForPath(path: string) {
-  return defaultUrl.replace(/\/calculator$/, path);
+  const url = new URL(path, defaultUrl);
+  for (const [k, v] of new URL(defaultUrl).searchParams) {
+    url.searchParams.append(k, v);
+  }
+  return url.toString();
 }
 
 /** Use if the page is expected to be clean */
@@ -98,6 +102,7 @@ export class Driver {
   $$ = this.page.$$.bind(this.page);
   $eval = this.page.$eval.bind(this.page);
   $$eval = this.page.$$eval.bind(this.page);
+  waitForSelector = this.page.waitForSelector.bind(this.page);
 
   /** Helpers */
   async getState() {
@@ -355,5 +360,9 @@ export class Driver {
       // Edit List Mode is off
       ".dcg-action-clearall"
     );
+  }
+
+  async getActiveElement() {
+    return await this.page.evaluateHandle(() => document.activeElement!);
   }
 }

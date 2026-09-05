@@ -1,5 +1,6 @@
 import VectorTools from "..";
 import { Component, jsx } from "#DCGView";
+import { mathquillFocusHelper } from "#globals";
 import {
   Button,
   For,
@@ -568,10 +569,14 @@ function componentInput(
         latex={() => vectorTools.slotLatex(which)}
         handleLatexChanged={(latex) => vectorTools.setSlot(which, latex)}
         hasError={() => hasIssue(validation().issues, SLOT_ISSUE_NAMES[which])}
-        handleFocusChanged={(focused) =>
-          vectorTools.updateFocus(which, focused)
-        }
-        isFocused={() => vectorTools.isFocused(which)}
+        manageFocus={mathquillFocusHelper({
+          controller: vectorTools.cc,
+          location: {
+            type: "dsm-focus",
+            plugin: "vector-tools",
+            kind: which,
+          },
+        })}
         controller={vectorTools.cc}
         readonly={false}
       />
