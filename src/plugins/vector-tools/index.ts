@@ -1,4 +1,4 @@
-import { Inserter, PluginController } from "../PluginController";
+import { PluginController } from "../PluginController";
 import { VectorToolsPanelFunc } from "./components/VectorToolsPanel";
 import {
   CalculatorExpressionAdapter,
@@ -40,21 +40,7 @@ import {
   type VectorFieldPlan,
 } from "./generator";
 import { differentiate, identifiersIn, toLatex } from "./symbolic";
-import {
-  mightBeDerivativeNotation,
-  NOTATION_TRIGGERS,
-  partialGlyphSpans,
-  PARTIAL_GLYPH_CLASS,
-  recognizeRow,
-  substituteGlyphs,
-  type DerivativeRow,
-} from "./notation";
-import { DerivativeResultFn } from "./components/DerivativeResult";
-import {
-  buildConfigFromGlobals,
-  parseLatex,
-  parseRootLatex,
-} from "../../../text-mode-core";
+import { buildConfigFromGlobals, parseLatex } from "../../../text-mode-core";
 import { FlowOverlay } from "./flow/FlowOverlay";
 import { compileFieldComponentToGLSL } from "./flow/latexToGLSL";
 import type { FlowField } from "./flow/FlowRenderer";
@@ -70,28 +56,12 @@ interface VectorToolsSettings {
 type GenerationTarget = "production" | "test";
 type TestChecklistID = "visual" | "zero" | "colors" | "responsiveness";
 
-/** The answer shown under a recognized derivative row, or why there is none. */
-export type DerivativeResultState =
-  | { ok: true; latex: string }
-  | { ok: false; error: string };
-
 /** The compiled shader field, or the reason it could not be put on the GPU. */
 type FlowCompilation =
   | { ok: true; field: FlowField }
   | { ok: false; error: string };
 
 const FLOW_REFRESH_DELAY_MS = 300;
-/**
- * How long typing has to pause before the trigger words are swapped for their
- * characters.
- *
- * Rewriting the field on the keystroke itself fights MathQuill: it is still
- * converting the typed word into an operator name, and replacing the content
- * underneath it loses the conversion, so `par/par x` intermittently came out as
- * `∂/p ar x`. Waiting for a pause means the swap only ever happens between
- * words, and each keystroke resets the wait.
- */
-const NOTATION_REWRITE_DELAY_MS = 350;
 const PANEL_SIZE_SAVE_DELAY_MS = 400;
 const POPOVER_CLASS = "dsm-vector-tools-popover";
 
@@ -174,22 +144,9 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   private panelResizeObserver?: ResizeObserver;
   private panelSizeTimer?: ReturnType<typeof setTimeout>;
   private componentLinkNote = "";
-  private oldMathquillConfig?: typeof this.cc.getMathquillConfig;
-  private readonly notationTimers = new Map<
-    string,
-    ReturnType<typeof setTimeout>
-  >();
-  /** Answers for recognized derivative rows, keyed by expression id. */
-  private readonly derivativeResults = new Map<string, DerivativeResultState>();
-  /** Rows whose glyphs need repainting after every render. */
-  private readonly paintedRows = new Map<string, DerivativeRow>();
-  /** Rows waiting to be rewritten until the user has left them. */
-  private readonly pendingSubstitution = new Set<string>();
-  private paintFrame?: ReturnType<typeof requestAnimationFrame>;
 
   afterEnable() {
     this.ensureStoredConfigIsCurrent();
-    this.installNotationTriggers();
     this.dsm.pillboxMenus?.addPillboxButton({
       id: "dsm-vector-tools-menu",
       tooltip: "vector-tools-name",
@@ -207,17 +164,6 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       ) {
         this.syncComponentsFromExpressions();
       }
-      // Only a fresh edit can introduce notation; rewriting on undo would put
-      // back what the user just undid.
-      if (event.type === "set-item-latex" && typeof event.id === "string") {
-        this.scheduleNotationRewrite(event.id);
-      }
-      // Any event can be the one where focus moved off a row that was waiting
-      // to be rewritten, and any render can have wiped the painted glyphs.
-      // The rewrite dispatches, and a dispatch raised from inside a dispatcher
-      // callback is dropped, so it has to wait for this one to finish.
-      setTimeout(() => this.flushPendingSubstitutions(), 0);
-      this.schedulePaint();
     });
   }
 
@@ -228,13 +174,6 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     if (this.dispatcherID !== undefined)
       this.cc.dispatcher.unregister(this.dispatcherID);
     this.dispatcherID = undefined;
-    for (const timer of this.notationTimers.values()) clearTimeout(timer);
-    this.notationTimers.clear();
-    this.derivativeResults.clear();
-    this.paintedRows.clear();
-    this.pendingSubstitution.clear();
-    if (this.paintFrame !== undefined) cancelAnimationFrame(this.paintFrame);
-    this.removeNotationTriggers();
     this.detachPanelElement();
     this.flowOverlay.stop();
     this.dsm.pillboxMenus?.removePillboxButton("dsm-vector-tools-menu");
@@ -594,287 +533,6 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.updateConfig((config) => {
       config.flow[key] = value;
     });
-  }
-
-  // ---- derivative notation -----------------------------------------------
-
-  /**
-   * Widens MathQuill's operator names so the trigger words become single
-   * tokens as they are typed, rather than a run of loose variables.
-   *
-   * The hook is wrapped rather than replaced, so whatever
-   * `custom-mathquill-config` and Desmos put there survives.
-   */
-  private installNotationTriggers() {
-    if (this.oldMathquillConfig !== undefined) return;
-    const { cc } = this;
-    this.oldMathquillConfig = cc.getMathquillConfig;
-    cc.getMathquillConfig = (options) => {
-      const config = this.oldMathquillConfig!.call(cc, options);
-      config.autoOperatorNames += ` ${NOTATION_TRIGGERS.join(" ")}`;
-      return config;
-    };
-  }
-
-  private removeNotationTriggers() {
-    if (this.oldMathquillConfig === undefined) return;
-    this.cc.getMathquillConfig = this.oldMathquillConfig;
-    this.oldMathquillConfig = undefined;
-  }
-
-  /**
-   * Queues a rewrite for just after the keystroke that triggered it.
-   *
-   * The dispatch arrives while MathQuill is still mid-edit: the model already
-   * holds the new latex, but the focused field is not settled, so a rewrite
-   * issued here goes to the wrong place and is overwritten. One turn later
-   * everything agrees.
-   */
-  private scheduleNotationRewrite(id: string) {
-    const existing = this.notationTimers.get(id);
-    if (existing !== undefined) clearTimeout(existing);
-    this.notationTimers.set(
-      id,
-      setTimeout(() => {
-        this.notationTimers.delete(id);
-        this.rewriteNotationIn(id);
-      }, NOTATION_REWRITE_DELAY_MS)
-    );
-  }
-
-  /**
-   * Substitutes the typed triggers for their characters, then works out what
-   * the row means.
-   *
-   * The substituted form no longer contains a trigger, so this cannot loop.
-   */
-  private rewriteNotationIn(id: string) {
-    const model = this.cc.getItemModel(id);
-    if (model?.type !== "expression" || typeof model.latex !== "string") return;
-
-    const substituted = substituteGlyphs(model.latex);
-    if (substituted !== undefined && this.isRowFocused(id)) {
-      // Replacing the content of a field being typed in resets the cursor to
-      // the end, which throws the user out of the fraction denominator they
-      // were half way through filling. Wait until they leave the row.
-      this.pendingSubstitution.add(id);
-      return;
-    }
-    this.pendingSubstitution.delete(id);
-    if (substituted !== undefined) {
-      // While a row is being typed in, MathQuill owns its content and rewrites
-      // the model back from its own DOM, so `setExpression` is silently undone.
-      // Writing the field alone has the opposite problem: the glyphs change but
-      // the model, which is what everything else reads, does not. Both have to
-      // move, and the dispatch is what Desmos itself uses to do that.
-      this.calc.focusedMathQuill?.mq.latex(substituted);
-      this.cc.dispatch({ type: "set-item-latex", id, latex: substituted });
-    }
-    this.readDerivativeRow(id, substituted ?? model.latex);
-  }
-
-  /**
-   * Works out what a row carrying `∂` or `∇` is asking for, and answers it.
-   *
-   * Desmos cannot parse either character, so a recognized row is always an
-   * error to Desmos. Its error is hidden — but only while the row is one this
-   * understands, so a genuine mistake still shows up as a mistake.
-   */
-  private readDerivativeRow(id: string, latex: string) {
-    if (!mightBeDerivativeNotation(latex)) {
-      this.paintedRows.delete(id);
-      if (this.derivativeResults.delete(id)) {
-        this.dsm.hideErrors?.hideError(id);
-        this.util.tick();
-      }
-      return;
-    }
-
-    const row = recognizeRow(latex, (name) => this.functionArguments(name));
-    if (row === undefined) {
-      // A fraction starting with `d` that is not a derivative is an
-      // ordinary expression; claiming it, and hiding its error, would be
-      // worse than saying nothing at all.
-      this.paintedRows.delete(id);
-      if (this.derivativeResults.delete(id)) this.util.tick();
-      return;
-    }
-    const result = this.answerDerivativeRow(row);
-    this.derivativeResults.set(id, result);
-    this.paintedRows.set(id, row);
-    // The tick below re-renders the row and discards any class put on its
-    // elements, so the paint has to be re-applied after it, not before.
-    this.schedulePaint();
-    // Recognized rows keep their error hidden. A `∂` or `∇` row cannot parse at
-    // all; a real `d/dx` row parses fine but usually still errors, because a
-    // partial derivative like `2y` depends on the other variable and so is not
-    // a graphable equation on its own. Either way the answer is in the box, and
-    // the triangle is noise.
-    const hasError =
-      (this.cc.getItemModel(id) as { error?: unknown })?.error !== undefined;
-    if (hasError && this.dsm.hideErrors?.isErrorHidden(id) !== true) {
-      this.dsm.hideErrors?.hideError(id);
-    }
-    this.util.tick();
-  }
-
-  /**
-   * Replaces a bare call to a user-defined function with what it was defined
-   * as, so `df/dx` differentiates `2xy` rather than an opaque call.
-   *
-   * Only an exact call on the function's own parameters is inlined. Anything
-   * else — a call at a point, a composition — would need the chain rule applied
-   * to substituted arguments, and getting that subtly wrong is worse than
-   * saying the derivative is not known.
-   */
-  private inlineFunctionCall(body: string): string {
-    const call = /^([a-zA-Z](?:_\{[a-zA-Z0-9]+\})?)\\left\((.*)\\right\)$/.exec(
-      body
-    );
-    if (call === null) return body;
-    const [, name, args] = call;
-    const definition = this.functionDefinition(name);
-    if (definition === undefined) return body;
-    if (args !== definition.args.join(",")) return body;
-    return definition.body;
-  }
-
-  private answerDerivativeRow(row: DerivativeRow): DerivativeResultState {
-    row = { ...row, body: this.inlineFunctionCall(row.body) };
-    if (row.kind === "partial") {
-      const derivative = this.partialDerivative(row.body, row.variable);
-      return derivative.ok
-        ? { ok: true, latex: derivative.latex }
-        : { ok: false, error: derivative.error };
-    }
-    const gradient = this.gradient(row.body);
-    if (!gradient.ok) return { ok: false, error: gradient.error };
-    // Two or three components are an ordinary Desmos point; beyond that Desmos
-    // has no vector type, so the gradient is shown as a list instead.
-    const [open, close] =
-      gradient.latex.length <= 3
-        ? ["\\left(", "\\right)"]
-        : ["\\left[", "\\right]"];
-    return { ok: true, latex: `${open}${gradient.latex.join(",")}${close}` };
-  }
-
-  /**
-   * Draws the `d` of a recognized `d/dx` as `∂`.
-   *
-   * Only for a body with more than one variable: on a single-variable function
-   * `d/dx` is an ordinary derivative and `∂` would be wrong notation.
-   */
-  private paintPartialGlyphs(id: string, row: DerivativeRow) {
-    const root = (this.cc.getItemModel(id) as { rootViewNode?: Element })
-      ?.rootViewNode;
-    if (root === undefined || row.kind !== "partial") return;
-    for (const glyph of root.querySelectorAll(`.${PARTIAL_GLYPH_CLASS}`)) {
-      glyph.classList.remove(PARTIAL_GLYPH_CLASS);
-    }
-    if (!this.isMultivariable(row.body)) return;
-    for (const glyph of partialGlyphSpans(root)) {
-      glyph.classList.add(PARTIAL_GLYPH_CLASS);
-    }
-  }
-
-  /** Whether the user is currently typing in this row. */
-  private isRowFocused(id: string) {
-    return (
-      this.calc.focusedMathQuill !== undefined &&
-      this.cc.getSelectedItem()?.id === id
-    );
-  }
-
-  /** Rewrites any row the user has now left. */
-  private flushPendingSubstitutions() {
-    for (const id of [...this.pendingSubstitution]) {
-      if (this.isRowFocused(id)) continue;
-      this.pendingSubstitution.delete(id);
-      this.rewriteNotationIn(id);
-    }
-  }
-
-  /**
-   * Re-applies the `∂` paint after the render that follows a change.
-   *
-   * The classes live on elements MathQuill owns and rebuilds, so they cannot be
-   * set once. A frame later the row exists again and the paint sticks.
-   */
-  private schedulePaint() {
-    if (this.paintFrame !== undefined) return;
-    this.paintFrame = requestAnimationFrame(() => {
-      this.paintFrame = undefined;
-      for (const [id, row] of this.paintedRows)
-        this.paintPartialGlyphs(id, row);
-    });
-  }
-
-  private isMultivariable(body: string) {
-    try {
-      const cfg = buildConfigFromGlobals(Desmos, this.calc);
-      return (
-        identifiersIn(parseLatex(cfg, this.inlineFunctionCall(body))).length > 1
-      );
-    } catch {
-      return false;
-    }
-  }
-
-  /** The answer to show under a row, if it is one this plugin recognized. */
-  derivativeResultFor(id: string): DerivativeResultState | undefined {
-    return this.derivativeResults.get(id);
-  }
-
-  /** Inserted under every expression; renders only for recognized rows. */
-  derivativeResult(id: string | undefined): Inserter {
-    if (id === undefined) return undefined;
-    return () => DerivativeResultFn(this, id);
-  }
-
-  /**
-   * The parameter names a function was defined with, so `df/dx` can expand to
-   * a call with the arguments the user actually wrote.
-   */
-  private functionDefinition(
-    name: string
-  ): { args: string[]; body: string } | undefined {
-    const cfg = buildConfigFromGlobals(Desmos, this.calc);
-    for (const item of this.cc.getAllItemModels()) {
-      if (item.type !== "expression" || typeof item.latex !== "string")
-        continue;
-      if (!item.latex.startsWith(name)) continue;
-      try {
-        const root = parseRootLatex(cfg, item.latex);
-        if (root.type === "FunctionDefinition" && root.symbol.symbol === name) {
-          return {
-            args: root.argSymbols.map((arg) => arg.symbol),
-            body: toLatex(cfg, root.definition),
-          };
-        }
-      } catch {
-        // An expression that does not parse is simply not the definition.
-      }
-    }
-    return undefined;
-  }
-
-  private functionArguments(name: string): string[] | undefined {
-    const cfg = buildConfigFromGlobals(Desmos, this.calc);
-    for (const item of this.cc.getAllItemModels()) {
-      if (item.type !== "expression" || typeof item.latex !== "string")
-        continue;
-      // Cheap reject before parsing: a definition of `f` has to mention it.
-      if (!item.latex.startsWith(name)) continue;
-      try {
-        const root = parseRootLatex(cfg, item.latex);
-        if (root.type === "FunctionDefinition" && root.symbol.symbol === name) {
-          return root.argSymbols.map((arg) => arg.symbol);
-        }
-      } catch {
-        // An expression that does not parse is simply not the definition.
-      }
-    }
-    return undefined;
   }
 
   // ---- symbolic differentiation ------------------------------------------
