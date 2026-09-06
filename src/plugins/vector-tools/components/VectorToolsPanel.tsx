@@ -22,6 +22,7 @@ import {
   PANEL_MIN_WIDTH,
   PANEL_TABS,
   type ColorPalette,
+  type FlowLook,
   type ColorRangeMode,
   type FieldSource,
   type FlowColorMode,
@@ -58,11 +59,17 @@ const COLOR_MODES: readonly Choice<VectorColorMode>[] = [
 ];
 
 const PALETTES: readonly Choice<ColorPalette>[] = [
-  { value: "sequential-a", label: "Indigo" },
+  { value: "spectral", label: "Spectral" },
+  { value: "sequential-a", label: "Viridis" },
   { value: "sequential-b", label: "Blue" },
   { value: "blue-red", label: "Blue to red" },
   { value: "grayscale", label: "Grayscale" },
   { value: "direction-hue", label: "Hue wheel" },
+];
+
+const FLOW_LOOKS: readonly Choice<FlowLook>[] = [
+  { value: "streamlines", label: "Streamlines" },
+  { value: "texture", label: "Texture" },
 ];
 
 const RANGE_MODES: readonly Choice<ColorRangeMode>[] = [
@@ -414,10 +421,22 @@ function flowTab(vectorTools: VectorTools, config: ConfigGetter) {
       <section class="dsm-vector-tools-section">
         {particleCountControl(vectorTools, flow)}
         {chipGroup(
+          "Look",
+          () => vectorTools.flowLook,
+          FLOW_LOOKS,
+          (value) => vectorTools.setFlowLook(value)
+        )}
+        {chipGroup(
           "Particle color",
           () => flow().colorMode,
           FLOW_COLOR_MODES,
           (value) => vectorTools.setFlow("colorMode", value)
+        )}
+        {chipGroup(
+          "Particle palette",
+          () => flow().palette,
+          PALETTES,
+          (value) => vectorTools.setFlow("palette", value)
         )}
         {checkboxControl(
           "Constant speed (follow streamlines evenly)",

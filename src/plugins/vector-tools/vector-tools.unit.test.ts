@@ -325,6 +325,9 @@ describe("Vector Tools field configuration", () => {
       pointSize: 6,
       renderScale: FLOW_RENDER_SCALE_MINIMUM,
       colorMode: "speed",
+      // Neither was in the saved object, so both fall back to the default.
+      palette: "spectral",
+      look: "streamlines",
       normalizeSpeed: true,
     });
     expect(

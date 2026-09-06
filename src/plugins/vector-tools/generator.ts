@@ -6,6 +6,7 @@ import {
   type VectorLengthMode,
   ZERO_VECTOR_TOLERANCE,
 } from "./model";
+import { paletteLatex } from "./palettes";
 import type {
   GeneratedExpressionSpec,
   GeneratedFolderSpec,
@@ -571,22 +572,15 @@ function paletteColorLatex(
   palette: VectorFieldConfig["color"]["palette"],
   t: string
 ) {
-  switch (palette) {
-    case "sequential-b":
-      return `\\operatorname{rgb}\\left(30+110\\left(${t}\\right),40+185\\left(${t}\\right),90+125\\left(${t}\\right)\\right)`;
-    case "blue-red":
-      return divergingColorLatex(t);
-    case "grayscale":
-      return `\\operatorname{rgb}\\left(30+210\\left(${t}\\right),30+210\\left(${t}\\right),30+210\\left(${t}\\right)\\right)`;
-    case "direction-hue":
-      return `\\operatorname{hsv}\\left(360\\left(${t}\\right),0.82,0.9\\right)`;
-    case "sequential-a":
-      return `\\operatorname{rgb}\\left(35+210\\left(${t}\\right),75+130\\left(${t}\\right),155-95\\left(${t}\\right)\\right)`;
-  }
+  return paletteLatex(palette, t, numberLatex);
 }
 
+/**
+ * The ramp a signed component is drawn with: blue below zero, red above, and
+ * light through the middle, so the neutral value recedes instead of shouting.
+ */
 function divergingColorLatex(t: string) {
-  return `\\operatorname{rgb}\\left(35+210\\left(${t}\\right),70+70\\left(1-\\left|2\\left(${t}\\right)-1\\right|\\right),220-185\\left(${t}\\right)\\right)`;
+  return paletteLatex("blue-red", t, numberLatex);
 }
 
 function parametricSegmentLatex(

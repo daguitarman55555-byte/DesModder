@@ -14,6 +14,8 @@ import {
   type DensityPreset,
   type FieldSource,
   type FlowConfig,
+  type FlowLook,
+  FLOW_LOOK_PRESETS,
   type PanelTab,
   type SamplingAxisConfig,
   type SamplingMode,
@@ -513,6 +515,20 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   setZeroVectorMode(mode: ZeroVectorMode) {
     this.updateConfig((config) => {
       config.zeroVectorMode = mode;
+    });
+  }
+
+  get flowLook() {
+    return this.getConfig().flow.look;
+  }
+
+  /**
+   * Applies a look, which is only ever a starting point: it writes the trail
+   * and respawn settings that produce it, and both stay adjustable afterwards.
+   */
+  setFlowLook(look: FlowLook) {
+    this.updateConfig((config) => {
+      config.flow = { ...config.flow, ...FLOW_LOOK_PRESETS[look], look };
     });
   }
 

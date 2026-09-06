@@ -1,4 +1,6 @@
+import { PALETTE_IDS, type PaletteID } from "./palettes";
 export const VECTOR_FIELD_SCHEMA_VERSION = 3;
+
 export const VECTOR_COUNT_WARNING = 2_500;
 export const VECTOR_COUNT_HARD_MAXIMUM = 10_000;
 export const ZERO_VECTOR_TOLERANCE = 1e-9;
@@ -23,15 +25,30 @@ export type VectorColorMode =
   | "direction"
   | "x-component"
   | "y-component";
-export type ColorPalette =
-  | "sequential-a"
-  | "sequential-b"
-  | "blue-red"
-  | "grayscale"
-  | "direction-hue";
+export type ColorPalette = PaletteID;
 export type ColorRangeMode = "automatic" | "manual";
 export type ZeroVectorMode = "hide" | "point";
 export type FlowColorMode = "fixed" | "speed" | "direction";
+
+/**
+ * The two things a particle flow can be asked to show.
+ *
+ * Long-lived particles with long trails draw the field's *streamlines*, which
+ * is what the visualizer has always done — and on a rotational field that
+ * genuinely is a set of concentric circles, with gaps between them. Short
+ * trails that respawn constantly cover the viewport evenly instead, reading as
+ * a texture with the field's direction in it rather than a set of curves.
+ */
+export type FlowLook = "streamlines" | "texture";
+
+/** What each look sets. Every one of these stays adjustable afterwards. */
+export const FLOW_LOOK_PRESETS: Record<
+  FlowLook,
+  Pick<FlowConfig, "trailPersistence" | "dropRate">
+> = {
+  streamlines: { trailPersistence: 0.95, dropRate: 0.01 },
+  texture: { trailPersistence: 0.6, dropRate: 0.15 },
+};
 
 /**
  * Settings for the GPU flow visualizer. Persisted alongside the field so a
@@ -46,6 +63,10 @@ export interface FlowConfig {
   opacity: number;
   pointSize: number;
   colorMode: FlowColorMode;
+  /** The ramp the `speed` color mode runs along. */
+  palette: ColorPalette;
+  /** Which of the two looks the trail and respawn settings were last set to. */
+  look: FlowLook;
   /** Draw streamlines at a constant pace instead of the field's magnitude. */
   normalizeSpeed: boolean;
   /**
@@ -222,7 +243,7 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
   arrowhead: { size: 0.18, angleRadians: 0.55 },
   color: {
     mode: "fixed",
-    palette: "sequential-a",
+    palette: "spectral",
     rangeMode: "automatic",
     minimum: 0,
     maximum: 1,
@@ -234,11 +255,13 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
   flow: {
     particleCount: 16_000,
     speed: 1,
-    trailPersistence: 0.9,
-    dropRate: 0.008,
+    trailPersistence: 0.95,
+    dropRate: 0.01,
     opacity: 0.42,
-    pointSize: 1.4,
+    pointSize: 2,
     colorMode: "speed",
+    palette: "spectral",
+    look: "streamlines",
     normalizeSpeed: true,
     renderScale: 1,
   },
@@ -588,6 +611,11 @@ function normalizeFlow(value: unknown, fallback: FlowConfig): FlowConfig {
     dropRate: clampNumber(flow?.dropRate, fallback.dropRate, 0, 0.2),
     opacity: clampNumber(flow?.opacity, fallback.opacity, 0.05, 1),
     pointSize: clampNumber(flow?.pointSize, fallback.pointSize, 0.5, 6),
+    palette: isPalette(flow?.palette) ? flow.palette : fallback.palette,
+    look:
+      flow?.look === "streamlines" || flow?.look === "texture"
+        ? flow.look
+        : fallback.look,
     colorMode: isFlowColorMode(flow?.colorMode)
       ? flow.colorMode
       : fallback.colorMode,
@@ -809,11 +837,5 @@ function isColorMode(value: unknown): value is VectorColorMode {
 }
 
 function isPalette(value: unknown): value is ColorPalette {
-  return [
-    "sequential-a",
-    "sequential-b",
-    "blue-red",
-    "grayscale",
-    "direction-hue",
-  ].includes(value as string);
+  return (PALETTE_IDS as string[]).includes(value as string);
 }

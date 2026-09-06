@@ -16,6 +16,7 @@
  *    instead of owning the whole screen.
  */
 import { GLSL_PRELUDE } from "./latexToGLSL";
+import { PALETTE_GLSL, paletteUniforms, type PaletteID } from "../palettes";
 import type { FlowColorMode } from "../model";
 
 export interface FlowBounds {
@@ -52,6 +53,8 @@ export interface FlowOptions {
   pointSize: number;
   opacity: number;
   colorMode: FlowColorMode;
+  /** The ramp the `speed` color mode runs along, shared with the arrows. */
+  palette: PaletteID;
   /** Hex color used by the `fixed` color mode. */
   fixedColor: string;
   /** Draw streamlines at a constant speed instead of the field's own magnitude. */
@@ -72,11 +75,12 @@ export interface FlowOptions {
 export const DEFAULT_FLOW_OPTIONS: FlowOptions = {
   particleCount: 16_000,
   speed: 1,
-  trailPersistence: 0.9,
-  dropRate: 0.008,
-  pointSize: 1.4,
+  trailPersistence: 0.95,
+  dropRate: 0.01,
+  pointSize: 2,
   opacity: 0.42,
   colorMode: "speed",
+  palette: "spectral",
   fixedColor: "#6042a6",
   normalizeSpeed: true,
   renderScale: 1,
@@ -508,6 +512,14 @@ export class FlowRenderer {
     );
     const [r, g, b] = hexToUnitRGB(this.options.fixedColor);
     gl.uniform3f(program.uniforms.u_fixedColor, r, g, b);
+    const palette = paletteUniforms(this.options.palette);
+    gl.uniform1fv(program.uniforms.u_paletteAt, palette.positions);
+    gl.uniform3fv(program.uniforms.u_paletteRGB, palette.colors);
+    gl.uniform1i(program.uniforms.u_paletteCount, palette.count);
+    gl.uniform1i(
+      program.uniforms.u_paletteIsHue,
+      this.options.palette === "direction-hue" ? 1 : 0
+    );
     gl.uniform1f(
       program.uniforms.u_speedScale,
       Math.max(1e-6, (xMax - xMin) / 3)
@@ -740,8 +752,12 @@ export class FlowRenderer {
     const count = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS) as number;
     for (let i = 0; i < count; i++) {
       const info = gl.getActiveUniform(program, i);
-      if (info !== null)
-        uniforms[info.name] = gl.getUniformLocation(program, info.name);
+      if (info === null) continue;
+      uniforms[info.name] = gl.getUniformLocation(program, info.name);
+      // An array uniform is reported as `u_name[0]`, but every call site names
+      // it without the index, so it is stored under both.
+      const array = /^(.*)\[0\]$/.exec(info.name);
+      if (array !== null) uniforms[array[1]] = uniforms[info.name];
     }
     return { program, uniforms };
   }
@@ -961,11 +977,7 @@ uniform float u_speedScale;
 out vec4 v_color;
 
 ${fieldFunctions(field)}
-
-vec3 vtHueToRGB(float hue) {
-  vec3 k = mod(hue * 6.0 + vec3(0.0, 4.0, 2.0), 6.0);
-  return clamp(min(k, 4.0 - k), 0.0, 1.0);
-}
+${PALETTE_GLSL}
 
 void main() {
   int index = int(a_index);
@@ -980,12 +992,9 @@ void main() {
   vec3 rgb = u_fixedColor;
   if (u_colorMode == 1) {
     // Scale-free ramp: no reduction pass is needed to find the field's range.
-    float t = 1.0 - exp(-length(v) / u_speedScale);
-    rgb = mix(vec3(0.15, 0.30, 0.68), vec3(0.16, 0.68, 0.62), smoothstep(0.0, 0.5, t));
-    rgb = mix(rgb, vec3(0.95, 0.70, 0.20), smoothstep(0.45, 0.85, t));
-    rgb = mix(rgb, vec3(0.85, 0.24, 0.22), smoothstep(0.85, 1.0, t));
+    rgb = vtPalette(1.0 - exp(-length(v) / u_speedScale));
   } else if (u_colorMode == 2) {
-    rgb = vtHueToRGB(fract(atan(v.y, v.x) / 6.2831853 + 1.0));
+    rgb = vtHueRamp(fract(atan(v.y, v.x) / 6.2831853 + 1.0));
   }
 
   // Ease particles in and out so respawns do not pop.
