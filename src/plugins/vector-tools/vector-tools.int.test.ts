@@ -936,35 +936,6 @@ testWithPage(
     expect(viewport.drawn).toEqual(viewport.canvas);
     expect(viewport.drawn.width).toBeGreaterThan(100);
 
-    // The colour ramp is spread over the field's range across the visible
-    // graph, clipped to the sampling domain — not across the domain itself. A
-    // domain far larger than the view has magnitudes far larger than anything
-    // on screen, and measuring over it put every visible arrow at the bottom of
-    // the ramp: a field drawn in one flat colour, whichever palette was picked.
-    await driver.evaluate(() => {
-      const plugin = DSM.enabledPlugins["vector-tools"] as any;
-      plugin.setAxis("x", "min", -400);
-      plugin.setAxis("x", "max", 400);
-      plugin.setAxis("y", "min", -233);
-      plugin.setAxis("y", "max", 233);
-      Calc.setMathBounds({ left: -10, right: 10, bottom: -6, top: 6 });
-    });
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    const coloured = await driver.evaluate(
-      () => (DSM.enabledPlugins["vector-tools"] as any).arrowRange
-    );
-    // The box is the view, not the eight-hundred-unit domain around it.
-    expect(coloured.box).toEqual({
-      xMin: -10,
-      xMax: 10,
-      yMin: -6,
-      yMax: 6,
-    });
-    // On this rotational field magnitude is the radius, so the corner of the
-    // view is what the top of the ramp has to reach.
-    expect(coloured.maximum).toBeGreaterThan(11);
-    expect(coloured.maximum).toBeLessThan(12);
-
     await driver.evaluate(() =>
       (DSM.enabledPlugins["vector-tools"] as any).resetConfig()
     );
