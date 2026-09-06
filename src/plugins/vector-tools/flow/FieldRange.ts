@@ -33,6 +33,73 @@ export interface MagnitudeRange {
  */
 const SAMPLES = 64;
 
+/**
+ * Where the ramp starts, as a fraction of the sorted samples.
+ *
+ * Not the smallest, which is the whole point — see `spanOf`.
+ */
+const LOW_PERCENTILE = 0.02;
+const HIGH_PERCENTILE = 0.98;
+
+/**
+ * How far past the middle half of the samples the ramp is allowed to reach.
+ *
+ * Four interquartile ranges above the median is comfortably past everything in
+ * a field whose magnitudes are spread evenly, and nowhere near the values a
+ * pole produces.
+ */
+const SPREADS_ABOVE_MEDIAN = 4;
+
+/**
+ * The range the ramp should span — robustly, not the smallest and largest.
+ *
+ * A field with a pole in it, which is anything with a denominator that passes
+ * through zero, has magnitudes near that pole larger than the entire rest of
+ * the field. `sin(x²+y²)/(1-|x³y³|+cos(x²+y²))` reaches two hundred thousand
+ * within a few units of the origin while the rest of it sits below ten. Spread
+ * a ramp from zero to that and every ordinary arrow lands in the first
+ * hundredth of it, which is one flat colour — the bottom of whichever palette
+ * was chosen. Clipping the top percentile is not enough either: the band around
+ * a pole is wide enough to be several percent of the samples.
+ *
+ * So the top is also held to a few spreads above the middle. On a field whose
+ * magnitudes are spread evenly that bound is far above everything and the range
+ * is simply the samples; on a field with a pole it is what the field does
+ * away from the pole, and the pole saturates at the end of the ramp where it
+ * belongs.
+ */
+export function spanOf(samples: ArrayLike<number>): MagnitudeRange | undefined {
+  const finite: number[] = [];
+  for (const value of Array.from(samples)) {
+    if (Number.isFinite(value)) finite.push(value);
+  }
+  if (finite.length === 0) return undefined;
+  finite.sort((a, b) => a - b);
+  const at = (fraction: number) =>
+    finite[
+      Math.min(
+        finite.length - 1,
+        Math.max(0, Math.round(fraction * (finite.length - 1)))
+      )
+    ];
+  const median = at(0.5);
+  const spread = at(0.75) - at(0.25);
+  const minimum = at(LOW_PERCENTILE);
+  const maximum = Math.min(
+    at(HIGH_PERCENTILE),
+    median + SPREADS_ABOVE_MEDIAN * spread
+  );
+  // A field that is flat, or one whose middle half is a single value, would
+  // otherwise leave nothing to divide by.
+  if (!(maximum - minimum > 1e-12)) {
+    return {
+      minimum,
+      maximum: minimum + Math.max(Math.abs(minimum), 1) * 1e-6,
+    };
+  }
+  return { minimum, maximum };
+}
+
 /** Boxes this close together would not move the range meaningfully. */
 function sameBox(a: FlowBounds, b: FlowBounds) {
   const span = Math.max(a.xMax - a.xMin, a.yMax - a.yMin, 1e-9);
@@ -66,7 +133,11 @@ export class FieldRangeProbe {
   private texture?: WebGLTexture;
   private framebuffer?: WebGLFramebuffer;
   private readonly pixels = new Float32Array(SAMPLES * SAMPLES);
-  private cached?: { box: FlowBounds; range: MagnitudeRange };
+  private cached?: {
+    box: FlowBounds;
+    logarithmic: boolean;
+    range: MagnitudeRange;
+  };
   private unavailable = false;
 
   constructor(
@@ -87,14 +158,18 @@ export class FieldRangeProbe {
    * box returns the cached answer, so panning re-measures once per new view
    * rather than once per frame.
    */
-  measure(box: FlowBounds): MagnitudeRange | undefined {
+  measure(box: FlowBounds, logarithmic = false): MagnitudeRange | undefined {
     if (this.unavailable || this.program === undefined) return undefined;
-    if (this.cached !== undefined && sameBox(this.cached.box, box)) {
+    if (
+      this.cached !== undefined &&
+      this.cached.logarithmic === logarithmic &&
+      sameBox(this.cached.box, box)
+    ) {
       return this.cached.range;
     }
-    const range = this.render(box);
+    const range = this.render(box, logarithmic);
     if (range === undefined) return undefined;
-    this.cached = { box: { ...box }, range };
+    this.cached = { box: { ...box }, logarithmic, range };
     return range;
   }
 
@@ -108,7 +183,10 @@ export class FieldRangeProbe {
     this.framebuffer = undefined;
   }
 
-  private render(box: FlowBounds): MagnitudeRange | undefined {
+  private render(
+    box: FlowBounds,
+    logarithmic: boolean
+  ): MagnitudeRange | undefined {
     const { gl } = this;
     // A float render target is what makes the magnitudes readable at all.
     if (gl.getExtension("EXT_color_buffer_float") === null) {
@@ -139,6 +217,7 @@ export class FieldRangeProbe {
     gl.uniform2f(uniforms.u_min, box.xMin, box.yMin);
     gl.uniform2f(uniforms.u_max, box.xMax, box.yMax);
     gl.uniform1f(uniforms.u_samples, SAMPLES);
+    gl.uniform1i(uniforms.u_logarithmic, logarithmic ? 1 : 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.readPixels(0, 0, SAMPLES, SAMPLES, gl.RED, gl.FLOAT, this.pixels);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -254,6 +333,12 @@ precision highp float;
 uniform vec2 u_min;
 uniform vec2 u_max;
 uniform float u_samples;
+// The range has to be measured in whatever space the colour is chosen in. A
+// ramp spread across raw magnitudes says nothing useful about the logarithms
+// of them: log(1+m) of a field reaching two hundred thousand is about twelve,
+// which against a range topping two hundred thousand is indistinguishable from
+// zero — the bottom of the palette, for every arrow.
+uniform int u_logarithmic;
 out float outMagnitude;
 
 ${fieldFunctions(field)}
@@ -263,7 +348,8 @@ void main() {
   float magnitude = length(vtField(u_min + at * (u_max - u_min)));
   // NaN compares false with itself, and a NaN texel would poison the range.
   if (!(magnitude == magnitude)) magnitude = 0.0;
-  outMagnitude = magnitude;
+  outMagnitude =
+    u_logarithmic == 1 ? log(1.0 + max(magnitude, 0.0)) : magnitude;
 }
 `;
 }

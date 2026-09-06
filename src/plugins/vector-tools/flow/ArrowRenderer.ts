@@ -293,7 +293,10 @@ export class ArrowRenderer {
         ? this.options.domain
         : (intersectBounds(this.bounds, this.options.domain) ??
           this.options.domain);
-    const measured = this.range.measure(box) ?? { minimum: 0, maximum: 1 };
+    const measured = this.range.measure(
+      box,
+      this.options.colorMode === "log-magnitude"
+    ) ?? { minimum: 0, maximum: 1 };
     this.lastRange = { ...measured, box };
     return measured;
   }
