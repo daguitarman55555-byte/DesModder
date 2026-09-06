@@ -54,6 +54,10 @@ export type ArrowMode = "off" | "live" | "desmos";
  *
  * It is the number Desmos generation refuses at, for the same reason and with a
  * gentler answer: the domain is sampled more coarsely rather than not drawn.
+ *
+ * It is also only a default. Live rendering is the half of this plugin with no
+ * limit, and a dense field drawn whole is a legitimate thing to want to look
+ * at — `arrowDensityLimit` turns this off and every sample is drawn.
  */
 export const LIVE_ARROW_MAXIMUM = VECTOR_COUNT_HARD_MAXIMUM;
 
@@ -213,6 +217,14 @@ export interface VectorFieldConfig {
   zeroVectorMode: ZeroVectorMode;
   /** Whether the extension draws the arrows itself. */
   arrowMode: ArrowMode;
+  /**
+   * Whether a grid too dense to read is sampled more coarsely before drawing.
+   *
+   * On by default, because matching the domain to a zoomed-out viewport asks
+   * for hundreds of thousands of arrows by accident. Off draws every one of
+   * them, which is the point of drawing them here rather than through Desmos.
+   */
+  arrowDensityLimit: boolean;
   flow: FlowConfig;
   panel: PanelConfig;
 }
@@ -304,6 +316,7 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
   },
   zeroVectorMode: "hide",
   arrowMode: "live",
+  arrowDensityLimit: true,
   // Deliberately restrained: the flow is drawn on top of the graph paper, so
   // the defaults have to leave the axes and expressions legible underneath.
   flow: {
@@ -611,6 +624,7 @@ export function normalizeVectorFieldConfig(value: unknown): VectorFieldConfig {
       value.arrowMode === "desmos" || value.arrowMode === "off"
         ? value.arrowMode
         : "live",
+    arrowDensityLimit: value.arrowDensityLimit !== false,
     flow: normalizeFlow(value.flow, fallback.flow),
     panel: normalizePanel(value.panel, fallback.panel),
   };

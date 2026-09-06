@@ -192,7 +192,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     if (!this.arrowOverlay.isRunning) return "";
     const grid = this.arrowGrid;
     if (grid.thinned) {
-      return `Drawing ${this.arrowOverlay.arrowCount} of ${grid.requested} arrows live — sampled coarsely so they stay readable at this zoom.`;
+      return `Drawing ${this.arrowOverlay.arrowCount} of ${grid.requested} arrows live — sampled coarsely to stay readable. Turn off the density limit to draw all of them.`;
     }
     return `Drawing ${this.arrowOverlay.arrowCount} arrows live.`;
   }
@@ -200,6 +200,12 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   /** Tests only: what the last live-arrow frame actually drew into. */
   get arrowViewport() {
     return this.arrowOverlay.drawnViewport;
+  }
+
+  setArrowDensityLimit(limit: boolean) {
+    this.updateConfig((config) => {
+      config.arrowDensityLimit = limit;
+    });
   }
 
   setArrowMode(mode: ArrowMode) {
@@ -233,13 +239,20 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.arrowOverlay.start(compiled.field, this.arrowOptions);
   }
 
-  /** The grid the live arrows are drawn on, thinned if the domain is vast. */
+  /**
+   * The grid the live arrows are drawn on.
+   *
+   * Thinned only if the user has left the density limit on. With it off the
+   * grid is whatever the sampling domain asks for, however many that is.
+   */
   private get arrowGrid() {
     const config = this.getConfig();
-    return thinArrowGrid(
-      getAxisSampleCount(config.domain.x),
-      getAxisSampleCount(config.domain.y)
-    );
+    const columns = getAxisSampleCount(config.domain.x);
+    const rows = getAxisSampleCount(config.domain.y);
+    if (!config.arrowDensityLimit) {
+      return { columns, rows, thinned: false, requested: columns * rows };
+    }
+    return thinArrowGrid(columns, rows);
   }
 
   private get arrowOptions(): ArrowOptions {

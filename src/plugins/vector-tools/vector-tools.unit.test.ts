@@ -602,4 +602,19 @@ describe("Vector Tools live arrow grid", () => {
   test("has nothing to say about an empty grid", () => {
     expect(thinArrowGrid(0, 0).thinned).toBe(false);
   });
+
+  test("is a default rather than a rule", () => {
+    // Live rendering is the half of this plugin with no limit. The density
+    // limit is on so a domain matched to a zoomed-out viewport does not draw
+    // hundreds of thousands of sub-pixel arrows by accident — not because
+    // asking for them on purpose is wrong.
+    expect(cloneDefaultConfig().arrowDensityLimit).toBe(true);
+    expect(
+      normalizeVectorFieldConfig({ arrowDensityLimit: false }).arrowDensityLimit
+    ).toBe(false);
+    // Anything unreadable falls back to the protective default.
+    expect(
+      normalizeVectorFieldConfig({ arrowDensityLimit: "no" }).arrowDensityLimit
+    ).toBe(true);
+  });
 });

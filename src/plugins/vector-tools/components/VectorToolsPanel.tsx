@@ -261,6 +261,15 @@ function arrowsTab(vectorTools: VectorTools, config: ConfigGetter) {
                 : "No arrows are drawn. The flow visualizer and Generate still work."
           }
         </div>
+        <If predicate={() => vectorTools.arrowMode === "live"}>
+          {() =>
+            checkboxControl(
+              "Thin very dense grids so arrows stay readable",
+              () => config().arrowDensityLimit,
+              (checked) => vectorTools.setArrowDensityLimit(checked)
+            )
+          }
+        </If>
         <div class="dsm-vector-tools-status">
           {() => vectorTools.arrowStatus}
         </div>

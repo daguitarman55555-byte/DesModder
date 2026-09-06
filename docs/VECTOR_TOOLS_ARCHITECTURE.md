@@ -159,12 +159,16 @@ view, the field or a setting changes, and not otherwise.
 the plugin is enabled and turning them off should not mean pretending you want
 Desmos to draw them.
 
-A vast sampling domain is sampled more coarsely rather than drawn in full.
-Matching the domain to a zoomed-out viewport asks for hundreds of thousands of
-arrows at a step of 1, every one of them inside a pixel, and what you see is the
-moire between the arrow grid and the pixel grid rather than the field.
-`thinArrowGrid` scales both axes by one factor down to the same limit Desmos
-generation refuses at, and the status line says it did. Arrow length is capped
+A vast sampling domain is sampled more coarsely rather than drawn in full —
+by default, and only by default. `arrowDensityLimit` turns it off, and then
+every sample is drawn however many that is; three hundred thousand arrows is a
+legitimate thing to ask for, and being able to ask is the point of drawing here
+rather than through Desmos. The limit exists because
+matching the domain to a zoomed-out viewport asks for hundreds of thousands of
+arrows at a step of 1 _by accident_, and what you get is the moire between the
+arrow grid and the pixel grid rather than the field. `thinArrowGrid` scales both
+axes by one factor down to the same limit Desmos generation refuses at, and the
+status line says it did and how to turn it off. Arrow length is capped
 against the viewport for the same reason from the other end: when the domain is
 far larger than the view, the spacing the auto length follows is itself larger
 than the screen.

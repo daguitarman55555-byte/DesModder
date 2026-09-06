@@ -886,6 +886,39 @@ testWithPage(
     );
     await waitForArrows(143);
 
+    // A domain matched to a zoomed-out viewport asks for far more arrows than
+    // there are pixels. That is thinned by default and drawn in full on
+    // request — the point of drawing here rather than through Desmos.
+    await driver.evaluate(() => {
+      const plugin = DSM.enabledPlugins["vector-tools"] as any;
+      plugin.setAxis("x", "mode", "step");
+      plugin.setAxis("x", "min", -400);
+      plugin.setAxis("x", "max", 400);
+      plugin.setAxis("y", "min", -233);
+      plugin.setAxis("y", "max", 233);
+    });
+    await driver.waitForFunction(() =>
+      (
+        (DSM.enabledPlugins["vector-tools"] as any).arrowStatus as string
+      ).includes("of 374067 arrows")
+    );
+    expect((await vt()).status).toContain("sampled coarsely");
+    expect(
+      (await driver.evaluate(
+        () => (DSM.enabledPlugins["vector-tools"] as any).arrowViewport
+      )) !== undefined
+    ).toBe(true);
+
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).setArrowDensityLimit(false)
+    );
+    await waitForArrows(374067);
+    // Turning it back on is what the rest of this test assumes.
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).resetConfig()
+    );
+    await waitForArrows(273);
+
     // Changing a setting re-measures the field's magnitude range, and that
     // pass renders into a grid-sized buffer of its own. Leaving the viewport
     // at that size drew the whole field into a corner — a failure nothing but
