@@ -176,46 +176,30 @@ than the screen.
 Two details are load-bearing. The arrowhead is a filled triangle, which is the
 thing Desmos expressions cannot do — a head there is two line segments, because
 a filled one would be a polygon per arrow — and it is capped against the arrow's
-own length so a short vector keeps a visible shaft. And the colors are spread over a range that
-has to survive a pole.
+own length so a short vector keeps a visible shaft. And the colors come off the same ramp the
+flow uses.
 
-Anything with a denominator passing through zero — most of what a multivariable
-course is about — reaches magnitudes near that pole larger than the rest of the
-field put together, and a ramp stretched to one of those leaves everything else
-in its first hundredth, which is one flat color: the bottom of whichever palette
-was chosen.
+That ramp saturates — `1 - exp(-m/scale)`, with the scale set by the viewport —
+rather than stretching between a measured smallest and largest. Which matters
+because of poles. Anything with a denominator passing through zero, which is
+most of what a multivariable course is about, reaches magnitudes near that pole
+larger than the rest of the field put together;
+`sin(x²+y²)/(1-|x³y³|+cos(x²+y²))` reaches two hundred thousand within a few
+units of the origin while the rest of it sits below ten. A ramp stretched to one
+of those leaves everything else inside its first hundredth, which is one flat
+color: the bottom of whichever palette was chosen. A saturating ramp gives the
+ordinary magnitudes most of its length and lets the poles run into its end.
 
-The two halves answer that differently, and deliberately. The flow uses a ramp
-that saturates, `1 - exp(-m/scale)`, so ordinary magnitudes get most of it and
-poles run into its end; nothing is measured and nothing can take the range over.
-The arrows measure, because they also have to be able to agree with the
-expressions Generate writes, which take Desmos's `min` and `max` over the grid.
-`flow/FieldRange.ts` renders a fixed 64x64 grid of magnitudes into a float
-target and reads it back — the CPU cannot do this, since the field only exists
-as compiled GLSL — then clips the result to between its second and
-ninety-eighth percentiles, and to no further above the middle of the samples
-than a few times their spread. On an evenly spread field that bound is past
-everything and the range is simply the samples.
+Nothing is measured, so nothing can take the range over, and both halves of the
+picture agree by construction rather than by keeping two measurements in step.
+Log magnitude takes logarithms of the same ramp, scaled so a magnitude means the
+same in either. `color.rangeMode` can still be set to `manual`, which spreads
+the ramp linearly between two given values, for when a fixed scale matters more
+than a readable one.
 
-It measures in whatever space the color is chosen in. Log magnitude picks its
-color from `log(1+m)`, and a range of raw `m` is not comparable to that: on a
-field reaching two hundred thousand, `log(1+m)` is about twelve, which against
-that range is indistinguishable from zero for every arrow.
-
-`color.rangeMode` picks the box. **Visible graph** measures what is on screen,
-clipped to the domain; **Whole domain** measures all of it wherever you are
-looking, which is what the generated expressions do — a static graph has no
-viewport to follow.
-
-The grid is a fixed size rather than one texel per arrow, because the range is a
-property of the field over a region and not of how densely it is being drawn.
-That also keeps a pole from being a function of the arrow count: a per-arrow
-measurement lands on a pole when the grid is dense and steps over it when the
-grid is coarse, so the same field colored differently depending on how many
-arrows were asked for. Measuring is a pass with its own program, vertex array,
-framebuffer and viewport, so it happens before any drawing pass binds anything;
-partway through setting one up, it sends that pass's uniforms to the wrong
-program.
+The generated expressions are the exception: they take Desmos's own `min` and
+`max` over the grid, because a static graph has no viewport for a scale to
+follow. A field drawn both ways will not colour identically.
 
 ## Flow visualizer
 

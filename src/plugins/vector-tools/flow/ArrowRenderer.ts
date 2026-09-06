@@ -24,7 +24,6 @@ import {
 } from "./FlowRenderer";
 import type { FlowBounds, FlowField } from "./FlowRenderer";
 import { PALETTE_GLSL, paletteUniforms, type PaletteID } from "../palettes";
-import { FieldRangeProbe, intersectBounds } from "./FieldRange";
 import type {
   ColorRangeMode,
   VectorColorMode,
@@ -71,7 +70,7 @@ export const DEFAULT_ARROW_OPTIONS: ArrowOptions = {
   palette: "spectral",
   fixedColor: "#6042a6",
   opacity: 1,
-  rangeMode: "visible",
+  rangeMode: "automatic",
   rangeMinimum: 0,
   rangeMaximum: 1,
 };
@@ -104,7 +103,6 @@ export class ArrowRenderer {
     program: WebGLProgram;
     uniforms: Record<string, WebGLUniformLocation | null>;
   };
-  private readonly range: FieldRangeProbe;
   /**
    * The drawing-buffer rectangle the last frame drew into.
    *
@@ -122,7 +120,6 @@ export class ArrowRenderer {
    * the wrong box draws a perfectly valid picture in one flat colour, and
    * nothing but the pixels can tell.
    */
-  lastRange: { minimum: number; maximum: number; box: FlowBounds } | undefined;
   private options: ArrowOptions = { ...DEFAULT_ARROW_OPTIONS };
   private bounds: FlowBounds = { xMin: -10, xMax: 10, yMin: -10, yMax: 10 };
   private destroyed = false;
@@ -145,7 +142,6 @@ export class ArrowRenderer {
     // The geometry comes from gl_VertexID and gl_InstanceID, so the draw needs
     // a bound vertex array but no buffers in it at all.
     this.emptyArray = array;
-    this.range = new FieldRangeProbe(gl, array);
   }
 
   setOptions(options: ArrowOptions) {
@@ -160,7 +156,6 @@ export class ArrowRenderer {
     const { gl } = this;
     if (this.program !== undefined) gl.deleteProgram(this.program.program);
     this.program = this.createProgram(field);
-    this.range.setField(field);
   }
 
   resize(cssWidth: number, cssHeight: number, devicePixelRatio: number) {
@@ -186,11 +181,6 @@ export class ArrowRenderer {
       return;
     }
 
-    // Measuring renders into a grid-sized buffer of its own, so the viewport is
-    // only set once that is done with it. Setting it first meant every frame
-    // that had to re-measure drew the whole field into a corner the size of the
-    // grid — which is what a change to the field looked like.
-    const range = this.magnitudeRange();
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     this.lastViewport = {
       width: this.canvas.width,
@@ -244,8 +234,10 @@ export class ArrowRenderer {
     gl.uniform1i(uniforms.u_colorMode, COLOR_MODE_INDEX[options.colorMode]);
     const [r, g, b] = hexToUnitRGB(options.fixedColor);
     gl.uniform3f(uniforms.u_fixedColor, r, g, b);
-    gl.uniform1f(uniforms.u_speedScale, Math.max(1e-6, (xMax - xMin) / 6));
-    gl.uniform2f(uniforms.u_range, range.minimum, range.maximum);
+    gl.uniform1f(uniforms.u_speedScale, Math.max(1e-6, (xMax - xMin) / 3));
+    const { rangeMode, rangeMinimum, rangeMaximum } = this.options;
+    gl.uniform1i(uniforms.u_manualRange, rangeMode === "manual" ? 1 : 0);
+    gl.uniform2f(uniforms.u_range, rangeMinimum, rangeMaximum);
     const palette = paletteUniforms(options.palette);
     gl.uniform1fv(uniforms.u_paletteAt, palette.positions);
     gl.uniform3fv(uniforms.u_paletteRGB, palette.colors);
@@ -265,40 +257,8 @@ export class ArrowRenderer {
     this.destroyed = true;
     const { gl } = this;
     if (this.program !== undefined) gl.deleteProgram(this.program.program);
-    this.range.destroy();
     gl.deleteVertexArray(this.emptyArray);
     this.program = undefined;
-  }
-
-  /**
-   * The range the colour ramp is spread over.
-   *
-   * Measured across what is on screen, clipped to the sampling domain, because
-   * that is the same box the flow visualiser measures and a colour has to mean
-   * the same thing in both. Spreading it over the whole domain instead put
-   * every visible arrow at the bottom of the ramp whenever the domain was
-   * larger than the view.
-   */
-  private magnitudeRange() {
-    const { rangeMode, rangeMinimum, rangeMaximum } = this.options;
-    if (rangeMode === "manual") {
-      return { minimum: rangeMinimum, maximum: rangeMaximum };
-    }
-    // `visible` is the graph you are looking at, clipped to where arrows
-    // actually are; `domain` is the whole of where they are, wherever you are
-    // looking. The first agrees with the flow, the second with the expressions
-    // Generate writes.
-    const box =
-      rangeMode === "domain"
-        ? this.options.domain
-        : (intersectBounds(this.bounds, this.options.domain) ??
-          this.options.domain);
-    const measured = this.range.measure(
-      box,
-      this.options.colorMode === "log-magnitude"
-    ) ?? { minimum: 0, maximum: 1 };
-    this.lastRange = { ...measured, box };
-    return measured;
   }
 
   private createProgram(field: FlowField) {
@@ -391,6 +351,7 @@ uniform int u_colorMode;
 uniform vec3 u_fixedColor;
 uniform float u_speedScale;
 uniform vec2 u_range;
+uniform int u_manualRange;
 out vec4 v_color;
 
 ${fieldFunctions(field)}
@@ -425,12 +386,25 @@ vec3 vtArrowColor(vec2 v, float magnitude) {
     float component = u_colorMode == 4 ? v.x : v.y;
     return vtPalette(0.5 + 0.5 * tanh(component / u_speedScale));
   }
-  float m = u_colorMode == 2 ? log(1.0 + max(magnitude, 0.0)) : magnitude;
-  // Against the grid's own range, the same span the generated expressions take
-  // with Desmos's min and max, so switching who draws the arrows does not
-  // change what a color means.
-  float span = max(u_range.y - u_range.x, 1.0e-9);
-  return vtPalette(clamp((m - u_range.x) / span, 0.0, 1.0));
+  if (u_manualRange == 1) {
+    float m = u_colorMode == 2 ? log(1.0 + max(magnitude, 0.0)) : magnitude;
+    float span = max(u_range.y - u_range.x, 1.0e-9);
+    return vtPalette(clamp((m - u_range.x) / span, 0.0, 1.0));
+  }
+  // The same ramp the flow uses, so an arrow and the particles over it are the
+  // same colour. It saturates rather than stretching between two ends, which
+  // is what lets a field with a pole in it be drawn at all: ordinary
+  // magnitudes get most of the ramp and the poles run into the end of it,
+  // instead of one value from beside a pole taking the whole thing.
+  if (u_colorMode == 2) {
+    // Logarithms of the same ramp, so the scale means the same in both: a
+    // magnitude of u_speedScale lands in the same place either way.
+    float scale = log(1.0 + u_speedScale);
+    return vtPalette(
+      1.0 - exp(-log(1.0 + max(magnitude, 0.0)) / max(scale, 1.0e-9))
+    );
+  }
+  return vtPalette(1.0 - exp(-magnitude / u_speedScale));
 }
 
 void main() {

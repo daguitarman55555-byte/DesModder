@@ -620,30 +620,25 @@ describe("Vector Tools live arrow grid", () => {
 });
 
 describe("Vector Tools colour range mode", () => {
-  test("spreads the ramp over the visible graph by default", () => {
-    expect(cloneDefaultConfig().color.rangeMode).toBe("visible");
+  test("saturates by default rather than stretching between two ends", () => {
+    // The default ramp is the flow's, so an arrow and the particles over it are
+    // the same colour, and neither can be taken over by a pole.
+    expect(cloneDefaultConfig().color.rangeMode).toBe("automatic");
   });
 
-  test("reads the old name as the whole-domain measurement it was", () => {
-    // `automatic` was this setting's only measured mode, and it measured the
-    // domain. A graph saved before the visible option existed has to keep
-    // looking the way it did.
+  test("keeps an explicit scale, and falls back to automatic otherwise", () => {
     expect(
-      normalizeVectorFieldConfig({ color: { rangeMode: "automatic" } }).color
+      normalizeVectorFieldConfig({ color: { rangeMode: "manual" } }).color
         .rangeMode
-    ).toBe("domain");
-  });
-
-  test("keeps each mode it knows, and falls back on one it does not", () => {
-    for (const mode of ["visible", "domain", "manual"] as const) {
+    ).toBe("manual");
+    // `visible` and `domain` named the two boxes the range used to be measured
+    // over. Neither is measured now, so a graph saved under either reads as
+    // automatic.
+    for (const old of ["visible", "domain", "nonsense"]) {
       expect(
-        normalizeVectorFieldConfig({ color: { rangeMode: mode } }).color
+        normalizeVectorFieldConfig({ color: { rangeMode: old } }).color
           .rangeMode
-      ).toBe(mode);
+      ).toBe("automatic");
     }
-    expect(
-      normalizeVectorFieldConfig({ color: { rangeMode: "nonsense" } }).color
-        .rangeMode
-    ).toBe("visible");
   });
 });

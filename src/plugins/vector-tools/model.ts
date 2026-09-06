@@ -29,15 +29,14 @@ export type ColorPalette = PaletteID;
 /**
  * What the colour ramp is spread across.
  *
- * `visible` measures the field over the graph you are looking at, which is what
- * the flow visualiser does, so an arrow and the particles over it agree.
- * `domain` measures the whole sampling domain, which is what Desmos's own `min`
- * and `max` give the generated expressions — the two match exactly while the
- * domain is roughly the view, and diverge sharply once it is not. A domain
- * matched to a zoomed-out viewport reaches magnitudes far above anything on
- * screen, and every visible arrow lands at the bottom of the ramp.
+ * `automatic` is a ramp that saturates, sized by the viewport — the same one
+ * the flow visualiser uses, so an arrow and the particles over it are the same
+ * colour. It cannot be taken over by a pole the way a ramp stretched between a
+ * measured smallest and largest can. `manual` spreads it linearly between the
+ * two values given instead, for when a fixed scale matters more.
  */
-export type ColorRangeMode = "visible" | "domain" | "manual";
+export type ColorRangeMode = "automatic" | "manual";
+
 export type ZeroVectorMode = "hide" | "point";
 export type FlowColorMode = "fixed" | "speed" | "direction";
 
@@ -320,7 +319,7 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
   color: {
     mode: "magnitude",
     palette: "spectral",
-    rangeMode: "visible",
+    rangeMode: "automatic",
     minimum: 0,
     maximum: 1,
     fixedColor: "#6042a6",
@@ -622,13 +621,9 @@ export function normalizeVectorFieldConfig(value: unknown): VectorFieldConfig {
       palette: isPalette(color?.palette)
         ? color.palette
         : fallback.color.palette,
-      // `automatic` was this setting's only measured mode, and it measured
-      // the whole domain.
-      rangeMode: isRangeMode(color?.rangeMode)
-        ? color.rangeMode
-        : color?.rangeMode === "automatic"
-          ? "domain"
-          : fallback.color.rangeMode,
+      // `visible` and `domain` were the two boxes the range used to be
+      // measured over; neither is measured any more.
+      rangeMode: color?.rangeMode === "manual" ? "manual" : "automatic",
       minimum: finiteOr(color?.minimum, fallback.color.minimum),
       maximum: finiteOr(color?.maximum, fallback.color.maximum),
       fixedColor:
@@ -923,10 +918,6 @@ function isColorMode(value: unknown): value is VectorColorMode {
     "x-component",
     "y-component",
   ].includes(value as string);
-}
-
-function isRangeMode(value: unknown): value is ColorRangeMode {
-  return ["visible", "domain", "manual"].includes(value as string);
 }
 
 function isPalette(value: unknown): value is ColorPalette {
