@@ -111,6 +111,15 @@ export class ArrowRenderer {
    * test looks at instead.
    */
   lastViewport = { width: 0, height: 0 };
+  /**
+   * The range, and the box it was measured over, that the last frame coloured
+   * against.
+   *
+   * Exposed for the same reason as the viewport above: measuring the range over
+   * the wrong box draws a perfectly valid picture in one flat colour, and
+   * nothing but the pixels can tell.
+   */
+  lastRange: { minimum: number; maximum: number; box: FlowBounds } | undefined;
   private options: ArrowOptions = { ...DEFAULT_ARROW_OPTIONS };
   private bounds: FlowBounds = { xMin: -10, xMax: 10, yMin: -10, yMax: 10 };
   private destroyed = false;
@@ -272,13 +281,11 @@ export class ArrowRenderer {
     if (rangeMode === "manual") {
       return { minimum: rangeMinimum, maximum: rangeMaximum };
     }
-    const box = intersectBounds(this.bounds, this.options.domain);
-    return (
-      this.range.measure(box ?? this.options.domain) ?? {
-        minimum: 0,
-        maximum: 1,
-      }
-    );
+    const box =
+      intersectBounds(this.bounds, this.options.domain) ?? this.options.domain;
+    const measured = this.range.measure(box) ?? { minimum: 0, maximum: 1 };
+    this.lastRange = { ...measured, box };
+    return measured;
   }
 
   private createProgram(field: FlowField) {

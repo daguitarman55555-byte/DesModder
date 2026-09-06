@@ -197,6 +197,11 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     return `Drawing ${this.arrowOverlay.arrowCount} arrows live.`;
   }
 
+  /** Tests only: the range and box the last live-arrow frame coloured against. */
+  get arrowRange() {
+    return this.arrowOverlay.drawnRange;
+  }
+
   /** Tests only: what the last live-arrow frame actually drew into. */
   get arrowViewport() {
     return this.arrowOverlay.drawnViewport;
