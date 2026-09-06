@@ -96,6 +96,90 @@ const COLOR_MODE_INDEX: Record<VectorColorMode, number> = {
 /** Vertices per arrow: two triangles of shaft, one of head. */
 const VERTICES_PER_ARROW = 9;
 
+/**
+ * How far outside the view an arrow's grid point can sit and still show.
+ *
+ * An arrow is drawn from its grid point, and the shader caps its length at
+ * 0.12 of the viewport's width however the length was chosen, so nothing whose
+ * base is further out than that can reach the screen. The margin is a little
+ * larger than the cap so the arrowhead's own width is covered too, and it is
+ * the same on both axes because the cap is a length, not a horizontal extent.
+ */
+const CULL_MARGIN_FRACTION = 0.15;
+
+/**
+ * The part of the sampling grid that could put an arrow on screen.
+ *
+ * The grid belongs to the sampling *domain*, which has nothing to do with what
+ * is in view: matching the domain to a zoomed-out viewport and then zooming
+ * back in leaves almost every arrow off screen, and each one still costs a
+ * vertex shader that evaluates the field before the clipper throws it away.
+ * Instancing only the rows and columns that intersect the view — plus the
+ * margin above — makes the cost follow what is being looked at rather than
+ * what was configured.
+ *
+ * Exported because the arithmetic is the whole of it, and a wrong answer here
+ * is arrows quietly missing from the edge of the screen, which is exactly the
+ * kind of thing a picture makes look like a rendering bug.
+ */
+export function visibleGridSpan(
+  options: Pick<ArrowOptions, "columns" | "rows" | "domain">,
+  bounds: FlowBounds
+) {
+  const columns = Math.max(0, Math.floor(options.columns));
+  const rows = Math.max(0, Math.floor(options.rows));
+  const width = Math.abs(bounds.xMax - bounds.xMin);
+  const margin = CULL_MARGIN_FRACTION * width;
+  const x = axisSpan(
+    options.domain.xMin,
+    options.domain.xMax,
+    columns,
+    Math.min(bounds.xMin, bounds.xMax) - margin,
+    Math.max(bounds.xMin, bounds.xMax) + margin
+  );
+  const y = axisSpan(
+    options.domain.yMin,
+    options.domain.yMax,
+    rows,
+    Math.min(bounds.yMin, bounds.yMax) - margin,
+    Math.max(bounds.yMin, bounds.yMax) + margin
+  );
+  return {
+    column: x.start,
+    row: y.start,
+    columns: x.span,
+    rows: y.span,
+  };
+}
+
+/**
+ * The sample indices along one axis whose coordinates land inside `[lo, hi]`.
+ *
+ * Anything it cannot reason about — a non-finite bound, a domain of zero
+ * width — falls back to the whole axis, because drawing too much is a
+ * performance answer and drawing too little is a wrong picture.
+ */
+function axisSpan(
+  domainMin: number,
+  domainMax: number,
+  count: number,
+  lo: number,
+  hi: number
+) {
+  const whole = { start: 0, span: count };
+  if (count <= 0) return { start: 0, span: 0 };
+  if (![domainMin, domainMax, lo, hi].every(Number.isFinite)) return whole;
+  if (count === 1 || domainMin === domainMax) {
+    return domainMin >= lo && domainMin <= hi ? whole : { start: 0, span: 0 };
+  }
+  const step = (domainMax - domainMin) / (count - 1);
+  const a = (lo - domainMin) / step;
+  const b = (hi - domainMin) / step;
+  const start = Math.max(0, Math.ceil(Math.min(a, b)));
+  const end = Math.min(count, Math.floor(Math.max(a, b)) + 1);
+  return { start, span: Math.max(0, end - start) };
+}
+
 export class ArrowRenderer {
   private readonly gl: WebGL2RenderingContext;
   private readonly emptyArray: WebGLVertexArrayObject;
@@ -123,6 +207,18 @@ export class ArrowRenderer {
   private options: ArrowOptions = { ...DEFAULT_ARROW_OPTIONS };
   private bounds: FlowBounds = { xMin: -10, xMax: 10, yMin: -10, yMax: 10 };
   private destroyed = false;
+  /**
+   * The field the linked program was built from.
+   *
+   * Every settings change arrives here as a `setField` with the same field, and
+   * relinking a program is the most expensive thing this class can be asked to
+   * do — so a drag on the arrowhead slider used to compile and link a shader
+   * per pointermove. The flow renderer has kept the same guard for the same
+   * reason.
+   */
+  private fieldSource?: string;
+  /** How many instances the last frame actually drew, after culling. */
+  drawnArrowCount = 0;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const gl = canvas.getContext("webgl2", {
@@ -154,8 +250,16 @@ export class ArrowRenderer {
 
   setField(field: FlowField) {
     const { gl } = this;
+    const key = JSON.stringify(field);
+    if (this.fieldSource === key && this.program !== undefined) return;
     if (this.program !== undefined) gl.deleteProgram(this.program.program);
     this.program = this.createProgram(field);
+    this.fieldSource = key;
+  }
+
+  /** Whether the GPU has taken the context away underneath this renderer. */
+  get isContextLost() {
+    return this.gl.isContextLost();
   }
 
   resize(cssWidth: number, cssHeight: number, devicePixelRatio: number) {
@@ -173,11 +277,17 @@ export class ArrowRenderer {
   frame() {
     const { gl } = this;
     if (this.destroyed || this.program === undefined) return;
-    const count = this.arrowCount;
+    const span = visibleGridSpan(this.options, this.bounds);
+    const count = span.columns * span.rows;
+    this.drawnArrowCount = count;
     if (count === 0) {
       gl.viewport(0, 0, this.canvas.width, this.canvas.height);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
+      this.lastViewport = {
+        width: this.canvas.width,
+        height: this.canvas.height,
+      };
       return;
     }
 
@@ -210,6 +320,8 @@ export class ArrowRenderer {
       Math.max(1, options.columns),
       Math.max(1, options.rows)
     );
+    gl.uniform2i(uniforms.u_gridOrigin, span.column, span.row);
+    gl.uniform2i(uniforms.u_gridSpan, span.columns, span.rows);
     gl.uniform4f(
       uniforms.u_domain,
       options.domain.xMin,
@@ -259,6 +371,7 @@ export class ArrowRenderer {
     if (this.program !== undefined) gl.deleteProgram(this.program.program);
     gl.deleteVertexArray(this.emptyArray);
     this.program = undefined;
+    this.fieldSource = undefined;
   }
 
   private createProgram(field: FlowField) {
@@ -337,6 +450,9 @@ uniform vec2 u_min;
 uniform vec2 u_max;
 uniform vec2 u_viewportPx;
 uniform ivec2 u_grid;
+/** The first column and row instanced, and how many of each: see visibleGridSpan. */
+uniform ivec2 u_gridOrigin;
+uniform ivec2 u_gridSpan;
 uniform vec4 u_domain;
 uniform int u_lengthMode;
 uniform float u_targetLength;
@@ -408,8 +524,11 @@ vec3 vtArrowColor(vec2 v, float magnitude) {
 }
 
 void main() {
-  int column = gl_InstanceID % u_grid.x;
-  int row = gl_InstanceID / u_grid.x;
+  // Instances cover only the visible part of the grid, but the spacing is still
+  // the whole domain's, so the arrows stay on the same points as they always
+  // were and merely stop being drawn once they are far enough off screen.
+  int column = u_gridOrigin.x + gl_InstanceID % max(u_gridSpan.x, 1);
+  int row = u_gridOrigin.y + gl_InstanceID / max(u_gridSpan.x, 1);
   vec2 counts = max(vec2(u_grid) - 1.0, vec2(1.0));
   vec2 step = (u_domain.zw - u_domain.xy) / counts;
   vec2 base = u_domain.xy + vec2(float(column), float(row)) * step;
