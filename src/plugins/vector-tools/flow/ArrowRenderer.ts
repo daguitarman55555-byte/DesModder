@@ -24,7 +24,12 @@ import {
 } from "./FlowRenderer";
 import type { FlowBounds, FlowField } from "./FlowRenderer";
 import { PALETTE_GLSL, paletteUniforms, type PaletteID } from "../palettes";
-import type { VectorColorMode, VectorLengthMode } from "../model";
+import { FieldRangeProbe, intersectBounds } from "./FieldRange";
+import type {
+  ColorRangeMode,
+  VectorColorMode,
+  VectorLengthMode,
+} from "../model";
 
 export interface ArrowOptions {
   /** Sample counts across the domain, which is one arrow per grid point. */
@@ -45,8 +50,7 @@ export interface ArrowOptions {
   palette: PaletteID;
   fixedColor: string;
   opacity: number;
-  /** `automatic` measures the grid; `manual` uses the two values below. */
-  rangeMode: "automatic" | "manual";
+  rangeMode: ColorRangeMode;
   rangeMinimum: number;
   rangeMaximum: number;
 }
@@ -67,7 +71,7 @@ export const DEFAULT_ARROW_OPTIONS: ArrowOptions = {
   palette: "spectral",
   fixedColor: "#6042a6",
   opacity: 1,
-  rangeMode: "automatic",
+  rangeMode: "visible",
   rangeMinimum: 0,
   rangeMaximum: 1,
 };
@@ -100,15 +104,7 @@ export class ArrowRenderer {
     program: WebGLProgram;
     uniforms: Record<string, WebGLUniformLocation | null>;
   };
-  private measureProgram?: {
-    program: WebGLProgram;
-    uniforms: Record<string, WebGLUniformLocation | null>;
-  };
-  private measureTexture?: WebGLTexture;
-  private measureFramebuffer?: WebGLFramebuffer;
-  private measureSize = { columns: 0, rows: 0 };
-  /** The grid's own magnitude range, measured on the GPU and cached. */
-  private measured?: { minimum: number; maximum: number };
+  private readonly range: FieldRangeProbe;
   /**
    * The drawing-buffer rectangle the last frame drew into.
    *
@@ -118,6 +114,15 @@ export class ArrowRenderer {
    * test looks at instead.
    */
   lastViewport = { width: 0, height: 0 };
+  /**
+   * The range, and the box it was measured over, that the last frame coloured
+   * against.
+   *
+   * Exposed for the same reason as the viewport above: measuring the range over
+   * the wrong box draws a perfectly valid picture in one flat colour, and
+   * nothing but the pixels can tell.
+   */
+  lastRange: { minimum: number; maximum: number; box: FlowBounds } | undefined;
   private options: ArrowOptions = { ...DEFAULT_ARROW_OPTIONS };
   private bounds: FlowBounds = { xMin: -10, xMax: 10, yMin: -10, yMax: 10 };
   private destroyed = false;
@@ -140,22 +145,11 @@ export class ArrowRenderer {
     // The geometry comes from gl_VertexID and gl_InstanceID, so the draw needs
     // a bound vertex array but no buffers in it at all.
     this.emptyArray = array;
+    this.range = new FieldRangeProbe(gl, array);
   }
 
   setOptions(options: ArrowOptions) {
-    const before = this.options;
     this.options = { ...options };
-    if (
-      before.columns !== options.columns ||
-      before.rows !== options.rows ||
-      before.domain.xMin !== options.domain.xMin ||
-      before.domain.xMax !== options.domain.xMax ||
-      before.domain.yMin !== options.domain.yMin ||
-      before.domain.yMax !== options.domain.yMax ||
-      before.colorMode !== options.colorMode
-    ) {
-      this.measured = undefined;
-    }
   }
 
   setBounds(bounds: FlowBounds) {
@@ -165,11 +159,8 @@ export class ArrowRenderer {
   setField(field: FlowField) {
     const { gl } = this;
     if (this.program !== undefined) gl.deleteProgram(this.program.program);
-    if (this.measureProgram !== undefined)
-      gl.deleteProgram(this.measureProgram.program);
     this.program = this.createProgram(field);
-    this.measureProgram = this.createMeasureProgram(field);
-    this.measured = undefined;
+    this.range.setField(field);
   }
 
   resize(cssWidth: number, cssHeight: number, devicePixelRatio: number) {
@@ -274,147 +265,37 @@ export class ArrowRenderer {
     this.destroyed = true;
     const { gl } = this;
     if (this.program !== undefined) gl.deleteProgram(this.program.program);
-    if (this.measureProgram !== undefined)
-      gl.deleteProgram(this.measureProgram.program);
-    if (this.measureTexture !== undefined)
-      gl.deleteTexture(this.measureTexture);
-    if (this.measureFramebuffer !== undefined)
-      gl.deleteFramebuffer(this.measureFramebuffer);
+    this.range.destroy();
     gl.deleteVertexArray(this.emptyArray);
     this.program = undefined;
-    this.measureProgram = undefined;
   }
 
   /**
-   * The smallest and largest magnitude anywhere on the grid.
+   * The range the colour ramp is spread over.
    *
-   * Without it the ramp has to be entered by a scale-free curve, which spends
-   * most of its range on magnitudes no arrow actually has — zoom in on a
-   * rotational field and every arrow comes out at the hot end. The generated
-   * expressions take Desmos's `min` and `max` over the list; this renders the
-   * same magnitudes into a one-texel-per-arrow buffer and reads them back.
-   *
-   * The result is cached: arrows do not animate, so this runs when the field,
-   * the domain or the grid changes and not on a pan.
+   * Measured across what is on screen, clipped to the sampling domain, because
+   * that is the same box the flow visualiser measures and a colour has to mean
+   * the same thing in both. Spreading it over the whole domain instead put
+   * every visible arrow at the bottom of the ramp whenever the domain was
+   * larger than the view.
    */
   private magnitudeRange() {
     const { rangeMode, rangeMinimum, rangeMaximum } = this.options;
     if (rangeMode === "manual") {
       return { minimum: rangeMinimum, maximum: rangeMaximum };
     }
-    if (this.measured !== undefined) return this.measured;
-    this.measured = this.measureMagnitudes() ?? { minimum: 0, maximum: 1 };
-    return this.measured;
-  }
-
-  private measureMagnitudes() {
-    const { gl } = this;
-    if (this.measureProgram === undefined) return undefined;
-    const columns = Math.max(1, this.options.columns);
-    const rows = Math.max(1, this.options.rows);
-    // A float render target is what makes one texel per arrow readable at full
-    // precision. Without the extension there is nothing to measure with.
-    if (gl.getExtension("EXT_color_buffer_float") === null) return undefined;
-
-    if (
-      this.measureTexture === undefined ||
-      this.measureSize.columns !== columns ||
-      this.measureSize.rows !== rows
-    ) {
-      if (this.measureTexture !== undefined)
-        gl.deleteTexture(this.measureTexture);
-      const texture = gl.createTexture();
-      if (texture === null) return undefined;
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.R32F,
-        columns,
-        rows,
-        0,
-        gl.RED,
-        gl.FLOAT,
-        null
-      );
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      this.measureTexture = texture;
-      this.measureSize = { columns, rows };
-    }
-    if (this.measureFramebuffer === undefined) {
-      const framebuffer = gl.createFramebuffer();
-      if (framebuffer === null) return undefined;
-      this.measureFramebuffer = framebuffer;
-    }
-
-    const { program, uniforms } = this.measureProgram;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.measureFramebuffer);
-    gl.framebufferTexture2D(
-      gl.FRAMEBUFFER,
-      gl.COLOR_ATTACHMENT0,
-      gl.TEXTURE_2D,
-      this.measureTexture,
-      0
-    );
-    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      return undefined;
-    }
-    gl.useProgram(program);
-    gl.bindVertexArray(this.emptyArray);
-    gl.disable(gl.BLEND);
-    gl.viewport(0, 0, columns, rows);
-    gl.uniform4f(
-      uniforms.u_domain,
-      this.options.domain.xMin,
-      this.options.domain.yMin,
-      this.options.domain.xMax,
-      this.options.domain.yMax
-    );
-    gl.uniform2i(uniforms.u_grid, columns, rows);
-    gl.uniform2f(
-      uniforms.u_min,
-      this.options.domain.xMin,
-      this.options.domain.yMin
-    );
-    gl.uniform2f(
-      uniforms.u_max,
-      this.options.domain.xMax,
-      this.options.domain.yMax
-    );
-    gl.uniform1i(
-      uniforms.u_logarithmic,
-      this.options.colorMode === "log-magnitude" ? 1 : 0
-    );
-    // Three vertices covering the target, so every texel runs the field once.
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-    const pixels = new Float32Array(columns * rows);
-    gl.readPixels(0, 0, columns, rows, gl.RED, gl.FLOAT, pixels);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.bindVertexArray(null);
-
-    let minimum = Infinity;
-    let maximum = -Infinity;
-    for (const value of pixels) {
-      if (!Number.isFinite(value)) continue;
-      if (value < minimum) minimum = value;
-      if (value > maximum) maximum = value;
-    }
-    if (!Number.isFinite(minimum) || !Number.isFinite(maximum))
-      return undefined;
-    return { minimum, maximum };
-  }
-
-  private createMeasureProgram(field: FlowField) {
-    return this.linkProgram(
-      MEASURE_VERTEX_SHADER,
-      measureFragmentShader(field),
-      "measure"
-    );
+    // `visible` is the graph you are looking at, clipped to where arrows
+    // actually are; `domain` is the whole of where they are, wherever you are
+    // looking. The first agrees with the flow, the second with the expressions
+    // Generate writes.
+    const box =
+      rangeMode === "domain"
+        ? this.options.domain
+        : (intersectBounds(this.bounds, this.options.domain) ??
+          this.options.domain);
+    const measured = this.range.measure(box) ?? { minimum: 0, maximum: 1 };
+    this.lastRange = { ...measured, box };
+    return measured;
   }
 
   private createProgram(field: FlowField) {
@@ -630,44 +511,3 @@ in vec4 v_color;
 out vec4 outColor;
 void main() { outColor = v_color; }
 `;
-
-/** A single triangle covering the target, so every texel runs the field once. */
-const MEASURE_VERTEX_SHADER = `#version 300 es
-precision highp float;
-void main() {
-  vec2 corner = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
-  gl_Position = vec4(corner * 2.0 - 1.0, 0.0, 1.0);
-}
-`;
-
-/**
- * One texel per arrow, holding that arrow's magnitude.
- *
- * Reading this back is how the range the colors are spread over is found,
- * without asking the CPU to evaluate a field it cannot evaluate.
- */
-function measureFragmentShader(field: FlowField) {
-  return `#version 300 es
-precision highp float;
-uniform vec4 u_domain;
-uniform ivec2 u_grid;
-uniform int u_logarithmic;
-// The field's own code refers to these — a gradient sizes its difference step
-// from them — so they are uploaded as the domain being sampled.
-uniform vec2 u_min;
-uniform vec2 u_max;
-out float outMagnitude;
-
-${fieldFunctions(field)}
-
-void main() {
-  ivec2 texel = ivec2(gl_FragCoord.xy);
-  vec2 counts = max(vec2(u_grid) - 1.0, vec2(1.0));
-  vec2 step = (u_domain.zw - u_domain.xy) / counts;
-  vec2 base = u_domain.xy + vec2(texel) * step;
-  float magnitude = length(vtField(base));
-  if (!(magnitude == magnitude)) magnitude = 0.0;
-  outMagnitude = u_logarithmic == 1 ? log(1.0 + max(magnitude, 0.0)) : magnitude;
-}
-`;
-}

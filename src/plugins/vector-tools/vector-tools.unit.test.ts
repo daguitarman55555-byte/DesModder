@@ -618,3 +618,32 @@ describe("Vector Tools live arrow grid", () => {
     ).toBe(true);
   });
 });
+
+describe("Vector Tools colour range mode", () => {
+  test("spreads the ramp over the visible graph by default", () => {
+    expect(cloneDefaultConfig().color.rangeMode).toBe("visible");
+  });
+
+  test("reads the old name as the whole-domain measurement it was", () => {
+    // `automatic` was this setting's only measured mode, and it measured the
+    // domain. A graph saved before the visible option existed has to keep
+    // looking the way it did.
+    expect(
+      normalizeVectorFieldConfig({ color: { rangeMode: "automatic" } }).color
+        .rangeMode
+    ).toBe("domain");
+  });
+
+  test("keeps each mode it knows, and falls back on one it does not", () => {
+    for (const mode of ["visible", "domain", "manual"] as const) {
+      expect(
+        normalizeVectorFieldConfig({ color: { rangeMode: mode } }).color
+          .rangeMode
+      ).toBe(mode);
+    }
+    expect(
+      normalizeVectorFieldConfig({ color: { rangeMode: "nonsense" } }).color
+        .rangeMode
+    ).toBe("visible");
+  });
+});

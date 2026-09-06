@@ -80,7 +80,8 @@ const FLOW_LOOKS: readonly Choice<FlowLook>[] = [
 ];
 
 const RANGE_MODES: readonly Choice<ColorRangeMode>[] = [
-  { value: "automatic", label: "Automatic" },
+  { value: "visible", label: "Visible graph" },
+  { value: "domain", label: "Whole domain" },
   { value: "manual", label: "Manual" },
 ];
 

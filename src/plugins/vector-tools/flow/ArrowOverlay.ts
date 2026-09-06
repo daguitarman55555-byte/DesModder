@@ -46,6 +46,11 @@ export class ArrowOverlay {
     return this.renderer?.arrowCount ?? 0;
   }
 
+  /** Tests only: the range and box the last frame coloured against. */
+  get drawnRange() {
+    return this.renderer?.lastRange;
+  }
+
   /** What the last frame drew into, and what the canvas expected. */
   get drawnViewport() {
     if (this.renderer === undefined || this.canvas === undefined)

@@ -26,7 +26,18 @@ export type VectorColorMode =
   | "x-component"
   | "y-component";
 export type ColorPalette = PaletteID;
-export type ColorRangeMode = "automatic" | "manual";
+/**
+ * What the colour ramp is spread across.
+ *
+ * `visible` measures the field over the graph you are looking at, which is what
+ * the flow visualiser does, so an arrow and the particles over it agree.
+ * `domain` measures the whole sampling domain, which is what Desmos's own `min`
+ * and `max` give the generated expressions — the two match exactly while the
+ * domain is roughly the view, and diverge sharply once it is not. A domain
+ * matched to a zoomed-out viewport reaches magnitudes far above anything on
+ * screen, and every visible arrow lands at the bottom of the ramp.
+ */
+export type ColorRangeMode = "visible" | "domain" | "manual";
 export type ZeroVectorMode = "hide" | "point";
 export type FlowColorMode = "fixed" | "speed" | "direction";
 
@@ -309,7 +320,7 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
   color: {
     mode: "magnitude",
     palette: "spectral",
-    rangeMode: "automatic",
+    rangeMode: "visible",
     minimum: 0,
     maximum: 1,
     fixedColor: "#6042a6",
@@ -611,7 +622,13 @@ export function normalizeVectorFieldConfig(value: unknown): VectorFieldConfig {
       palette: isPalette(color?.palette)
         ? color.palette
         : fallback.color.palette,
-      rangeMode: color?.rangeMode === "manual" ? "manual" : "automatic",
+      // `automatic` was this setting's only measured mode, and it measured
+      // the whole domain.
+      rangeMode: isRangeMode(color?.rangeMode)
+        ? color.rangeMode
+        : color?.rangeMode === "automatic"
+          ? "domain"
+          : fallback.color.rangeMode,
       minimum: finiteOr(color?.minimum, fallback.color.minimum),
       maximum: finiteOr(color?.maximum, fallback.color.maximum),
       fixedColor:
@@ -906,6 +923,10 @@ function isColorMode(value: unknown): value is VectorColorMode {
     "x-component",
     "y-component",
   ].includes(value as string);
+}
+
+function isRangeMode(value: unknown): value is ColorRangeMode {
+  return ["visible", "domain", "manual"].includes(value as string);
 }
 
 function isPalette(value: unknown): value is ColorPalette {
