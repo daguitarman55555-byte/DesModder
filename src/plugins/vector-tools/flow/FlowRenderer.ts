@@ -18,7 +18,6 @@
 import { PALETTE_GLSL, paletteUniforms, type PaletteID } from "../palettes";
 import { fieldFunctions, FlowRendererError } from "./field";
 import type { FlowBounds, FlowField } from "./field";
-import { FieldRangeProbe } from "./FieldRange";
 import type { FlowColorMode } from "../model";
 
 // Re-exported so the parts that only ever wanted a field keep one import.
@@ -165,9 +164,6 @@ export class FlowRenderer {
   private readonly reprojectProgram: ProgramInfo;
 
   private readonly quadArray: WebGLVertexArrayObject;
-  private readonly range: FieldRangeProbe;
-  /** The field's magnitude range over the visible box, for the colour ramp. */
-  private measuredRange = { minimum: 0, maximum: 1 };
   private indexArray?: WebGLVertexArrayObject;
 
   private particleRead?: WebGLTexture;
@@ -218,7 +214,6 @@ export class FlowRenderer {
     gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, QUAD, gl.STATIC_DRAW);
     this.quadArray = this.createVertexArray(quadBuffer, 2);
-    this.range = new FieldRangeProbe(gl, this.quadArray);
 
     this.fadeProgram = this.createProgram(
       SCREEN_VERTEX_SHADER,
@@ -255,7 +250,6 @@ export class FlowRenderer {
     this.updateProgram = updateProgram;
     this.drawProgram = drawProgram;
     this.fieldSource = key;
-    this.range.setField(field);
     this.seedParticles();
   }
 
@@ -357,12 +351,6 @@ export class FlowRenderer {
       return;
     }
     this.frameSeed = (this.frameSeed * 16807) % 2147483647;
-    // Before anything else binds. Measuring is a pass of its own — its own
-    // program, vertex array, framebuffer and viewport — so doing it partway
-    // through setting up another one leaves that one's uniforms going to the
-    // wrong program.
-    this.measuredRange =
-      this.range.measure(this.bounds) ?? this.fallbackRange();
     this.stepParticles();
     this.fadeTrails();
     this.drawParticles();
@@ -379,7 +367,6 @@ export class FlowRenderer {
     this.deleteProgram(this.fadeProgram);
     this.deleteProgram(this.blitProgram);
     this.deleteProgram(this.reprojectProgram);
-    this.range.destroy();
     for (const texture of [
       this.particleRead,
       this.particleWrite,
@@ -522,13 +509,6 @@ export class FlowRenderer {
       program.uniforms.u_speedScale,
       Math.max(1e-6, (xMax - xMin) / 3)
     );
-    // Measured once at the top of the frame, over the same visible box the
-    // arrows measure.
-    gl.uniform2f(
-      program.uniforms.u_range,
-      this.measuredRange.minimum,
-      this.measuredRange.maximum
-    );
 
     gl.drawArrays(gl.POINTS, 0, this.particleCount);
     gl.disable(gl.BLEND);
@@ -549,12 +529,6 @@ export class FlowRenderer {
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
-  }
-
-  /** Something for the ramp to span when the range cannot be measured. */
-  private fallbackRange() {
-    const { xMin, xMax } = this.bounds;
-    return { minimum: 0, maximum: Math.max(1e-6, (xMax - xMin) / 3) };
   }
 
   private bindTrailTarget(texture: WebGLTexture) {
@@ -953,7 +927,6 @@ uniform float u_opacity;
 uniform int u_colorMode;
 uniform vec3 u_fixedColor;
 uniform float u_speedScale;
-uniform vec2 u_range;
 out vec4 v_color;
 
 ${fieldFunctions(field)}
@@ -971,11 +944,14 @@ void main() {
   vec2 v = vtField(state.xy);
   vec3 rgb = u_fixedColor;
   if (u_colorMode == 1) {
-    // Across the field's own range over what is on screen — the same box and
-    // the same mapping the arrows use, so one colour means one magnitude
-    // whichever half of the picture it is in.
-    float span = max(u_range.y - u_range.x, 1.0e-9);
-    rgb = vtPalette(clamp((length(v) - u_range.x) / span, 0.0, 1.0));
+    // A ramp that saturates rather than one stretched between two measured
+    // ends. Nothing has to be reduced to find the field's range — and, which
+    // matters more, nothing can take the range over. A field with a pole in it
+    // reaches magnitudes larger than the rest of it put together, and a ramp
+    // spread to one of those leaves every ordinary particle at the bottom of
+    // it. This one gives the ordinary values most of the ramp and lets the
+    // poles run into its end.
+    rgb = vtPalette(1.0 - exp(-length(v) / u_speedScale));
   } else if (u_colorMode == 2) {
     rgb = vtHueRamp(fract(atan(v.y, v.x) / 6.2831853 + 1.0));
   }

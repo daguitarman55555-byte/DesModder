@@ -176,12 +176,46 @@ than the screen.
 Two details are load-bearing. The arrowhead is a filled triangle, which is the
 thing Desmos expressions cannot do — a head there is two line segments, because
 a filled one would be a polygon per arrow — and it is capped against the arrow's
-own length so a short vector keeps a visible shaft. And the colors are spread
-over the grid's real magnitude range, measured by rendering one texel per arrow
-into a float target and reading it back, because that is the span Desmos's `min`
-and `max` give the generated expressions. Without it the ramp has to be entered
-by a scale-free curve, and every arrow comes out at the hot end as soon as you
-zoom in.
+own length so a short vector keeps a visible shaft. And the colors are spread over a range that
+has to survive a pole.
+
+Anything with a denominator passing through zero — most of what a multivariable
+course is about — reaches magnitudes near that pole larger than the rest of the
+field put together, and a ramp stretched to one of those leaves everything else
+in its first hundredth, which is one flat color: the bottom of whichever palette
+was chosen.
+
+The two halves answer that differently, and deliberately. The flow uses a ramp
+that saturates, `1 - exp(-m/scale)`, so ordinary magnitudes get most of it and
+poles run into its end; nothing is measured and nothing can take the range over.
+The arrows measure, because they also have to be able to agree with the
+expressions Generate writes, which take Desmos's `min` and `max` over the grid.
+`flow/FieldRange.ts` renders a fixed 64x64 grid of magnitudes into a float
+target and reads it back — the CPU cannot do this, since the field only exists
+as compiled GLSL — then clips the result to between its second and
+ninety-eighth percentiles, and to no further above the middle of the samples
+than a few times their spread. On an evenly spread field that bound is past
+everything and the range is simply the samples.
+
+It measures in whatever space the color is chosen in. Log magnitude picks its
+color from `log(1+m)`, and a range of raw `m` is not comparable to that: on a
+field reaching two hundred thousand, `log(1+m)` is about twelve, which against
+that range is indistinguishable from zero for every arrow.
+
+`color.rangeMode` picks the box. **Visible graph** measures what is on screen,
+clipped to the domain; **Whole domain** measures all of it wherever you are
+looking, which is what the generated expressions do — a static graph has no
+viewport to follow.
+
+The grid is a fixed size rather than one texel per arrow, because the range is a
+property of the field over a region and not of how densely it is being drawn.
+That also keeps a pole from being a function of the arrow count: a per-arrow
+measurement lands on a pole when the grid is dense and steps over it when the
+grid is coarse, so the same field colored differently depending on how many
+arrows were asked for. Measuring is a pass with its own program, vertex array,
+framebuffer and viewport, so it happens before any drawing pass binds anything;
+partway through setting one up, it sends that pass's uniforms to the wrong
+program.
 
 ## Flow visualizer
 
