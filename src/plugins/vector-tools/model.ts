@@ -190,6 +190,46 @@ export interface VectorLengthConfig {
   compression: number;
 }
 
+/**
+ * Which of the four length numbers a mode actually reads.
+ *
+ * Both halves of the plugin scale a vector by the same factor — the shader's
+ * `vtLengthFactor` and the generator's `factor` are the same five cases — and
+ * every one of them leaves at least two of the numbers unread. Showing all four
+ * whatever the mode is offers the user three controls that do nothing and gives
+ * no clue which one is live, so the panel asks here instead.
+ *
+ * It lives beside the modes rather than in the panel because it is a fact about
+ * what the modes mean, and a wrong answer hides a control the field depends on.
+ */
+export function lengthInputsFor(mode: VectorLengthMode): {
+  targetLength: boolean;
+  scale: boolean;
+  maximumLength: boolean;
+  compression: boolean;
+} {
+  const none = {
+    targetLength: false,
+    scale: false,
+    maximumLength: false,
+    compression: false,
+  };
+  switch (mode) {
+    case "actual":
+      return none;
+    // Both draw every arrow the same length, and it is this one.
+    case "normalized":
+    case "direction-only":
+      return { ...none, targetLength: true };
+    case "scaled":
+      return { ...none, scale: true };
+    case "clamped":
+      return { ...none, scale: true, maximumLength: true };
+    case "compressed":
+      return { ...none, scale: true, compression: true };
+  }
+}
+
 export interface ArrowheadConfig {
   size: number;
   angleRadians: number;

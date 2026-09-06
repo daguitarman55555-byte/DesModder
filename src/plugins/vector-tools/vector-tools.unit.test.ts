@@ -19,6 +19,7 @@ import {
   FLOW_RENDER_SCALE_MINIMUM,
   FLOW_PARTICLE_MINIMUM,
   isDevelopmentBuild,
+  lengthInputsFor,
   LIVE_ARROW_MAXIMUM,
   normalizeVectorFieldConfig,
   PANEL_MAX_WIDTH,
@@ -639,6 +640,60 @@ describe("Vector Tools colour range mode", () => {
         normalizeVectorFieldConfig({ color: { rangeMode: old } }).color
           .rangeMode
       ).toBe("automatic");
+    }
+  });
+});
+
+describe("Vector Tools length inputs", () => {
+  /**
+   * The panel shows only the numbers the chosen mode reads, so this mapping is
+   * what decides whether a control the field depends on is on screen. Both the
+   * shader's `vtLengthFactor` and the generator's `factor` are the same five
+   * cases; if either grows one, this has to grow with it.
+   */
+  test("names exactly the numbers each mode scales by", () => {
+    expect(lengthInputsFor("actual")).toEqual({
+      targetLength: false,
+      scale: false,
+      maximumLength: false,
+      compression: false,
+    });
+    for (const mode of ["normalized", "direction-only"] as const) {
+      expect(lengthInputsFor(mode).targetLength).toBe(true);
+      expect(lengthInputsFor(mode).scale).toBe(false);
+    }
+    expect(lengthInputsFor("scaled")).toMatchObject({
+      scale: true,
+      maximumLength: false,
+      compression: false,
+    });
+    expect(lengthInputsFor("clamped")).toMatchObject({
+      scale: true,
+      maximumLength: true,
+      compression: false,
+    });
+    expect(lengthInputsFor("compressed")).toMatchObject({
+      scale: true,
+      maximumLength: false,
+      compression: true,
+    });
+  });
+
+  test("leaves no mode without a control except the one that needs none", () => {
+    const modes = [
+      "actual",
+      "normalized",
+      "scaled",
+      "clamped",
+      "compressed",
+      "direction-only",
+    ] as const;
+    for (const mode of modes) {
+      const shown = Object.values(lengthInputsFor(mode)).filter(Boolean).length;
+      // Actual draws the field's own magnitude and reads nothing; every other
+      // mode has at least one number, or its section would be empty.
+      if (mode === "actual") expect(shown).toBe(0);
+      else expect(shown).toBeGreaterThan(0);
     }
   });
 });

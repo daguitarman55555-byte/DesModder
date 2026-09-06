@@ -21,6 +21,7 @@ import {
   PANEL_MIN_HEIGHT,
   PANEL_MIN_WIDTH,
   PANEL_TABS,
+  lengthInputsFor,
   type ArrowMode,
   type ColorPalette,
   type FlowLook,
@@ -243,6 +244,7 @@ function fieldTab(
 
 function arrowsTab(vectorTools: VectorTools, config: ConfigGetter) {
   const length = () => config().length;
+  const inputs = () => lengthInputsFor(length().mode);
   return (
     <div>
       <section class="dsm-vector-tools-section">
@@ -282,38 +284,69 @@ function arrowsTab(vectorTools: VectorTools, config: ConfigGetter) {
           LENGTH_MODES,
           (value) => vectorTools.setLength("mode", value)
         )}
-        {checkboxControl(
-          "Auto target length from sampling spacing",
-          () => length().autoLength,
-          (checked) => vectorTools.setLength("autoLength", checked)
-        )}
+        {/* Only the numbers this mode reads. The other three would take input
+            and change nothing, which reads as a broken control rather than an
+            inapplicable one. */}
+        <If predicate={() => inputs().targetLength}>
+          {() =>
+            checkboxControl(
+              "Auto target length from sampling spacing",
+              () => length().autoLength,
+              (checked) => vectorTools.setLength("autoLength", checked)
+            )
+          }
+        </If>
         <div class="dsm-vector-tools-number-grid">
-          {numberControl(
-            "dsm-vector-tools-target-length",
-            "Target length",
-            () => length().targetLength,
-            (value) => vectorTools.setLength("targetLength", value),
-            () => length().autoLength
-          )}
-          {numberControl(
-            "dsm-vector-tools-scale",
-            "Scale",
-            () => length().scale,
-            (value) => vectorTools.setLength("scale", value)
-          )}
-          {numberControl(
-            "dsm-vector-tools-clamp-maximum",
-            "Clamp maximum",
-            () => length().maximumLength,
-            (value) => vectorTools.setLength("maximumLength", value)
-          )}
-          {numberControl(
-            "dsm-vector-tools-compression",
-            "Compression",
-            () => length().compression,
-            (value) => vectorTools.setLength("compression", value)
-          )}
+          <If predicate={() => inputs().targetLength}>
+            {() =>
+              numberControl(
+                "dsm-vector-tools-target-length",
+                "Target length",
+                () => length().targetLength,
+                (value) => vectorTools.setLength("targetLength", value),
+                () => length().autoLength
+              )
+            }
+          </If>
+          <If predicate={() => inputs().scale}>
+            {() =>
+              numberControl(
+                "dsm-vector-tools-scale",
+                "Scale",
+                () => length().scale,
+                (value) => vectorTools.setLength("scale", value)
+              )
+            }
+          </If>
+          <If predicate={() => inputs().maximumLength}>
+            {() =>
+              numberControl(
+                "dsm-vector-tools-clamp-maximum",
+                "Clamp maximum",
+                () => length().maximumLength,
+                (value) => vectorTools.setLength("maximumLength", value)
+              )
+            }
+          </If>
+          <If predicate={() => inputs().compression}>
+            {() =>
+              numberControl(
+                "dsm-vector-tools-compression",
+                "Compression",
+                () => length().compression,
+                (value) => vectorTools.setLength("compression", value)
+              )
+            }
+          </If>
         </div>
+        <If predicate={() => length().mode === "actual"}>
+          {() => (
+            <div class="dsm-vector-tools-hint">
+              Arrows are drawn at the field's own magnitude, so there is nothing
+              to set here.
+            </div>
+          )}
+        </If>
       </section>
 
       <section class="dsm-vector-tools-section">
@@ -347,6 +380,10 @@ function colorTab(vectorTools: VectorTools, config: ConfigGetter) {
   const color = () => config().color;
   const usesPalette = () =>
     color().mode === "magnitude" || color().mode === "log-magnitude";
+  // One swatch, two users: the arrows read it in fixed mode and so does the
+  // flow, so it stays while either of them still needs it.
+  const flowUsesFixed = () => config().flow.colorMode === "fixed";
+  const usesFixed = () => color().mode === "fixed" || flowUsesFixed();
   return (
     <div>
       <section class="dsm-vector-tools-section">
@@ -356,26 +393,39 @@ function colorTab(vectorTools: VectorTools, config: ConfigGetter) {
           COLOR_MODES,
           (value) => vectorTools.setColor("mode", value)
         )}
-        <label
-          class="dsm-vector-tools-label"
-          for="dsm-vector-tools-fixed-color"
-        >
-          Fixed color
-        </label>
-        <input
-          id="dsm-vector-tools-fixed-color"
-          type="color"
-          onUpdate={(element: HTMLInputElement) => {
-            if (document.activeElement !== element)
-              element.value = color().fixedColor;
-          }}
-          onInput={(event: Event) =>
-            vectorTools.setColor(
-              "fixedColor",
-              (event.target as HTMLInputElement).value
-            )
-          }
-        />
+        <If predicate={usesFixed}>
+          {() => (
+            <div>
+              <label
+                class="dsm-vector-tools-label"
+                for="dsm-vector-tools-fixed-color"
+              >
+                Fixed color
+              </label>
+              <input
+                id="dsm-vector-tools-fixed-color"
+                type="color"
+                onUpdate={(element: HTMLInputElement) => {
+                  if (document.activeElement !== element)
+                    element.value = color().fixedColor;
+                }}
+                onInput={(event: Event) =>
+                  vectorTools.setColor(
+                    "fixedColor",
+                    (event.target as HTMLInputElement).value
+                  )
+                }
+              />
+              <If predicate={() => color().mode !== "fixed" && flowUsesFixed()}>
+                {() => (
+                  <div class="dsm-vector-tools-hint">
+                    The flow's particles are set to this color.
+                  </div>
+                )}
+              </If>
+            </div>
+          )}
+        </If>
       </section>
 
       <If predicate={usesPalette}>
@@ -463,23 +513,6 @@ function flowTab(vectorTools: VectorTools, config: ConfigGetter) {
           FLOW_LOOKS,
           (value) => vectorTools.setFlowLook(value)
         )}
-        {chipGroup(
-          "Particle color",
-          () => flow().colorMode,
-          FLOW_COLOR_MODES,
-          (value) => vectorTools.setFlow("colorMode", value)
-        )}
-        {chipGroup(
-          "Particle palette",
-          () => flow().palette,
-          PALETTES,
-          (value) => vectorTools.setFlow("palette", value)
-        )}
-        {checkboxControl(
-          "Constant speed (follow streamlines evenly)",
-          () => flow().normalizeSpeed,
-          (checked) => vectorTools.setFlow("normalizeSpeed", checked)
-        )}
         {sliderControl(
           "dsm-vector-tools-flow-speed",
           "Speed",
@@ -487,12 +520,53 @@ function flowTab(vectorTools: VectorTools, config: ConfigGetter) {
           { minimum: 0.05, maximum: 8, step: 0.05, decimals: 2 },
           (value) => vectorTools.setFlow("speed", value)
         )}
+        {checkboxControl(
+          "Constant speed (follow streamlines evenly)",
+          () => flow().normalizeSpeed,
+          (checked) => vectorTools.setFlow("normalizeSpeed", checked)
+        )}
+        {chipGroup(
+          "Particle color",
+          () => flow().colorMode,
+          FLOW_COLOR_MODES,
+          (value) => vectorTools.setFlow("colorMode", value)
+        )}
+        {/* Direction runs along the hue wheel and fixed takes the Color tab's
+            swatch, so only speed has a ramp to choose. */}
+        <If predicate={() => flow().colorMode === "speed"}>
+          {() =>
+            chipGroup(
+              "Particle palette",
+              () => flow().palette,
+              PALETTES,
+              (value) => vectorTools.setFlow("palette", value)
+            )
+          }
+        </If>
+      </section>
+
+      {/* Everything below is a refinement of what Look already set, or a
+          trade of detail for frame rate. Folded away so the controls that
+          change what the flow *is* are the ones on screen. */}
+      <details class="dsm-vector-tools-more">
+        <summary>Fine tuning</summary>
+        <div class="dsm-vector-tools-hint">
+          Look sets the trail and respawn rates; changing them here keeps
+          whatever you choose.
+        </div>
         {sliderControl(
           "dsm-vector-tools-flow-trail",
           "Trail length",
           () => flow().trailPersistence,
           { minimum: 0, maximum: 0.995, step: 0.005, decimals: 3 },
           (value) => vectorTools.setFlow("trailPersistence", value)
+        )}
+        {sliderControl(
+          "dsm-vector-tools-flow-drop-rate",
+          "Respawn rate",
+          () => flow().dropRate,
+          { minimum: 0, maximum: 0.2, step: 0.001, decimals: 3 },
+          (value) => vectorTools.setFlow("dropRate", value)
         )}
         {sliderControl(
           "dsm-vector-tools-flow-opacity",
@@ -509,13 +583,6 @@ function flowTab(vectorTools: VectorTools, config: ConfigGetter) {
           (value) => vectorTools.setFlow("pointSize", value)
         )}
         {sliderControl(
-          "dsm-vector-tools-flow-drop-rate",
-          "Respawn rate",
-          () => flow().dropRate,
-          { minimum: 0, maximum: 0.2, step: 0.001, decimals: 3 },
-          (value) => vectorTools.setFlow("dropRate", value)
-        )}
-        {sliderControl(
           "dsm-vector-tools-flow-render-scale",
           "Render detail (lower is faster)",
           () => flow().renderScale,
@@ -527,7 +594,7 @@ function flowTab(vectorTools: VectorTools, config: ConfigGetter) {
           },
           (value) => vectorTools.setFlow("renderScale", value)
         )}
-      </section>
+      </details>
     </div>
   );
 }

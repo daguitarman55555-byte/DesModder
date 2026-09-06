@@ -109,6 +109,23 @@ control before it was accounted for:
 - Inputs are only re-synced while they do **not** hold focus, so a render
   triggered mid-edit cannot fight the user's typing.
 
+A control that the current mode does not read is not shown. The four length
+numbers are the case that matters: `actual` reads none of them, `normalized`
+reads one, `clamped` reads two, and all four on screen at once offer three
+controls that take input and change nothing, with no clue which is live.
+`lengthInputsFor` in `model.ts` is the single answer to which is which, because
+the same five cases are the shader's `vtLengthFactor` and the generator's
+`factor`, and a wrong answer here hides a control the field depends on. The
+same rule hides the palette when the colour mode does not run along one, and
+the fixed-colour swatch when neither the arrows nor the flow is set to use it —
+that one swatch has two users, so it stays while either still needs it.
+
+The flow's secondary controls are folded into a `<details>` instead. Trail
+length and respawn rate are what the Look preset sets, and opacity, particle
+size and render detail are refinements of a picture that already exists; on
+screen with the controls that decide what the flow _is_, eleven of them in one
+column, none of them read as more important than another.
+
 The panel has no `<select>` elements. A native dropdown inside a scrolling
 popover is awkward to hit and DCGView cannot drive its selection through props
 anyway, so option lists are wrapping rows of one-click chips instead, and the
@@ -158,6 +175,21 @@ view, the field or a setting changes, and not otherwise.
 `arrowMode` has a third setting, `off`, because live arrows are on as soon as
 the plugin is enabled and turning them off should not mean pretending you want
 Desmos to draw them.
+
+Two things keep a settings change cheap, and both had to be added after the
+fact. Every change arrives as `start(field, options)` with the _same_ field, so
+`setField` compares it against the one the linked program was built from and
+returns; without that, dragging the arrowhead slider compiled and linked a
+shader per pointermove — measured at a hundred links across a hundred frames of
+a drag, against none now. And instances cover only the columns and rows of the
+grid that intersect the view, plus a margin wider than the longest arrow the
+shader will draw, because the sampling domain has nothing to do with what is
+on screen: a 201×201 domain looked at from twelve units across submitted forty
+thousand instances a frame and now submits about a hundred and sixty-five, each
+of the rest having evaluated the field in a vertex shader only to be clipped.
+`visibleGridSpan` is where that arithmetic lives and it falls back to the whole
+grid rather than guess whenever a bound is not finite — drawing too much is a
+performance answer, drawing too little is a wrong picture.
 
 A vast sampling domain is sampled more coarsely rather than drawn in full —
 by default, and only by default. `arrowDensityLimit` turns it off, and then
@@ -238,6 +270,18 @@ that:
   stops for a hidden tab but not for a graph scrolled out of view, so an
   `IntersectionObserver` on the canvas skips the frame body while it is off
   screen.
+
+Both overlays also survive losing their context. A browser caps how many WebGL
+contexts a page may hold, and these are two on top of Desmos's own; a GPU reset
+or a page with too many graphs on it takes one away. Each overlay listens for
+`webglcontextlost` — calling `preventDefault`, without which the browser never
+restores it — drops the renderer, says so, and rebuilds on
+`webglcontextrestored` from the field and options it kept for exactly that
+reason. `isRunning` is therefore the canvas, not the renderer: a mounted
+overlay with a lost context is still running, briefly drawing nothing, and
+offering to start it again would be answering the wrong question. Pressing
+Visualize while one is lost remounts, which is the way back if the browser
+never restores it.
 
 Every program's single vertex attribute is bound to slot 0 before linking, which
 lets one vertex array object per buffer be shared by all of them. The attribute
