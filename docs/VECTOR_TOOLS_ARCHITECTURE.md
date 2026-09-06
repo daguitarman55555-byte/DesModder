@@ -155,6 +155,20 @@ sharing a renderer would mean the arrows paying an animation loop's costs to sit
 still. `ArrowOverlay` redraws on a coalesced `requestAnimationFrame` when the
 view, the field or a setting changes, and not otherwise.
 
+`arrowMode` has a third setting, `off`, because live arrows are on as soon as
+the plugin is enabled and turning them off should not mean pretending you want
+Desmos to draw them.
+
+A vast sampling domain is sampled more coarsely rather than drawn in full.
+Matching the domain to a zoomed-out viewport asks for hundreds of thousands of
+arrows at a step of 1, every one of them inside a pixel, and what you see is the
+moire between the arrow grid and the pixel grid rather than the field.
+`thinArrowGrid` scales both axes by one factor down to the same limit Desmos
+generation refuses at, and the status line says it did. Arrow length is capped
+against the viewport for the same reason from the other end: when the domain is
+far larger than the view, the spacing the auto length follows is itself larger
+than the screen.
+
 Two details are load-bearing. The arrowhead is a filled triangle, which is the
 thing Desmos expressions cannot do — a head there is two line segments, because
 a filled one would be a polygon per arrow — and it is capped against the arrow's

@@ -46,13 +46,22 @@ export class ArrowOverlay {
     return this.renderer?.arrowCount ?? 0;
   }
 
+  /** What the last frame drew into, and what the canvas expected. */
+  get drawnViewport() {
+    if (this.renderer === undefined || this.canvas === undefined)
+      return undefined;
+    return {
+      drawn: this.renderer.lastViewport,
+      canvas: { width: this.canvas.width, height: this.canvas.height },
+    };
+  }
+
   /** Starts the overlay, or swaps the field and settings if already running. */
   start(field: FlowField, options: ArrowOptions) {
     try {
       if (this.renderer === undefined) this.mount();
       this.renderer!.setOptions(options);
       this.renderer!.setField(field);
-      this.syncBounds();
       this.requestFrame();
     } catch (error) {
       this.stop();
@@ -130,10 +139,7 @@ export class ArrowOverlay {
     );
     this.visibilityObserver.observe(canvas);
 
-    this.calc.observe(BOUNDS_OBSERVER_KEY, () => {
-      this.syncBounds();
-      this.requestFrame();
-    });
+    this.calc.observe(BOUNDS_OBSERVER_KEY, () => this.requestFrame());
     this.unobserveBounds = () => this.calc.unobserve(BOUNDS_OBSERVER_KEY);
   }
 
@@ -169,6 +175,12 @@ export class ArrowOverlay {
       if (this.renderer === undefined || !this.onScreen) return;
       try {
         this.resizeToBox();
+        // Read the bounds now rather than trusting what the observer last
+        // reported. Desmos adjusts what it was asked for to keep the pixels
+        // square, and the corrected value does not always arrive as another
+        // observation — so a cached copy can be a view the graph never had,
+        // which draws the field offset from the paper under it.
+        this.syncBounds();
         this.renderer.frame();
       } catch (error) {
         const message =

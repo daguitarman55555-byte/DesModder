@@ -41,7 +41,45 @@ export type FlowColorMode = "fixed" | "speed" | "direction";
  * They are not exclusive. Live arrows are what you configure against; pressing
  * Generate commits the same field to the expression list.
  */
-export type ArrowMode = "live" | "desmos";
+export type ArrowMode = "off" | "live" | "desmos";
+
+/**
+ * The most arrows worth drawing live.
+ *
+ * Not a performance limit — the GPU will happily draw far more. It is a
+ * legibility one: past roughly one arrow per few pixels the arrows are smaller
+ * than the grid they sit on, and what you see is the moiré between the two
+ * rather than the field. Matching the sampling domain to a zoomed-out viewport
+ * asks for hundreds of thousands, and every one of them lands inside a pixel.
+ *
+ * It is the number Desmos generation refuses at, for the same reason and with a
+ * gentler answer: the domain is sampled more coarsely rather than not drawn.
+ */
+export const LIVE_ARROW_MAXIMUM = VECTOR_COUNT_HARD_MAXIMUM;
+
+/**
+ * The same domain, sampled coarsely enough to stay readable.
+ *
+ * Both axes are scaled by one factor so the arrows stay square to the grid
+ * rather than stretching along whichever axis had more of them.
+ */
+export function thinArrowGrid(
+  columns: number,
+  rows: number,
+  maximum = LIVE_ARROW_MAXIMUM
+) {
+  const total = Math.max(0, columns) * Math.max(0, rows);
+  if (total <= maximum || total === 0) {
+    return { columns, rows, thinned: false, requested: total };
+  }
+  const factor = Math.sqrt(maximum / total);
+  return {
+    columns: Math.max(2, Math.floor(columns * factor)),
+    rows: Math.max(2, Math.floor(rows * factor)),
+    thinned: true,
+    requested: total,
+  };
+}
 
 /**
  * The two things a particle flow can be asked to show.
@@ -569,7 +607,10 @@ export function normalizeVectorFieldConfig(value: unknown): VectorFieldConfig {
           : fallback.color.fixedColor,
     },
     zeroVectorMode: value.zeroVectorMode === "point" ? "point" : "hide",
-    arrowMode: value.arrowMode === "desmos" ? "desmos" : "live",
+    arrowMode:
+      value.arrowMode === "desmos" || value.arrowMode === "off"
+        ? value.arrowMode
+        : "live",
     flow: normalizeFlow(value.flow, fallback.flow),
     panel: normalizePanel(value.panel, fallback.panel),
   };

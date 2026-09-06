@@ -874,6 +874,35 @@ testWithPage(
     );
     await driver.assertSelectorEventually(ARROW_CANVAS);
 
+    // Off is neither of the other two: nothing is drawn, and nothing is
+    // written either.
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).setArrowMode("off")
+    );
+    await driver.assertSelectorNot(ARROW_CANVAS);
+    expect((await vt()).status).toBe("Arrows are off.");
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).setArrowMode("live")
+    );
+    await waitForArrows(143);
+
+    // Changing a setting re-measures the field's magnitude range, and that
+    // pass renders into a grid-sized buffer of its own. Leaving the viewport
+    // at that size drew the whole field into a corner — a failure nothing but
+    // the pixels could see, so what the frame drew into is checked directly.
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).setColor(
+        "palette",
+        "sequential-a"
+      )
+    );
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const viewport = await driver.evaluate(
+      () => (DSM.enabledPlugins["vector-tools"] as any).arrowViewport
+    );
+    expect(viewport.drawn).toEqual(viewport.canvas);
+    expect(viewport.drawn.width).toBeGreaterThan(100);
+
     await driver.evaluate(() =>
       (DSM.enabledPlugins["vector-tools"] as any).resetConfig()
     );

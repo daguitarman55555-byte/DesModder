@@ -19,9 +19,11 @@ import {
   FLOW_RENDER_SCALE_MINIMUM,
   FLOW_PARTICLE_MINIMUM,
   isDevelopmentBuild,
+  LIVE_ARROW_MAXIMUM,
   normalizeVectorFieldConfig,
   PANEL_MAX_WIDTH,
   PANEL_MIN_HEIGHT,
+  thinArrowGrid,
   validateVectorFieldConfig,
   VECTOR_FIELD_PRESETS,
 } from "./model";
@@ -562,5 +564,42 @@ describe("Vector Tools Desmos expression plans", () => {
     expect(audit.missing).toHaveLength(plan.expressions.length - 2);
     expect(audit.unexpected).toEqual([`${plan.namespace}_manual_probe`]);
     expect(audit.renderMissing).toBe(true);
+  });
+});
+
+describe("Vector Tools live arrow grid", () => {
+  test("leaves a grid that is already readable alone", () => {
+    expect(thinArrowGrid(21, 13)).toEqual({
+      columns: 21,
+      rows: 13,
+      thinned: false,
+      requested: 273,
+    });
+  });
+
+  test("thins a domain matched to a zoomed-out viewport", () => {
+    // 801 by 467 is what matching the domain to a view 800 units wide asks for
+    // at a step of 1. Every one of those arrows lands inside a pixel, and what
+    // you see is the moire between the two grids rather than the field.
+    const thinned = thinArrowGrid(801, 467);
+    expect(thinned.thinned).toBe(true);
+    expect(thinned.requested).toBe(374067);
+    expect(thinned.columns * thinned.rows).toBeLessThanOrEqual(
+      LIVE_ARROW_MAXIMUM
+    );
+    // Scaled by one factor, so the arrows stay square to the grid rather than
+    // stretching along whichever axis had more of them.
+    const before = 801 / 467;
+    const after = thinned.columns / thinned.rows;
+    expect(Math.abs(after - before)).toBeLessThan(0.05);
+  });
+
+  test("never thins below a grid that can still show a direction", () => {
+    expect(thinArrowGrid(100000, 2).rows).toBeGreaterThanOrEqual(2);
+    expect(thinArrowGrid(2, 100000).columns).toBeGreaterThanOrEqual(2);
+  });
+
+  test("has nothing to say about an empty grid", () => {
+    expect(thinArrowGrid(0, 0).thinned).toBe(false);
   });
 });

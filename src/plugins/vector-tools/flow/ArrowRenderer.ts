@@ -109,6 +109,15 @@ export class ArrowRenderer {
   private measureSize = { columns: 0, rows: 0 };
   /** The grid's own magnitude range, measured on the GPU and cached. */
   private measured?: { minimum: number; maximum: number };
+  /**
+   * The drawing-buffer rectangle the last frame drew into.
+   *
+   * Exposed because the measuring pass renders into a buffer of its own, and
+   * leaving the viewport at that size drew the whole field into a corner. That
+   * failure is invisible to anything except the pixels, so this is what the
+   * test looks at instead.
+   */
+  lastViewport = { width: 0, height: 0 };
   private options: ArrowOptions = { ...DEFAULT_ARROW_OPTIONS };
   private bounds: FlowBounds = { xMin: -10, xMax: 10, yMin: -10, yMax: 10 };
   private destroyed = false;
@@ -179,12 +188,26 @@ export class ArrowRenderer {
     const { gl } = this;
     if (this.destroyed || this.program === undefined) return;
     const count = this.arrowCount;
+    if (count === 0) {
+      gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      return;
+    }
+
+    // Measuring renders into a grid-sized buffer of its own, so the viewport is
+    // only set once that is done with it. Setting it first meant every frame
+    // that had to re-measure drew the whole field into a corner the size of the
+    // grid — which is what a change to the field looked like.
+    const range = this.magnitudeRange();
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    this.lastViewport = {
+      width: this.canvas.width,
+      height: this.canvas.height,
+    };
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
-    if (count === 0) return;
 
-    const range = this.magnitudeRange();
     const { uniforms, program } = this.program;
     gl.useProgram(program);
     gl.bindVertexArray(this.emptyArray);
@@ -536,29 +559,50 @@ void main() {
   vec2 v = vtField(base);
   float magnitude = length(v);
   vec2 shown = v * vtLengthFactor(magnitude);
-  float len = length(shown);
+  float drawn = length(shown);
 
   // A zero vector has no direction to draw, and a degenerate triangle would
   // still be rasterized. Send it outside the clip volume instead.
-  if (magnitude <= 1.0e-9 || len <= 0.0) {
+  if (magnitude <= 1.0e-9 || drawn <= 0.0) {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     v_color = vec4(0.0);
     return;
   }
 
-  vec2 dir = shown / len;
+  // The direction has to come from the unclamped vector: normalizing by the
+  // clamped length would scale the direction back up by exactly the amount the
+  // clamp took off, and the arrow would come out its original size.
+  vec2 dir = shown / drawn;
+  // However the length was chosen, an arrow longer than a fraction of the view
+  // says nothing — it leaves the screen before its direction reads. This bites
+  // when the sampling domain is far larger than what is on screen, where the
+  // spacing the length follows is itself larger than the viewport.
+  float len = min(drawn, 0.12 * (u_max.x - u_min.x));
   vec2 perp = vec2(-dir.y, dir.x);
   vec2 unitsPerPixel = (u_max - u_min) / u_viewportPx;
-  float halfWidth = 0.5 * u_shaftWidth *
-                    0.5 * (unitsPerPixel.x + unitsPerPixel.y);
+  // Thickness is in pixels so it does not change with the zoom — but a pixel is
+  // worth more graph units the further out you go, and left alone the shaft
+  // ends up wider than the arrow is long. Past that point it is not an arrow
+  // any more, just a blob square to its own direction, and a field of them
+  // smears into a wash. So the pixel width is also capped against the length.
+  float pixel = 0.5 * (unitsPerPixel.x + unitsPerPixel.y);
+  // Thin enough never to be wider than long, but never thinner than about half
+  // a pixel, or a dense field disappears instead of reading as a fine texture.
+  float halfWidth = max(
+    min(0.5 * u_shaftWidth * pixel, 0.2 * len),
+    0.3 * pixel
+  );
 
   // The head is capped against the arrow's own length, so a short vector keeps
   // a visible shaft instead of becoming a triangle on a dot.
   float headLength = min(u_headSize, 0.45 * len);
   // A head narrower than about twice the shaft does not read as a head at all,
-  // so the angle sets its width only while that stays true. Zooming out shrinks
-  // the arrow but not the shaft, which is what makes the floor necessary.
-  float headHalf = max(headLength * tan(u_headAngle), 2.4 * halfWidth);
+  // so the angle sets its width only while that stays true — and never wider
+  // than the arrow is long, for the same reason as the shaft.
+  float headHalf = min(
+    max(headLength * tan(u_headAngle), 2.4 * halfWidth),
+    0.5 * len
+  );
   float shaftEnd = max(len - headLength, 0.0);
 
   vec2 local;

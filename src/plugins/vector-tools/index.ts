@@ -9,6 +9,7 @@ import {
   DENSITY_PRESETS,
   isDevelopmentBuild,
   getAxisSampleCount,
+  thinArrowGrid,
   normalizeVectorFieldConfig,
   type ColorPalette,
   type ColorRangeMode,
@@ -185,10 +186,20 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   }
 
   get arrowStatus() {
+    if (this.arrowMode === "off") return "Arrows are off.";
     if (this.arrowMode !== "live") return "";
     if (this.arrowMessage !== "") return this.arrowMessage;
     if (!this.arrowOverlay.isRunning) return "";
+    const grid = this.arrowGrid;
+    if (grid.thinned) {
+      return `Drawing ${this.arrowOverlay.arrowCount} of ${grid.requested} arrows live — sampled coarsely so they stay readable at this zoom.`;
+    }
     return `Drawing ${this.arrowOverlay.arrowCount} arrows live.`;
+  }
+
+  /** Tests only: what the last live-arrow frame actually drew into. */
+  get arrowViewport() {
+    return this.arrowOverlay.drawnViewport;
   }
 
   setArrowMode(mode: ArrowMode) {
@@ -222,11 +233,30 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.arrowOverlay.start(compiled.field, this.arrowOptions);
   }
 
+  /** The grid the live arrows are drawn on, thinned if the domain is vast. */
+  private get arrowGrid() {
+    const config = this.getConfig();
+    return thinArrowGrid(
+      getAxisSampleCount(config.domain.x),
+      getAxisSampleCount(config.domain.y)
+    );
+  }
+
   private get arrowOptions(): ArrowOptions {
     const config = this.getConfig();
+    const grid = this.arrowGrid;
+    // The same rule the generator uses, over the spacing actually drawn: a
+    // thinned grid is a coarser one, and its arrows have to grow to match or
+    // they end up shorter than a pixel and disappear.
+    const spacing = Math.min(
+      Math.abs(config.domain.x.max - config.domain.x.min) /
+        Math.max(1, grid.columns - 1),
+      Math.abs(config.domain.y.max - config.domain.y.min) /
+        Math.max(1, grid.rows - 1)
+    );
     return {
-      columns: getAxisSampleCount(config.domain.x),
-      rows: getAxisSampleCount(config.domain.y),
+      columns: grid.columns,
+      rows: grid.rows,
       domain: {
         xMin: config.domain.x.min,
         xMax: config.domain.x.max,
@@ -234,7 +264,9 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
         yMax: config.domain.y.max,
       },
       lengthMode: config.length.mode,
-      targetLength: config.length.targetLength,
+      targetLength: config.length.autoLength
+        ? 0.7 * spacing
+        : config.length.targetLength,
       scale: config.length.scale,
       maximumLength: config.length.maximumLength,
       compression: config.length.compression,

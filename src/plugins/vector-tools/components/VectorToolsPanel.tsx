@@ -71,6 +71,7 @@ const PALETTES: readonly Choice<ColorPalette>[] = [
 const ARROW_MODES: readonly Choice<ArrowMode>[] = [
   { value: "live", label: "Live (extension)" },
   { value: "desmos", label: "Desmos expressions" },
+  { value: "off", label: "Off" },
 ];
 
 const FLOW_LOOKS: readonly Choice<FlowLook>[] = [
@@ -254,8 +255,10 @@ function arrowsTab(vectorTools: VectorTools, config: ConfigGetter) {
         <div class="dsm-vector-tools-note">
           {() =>
             vectorTools.arrowMode === "live"
-              ? "Arrows are drawn over the graph as you change them, with no vector limit. Generate writes the same field as Desmos expressions when you want to share it."
-              : "Arrows come from the expression list, so the graph works without this extension. Press Generate to write them."
+              ? "Arrows are drawn over the graph as you change them. Generate writes the same field as Desmos expressions when you want to share it."
+              : vectorTools.arrowMode === "desmos"
+                ? "Arrows come from the expression list, so the graph works without this extension. Press Generate to write them."
+                : "No arrows are drawn. The flow visualizer and Generate still work."
           }
         </div>
         <div class="dsm-vector-tools-status">
