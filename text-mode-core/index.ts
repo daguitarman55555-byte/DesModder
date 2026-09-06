@@ -16,7 +16,13 @@ export { graphSettingsToText, itemToText, augToText } from "./up/augToText";
 export * as StyleDefaults from "./down/style/defaults";
 export type { AnyHydrated, AnyHydratedValue } from "./down/style/Hydrated";
 export { rawToText } from "./up/rawToText";
-export { identifierToString } from "./aug/augLatexToRaw";
+export { identifierToString, latexTreeToString } from "./aug/augLatexToRaw";
 export type { ExpressionAug } from "./aug/AugState";
+// The Aug latex tree, its builders, and the parser that produces it. Exported
+// so consumers can analyze and rewrite expressions (Vector Tools differentiates
+// them) without reaching past this boundary.
+export { Aug } from "./aug";
+export * as AugBuilders from "./aug/augBuilders";
+export { parseLatex } from "./aug/rawToAug";
 export type { PublicConfig, Config } from "./TextModeConfig";
 export { buildConfig, buildConfigFromGlobals } from "./TextModeConfig";

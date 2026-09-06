@@ -50,6 +50,9 @@ async function normalizedHtml(page: Page) {
     /<div tabindex="(0|-1)"><\/div>(<canvas class="dcg-graph-inner")/,
     "$2"
   );
+  // MathQuill toggles this class on a ~500ms timer, so whether a snapshot has
+  // it depends only on when the snapshot was taken.
+  html = html.replace(/(class="dcg-mq-cursor) dcg-mq-blink"/g, '$1"');
   return html;
 }
 
@@ -102,4 +105,7 @@ test("DSM destroy reverts page HTML", async () => {
   // `git diff --no-index before.html after.html > diff.html`
 
   await page.close();
-});
+  // This test loads a page, initialises DesModder, and tears it down again.
+  // Jest's 5s default is not enough for that, and `testWithPage` (15s) is not
+  // used here, so the timeout has to be given explicitly.
+}, 60000);

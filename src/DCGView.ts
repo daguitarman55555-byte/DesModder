@@ -4,13 +4,15 @@ import { createElementWrapped } from "./preload/replaceElement";
 export const { DCGView } = Fragile;
 
 export type OrConst<T> = {
-  [K in keyof T]: T[K] extends (...args: any[]) => any
+  [K in keyof T]: T[K] extends ((...args: any[]) => any) | undefined
     ? T[K]
     : T[K] | (() => T[K]);
 };
 
 type ToFunc<T> = {
-  [K in keyof T]: T[K] extends (...args: any[]) => any ? T[K] : () => T[K];
+  [K in keyof T]: T[K] extends ((...args: any[]) => any) | undefined
+    ? T[K]
+    : () => T[K];
 };
 
 export abstract class ClassComponent<
@@ -136,6 +138,14 @@ declare global {
       td: any;
       button: any;
       br: any;
+      details: any;
+      h3: any;
+      option: any;
+      section: any;
+      select: any;
+      summary: any;
+      tbody: any;
+      thead: any;
     }
   }
 }

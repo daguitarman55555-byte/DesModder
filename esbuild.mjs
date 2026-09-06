@@ -82,6 +82,7 @@ const opts = {
   ],
   define: {
     BROWSER: JSON.stringify(browser),
+    DEV_BUILD: JSON.stringify(watch),
     VERSION: JSON.stringify(version),
   },
   loader: {

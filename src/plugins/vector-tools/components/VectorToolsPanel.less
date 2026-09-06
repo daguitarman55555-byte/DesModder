@@ -1,0 +1,385 @@
+// Pillbox popovers are a fixed 290px wide, which would clip the panel and
+// defeat resizing. The plugin tags its own popover so only this one grows.
+.dcg-container .dsm-pillbox-popover.dsm-vector-tools-popover {
+  max-width: none;
+  width: auto;
+}
+
+.dsm-vector-tools-menu {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  // `resize` needs a non-visible overflow. The body scrolls, not the panel, so
+  // the tab bar and the action buttons stay put while the user scrolls.
+  overflow: hidden;
+  resize: both;
+  min-width: 320px;
+  max-width: min(720px, 92vw);
+  min-height: 260px;
+  max-height: min(900px, 86vh);
+
+  .dcg-popover-title {
+    flex: none;
+  }
+
+  .dsm-vector-tools-tabs {
+    flex: none;
+    margin: 6px 0 2px;
+  }
+
+  .dsm-vector-tools-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-right: 2px;
+  }
+
+  .dsm-vector-tools-footer {
+    background: inherit;
+    border-top: 1px solid #ddd;
+    flex: none;
+    margin-top: 6px;
+    padding-top: 7px;
+  }
+
+  .dsm-vector-tools-hint {
+    color: #666;
+    font-size: 11px;
+    line-height: 1.4;
+    margin: 4px 0 6px;
+  }
+
+  .dsm-vector-tools-section {
+    margin-top: 8px;
+
+    & + .dsm-vector-tools-section {
+      border-top: 1px solid #e6e6e6;
+      padding-top: 8px;
+    }
+  }
+
+  h3 {
+    font-size: 12px;
+    font-weight: bold;
+    margin: 0 0 6px;
+  }
+
+  // A heading with an action on the same line. The heading keeps its bottom
+  // margin, so the button is aligned to the top of the row rather than centred
+  // against it.
+  .dsm-vector-tools-section-head {
+    align-items: flex-start;
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+
+    .dsm-btn {
+      flex: none;
+      font-size: 11px;
+      margin: -2px 0 6px;
+      padding: 2px 7px;
+    }
+  }
+
+  .dsm-vector-tools-label {
+    display: block;
+    font-size: 11px;
+    font-weight: bold;
+    margin: 7px 0 3px;
+  }
+
+  .dsm-vector-tools-text-input,
+  .dsm-vector-tools-number input,
+  .dsm-vector-tools-particle-count {
+    box-sizing: border-box;
+    border: 1px solid #bcbcbc;
+    border-radius: 3px;
+    min-height: 26px;
+    padding: 3px 5px;
+    width: 100%;
+  }
+
+  .dsm-vector-tools-number input:disabled {
+    background: #f2f2f2;
+    color: #999;
+  }
+
+  // ---- one-click option chips, in place of native dropdowns ----
+
+  .dsm-vector-tools-chips {
+    margin-top: 6px;
+  }
+
+  .dsm-vector-tools-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .dsm-vector-tools-chip {
+    background: #f4f4f4;
+    border: 1px solid #cfcfcf;
+    border-radius: 11px;
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1.5;
+    padding: 2px 9px;
+    user-select: none;
+    white-space: nowrap;
+
+    &:hover {
+      background: #e9e9e9;
+    }
+
+    &:focus-visible {
+      outline: 2px solid #2f72dc;
+      outline-offset: 1px;
+    }
+  }
+
+  .dsm-vector-tools-chip-selected,
+  .dsm-vector-tools-chip-selected:hover {
+    background: #2f72dc;
+    border-color: #2f72dc;
+    color: #fff;
+  }
+
+  // ---- sliders ----
+
+  .dsm-vector-tools-slider-row,
+  .dsm-vector-tools-particles {
+    margin-top: 7px;
+  }
+
+  .dsm-vector-tools-slider-head {
+    align-items: baseline;
+    display: flex;
+    gap: 6px;
+    justify-content: space-between;
+
+    .dsm-vector-tools-label {
+      margin: 0;
+    }
+  }
+
+  .dsm-vector-tools-slider-value {
+    color: #555;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dsm-vector-tools-slider {
+    display: block;
+    margin: 3px 0 0;
+    width: 100%;
+  }
+
+  .dsm-vector-tools-particle-count {
+    flex: none;
+    text-align: right;
+    width: 84px;
+  }
+
+  // ---- field tab ----
+
+  .dsm-vector-tools-math-row {
+    display: grid;
+    gap: 7px;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  // A gradient field has one input, not two, so it gets the full width rather
+  // than sitting in half a two-column grid.
+  .dsm-vector-tools-scalar-row {
+    grid-template-columns: 1fr;
+  }
+
+  .dsm-vector-tools-math-input {
+    border: 1px solid #bcbcbc;
+    border-radius: 3px;
+    min-height: 28px;
+  }
+
+  .dsm-vector-tools-link-row {
+    margin-top: 8px;
+
+    .dsm-btn {
+      margin: 0;
+    }
+
+    .dsm-vector-tools-hint {
+      margin: 5px 0 0;
+    }
+  }
+
+  .dsm-vector-tools-axis {
+    border: 1px solid #e1e1e1;
+    border-radius: 4px;
+    margin-top: 7px;
+    padding: 7px;
+  }
+
+  .dsm-vector-tools-axis-heading {
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+  }
+
+  .dsm-vector-tools-number-grid {
+    display: grid;
+    gap: 6px;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dsm-vector-tools-number {
+    display: block;
+    font-size: 11px;
+    margin-top: 6px;
+  }
+
+  .dsm-vector-tools-number span {
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  .dsm-vector-tools-count {
+    color: #555;
+    font-size: 12px;
+    margin-top: 8px;
+  }
+
+  .dsm-vector-tools-checkbox {
+    align-items: center;
+    display: flex;
+    font-size: 12px;
+    gap: 5px;
+    margin: 8px 0 2px;
+  }
+
+  .dsm-vector-tools-checkbox input {
+    margin: 0;
+  }
+
+  input[type="color"] {
+    border: 1px solid #bcbcbc;
+    border-radius: 3px;
+    height: 28px;
+    padding: 1px;
+    width: 100%;
+  }
+
+  // ---- validation and actions ----
+
+  .dsm-vector-tools-valid,
+  .dsm-vector-tools-warning,
+  .dsm-vector-tools-error {
+    border-radius: 3px;
+    font-size: 11px;
+    line-height: 1.35;
+    margin-top: 5px;
+    padding: 4px 6px;
+  }
+
+  .dsm-vector-tools-valid {
+    background: #edf8ef;
+    color: #275c2e;
+  }
+
+  .dsm-vector-tools-warning {
+    background: #fff7df;
+    color: #755600;
+  }
+
+  .dsm-vector-tools-error {
+    background: #fff0f0;
+    color: #9b2525;
+  }
+
+  .dsm-vector-tools-issues {
+    max-height: 84px;
+    overflow-y: auto;
+  }
+
+  .dsm-vector-tools-actions,
+  .dsm-vector-tools-confirmation {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 8px;
+
+    .dsm-btn {
+      margin: 0;
+    }
+  }
+
+  .dsm-vector-tools-confirmation {
+    color: #8a2929;
+    font-size: 12px;
+  }
+
+  .dsm-vector-tools-status {
+    color: #666;
+    font-size: 11px;
+    line-height: 1.35;
+    margin-top: 7px;
+  }
+
+  .dsm-vector-tools-flow-status {
+    font-style: italic;
+  }
+
+  // ---- development test lab ----
+
+  .dsm-vector-tools-test-lab {
+    border-top: 1px solid #7761ae;
+    margin-top: 13px;
+    padding-top: 8px;
+  }
+
+  .dsm-vector-tools-test-lab summary {
+    color: #4f397d;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+  }
+
+  .dsm-vector-tools-probes,
+  .dsm-vector-tools-checklist,
+  .dsm-vector-tools-audit {
+    border-top: 1px solid #e5e0f0;
+    font-size: 11px;
+    line-height: 1.4;
+    margin-top: 9px;
+    padding-top: 7px;
+  }
+
+  .dsm-vector-tools-checklist label {
+    display: block;
+    margin-top: 4px;
+  }
+
+  .dsm-vector-tools-checklist input {
+    margin: 0 5px 0 0;
+  }
+
+  .dsm-vector-tools-audit-summary {
+    color: #666;
+    margin: 3px 0;
+  }
+
+  .dsm-vector-tools-audit table {
+    border-collapse: collapse;
+    margin-top: 4px;
+    width: 100%;
+  }
+
+  .dsm-vector-tools-audit th,
+  .dsm-vector-tools-audit td {
+    border-bottom: 1px solid #eee;
+    padding: 2px 3px;
+    text-align: left;
+  }
+}

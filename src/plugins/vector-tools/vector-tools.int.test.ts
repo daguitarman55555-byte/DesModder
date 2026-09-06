@@ -1,0 +1,950 @@
+import {
+  clean,
+  Driver,
+  testWithPage,
+  testWithPageAndOpts,
+} from "../../tests/puppeteer-utils";
+import type { Calc as CalcType } from "#globals";
+
+declare let Calc: CalcType;
+declare let DSM: Window["DSM"];
+
+const BUTTON = ".dsm-action-menu .dsm-icon-compass2";
+const PANEL = ".dsm-vector-tools-menu";
+const GENERATE = ".dsm-vector-tools-generate";
+const REMOVE = ".dsm-vector-tools-remove";
+const RESET = ".dsm-vector-tools-reset";
+const VISUALIZE = ".dsm-vector-tools-visualize";
+const TEST_LAB = ".dsm-vector-tools-test-lab";
+const FLOW_CANVAS = "#dsm-vector-tools-flow-canvas";
+const NAMESPACE = "vector_tools_vf_default";
+const FOLDER_ID = `${NAMESPACE}_folder`;
+const UNRELATED_LINE_ID = "unrelated_line";
+
+testWithPage(
+  "Vector Tools generates a stable production field and does not expose its development lab in a production build",
+  async (driver) => {
+    expect(await driver.getEnabledPlugins()).not.toContain("vector-tools");
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    expect(await driver.$$(BUTTON)).toHaveLength(1);
+
+    await driver.click(BUTTON);
+    await driver.assertSelector(PANEL, GENERATE, REMOVE);
+    await driver.assertSelectorNot(TEST_LAB);
+    await driver.click(GENERATE);
+    await driver.waitForSync();
+
+    let items = (await driver.getState()).expressions.list;
+    expect(items.filter((item) => item.id === FOLDER_ID)).toHaveLength(1);
+    expect(items.find((item) => item.id === FOLDER_ID)).toMatchObject({
+      type: "folder",
+      title: "Vector Tools — Vector Field",
+    });
+    expect(
+      items.filter((item) => item.id?.startsWith(`${NAMESPACE}_`)).length
+    ).toBe(20);
+    expect(
+      items.find((item) => item.id === `${NAMESPACE}_shafts`)
+    ).toMatchObject({
+      type: "expression",
+      folderId: FOLDER_ID,
+      // Desmos drops colorLatex from setExpression and ignores the
+      // set-item-colorLatex action, so a regression here means every arrow
+      // silently renders in the same flat color.
+      colorLatex: "v_{tfdc}",
+    });
+    expect(
+      items.find((item) => item.id === `${NAMESPACE}_p_function`)
+    ).toMatchObject({
+      latex: "v_{tfdp}\\left(x,y\\right)=\\left(-y\\right)",
+      hidden: true,
+    });
+    const semanticSnapshot = await driver.evaluate(
+      (namespace) =>
+        Calc.controller
+          .getAllItemModels()
+          .filter((item) => item.id.startsWith(`${namespace}_`))
+          .map((item) => {
+            const expression = item as typeof item & {
+              formula?: { expression_type?: string };
+              error?: unknown;
+            };
+            return {
+              id: item.id,
+              expressionType: expression.formula?.expression_type,
+              hasError: expression.error !== undefined,
+              error:
+                expression.error === undefined
+                  ? undefined
+                  : JSON.stringify(expression.error),
+            };
+          }),
+      NAMESPACE
+    );
+    expect(semanticSnapshot).toHaveLength(20);
+    expect(semanticSnapshot.filter((item) => item.hasError)).toEqual([]);
+    await driver.click(GENERATE);
+    await driver.waitForSync();
+    items = (await driver.getState()).expressions.list;
+    expect(
+      items.filter((item) => item.id?.startsWith(`${NAMESPACE}_`))
+    ).toHaveLength(20);
+
+    await driver.evaluate(
+      (id) => Calc.setExpression({ id, latex: "y=x^2" }),
+      UNRELATED_LINE_ID
+    );
+    await driver.waitForSync();
+    await driver.click(REMOVE);
+    await driver.waitForSync();
+
+    items = (await driver.getState()).expressions.list;
+    expect(items.find((item) => item.id === FOLDER_ID)).toBeUndefined();
+    expect(
+      items.find((item) => item.id?.startsWith(`${NAMESPACE}_`))
+    ).toBeUndefined();
+    expect(items.find((item) => item.id === UNRELATED_LINE_ID)).toMatchObject({
+      type: "expression",
+      latex: "y=x^2",
+    });
+
+    await driver.disablePlugin("vector-tools");
+    await driver.assertSelectorNot(BUTTON, PANEL);
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    expect(await driver.$$(BUTTON)).toHaveLength(1);
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+
+    return clean;
+  },
+  90000
+);
+
+/** Chips replaced the panel's dropdowns; this is how one is read and pressed. */
+const selectedChip = (label: string) =>
+  [
+    ...document.querySelectorAll<HTMLElement>(
+      `.dsm-vector-tools-menu [aria-label="${label}"] .dsm-vector-tools-chip`
+    ),
+  ].find((chip) => chip.getAttribute("aria-pressed") === "true")?.dataset.value;
+
+/**
+ * `evaluate` stringifies its callback, so nothing from module scope is in
+ * scope inside one. Read the stored config through its own round trip.
+ */
+const storedConfig = async (driver: Driver) =>
+  await driver.evaluate(() =>
+    JSON.parse(
+      DSM.pluginSettings["vector-tools"]!.serializedFieldConfig as string
+    )
+  );
+
+async function openTab(driver: Driver, index: number) {
+  await driver.click(
+    `.dsm-vector-tools-tabs .dcg-segmented-control-btn:nth-child(${index + 1})`
+  );
+}
+
+testWithPage(
+  "Vector Tools panel controls show the stored configuration",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+
+    // The panel opens on Field, and its sampling chips reflect stored state.
+    expect(await driver.evaluate(selectedChip, "Sampling by")).toBe("step");
+
+    // Number inputs must be unique per axis, or the labels point at the wrong
+    // field and the y axis mirrors the x axis.
+    const numberIDs = await driver.evaluate(() =>
+      [
+        ...document.querySelectorAll(
+          ".dsm-vector-tools-menu input[type=number]"
+        ),
+      ].map((input) => input.id)
+    );
+    expect(new Set(numberIDs).size).toBe(numberIDs.length);
+    expect(numberIDs).toContain("dsm-vector-tools-x-minimum");
+    expect(numberIDs).toContain("dsm-vector-tools-y-minimum");
+
+    // DCGView writes props as attributes, and `disabled="false"` still
+    // disables an input, so every number field used to be unusable.
+    const disabled = await driver.evaluate(() =>
+      [
+        ...document.querySelectorAll<HTMLInputElement>(
+          ".dsm-vector-tools-menu input[type=number]"
+        ),
+      ].map((input) => input.disabled)
+    );
+    expect(disabled).not.toContain(true);
+
+    // Typing must actually reach the stored configuration.
+    await driver.page.click("#dsm-vector-tools-x-minimum", { clickCount: 3 });
+    await driver.page.keyboard.type("-4");
+    await driver.waitForSync();
+    expect((await storedConfig(driver)).domain.x.min).toBe(-4);
+
+    await openTab(driver, 1);
+    expect(await driver.evaluate(selectedChip, "Length mode")).toBe(
+      "normalized"
+    );
+    await driver.click('[aria-label="Length mode"] [data-value="compressed"]');
+    await driver.waitForSync();
+    expect(await driver.evaluate(selectedChip, "Length mode")).toBe(
+      "compressed"
+    );
+
+    await driver.click(RESET);
+    await driver.waitForSync();
+    expect(await driver.evaluate(selectedChip, "Length mode")).toBe(
+      "normalized"
+    );
+
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);
+
+testWithPage(
+  "Vector Tools panel is resizable and its popover grows with it",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+
+    // Resizing is a corner drag on the panel itself, so the size has to be
+    // read back off the element and persisted.
+    await driver.evaluate(() => {
+      const menu = document.querySelector<HTMLElement>(
+        ".dsm-vector-tools-menu"
+      )!;
+      menu.style.width = "470px";
+    });
+    // The size is debounced before it is written, and writing a plugin setting
+    // is itself deferred, so wait for the value rather than for a duration.
+    await driver.page.waitForFunction(
+      () =>
+        JSON.parse(
+          (window as unknown as { DSM: { pluginSettings: any } }).DSM
+            .pluginSettings["vector-tools"].serializedFieldConfig
+        ).panel.width === 470
+    );
+
+    const geometry = await driver.evaluate(() => {
+      const menu = document.querySelector<HTMLElement>(
+        ".dsm-vector-tools-menu"
+      )!;
+      const popover = menu.closest<HTMLElement>(".dsm-pillbox-popover")!;
+      const body = menu.querySelector<HTMLElement>(".dsm-vector-tools-body")!;
+      return {
+        resize: getComputedStyle(menu).resize,
+        menuWidth: Math.round(menu.getBoundingClientRect().width),
+        // A fixed-width pillbox popover would clip the resized panel.
+        popoverWidth: Math.round(popover.getBoundingClientRect().width),
+        // The body scrolls so the tabs and action buttons stay put.
+        bodyScrolls: body.scrollHeight > body.clientHeight,
+        footerPresent: menu.querySelector(".dsm-vector-tools-footer") !== null,
+        storedWidth: JSON.parse(
+          DSM.pluginSettings["vector-tools"]!.serializedFieldConfig as string
+        ).panel.width,
+      };
+    });
+    expect(geometry.resize).toBe("both");
+    expect(geometry.menuWidth).toBe(470);
+    expect(geometry.popoverWidth).toBe(470);
+    expect(geometry.bodyScrolls).toBe(true);
+    expect(geometry.footerPresent).toBe(true);
+    expect(geometry.storedWidth).toBe(470);
+
+    // Closing and reopening must bring the panel back at the chosen size.
+    await driver.click(BUTTON);
+    await driver.assertSelectorNot(PANEL);
+    await driver.click(BUTTON);
+    expect(
+      await driver.evaluate(() =>
+        Math.round(
+          document
+            .querySelector(".dsm-vector-tools-menu")!
+            .getBoundingClientRect().width
+        )
+      )
+    ).toBe(470);
+
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);
+
+testWithPage(
+  "Vector Tools mirrors P and Q through the expression list",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+
+    await driver.click(".dsm-vector-tools-link-components");
+    await driver.waitForSync();
+
+    // Only the folder and the two definitions: this must not conjure a whole
+    // field the user did not ask to generate.
+    expect(
+      await driver.evaluate(() =>
+        Calc.getState()
+          .expressions.list.filter((item) =>
+            item.id?.startsWith("vector_tools_vf_default")
+          )
+          .map((item) => item.id)
+      )
+    ).toEqual([
+      FOLDER_ID,
+      `${NAMESPACE}_p_function`,
+      `${NAMESPACE}_q_function`,
+    ]);
+
+    // Editing the definition in the expression list reaches the panel.
+    await driver.evaluate(() =>
+      Calc.controller.dispatch({
+        type: "set-item-latex",
+        id: "vector_tools_vf_default_p_function",
+        latex: "v_{tfdp}\\left(x,y\\right)=\\left(-3y\\right)",
+      })
+    );
+    await driver.waitForSync();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect((await storedConfig(driver)).components).toEqual({
+      xLatex: "-3y",
+      yLatex: "x",
+    });
+
+    // A definition renamed out from under the plugin is reported, not adopted.
+    await driver.evaluate(() =>
+      Calc.controller.dispatch({
+        type: "set-item-latex",
+        id: "vector_tools_vf_default_q_function",
+        latex: "g\\left(x,y\\right)=x",
+      })
+    );
+    await driver.waitForSync();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const afterRename = await driver.evaluate(() => ({
+      hint: document.querySelector(
+        ".dsm-vector-tools-link-row .dsm-vector-tools-hint"
+      )?.textContent,
+      components: JSON.parse(
+        DSM.pluginSettings["vector-tools"]!.serializedFieldConfig as string
+      ).components,
+    }));
+    expect(afterRename.hint).toContain("no longer matches");
+    expect(afterRename.components.yLatex).toBe("x");
+
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);
+
+testWithPage(
+  "Vector Tools generates a gradient field Desmos differentiates itself",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+    await openTab(driver, 0);
+
+    await driver.click('[aria-label="Field from"] [data-value="gradient"]');
+    await driver.waitForSync();
+    expect((await storedConfig(driver)).source).toBe("gradient");
+
+    await driver.click(GENERATE);
+    await driver.waitForSync();
+
+    const items = (await driver.getState()).expressions.list;
+    // The scalar joins the folder, and P and Q become its partials.
+    expect(
+      items.find((item) => item.id === `${NAMESPACE}_f_function`)
+    ).toMatchObject({
+      latex: "v_{tfdf}\\left(x,y\\right)=\\left(x^{2}+y^{2}\\right)",
+      hidden: true,
+    });
+    expect(
+      items.find((item) => item.id === `${NAMESPACE}_p_function`)
+    ).toMatchObject({
+      latex:
+        "v_{tfdp}\\left(x,y\\right)=\\left(\\frac{d}{dx}v_{tfdf}\\left(x,y\\right)\\right)",
+    });
+    expect(
+      items.filter((item) => item.id?.startsWith(`${NAMESPACE}_`))
+    ).toHaveLength(21);
+
+    // Nothing errors, and the derivative is Desmos's own, so it is exact
+    // rather than approximated: ∇(x²+y²) = (2x, 2y).
+    const evaluated = await driver.evaluate(async () => {
+      const read = async (latex: string) => {
+        const helper = Calc.HelperExpression({ latex });
+        return await new Promise<number>((resolve) => {
+          const timer = setTimeout(() => resolve(Number.NaN), 3000);
+          helper.observe("numericValue", () => {
+            clearTimeout(timer);
+            resolve(helper.numericValue);
+          });
+        });
+      };
+      return {
+        p: await read("v_{tfdp}\\left(3,4\\right)"),
+        q: await read("v_{tfdq}\\left(3,4\\right)"),
+        errors: Calc.controller
+          .getAllItemModels()
+          .filter(
+            (item) =>
+              item.id.startsWith("vector_tools_vf_default_") &&
+              (item as { error?: unknown }).error !== undefined
+          )
+          .map((item) => item.id),
+      };
+    });
+    expect(evaluated.p).toBe(6);
+    expect(evaluated.q).toBe(8);
+    expect(evaluated.errors).toEqual([]);
+
+    // Editing f in the panel has to rewrite the derived components too, or the
+    // graph keeps the old gradient.
+    await driver.evaluate(() => {
+      // The panel calls this from its math input; reaching it directly keeps
+      // the test off MathQuill's keystroke handling.
+      (
+        DSM.enabledPlugins["vector-tools"] as unknown as {
+          setSlot: (slot: string, latex: string) => void;
+        }
+      ).setSlot("f", "x^{3}");
+    });
+    await driver.waitForSync();
+    expect(
+      (await driver.getState()).expressions.list.find(
+        (item) => item.id === `${NAMESPACE}_f_function`
+      )
+    ).toMatchObject({
+      latex: "v_{tfdf}\\left(x,y\\right)=\\left(x^{3}\\right)",
+    });
+    expect(
+      await driver.evaluate(async () => {
+        const helper = Calc.HelperExpression({
+          latex: "v_{tfdp}\\left(2,0\\right)",
+        });
+        return await new Promise<number>((resolve) => {
+          const timer = setTimeout(() => resolve(Number.NaN), 3000);
+          helper.observe("numericValue", () => {
+            clearTimeout(timer);
+            resolve(helper.numericValue);
+          });
+        });
+      })
+    ).toBe(12);
+
+    await driver.click(REMOVE);
+    await driver.waitForSync();
+    await driver.click('[aria-label="Field from"] [data-value="components"]');
+    await driver.waitForSync();
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+    // Plugin settings are written to extension storage on a delay, and every
+    // later test opens a fresh page that reads them back. Without this the
+    // source would still be `gradient` for the rest of the run.
+    await driver.page.waitForFunction(() => !DSM.delaySetPluginSettings);
+  },
+  90000
+);
+
+testWithPage(
+  "Vector Tools fills the sampling domain from the visible graph",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+    // The open tab is persisted, so this test cannot assume the panel opens on
+    // the tab that holds the sampling domain.
+    await openTab(driver, 0);
+
+    await driver.evaluate(() =>
+      Calc.setMathBounds({ left: -3, right: 7, bottom: -2, top: 5 })
+    );
+    await driver.waitForSync();
+    await driver.click(".dsm-vector-tools-match-viewport");
+    await driver.waitForSync();
+
+    // Desmos adjusts the requested bounds to the graph paper's aspect ratio, so
+    // the check is against what the viewport actually became.
+    const { domain, bounds } = await driver.evaluate(() => ({
+      domain: JSON.parse(
+        DSM.pluginSettings["vector-tools"]!.serializedFieldConfig as string
+      ).domain,
+      bounds: Calc.graphpaperBounds.mathCoordinates,
+    }));
+    const round = (value: number) => Math.round(value * 1000) / 1000;
+    expect(domain.x.min).toBe(round(bounds.left));
+    expect(domain.x.max).toBe(round(bounds.right));
+    expect(domain.y.min).toBe(round(bounds.bottom));
+    expect(domain.y.max).toBe(round(bounds.top));
+    expect(domain.x.min).toBe(-3);
+    expect(domain.x.max).toBe(7);
+    // Only the four bounds move: the sampling mode and step are the user's.
+    expect(domain.x.mode).toBe("step");
+    expect(domain.x.step).toBe(1);
+
+    // The panel's own number fields have to show the new bounds too.
+    expect(
+      await driver.evaluate(
+        () =>
+          document.querySelector<HTMLInputElement>(
+            "#dsm-vector-tools-x-maximum"
+          )?.value
+      )
+    ).toBe("7");
+
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);
+
+testWithPageAndOpts(
+  "Vector Tools flow visualizer runs on the geometry graph paper",
+  { path: "/geometry", timeout: 90000 },
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+    await openTab(driver, 3);
+
+    await driver.click(VISUALIZE);
+    await driver.assertSelectorEventually(FLOW_CANVAS);
+
+    // Geometry is the same 2D graph paper, so the overlay registers with it
+    // exactly as it does in the calculator.
+    const geometry = await driver.evaluate(() => {
+      const overlay = document.querySelector<HTMLCanvasElement>(
+        "#dsm-vector-tools-flow-canvas"
+      )!;
+      const graph = document.querySelector<HTMLCanvasElement>(
+        "canvas.dcg-graph-inner"
+      )!;
+      const a = overlay.getBoundingClientRect();
+      const b = graph.getBoundingClientRect();
+      return {
+        aligned:
+          Math.abs(a.x - b.x) < 1 &&
+          Math.abs(a.y - b.y) < 1 &&
+          Math.abs(a.width - b.width) < 1 &&
+          Math.abs(a.height - b.height) < 1,
+        pointerEvents: getComputedStyle(overlay).pointerEvents,
+        hasBuffer: overlay.width > 0 && overlay.height > 0,
+      };
+    });
+    expect(geometry.aligned).toBe(true);
+    expect(geometry.pointerEvents).toBe("none");
+    expect(geometry.hasBuffer).toBe(true);
+
+    await driver.disablePlugin("vector-tools");
+    await driver.assertSelectorNot(FLOW_CANVAS);
+  }
+);
+
+testWithPageAndOpts(
+  "Vector Tools refuses to flow over the 3D calculator",
+  { path: "/3d", timeout: 90000 },
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+    await openTab(driver, 3);
+
+    // The overlay maps math coordinates linearly onto the graph paper's rect,
+    // which the 3D product's rotatable x/y/z box does not support — and the 3D
+    // canvas paints over the overlay anyway. Say so instead of animating a
+    // wrong, invisible field.
+    const state = await driver.evaluate(() => ({
+      disabled: document
+        .querySelector(".dsm-vector-tools-visualize")
+        ?.classList.contains("dsm-btn-disabled"),
+      warning: document.querySelector(
+        ".dsm-vector-tools-flow .dsm-vector-tools-warning"
+      )?.textContent,
+    }));
+    expect(state.disabled).toBe(true);
+    expect(state.warning).toContain("3D calculator");
+
+    await driver.click(VISUALIZE);
+    await driver.assertSelectorNot(FLOW_CANVAS);
+    // Generation is unaffected: the field is ordinary Desmos expressions.
+    await driver.click(GENERATE);
+    await driver.waitForSync();
+    expect(
+      (await driver.getState()).expressions.list.filter((item) =>
+        item.id?.startsWith(`${NAMESPACE}_`)
+      )
+    ).toHaveLength(20);
+
+    await driver.click(REMOVE);
+    await driver.waitForSync();
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  }
+);
+
+testWithPage(
+  "Vector Tools flow visualizer covers the graph paper and cleans up after itself",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+    await openTab(driver, 3);
+
+    await driver.assertSelectorNot(FLOW_CANVAS);
+    await driver.click(VISUALIZE);
+    await driver.assertSelectorEventually(FLOW_CANVAS);
+
+    const geometry = await driver.evaluate(() => {
+      const overlay = document.querySelector<HTMLCanvasElement>(
+        "#dsm-vector-tools-flow-canvas"
+      )!;
+      const graph = document.querySelector<HTMLCanvasElement>(
+        "canvas.dcg-graph-inner"
+      )!;
+      const a = overlay.getBoundingClientRect();
+      const b = graph.getBoundingClientRect();
+      return {
+        aligned:
+          Math.abs(a.x - b.x) < 1 &&
+          Math.abs(a.y - b.y) < 1 &&
+          Math.abs(a.width - b.width) < 1 &&
+          Math.abs(a.height - b.height) < 1,
+        pointerEvents: getComputedStyle(overlay).pointerEvents,
+        hasBuffer: overlay.width > 0 && overlay.height > 0,
+        // The overlay must sit above the graph paper, not replace it.
+        drawnAfterGraph:
+          graph.compareDocumentPosition(overlay) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      };
+    });
+    expect(geometry.aligned).toBe(true);
+    expect(geometry.pointerEvents).toBe("none");
+    expect(geometry.hasBuffer).toBe(true);
+    expect(geometry.drawnAfterGraph).toBeGreaterThan(0);
+
+    // Particle count is a free number, not a menu of fixed sizes.
+    await driver.page.click("#dsm-vector-tools-particle-count", {
+      clickCount: 3,
+    });
+    await driver.page.keyboard.type("37500");
+    await driver.page.keyboard.press("Tab");
+    await driver.waitForSync();
+    expect((await storedConfig(driver)).flow.particleCount).toBe(37500);
+
+    // A component the GPU cannot evaluate must disable the button with a
+    // reason rather than failing when it is pressed.
+    await driver.evaluate(() => {
+      const config = JSON.parse(
+        DSM.pluginSettings["vector-tools"]!.serializedFieldConfig as string
+      );
+      config.components.xLatex = "a_{1}";
+      DSM.setPluginSetting(
+        "vector-tools",
+        "serializedFieldConfig",
+        JSON.stringify(config)
+      );
+    });
+    await driver.waitForSync();
+    expect(
+      await driver.evaluate(
+        () =>
+          document.querySelector(
+            ".dsm-vector-tools-flow .dsm-vector-tools-warning"
+          )?.textContent
+      )
+    ).toContain("refers to another expression");
+
+    await driver.disablePlugin("vector-tools");
+    await driver.assertSelectorNot(FLOW_CANVAS);
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);
+
+/**
+ * The parts of the frame that only a GPU can answer for: that the pipeline
+ * still paints after the vertex arrays were shared between programs, that
+ * render scale really does shrink the buffer being filled, and that a drag —
+ * which arrives as a burst of bounds changes — reprojects the trails instead of
+ * erroring or wiping them.
+ */
+testWithPage(
+  "Vector Tools flow visualizer paints, scales, and survives a drag",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.evaluate(() => {
+      (DSM.enabledPlugins["vector-tools"] as any).toggleFlow();
+    });
+    await driver.assertSelectorEventually(FLOW_CANVAS);
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+
+    /**
+     * Opaque pixels in the drawing buffer, read inside a frame callback.
+     * `preserveDrawingBuffer` is off, so this is only valid before the frame
+     * is composited away.
+     */
+    const litPixels = async () =>
+      await driver.evaluate(
+        async () =>
+          await new Promise<number>((resolve) => {
+            requestAnimationFrame(() => {
+              const canvas = document.querySelector<HTMLCanvasElement>(
+                "#dsm-vector-tools-flow-canvas"
+              )!;
+              const gl = canvas.getContext("webgl2")!;
+              const pixels = new Uint8Array(canvas.width * canvas.height * 4);
+              gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+              gl.readPixels(
+                0,
+                0,
+                canvas.width,
+                canvas.height,
+                gl.RGBA,
+                gl.UNSIGNED_BYTE,
+                pixels
+              );
+              let lit = 0;
+              for (let i = 3; i < pixels.length; i += 4) {
+                if (pixels[i] > 8) lit++;
+              }
+              resolve(lit);
+            });
+          })
+      );
+    const canvasSize = async () =>
+      await driver.evaluate(() => {
+        const canvas = document.querySelector<HTMLCanvasElement>(
+          "#dsm-vector-tools-flow-canvas"
+        )!;
+        const gl = canvas.getContext("webgl2")!;
+        return {
+          buffer: canvas.width,
+          css: canvas.clientWidth,
+          error: gl.getError(),
+        };
+      });
+
+    const full = await canvasSize();
+    expect(full.error, "the flow reported a WebGL error").toBe(0);
+    // Something has to actually be on the canvas; a broken vertex binding
+    // would leave it perfectly empty while everything else still looked fine.
+    expect(await litPixels()).toBeGreaterThan(full.buffer * 4);
+
+    // Half the render scale is a quarter of the pixels, with the element and
+    // its layout untouched.
+    await driver.evaluate(() => {
+      (DSM.enabledPlugins["vector-tools"] as any).setFlow("renderScale", 0.5);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const halved = await canvasSize();
+    expect(halved.buffer).toBe(Math.round(full.buffer / 2));
+    expect(halved.css).toBe(full.css);
+    expect(await litPixels()).toBeGreaterThan(halved.buffer * 4);
+
+    // A drag is a burst of bounds changes, not one. Reprojecting on each has
+    // to leave the visualizer running and error-free.
+    await driver.evaluate(() => {
+      for (let i = 1; i <= 20; i++) {
+        Calc.setMathBounds({
+          left: -10 + i * 0.1,
+          right: 10 + i * 0.1,
+          bottom: -6,
+          top: 6,
+        });
+      }
+    });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const panned = await canvasSize();
+    expect(panned.error, "panning left the flow in a WebGL error state").toBe(
+      0
+    );
+    expect(
+      await driver.evaluate(
+        () => (DSM.enabledPlugins["vector-tools"] as any).flowStatus
+      )
+    ).toContain("Streaming");
+    expect(await litPixels()).toBeGreaterThan(panned.buffer * 4);
+
+    await driver.disablePlugin("vector-tools");
+    await driver.assertSelectorNot(FLOW_CANVAS);
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);
+
+const ARROW_CANVAS = "#dsm-vector-tools-arrow-canvas";
+
+/**
+ * The live arrows are the half of the plugin Desmos does not draw, so nothing
+ * about them shows up in the expression list. What can be checked is that they
+ * mount, that they follow the configuration, and that choosing Desmos instead
+ * puts the graph back the way it was.
+ */
+testWithPage(
+  "Vector Tools draws arrows itself, and hands them back to Desmos on request",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    // The configuration persists across tests on a shared page, so this starts
+    // from the defaults and puts them back before it leaves.
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).resetConfig()
+    );
+    /**
+     * Settings are written asynchronously and the arrows follow a tick later,
+     * so the count is what to wait on rather than a fixed pause.
+     */
+    const waitForArrows = async (count: number) =>
+      await driver.waitForFunction(
+        (expected: number) =>
+          ((DSM.enabledPlugins["vector-tools"] as any)
+            .arrowStatus as string) === `Drawing ${expected} arrows live.`,
+        {},
+        count
+      );
+    await waitForArrows(273);
+
+    const vt = async () =>
+      await driver.evaluate(() => {
+        const plugin = DSM.enabledPlugins["vector-tools"] as any;
+        const canvas = document.querySelector<HTMLCanvasElement>(
+          "#dsm-vector-tools-arrow-canvas"
+        );
+        return {
+          mode: plugin.arrowMode as string,
+          status: plugin.arrowStatus as string,
+          mounted: canvas !== null,
+          // A zero-sized drawing buffer would mount and draw nothing at all.
+          width: canvas?.width ?? 0,
+          expressions: Calc.getState().expressions.list.length,
+        };
+      });
+
+    // Live is the default, so enabling the plugin is enough to see the field.
+    await driver.assertSelectorEventually(ARROW_CANVAS);
+    const live = await vt();
+    expect(live.mode).toBe("live");
+    expect(live.mounted).toBe(true);
+    expect(live.width).toBeGreaterThan(0);
+    expect(live.status).toContain("273");
+    // Nothing was written to the expression list to get that picture.
+    expect(live.expressions).toBe(1);
+
+    // The grid follows the sampling domain, so a coarser axis means fewer.
+    await driver.evaluate(() => {
+      const plugin = DSM.enabledPlugins["vector-tools"] as any;
+      plugin.setAxis("x", "mode", "count");
+      plugin.setAxis("x", "count", 11);
+    });
+    await waitForArrows(143);
+
+    // Handing the arrows back to Desmos takes the canvas away entirely.
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).setArrowMode("desmos")
+    );
+    await driver.assertSelectorNot(ARROW_CANVAS);
+    const generated = await vt();
+    expect(generated.mode).toBe("desmos");
+    expect(generated.mounted).toBe(false);
+    await driver.assertSelectorNot(ARROW_CANVAS);
+
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).setArrowMode("live")
+    );
+    await driver.assertSelectorEventually(ARROW_CANVAS);
+
+    // Off is neither of the other two: nothing is drawn, and nothing is
+    // written either.
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).setArrowMode("off")
+    );
+    await driver.assertSelectorNot(ARROW_CANVAS);
+    expect((await vt()).status).toBe("Arrows are off.");
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).setArrowMode("live")
+    );
+    await waitForArrows(143);
+
+    // A domain matched to a zoomed-out viewport asks for far more arrows than
+    // there are pixels. That is thinned by default and drawn in full on
+    // request — the point of drawing here rather than through Desmos.
+    await driver.evaluate(() => {
+      const plugin = DSM.enabledPlugins["vector-tools"] as any;
+      plugin.setAxis("x", "mode", "step");
+      plugin.setAxis("x", "min", -400);
+      plugin.setAxis("x", "max", 400);
+      plugin.setAxis("y", "min", -233);
+      plugin.setAxis("y", "max", 233);
+    });
+    await driver.waitForFunction(() =>
+      (
+        (DSM.enabledPlugins["vector-tools"] as any).arrowStatus as string
+      ).includes("of 374067 arrows")
+    );
+    expect((await vt()).status).toContain("sampled coarsely");
+    expect(
+      (await driver.evaluate(
+        () => (DSM.enabledPlugins["vector-tools"] as any).arrowViewport
+      )) !== undefined
+    ).toBe(true);
+
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).setArrowDensityLimit(false)
+    );
+    await waitForArrows(374067);
+    // Turning it back on is what the rest of this test assumes.
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).resetConfig()
+    );
+    await waitForArrows(273);
+
+    // Changing a setting re-measures the field's magnitude range, and that
+    // pass renders into a grid-sized buffer of its own. Leaving the viewport
+    // at that size drew the whole field into a corner — a failure nothing but
+    // the pixels could see, so what the frame drew into is checked directly.
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).setColor(
+        "palette",
+        "sequential-a"
+      )
+    );
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const viewport = await driver.evaluate(
+      () => (DSM.enabledPlugins["vector-tools"] as any).arrowViewport
+    );
+    expect(viewport.drawn).toEqual(viewport.canvas);
+    expect(viewport.drawn.width).toBeGreaterThan(100);
+
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).resetConfig()
+    );
+
+    // Disabling the plugin has to leave the page as it found it.
+    await driver.disablePlugin("vector-tools");
+    await driver.assertSelectorNot(ARROW_CANVAS);
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);

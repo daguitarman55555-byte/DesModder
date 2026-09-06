@@ -1,0 +1,121 @@
+import { clean, testWithPage } from "../../tests/puppeteer-utils";
+import type { Calc as CalcType } from "#globals";
+
+declare let Calc: CalcType;
+declare let DSM: Window["DSM"];
+
+interface Symbolic {
+  partialDerivative: (
+    latex: string,
+    variable: string
+  ) => { ok: true; latex: string } | { ok: false; error: string };
+  gradient: (
+    latex: string,
+    variables?: readonly string[]
+  ) =>
+    | { ok: true; variables: string[]; latex: string[] }
+    | { ok: false; error: string };
+}
+
+/**
+ * The unit tests pin the derivative rules. This checks the two things only a
+ * real Desmos can answer: that Desmos's parser feeds the differentiator what it
+ * expects, and that the LaTeX it emits is something Desmos evaluates back to
+ * the right numbers.
+ */
+testWithPage(
+  "Vector Tools differentiates real Desmos expressions symbolically",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+
+    const derivatives = await driver.evaluate(() => {
+      const plugin = DSM.enabledPlugins["vector-tools"] as unknown as Symbolic;
+      return {
+        // The case that motivates the whole thing: f(x,y)=2xy, so ∂f/∂x = 2y.
+        product: plugin.partialDerivative("2xy", "x"),
+        productY: plugin.partialDerivative("2xy", "y"),
+        polynomial: plugin.partialDerivative("x^{3}+y^{2}", "x"),
+        chain: plugin.partialDerivative("\\sin\\left(xy\\right)", "y"),
+        quotient: plugin.partialDerivative("\\frac{x}{y}", "x"),
+        // Refused rather than guessed.
+        unknown: plugin.partialDerivative("\\operatorname{mystery}(x)", "x"),
+      };
+    });
+    expect(derivatives.product).toEqual({ ok: true, latex: "2y" });
+    expect(derivatives.productY).toEqual({ ok: true, latex: "2x" });
+    expect(derivatives.polynomial).toEqual({ ok: true, latex: "3x^{2}" });
+    expect(derivatives.unknown.ok).toBe(false);
+
+    // Whatever spelling it emits, Desmos has to accept it and get the right
+    // number. This is the check that a string comparison cannot make.
+    const evaluated = await driver.evaluate(
+      async (latexes) => {
+        const read = async (latex: string) => {
+          const helper = Calc.HelperExpression({ latex });
+          return await new Promise<number>((resolve) => {
+            const timer = setTimeout(() => resolve(Number.NaN), 3000);
+            helper.observe("numericValue", () => {
+              clearTimeout(timer);
+              resolve(helper.numericValue);
+            });
+          });
+        };
+        const out: Record<string, number> = {};
+        for (const [name, latex] of Object.entries(latexes)) {
+          // Wrapping in a definition evaluates the emitted LaTeX exactly as
+          // Desmos would use it, with no substitution into the string.
+          Calc.setBlank();
+          Calc.setExpression({
+            id: "g",
+            latex: `g_{1}\\left(x,y\\right)=${latex}`,
+          });
+          out[name] = await read("g_{1}\\left(3,4\\right)");
+        }
+        Calc.setBlank();
+        return out;
+      },
+      {
+        // d/dy sin(xy) = x cos(xy); at (3,4) that is 3cos(12).
+        chain: (derivatives.chain as { latex: string }).latex,
+        // d/dx (x/y) at (3,4) is 1/4.
+        quotient: (derivatives.quotient as { latex: string }).latex,
+      }
+    );
+    expect(evaluated.chain).toBeCloseTo(3 * Math.cos(12), 9);
+    expect(evaluated.quotient).toBeCloseTo(0.25, 9);
+
+    // The gradient adapts to whichever variables the expression uses, which is
+    // what lets ∇ work for f(x,y) and f(u,v,w) alike.
+    const gradients = await driver.evaluate(() => {
+      const plugin = DSM.enabledPlugins["vector-tools"] as unknown as Symbolic;
+      return {
+        twoVariables: plugin.gradient("x^{2}+y^{2}"),
+        threeVariables: plugin.gradient("uvw"),
+        explicit: plugin.gradient("x^{2}", ["x", "y"]),
+      };
+    });
+    expect(gradients.twoVariables).toEqual({
+      ok: true,
+      variables: ["x", "y"],
+      latex: ["2x", "2y"],
+    });
+    expect(gradients.threeVariables).toEqual({
+      ok: true,
+      variables: ["u", "v", "w"],
+      latex: ["vw", "uw", "uv"],
+    });
+    // Naming the arguments keeps a variable that does not appear, so a field
+    // built from f(x,y)=x² still gets both components.
+    expect(gradients.explicit).toEqual({
+      ok: true,
+      variables: ["x", "y"],
+      latex: ["2x", "0"],
+    });
+
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+    return clean;
+  },
+  90000
+);

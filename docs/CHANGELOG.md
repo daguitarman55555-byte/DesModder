@@ -1,5 +1,44 @@
 # DesModder Changelog
 
+## 0.15.17
+
+Bug fixes:
+
+- (Calculator Settings) Fix "Show IDs" option.
+- (Video Creator) Only show "ticks" option when relevant (a slider is running, or in 3d and the cube is spinning).
+- (Video Creator) Avoid duplicated arrow keys in math fields.
+- (Find and Replace) Stop showing the virtual keypad on the replace buttons.
+
+## 0.15.16
+
+Bug fixes and enhancements:
+
+- (Syntax Highlighting) Square brackets now have normal thickness again.
+- (Syntax Highlighting) Commas match the colors of their containers again.
+- (Video Creator) Fix focus problems with the mathquill fields.
+- (Find and Replace) Keep delete buttons around when replace buttons are shown.
+
+Translations:
+
+- Updates to Spanish translations.
+
+## 0.15.15
+
+New features:
+
+- (Video Creator) Arrow left and right between input fields.
+
+Bug fixes:
+
+- (Video Creator, Find-Replace) The virtual keypad should work on the input fields again.
+- (Multiline Expressions) No longer affects layout when expressions are not multiline.
+
+## 0.15.14
+
+New features:
+
+- (Find replace) Support find-replace within a folder, and within a single expression.
+
 ## 0.15.13
 
 Bug fixes:

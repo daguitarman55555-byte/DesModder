@@ -3,13 +3,27 @@ import { GraphState, ItemState, Product } from "../../graph-state";
 import { MathQuillConfig, MathQuillField } from "#components";
 import { Matrix3 } from "./matrix3";
 import type { DispatchedEvent } from "./extra-actions";
+import { VcFocusedMq } from "../plugins/video-creator/index.ts";
 
 export type { DispatchedEvent };
 
 export type FocusLocation =
   | { type: "expression"; id: string }
-  | { type: "dsm-focus"; plugin: "video-creator"; id: string }
-  | { type: "dsm-focus"; plugin: "find-and-replace"; id: "replace-bar" }
+  | { type: "dsm-focus"; plugin: "video-creator"; kind: VcFocusedMq }
+  | {
+      type: "dsm-focus";
+      plugin: "find-and-replace";
+      kind: "replace-button";
+      id: string;
+    }
+  | { type: "dsm-focus"; plugin: "find-and-replace"; kind: "replace-bar" }
+  | {
+      type: "dsm-focus";
+      plugin: "code-golf";
+      /** Should be unreachable; just using to guarantee compatability with `manageFocusHelper`. */
+      kind: "dummy-mq";
+    }
+  | { type: "dsm-focus"; plugin: "vector-tools"; kind: "p" | "q" | "f" }
   | { type: "search-expressions" }
   | {
       /**
@@ -149,6 +163,7 @@ export type VanillaDispatchedEvent =
     }
   | { type: "set-folder-collapsed"; id: string; isCollapsed: boolean }
   | { type: "set-item-colorLatex"; id: string; colorLatex: string }
+  | { type: "rename-identifier-in-item"; id: string }
   | { type: "set-note-text"; id: string; text: string };
 
 /**
@@ -246,6 +261,15 @@ export interface Grapher3d {
 
 export type Scale = "linear" | "logarithmic";
 
+export type DsmFocusLocation = Extract<FocusLocation, { type: "dsm-focus" }>;
+
+export interface DesModderHooks {
+  isCurrentFocusLocationValid: (location: DsmFocusLocation) => boolean;
+  getFocusedItem: (location: DsmFocusLocation) => ItemModel | undefined;
+  isExpressionListFocused: (location: DsmFocusLocation) => boolean;
+  needsFakeKeypad: (location: DsmFocusLocation) => boolean;
+}
+
 interface CalcPrivate {
   withHistoryReplacement: (fn: () => void) => any;
   focusedMathQuill:
@@ -278,6 +302,7 @@ interface CalcPrivate {
     };
     dispatch: (e: DispatchedEvent) => void;
     getExpressionSearchStr: () => string;
+    getExpressionReplaceStr: () => string;
     dispatcher: {
       /** Make sure to save the result to a variable, and unregister
        * it in afterDisable. */
@@ -365,12 +390,14 @@ interface CalcPrivate {
     isUploadingImages: () => boolean;
     areImagesEnabled: () => boolean;
     scrollSelectedItemIntoView: () => void;
+    shouldShowReplaceIcon: () => boolean;
     s: (identifier: string, placeables?: Record<string, any> | null) => string;
     runAfterDispatch: (cb: () => void) => void;
     getEvaluatedDefaultViewport: () => {
       constructor: { fromObject: (vp: Viewport) => ViewportClass };
     };
     destroy: () => void;
+    dsmHooks: DesModderHooks;
   };
   /// / public
 

@@ -54,7 +54,7 @@ export function generateBracketPairColorizationCSS(settings: Config) {
 
         &:not(.dcg-mq-textcolor *, .dcg-base-case-btn *) {
           .dcg-mq-paren,
-          .dsm-mq-syntax-comma,
+          .dcg-mq-comma,
           *${colorInText ? "" : ":not(.dcg-mq-bracket-middle, .dcg-mq-bracket-middle *)"} {
             color: ${colorMaker};
           }
@@ -63,6 +63,10 @@ export function generateBracketPairColorizationCSS(settings: Config) {
         .dcg-mq-paren path {
           stroke-width: ${thickenBrackets}%;
           stroke: currentColor;
+
+          &[vector-effect="non-scaling-stroke"] {
+            stroke-width: calc(0.05em + ${thickenBrackets}%);
+          }
         }
 
         .dcg-mq-bracket-middle {

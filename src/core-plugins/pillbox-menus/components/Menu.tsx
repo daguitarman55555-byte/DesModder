@@ -44,6 +44,7 @@ const categoryPlugins: Record<string, PluginID[]> = {
     "pin-expressions",
     "find-and-replace",
     "performance-info",
+    "vector-tools",
     "right-click-tray",
     "duplicate-expression-hotkey",
     "folder-tools",
