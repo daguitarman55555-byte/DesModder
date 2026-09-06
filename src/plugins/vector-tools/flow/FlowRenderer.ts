@@ -872,7 +872,7 @@ void main() {
  * and `u_max` before it — which is what lets the gradient step size follow the
  * viewport without an extra uniform.
  */
-function fieldFunctions(field: FlowField) {
+export function fieldFunctions(field: FlowField) {
   const body =
     field.kind === "gradient"
       ? `

@@ -136,6 +136,35 @@ that is no longer the field's component. Writes in the other direction use
 `setExpression`, which merges into an existing expression and so leaves
 `folderId` and `colorLatex` on the rest of the field alone.
 
+## Who draws the arrows
+
+`config.arrowMode` chooses, and the two are not alternatives so much as two
+stages. **Live** is `flow/ArrowRenderer.ts`: one instance per grid point, the
+field evaluated in a vertex shader, geometry that exists only in that shader —
+nine vertices addressed by `gl_VertexID`, with no vertex buffer at all. It
+writes nothing to the expression list, has no vector cap worth naming, and
+redraws as the settings change. **Desmos** is the generator above, which is
+slower and capped but produces a graph that still works for someone without the
+extension. Live is the default because a tool for looking at a field should show
+one immediately; Generate is what commits it.
+
+Live arrows are their own canvas and so their own WebGL context, beside the
+flow's. The two want opposite things from a frame — the flow advects sixty times
+a second and fades its previous frame, the arrows are a still picture — so
+sharing a renderer would mean the arrows paying an animation loop's costs to sit
+still. `ArrowOverlay` redraws on a coalesced `requestAnimationFrame` when the
+view, the field or a setting changes, and not otherwise.
+
+Two details are load-bearing. The arrowhead is a filled triangle, which is the
+thing Desmos expressions cannot do — a head there is two line segments, because
+a filled one would be a polygon per arrow — and it is capped against the arrow's
+own length so a short vector keeps a visible shaft. And the colors are spread
+over the grid's real magnitude range, measured by rendering one texel per arrow
+into a float target and reading it back, because that is the span Desmos's `min`
+and `max` give the generated expressions. Without it the ramp has to be entered
+by a scale-free curve, and every arrow comes out at the hot end as soon as you
+zoom in.
+
 ## Flow visualizer
 
 `flow/` holds the only rendering code in the plugin. It is a deliberate,

@@ -793,3 +793,96 @@ testWithPage(
   },
   90000
 );
+
+const ARROW_CANVAS = "#dsm-vector-tools-arrow-canvas";
+
+/**
+ * The live arrows are the half of the plugin Desmos does not draw, so nothing
+ * about them shows up in the expression list. What can be checked is that they
+ * mount, that they follow the configuration, and that choosing Desmos instead
+ * puts the graph back the way it was.
+ */
+testWithPage(
+  "Vector Tools draws arrows itself, and hands them back to Desmos on request",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    // The configuration persists across tests on a shared page, so this starts
+    // from the defaults and puts them back before it leaves.
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).resetConfig()
+    );
+    /**
+     * Settings are written asynchronously and the arrows follow a tick later,
+     * so the count is what to wait on rather than a fixed pause.
+     */
+    const waitForArrows = async (count: number) =>
+      await driver.waitForFunction(
+        (expected: number) =>
+          ((DSM.enabledPlugins["vector-tools"] as any)
+            .arrowStatus as string) === `Drawing ${expected} arrows live.`,
+        {},
+        count
+      );
+    await waitForArrows(273);
+
+    const vt = async () =>
+      await driver.evaluate(() => {
+        const plugin = DSM.enabledPlugins["vector-tools"] as any;
+        const canvas = document.querySelector<HTMLCanvasElement>(
+          "#dsm-vector-tools-arrow-canvas"
+        );
+        return {
+          mode: plugin.arrowMode as string,
+          status: plugin.arrowStatus as string,
+          mounted: canvas !== null,
+          // A zero-sized drawing buffer would mount and draw nothing at all.
+          width: canvas?.width ?? 0,
+          expressions: Calc.getState().expressions.list.length,
+        };
+      });
+
+    // Live is the default, so enabling the plugin is enough to see the field.
+    await driver.assertSelectorEventually(ARROW_CANVAS);
+    const live = await vt();
+    expect(live.mode).toBe("live");
+    expect(live.mounted).toBe(true);
+    expect(live.width).toBeGreaterThan(0);
+    expect(live.status).toContain("273");
+    // Nothing was written to the expression list to get that picture.
+    expect(live.expressions).toBe(1);
+
+    // The grid follows the sampling domain, so a coarser axis means fewer.
+    await driver.evaluate(() => {
+      const plugin = DSM.enabledPlugins["vector-tools"] as any;
+      plugin.setAxis("x", "mode", "count");
+      plugin.setAxis("x", "count", 11);
+    });
+    await waitForArrows(143);
+
+    // Handing the arrows back to Desmos takes the canvas away entirely.
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).setArrowMode("desmos")
+    );
+    await driver.assertSelectorNot(ARROW_CANVAS);
+    const generated = await vt();
+    expect(generated.mode).toBe("desmos");
+    expect(generated.mounted).toBe(false);
+    await driver.assertSelectorNot(ARROW_CANVAS);
+
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).setArrowMode("live")
+    );
+    await driver.assertSelectorEventually(ARROW_CANVAS);
+
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).resetConfig()
+    );
+
+    // Disabling the plugin has to leave the page as it found it.
+    await driver.disablePlugin("vector-tools");
+    await driver.assertSelectorNot(ARROW_CANVAS);
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);

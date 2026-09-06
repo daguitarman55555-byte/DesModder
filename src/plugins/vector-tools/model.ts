@@ -31,6 +31,19 @@ export type ZeroVectorMode = "hide" | "point";
 export type FlowColorMode = "fixed" | "speed" | "direction";
 
 /**
+ * Who draws the arrows.
+ *
+ * `live` is this extension, on its own canvas: instant, uncapped, and with
+ * solid tapered arrowheads Desmos expressions cannot draw. `desmos` is the
+ * generator, which writes ordinary expressions — slower and capped, but the
+ * result is a graph that still works for someone without the extension.
+ *
+ * They are not exclusive. Live arrows are what you configure against; pressing
+ * Generate commits the same field to the expression list.
+ */
+export type ArrowMode = "live" | "desmos";
+
+/**
  * The two things a particle flow can be asked to show.
  *
  * Long-lived particles with long trails draw the field's *streamlines*, which
@@ -160,6 +173,8 @@ export interface VectorFieldConfig {
   arrowhead: ArrowheadConfig;
   color: VectorColorConfig;
   zeroVectorMode: ZeroVectorMode;
+  /** Whether the extension draws the arrows itself. */
+  arrowMode: ArrowMode;
   flow: FlowConfig;
   panel: PanelConfig;
 }
@@ -242,7 +257,7 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
   },
   arrowhead: { size: 0.18, angleRadians: 0.55 },
   color: {
-    mode: "fixed",
+    mode: "magnitude",
     palette: "spectral",
     rangeMode: "automatic",
     minimum: 0,
@@ -250,6 +265,7 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
     fixedColor: "#6042a6",
   },
   zeroVectorMode: "hide",
+  arrowMode: "live",
   // Deliberately restrained: the flow is drawn on top of the graph paper, so
   // the defaults have to leave the axes and expressions legible underneath.
   flow: {
@@ -553,6 +569,7 @@ export function normalizeVectorFieldConfig(value: unknown): VectorFieldConfig {
           : fallback.color.fixedColor,
     },
     zeroVectorMode: value.zeroVectorMode === "point" ? "point" : "hide",
+    arrowMode: value.arrowMode === "desmos" ? "desmos" : "live",
     flow: normalizeFlow(value.flow, fallback.flow),
     panel: normalizePanel(value.panel, fallback.panel),
   };
@@ -611,14 +628,14 @@ function normalizeFlow(value: unknown, fallback: FlowConfig): FlowConfig {
     dropRate: clampNumber(flow?.dropRate, fallback.dropRate, 0, 0.2),
     opacity: clampNumber(flow?.opacity, fallback.opacity, 0.05, 1),
     pointSize: clampNumber(flow?.pointSize, fallback.pointSize, 0.5, 6),
+    colorMode: isFlowColorMode(flow?.colorMode)
+      ? flow.colorMode
+      : fallback.colorMode,
     palette: isPalette(flow?.palette) ? flow.palette : fallback.palette,
     look:
       flow?.look === "streamlines" || flow?.look === "texture"
         ? flow.look
         : fallback.look,
-    colorMode: isFlowColorMode(flow?.colorMode)
-      ? flow.colorMode
-      : fallback.colorMode,
     normalizeSpeed:
       typeof flow?.normalizeSpeed === "boolean"
         ? flow.normalizeSpeed

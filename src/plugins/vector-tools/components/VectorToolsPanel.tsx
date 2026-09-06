@@ -21,6 +21,7 @@ import {
   PANEL_MIN_HEIGHT,
   PANEL_MIN_WIDTH,
   PANEL_TABS,
+  type ArrowMode,
   type ColorPalette,
   type FlowLook,
   type ColorRangeMode,
@@ -65,6 +66,11 @@ const PALETTES: readonly Choice<ColorPalette>[] = [
   { value: "blue-red", label: "Blue to red" },
   { value: "grayscale", label: "Grayscale" },
   { value: "direction-hue", label: "Hue wheel" },
+];
+
+const ARROW_MODES: readonly Choice<ArrowMode>[] = [
+  { value: "live", label: "Live (extension)" },
+  { value: "desmos", label: "Desmos expressions" },
 ];
 
 const FLOW_LOOKS: readonly Choice<FlowLook>[] = [
@@ -238,6 +244,25 @@ function arrowsTab(vectorTools: VectorTools, config: ConfigGetter) {
   const length = () => config().length;
   return (
     <div>
+      <section class="dsm-vector-tools-section">
+        {chipGroup(
+          "Drawn by",
+          () => vectorTools.arrowMode,
+          ARROW_MODES,
+          (value) => vectorTools.setArrowMode(value)
+        )}
+        <div class="dsm-vector-tools-note">
+          {() =>
+            vectorTools.arrowMode === "live"
+              ? "Arrows are drawn over the graph as you change them, with no vector limit. Generate writes the same field as Desmos expressions when you want to share it."
+              : "Arrows come from the expression list, so the graph works without this extension. Press Generate to write them."
+          }
+        </div>
+        <div class="dsm-vector-tools-status">
+          {() => vectorTools.arrowStatus}
+        </div>
+      </section>
+
       <section class="dsm-vector-tools-section">
         {chipGroup(
           "Length mode",

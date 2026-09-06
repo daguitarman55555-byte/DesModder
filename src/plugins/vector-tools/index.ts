@@ -8,11 +8,13 @@ import {
   configForPreset,
   DENSITY_PRESETS,
   isDevelopmentBuild,
+  getAxisSampleCount,
   normalizeVectorFieldConfig,
   type ColorPalette,
   type ColorRangeMode,
   type DensityPreset,
   type FieldSource,
+  type ArrowMode,
   type FlowConfig,
   type FlowLook,
   FLOW_LOOK_PRESETS,
@@ -44,6 +46,8 @@ import {
 import { differentiate, identifiersIn, toLatex } from "./symbolic";
 import { buildConfigFromGlobals, parseLatex } from "../../../text-mode-core";
 import { FlowOverlay } from "./flow/FlowOverlay";
+import { ArrowOverlay } from "./flow/ArrowOverlay";
+import type { ArrowOptions } from "./flow/ArrowRenderer";
 import { compileFieldComponentToGLSL } from "./flow/latexToGLSL";
 import type { FlowField } from "./flow/FlowRenderer";
 import type { ConfigItem } from "..";
@@ -131,6 +135,13 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       this.util.tick();
     },
   });
+  private readonly arrowOverlay = new ArrowOverlay(this.calc, {
+    onError: (message) => {
+      this.arrowMessage = message;
+      this.util.tick();
+    },
+  });
+  private arrowMessage = "";
   private flowMessage = "";
   private flowRefreshTimer?: ReturnType<typeof setTimeout>;
   private flowCompilationCache?: { key: string; result: FlowCompilation };
@@ -148,6 +159,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
 
   afterEnable() {
     this.ensureStoredConfigIsCurrent();
+    this.refreshArrows();
     this.dsm.pillboxMenus?.addPillboxButton({
       id: "dsm-vector-tools-menu",
       tooltip: "vector-tools-name",
@@ -168,6 +180,77 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     });
   }
 
+  get arrowMode() {
+    return this.getConfig().arrowMode;
+  }
+
+  get arrowStatus() {
+    if (this.arrowMode !== "live") return "";
+    if (this.arrowMessage !== "") return this.arrowMessage;
+    if (!this.arrowOverlay.isRunning) return "";
+    return `Drawing ${this.arrowOverlay.arrowCount} arrows live.`;
+  }
+
+  setArrowMode(mode: ArrowMode) {
+    this.updateConfig((config) => {
+      config.arrowMode = mode;
+    });
+  }
+
+  /**
+   * Starts, updates or stops the live arrows to match the configuration.
+   *
+   * Cheap enough to call on every change: the overlay only relinks a shader
+   * when the field itself changed, and a settings-only change is a uniform
+   * upload and one frame.
+   */
+  refreshArrows() {
+    if (this.arrowMode !== "live") {
+      if (this.arrowOverlay.isRunning) {
+        this.arrowOverlay.stop();
+        this.arrowMessage = "";
+      }
+      return;
+    }
+    const compiled = this.flowAvailability;
+    if (!compiled.ok) {
+      this.arrowOverlay.stop();
+      this.arrowMessage = compiled.error;
+      return;
+    }
+    this.arrowMessage = "";
+    this.arrowOverlay.start(compiled.field, this.arrowOptions);
+  }
+
+  private get arrowOptions(): ArrowOptions {
+    const config = this.getConfig();
+    return {
+      columns: getAxisSampleCount(config.domain.x),
+      rows: getAxisSampleCount(config.domain.y),
+      domain: {
+        xMin: config.domain.x.min,
+        xMax: config.domain.x.max,
+        yMin: config.domain.y.min,
+        yMax: config.domain.y.max,
+      },
+      lengthMode: config.length.mode,
+      targetLength: config.length.targetLength,
+      scale: config.length.scale,
+      maximumLength: config.length.maximumLength,
+      compression: config.length.compression,
+      headSize: config.arrowhead.size,
+      headAngle: config.arrowhead.angleRadians,
+      shaftWidth: 2.4,
+      colorMode: config.color.mode,
+      palette: config.color.palette,
+      fixedColor: config.color.fixedColor,
+      opacity: 1,
+      rangeMode: config.color.rangeMode,
+      rangeMinimum: config.color.minimum,
+      rangeMaximum: config.color.maximum,
+    };
+  }
+
   afterDisable() {
     if (this.flowRefreshTimer !== undefined)
       clearTimeout(this.flowRefreshTimer);
@@ -176,6 +259,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       this.cc.dispatcher.unregister(this.dispatcherID);
     this.dispatcherID = undefined;
     this.detachPanelElement();
+    this.arrowOverlay.stop();
     this.flowOverlay.stop();
     this.dsm.pillboxMenus?.removePillboxButton("dsm-vector-tools-menu");
   }
@@ -183,6 +267,10 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   afterConfigChange() {
     if (this.flowOverlay.isRunning)
       this.flowOverlay.setOptions(this.flowOptions);
+    // Written settings only reach `this.settings` by the time this runs, so
+    // this is where the arrows can read what they have to follow. Every path
+    // that changes the field arrives here, `resetConfig` included.
+    this.refreshArrows();
     this.util.tick();
   }
 
