@@ -22,6 +22,8 @@ const BOUNDS_OBSERVER_KEY = "graphpaperBounds.dsm-vector-tools-arrows";
 
 export interface ArrowOverlayCallbacks {
   onError: (message: string) => void;
+  /** The overlay is drawing again after having reported a failure. */
+  onRecovered: () => void;
 }
 
 export class ArrowOverlay {
@@ -32,14 +34,62 @@ export class ArrowOverlay {
   private visibilityObserver?: IntersectionObserver;
   private unobserveBounds?: () => void;
   private onScreen = true;
+  /**
+   * The field and settings the renderer was last given.
+   *
+   * Kept because a lost WebGL context takes the renderer with it, and the
+   * restored one has to be given the same field back — the overlay is the only
+   * thing that still knows what was being drawn.
+   */
+  private lastField?: FlowField;
+  private lastOptions?: ArrowOptions;
+  private contextLost = false;
+  private readonly onContextLost = (event: Event) => {
+    // Without this the browser never restores the context at all.
+    event.preventDefault();
+    this.contextLost = true;
+    if (this.frame !== undefined) cancelAnimationFrame(this.frame);
+    this.frame = undefined;
+    this.renderer = undefined;
+    this.callbacks.onError(
+      "The browser took the graphics context away from the arrows. They will come back on their own."
+    );
+  };
+  private readonly onContextRestored = () => {
+    this.contextLost = false;
+    const { canvas } = this;
+    if (canvas === undefined || this.lastField === undefined) return;
+    try {
+      this.renderer = new ArrowRenderer(canvas);
+      if (this.lastOptions !== undefined)
+        this.renderer.setOptions(this.lastOptions);
+      this.renderer.setField(this.lastField);
+      this.resizeToBox();
+      this.callbacks.onRecovered();
+      this.requestFrame();
+    } catch (error) {
+      this.stop();
+      this.callbacks.onError(
+        error instanceof FlowRendererError
+          ? error.message
+          : "The arrows could not be drawn again after the graphics context came back."
+      );
+    }
+  };
 
   constructor(
     private readonly calc: Calc,
     private readonly callbacks: ArrowOverlayCallbacks
   ) {}
 
+  /**
+   * Whether the overlay is mounted — which is the canvas, not the renderer. A
+   * lost context leaves a mounted overlay drawing nothing for a moment, and
+   * calling that "stopped" would have the panel offer to start something that
+   * is already on its way back.
+   */
   get isRunning() {
-    return this.renderer !== undefined;
+    return this.canvas !== undefined;
   }
 
   get arrowCount() {
@@ -58,7 +108,12 @@ export class ArrowOverlay {
 
   /** Starts the overlay, or swaps the field and settings if already running. */
   start(field: FlowField, options: ArrowOptions) {
+    this.lastField = field;
+    this.lastOptions = options;
     try {
+      // A remount while the context is lost is the manual way back: the browser
+      // may never restore one it took, and a fresh canvas gets a fresh context.
+      if (this.contextLost) this.stop();
       if (this.renderer === undefined) this.mount();
       this.renderer!.setOptions(options);
       this.renderer!.setField(field);
@@ -74,6 +129,7 @@ export class ArrowOverlay {
   }
 
   setOptions(options: ArrowOptions) {
+    this.lastOptions = options;
     if (this.renderer === undefined) return;
     this.renderer.setOptions(options);
     this.requestFrame();
@@ -91,6 +147,12 @@ export class ArrowOverlay {
     this.unobserveBounds = undefined;
     this.renderer?.destroy();
     this.renderer = undefined;
+    this.canvas?.removeEventListener("webglcontextlost", this.onContextLost);
+    this.canvas?.removeEventListener(
+      "webglcontextrestored",
+      this.onContextRestored
+    );
+    this.contextLost = false;
     this.canvas?.remove();
     this.canvas = undefined;
   }
@@ -117,6 +179,8 @@ export class ArrowOverlay {
     // After the graph paper, and after the flow canvas if one is already there,
     // so arrows read on top of the particles rather than under them.
     parent.append(canvas);
+    canvas.addEventListener("webglcontextlost", this.onContextLost);
+    canvas.addEventListener("webglcontextrestored", this.onContextRestored);
     this.canvas = canvas;
     this.renderer = new ArrowRenderer(canvas);
     this.resizeToBox();
@@ -173,6 +237,7 @@ export class ArrowOverlay {
     this.frame = requestAnimationFrame(() => {
       this.frame = undefined;
       if (this.renderer === undefined || !this.onScreen) return;
+      if (this.renderer.isContextLost) return;
       try {
         this.resizeToBox();
         // Read the bounds now rather than trusting what the observer last
@@ -183,6 +248,9 @@ export class ArrowOverlay {
         this.syncBounds();
         this.renderer.frame();
       } catch (error) {
+        // A context lost mid-frame is not a failure to report and tear down;
+        // its own handler has already said so and is waiting for it back.
+        if (this.contextLost) return;
         const message =
           error instanceof Error ? error.message : "The arrows stopped.";
         this.stop();

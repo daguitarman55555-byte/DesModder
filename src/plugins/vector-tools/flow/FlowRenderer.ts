@@ -230,6 +230,11 @@ export class FlowRenderer {
     this.setParticleCount(this.options.particleCount);
   }
 
+  /** Whether the GPU has taken the context away underneath this renderer. */
+  get isContextLost() {
+    return this.gl.isContextLost();
+  }
+
   /**
    * Swaps in a new field. Throws {@link FlowRendererError} if the GLSL will not
    * compile, which is the last line of defence behind the LaTeX compiler.

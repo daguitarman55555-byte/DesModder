@@ -135,10 +135,18 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       this.flowMessage = message;
       this.util.tick();
     },
+    onRecovered: () => {
+      this.flowMessage = "";
+      this.util.tick();
+    },
   });
   private readonly arrowOverlay = new ArrowOverlay(this.calc, {
     onError: (message) => {
       this.arrowMessage = message;
+      this.util.tick();
+    },
+    onRecovered: () => {
+      this.arrowMessage = "";
       this.util.tick();
     },
   });

@@ -23,6 +23,8 @@ const BOUNDS_OBSERVER_KEY = "graphpaperBounds.dsm-vector-tools";
 
 export interface FlowOverlayCallbacks {
   onError: (message: string) => void;
+  /** The overlay is drawing again after having reported a failure. */
+  onRecovered: () => void;
 }
 
 export class FlowOverlay {
@@ -36,14 +38,63 @@ export class FlowOverlay {
   private lastBounds?: FlowBounds;
   /** Whether any of the canvas is on screen. Off screen, frames are skipped. */
   private onScreen = true;
+  /**
+   * The field the renderer was last given, kept because a lost WebGL context
+   * takes the renderer with it and the restored one has to be handed the same
+   * field back. Particles are reseeded either way — there is nothing in a lost
+   * context to carry over.
+   */
+  private lastField?: FlowField;
+  private contextLost = false;
+  private readonly onContextLost = (event: Event) => {
+    // Without this the browser never restores the context at all.
+    event.preventDefault();
+    this.contextLost = true;
+    if (this.animationFrame !== undefined) {
+      cancelAnimationFrame(this.animationFrame);
+      this.animationFrame = undefined;
+    }
+    this.renderer = undefined;
+    this.callbacks.onError(
+      "The browser took the graphics context away from the flow. It will come back on its own."
+    );
+  };
+  private readonly onContextRestored = () => {
+    this.contextLost = false;
+    const { canvas } = this;
+    if (canvas === undefined || this.lastField === undefined) return;
+    try {
+      this.renderer = new FlowRenderer(canvas);
+      this.renderer.setOptions(this.options);
+      this.renderer.setField(this.lastField);
+      this.resizeToBox();
+      this.lastBounds = undefined;
+      this.syncBounds(true);
+      this.callbacks.onRecovered();
+      this.scheduleFrame();
+    } catch (error) {
+      this.stop();
+      this.callbacks.onError(
+        error instanceof FlowRendererError
+          ? error.message
+          : "The flow visualizer could not restart after the graphics context came back."
+      );
+    }
+  };
 
   constructor(
     private readonly calc: Calc,
     private readonly callbacks: FlowOverlayCallbacks
   ) {}
 
+  /**
+   * Whether the overlay is mounted — which is the canvas, not the renderer. A
+   * lost context leaves a mounted overlay drawing nothing for a moment, and
+   * calling that "stopped" would have the button offer to start something that
+   * is already on its way back.
+   */
   get isRunning() {
-    return this.renderer !== undefined;
+    return this.canvas !== undefined;
   }
 
   /**
@@ -53,7 +104,11 @@ export class FlowOverlay {
    */
   start(field: FlowField, options: FlowOptions) {
     this.options = { ...options };
+    this.lastField = field;
     try {
+      // A remount while the context is lost is the manual way back: the browser
+      // may never restore one it took, and a fresh canvas gets a fresh context.
+      if (this.contextLost) this.stop();
       if (this.renderer === undefined) this.mount();
       this.renderer!.setOptions(this.options);
       this.renderer!.setField(field);
@@ -92,6 +147,12 @@ export class FlowOverlay {
     this.unobserveBounds = undefined;
     this.renderer?.destroy();
     this.renderer = undefined;
+    this.canvas?.removeEventListener("webglcontextlost", this.onContextLost);
+    this.canvas?.removeEventListener(
+      "webglcontextrestored",
+      this.onContextRestored
+    );
+    this.contextLost = false;
     this.canvas?.remove();
     this.canvas = undefined;
     this.lastBounds = undefined;
@@ -117,6 +178,8 @@ export class FlowOverlay {
     canvas.style.height = "100%";
     canvas.style.pointerEvents = "none";
     parent.insertBefore(canvas, graphCanvas.nextSibling);
+    canvas.addEventListener("webglcontextlost", this.onContextLost);
+    canvas.addEventListener("webglcontextrestored", this.onContextRestored);
     this.canvas = canvas;
 
     this.renderer = new FlowRenderer(canvas);
@@ -181,10 +244,13 @@ export class FlowOverlay {
     if (this.animationFrame !== undefined) return;
     const step = () => {
       this.animationFrame = undefined;
-      if (this.renderer === undefined) return;
+      if (this.renderer === undefined || this.renderer.isContextLost) return;
       try {
         if (this.onScreen) this.renderer.frame();
       } catch (error) {
+        // A context lost mid-frame is not a failure to report and tear down;
+        // its own handler has already said so and is waiting for it back.
+        if (this.contextLost) return;
         const message =
           error instanceof Error
             ? error.message
