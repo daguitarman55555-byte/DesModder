@@ -15,27 +15,15 @@
  *  - It renders onto a transparent canvas layered over the Desmos graph
  *    instead of owning the whole screen.
  */
-import { GLSL_PRELUDE } from "./latexToGLSL";
 import { PALETTE_GLSL, paletteUniforms, type PaletteID } from "../palettes";
+import { fieldFunctions, FlowRendererError } from "./field";
+import type { FlowBounds, FlowField } from "./field";
+import { FieldRangeProbe } from "./FieldRange";
 import type { FlowColorMode } from "../model";
 
-export interface FlowBounds {
-  xMin: number;
-  xMax: number;
-  yMin: number;
-  yMax: number;
-}
-
-/**
- * The field to advect by, as compiled GLSL.
- *
- * A gradient field arrives as its scalar function rather than as two
- * components, because the GPU cannot differentiate symbolically the way the
- * generated Desmos expressions do — it has to sample instead.
- */
-export type FlowField =
-  | { kind: "components"; p: string; q: string }
-  | { kind: "gradient"; f: string };
+// Re-exported so the parts that only ever wanted a field keep one import.
+export { fieldFunctions, FlowRendererError } from "./field";
+export type { FlowBounds, FlowField } from "./field";
 
 export interface FlowOptions {
   /**
@@ -85,8 +73,6 @@ export const DEFAULT_FLOW_OPTIONS: FlowOptions = {
   normalizeSpeed: true,
   renderScale: 1,
 };
-
-export class FlowRendererError extends Error {}
 
 interface ProgramInfo {
   program: WebGLProgram;
@@ -179,6 +165,9 @@ export class FlowRenderer {
   private readonly reprojectProgram: ProgramInfo;
 
   private readonly quadArray: WebGLVertexArrayObject;
+  private readonly range: FieldRangeProbe;
+  /** The field's magnitude range over the visible box, for the colour ramp. */
+  private measuredRange = { minimum: 0, maximum: 1 };
   private indexArray?: WebGLVertexArrayObject;
 
   private particleRead?: WebGLTexture;
@@ -229,6 +218,7 @@ export class FlowRenderer {
     gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, QUAD, gl.STATIC_DRAW);
     this.quadArray = this.createVertexArray(quadBuffer, 2);
+    this.range = new FieldRangeProbe(gl, this.quadArray);
 
     this.fadeProgram = this.createProgram(
       SCREEN_VERTEX_SHADER,
@@ -265,6 +255,7 @@ export class FlowRenderer {
     this.updateProgram = updateProgram;
     this.drawProgram = drawProgram;
     this.fieldSource = key;
+    this.range.setField(field);
     this.seedParticles();
   }
 
@@ -366,6 +357,12 @@ export class FlowRenderer {
       return;
     }
     this.frameSeed = (this.frameSeed * 16807) % 2147483647;
+    // Before anything else binds. Measuring is a pass of its own — its own
+    // program, vertex array, framebuffer and viewport — so doing it partway
+    // through setting up another one leaves that one's uniforms going to the
+    // wrong program.
+    this.measuredRange =
+      this.range.measure(this.bounds) ?? this.fallbackRange();
     this.stepParticles();
     this.fadeTrails();
     this.drawParticles();
@@ -382,6 +379,7 @@ export class FlowRenderer {
     this.deleteProgram(this.fadeProgram);
     this.deleteProgram(this.blitProgram);
     this.deleteProgram(this.reprojectProgram);
+    this.range.destroy();
     for (const texture of [
       this.particleRead,
       this.particleWrite,
@@ -524,6 +522,13 @@ export class FlowRenderer {
       program.uniforms.u_speedScale,
       Math.max(1e-6, (xMax - xMin) / 3)
     );
+    // Measured once at the top of the frame, over the same visible box the
+    // arrows measure.
+    gl.uniform2f(
+      program.uniforms.u_range,
+      this.measuredRange.minimum,
+      this.measuredRange.maximum
+    );
 
     gl.drawArrays(gl.POINTS, 0, this.particleCount);
     gl.disable(gl.BLEND);
@@ -544,6 +549,12 @@ export class FlowRenderer {
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
+
+  /** Something for the ramp to span when the range cannot be measured. */
+  private fallbackRange() {
+    const { xMin, xMax } = this.bounds;
+    return { minimum: 0, maximum: Math.max(1e-6, (xMax - xMin) / 3) };
   }
 
   private bindTrailTarget(texture: WebGLTexture) {
@@ -867,38 +878,6 @@ void main() {
 }
 `;
 
-/**
- * Both shaders that evaluate the field include this, and both declare `u_min`
- * and `u_max` before it — which is what lets the gradient step size follow the
- * viewport without an extra uniform.
- */
-export function fieldFunctions(field: FlowField) {
-  const body =
-    field.kind === "gradient"
-      ? `
-float vtScalar(vec2 p) { return ${field.f}; }
-vec2 vtField(vec2 p) {
-  // The generated Desmos arrows differentiate symbolically; the GPU cannot, so
-  // it central-differences instead. The step follows the viewport so the
-  // gradient stays smooth at any zoom, and it is exact for the quadratics that
-  // most potentials are built from.
-  float h = 1.0e-3 * max(u_max.x - u_min.x, u_max.y - u_min.y);
-  float u = (vtScalar(p + vec2(h, 0.0)) - vtScalar(p - vec2(h, 0.0))) / (2.0 * h);
-  float v = (vtScalar(p + vec2(0.0, h)) - vtScalar(p - vec2(0.0, h))) / (2.0 * h);`
-      : `
-vec2 vtField(vec2 p) {
-  float u = ${field.p};
-  float v = ${field.q};`;
-  return `
-${GLSL_PRELUDE}
-${body}
-  if (isnan(u) || isinf(u)) u = 0.0;
-  if (isnan(v) || isinf(v)) v = 0.0;
-  return vec2(u, v);
-}
-`;
-}
-
 function updateFragmentShader(field: FlowField) {
   return `#version 300 es
 precision highp float;
@@ -974,6 +953,7 @@ uniform float u_opacity;
 uniform int u_colorMode;
 uniform vec3 u_fixedColor;
 uniform float u_speedScale;
+uniform vec2 u_range;
 out vec4 v_color;
 
 ${fieldFunctions(field)}
@@ -991,8 +971,11 @@ void main() {
   vec2 v = vtField(state.xy);
   vec3 rgb = u_fixedColor;
   if (u_colorMode == 1) {
-    // Scale-free ramp: no reduction pass is needed to find the field's range.
-    rgb = vtPalette(1.0 - exp(-length(v) / u_speedScale));
+    // Across the field's own range over what is on screen — the same box and
+    // the same mapping the arrows use, so one colour means one magnitude
+    // whichever half of the picture it is in.
+    float span = max(u_range.y - u_range.x, 1.0e-9);
+    rgb = vtPalette(clamp((length(v) - u_range.x) / span, 0.0, 1.0));
   } else if (u_colorMode == 2) {
     rgb = vtHueRamp(fract(atan(v.y, v.x) / 6.2831853 + 1.0));
   }
