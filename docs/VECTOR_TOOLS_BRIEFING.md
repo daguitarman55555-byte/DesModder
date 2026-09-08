@@ -52,8 +52,8 @@ Two design commitments follow from that and constrain everything:
 
 ```
 npm run lint            # prettier --check, tsc --build, eslint
-npm run test:unit       # 1562 tests
-npm run test:integration  # 49 tests, real Desmos in headless Chrome
+npm run test:unit       # 1582 tests
+npm run test:integration  # 50 tests, real Desmos in headless Chrome
 ```
 
 The integration harness loads the built extension (`npm run build` → `dist/`)
@@ -67,7 +67,7 @@ assertions and obvious in a picture.**
 ## 2. The shape of the plugin
 
 Vector Tools is one configuration driving **three independent renderers**, plus
-two shared libraries.
+the shared libraries they draw on.
 
 ```
                          VectorFieldConfig  (model.ts, JSON, schemaVersion 3)
@@ -82,29 +82,31 @@ two shared libraries.
         |                         |                         |
    the graph itself        transparent overlay over the graph paper
 
-  shared: palettes.ts (ramps, emitted twice)
-          latexToGLSL.ts (LaTeX subset → GLSL)
+  shared: palettes.ts (ramps, emitted three ways: Desmos, GLSL, CSS)
+          latexToGLSL.ts (LaTeX subset → GLSL, against an environment)
+          environment.ts (what the expression list defines)
           symbolic.ts (exact partial derivatives — currently no caller)
 ```
 
 ### File map
 
-| File                              | Lines | What it owns                                                              |
-| --------------------------------- | ----: | ------------------------------------------------------------------------- |
-| `model.ts`                        |  ~965 | `VectorFieldConfig`, defaults, normalization, validation, presets, limits |
-| `generator.ts`                    |   653 | config → deterministic `VectorFieldPlan` of Desmos expressions; audit     |
-| `desmos/ExpressionAdapter.ts`     |   270 | the **only** calculator boundary; apply / remove / audit a generated set  |
-| `index.ts`                        | ~1070 | the plugin controller: settings, overlays, dispatcher, component sync     |
-| `components/VectorToolsPanel.tsx` | ~1180 | the DCGView panel (Field / Arrows / Color / Flow tabs)                    |
-| `palettes.ts`                     |   213 | colour ramps as stops, emitted as Desmos LaTeX **and** as shader uniforms |
-| `symbolic.ts`                     |   409 | exact symbolic partial differentiation over Desmos's own syntax tree      |
-| `flow/latexToGLSL.ts`             |   532 | compiles the usable subset of Desmos LaTeX to GLSL ES 3.00                |
-| `flow/field.ts`                   |    59 | the shared `vtField(vec2 p)` prelude both shaders include                 |
-| `flow/ArrowRenderer.ts`           |  ~590 | instanced arrows, geometry from `gl_VertexID`/`gl_InstanceID`             |
-| `flow/ArrowOverlay.ts`            |  ~245 | the arrows' canvas, bounds, visibility, context loss                      |
-| `flow/FlowRenderer.ts`            |  ~985 | ping-ponged particle textures, RK4 advection, trails                      |
-| `flow/FlowOverlay.ts`             |  ~255 | the flow's canvas, bounds, visibility, context loss                       |
-| `flow/glTestDouble.ts`            |    90 | a fake WebGL2 both renderers are unit-tested against                      |
+| File                              | Lines | What it owns                                                                |
+| --------------------------------- | ----: | --------------------------------------------------------------------------- |
+| `model.ts`                        |  ~965 | `VectorFieldConfig`, defaults, normalization, validation, presets, limits   |
+| `generator.ts`                    |   653 | config → deterministic `VectorFieldPlan` of Desmos expressions; audit       |
+| `desmos/ExpressionAdapter.ts`     |   270 | the **only** calculator boundary; apply / remove / audit a generated set    |
+| `index.ts`                        | ~1070 | the plugin controller: settings, overlays, dispatcher, component sync       |
+| `components/VectorToolsPanel.tsx` | ~1180 | the DCGView panel (Field / Arrows / Color / Flow tabs)                      |
+| `palettes.ts`                     |  ~460 | colour ramps as stops, emitted as Desmos LaTeX, shader uniforms **and** CSS |
+| `environment.ts`                  |  ~125 | scans the expression list for what a component may reference                |
+| `symbolic.ts`                     |   409 | exact symbolic partial differentiation over Desmos's own syntax tree        |
+| `flow/latexToGLSL.ts`             |  ~700 | compiles the usable subset of Desmos LaTeX to GLSL ES 3.00                  |
+| `flow/field.ts`                   |  ~110 | the shared `vtField(vec2 p)` prelude, helpers, and parameter uniforms       |
+| `flow/ArrowRenderer.ts`           |  ~590 | instanced arrows, geometry from `gl_VertexID`/`gl_InstanceID`               |
+| `flow/ArrowOverlay.ts`            |  ~245 | the arrows' canvas, bounds, visibility, context loss                        |
+| `flow/FlowRenderer.ts`            |  ~985 | ping-ponged particle textures, RK4 advection, trails                        |
+| `flow/FlowOverlay.ts`             |  ~255 | the flow's canvas, bounds, visibility, context loss                         |
+| `flow/glTestDouble.ts`            |    90 | a fake WebGL2 both renderers are unit-tested against                        |
 
 ---
 
@@ -179,11 +181,29 @@ meaning. `/geometry` is the same 2D graph paper and works unchanged.
 
 ### 4.1 `palettes.ts`
 
-Ramps are defined **once, as stops**, and emitted twice: as a Desmos `rgb`/`hsv`
-list expression for generated arrows, and as shader uniforms for the GPU. Six
-palettes: Spectral (default), Viridis, Blue, Blue-to-red, Grayscale, Hue wheel
-(emitted as `hsv` rather than from stops, because a hue wheel has no stops to
-interpolate).
+Ramps are defined **once, as stops**, and emitted **three times**: as a Desmos
+`rgb`/`hsv` list expression for generated arrows, as shader uniforms for the
+GPU, and as a CSS `linear-gradient` for the picker's swatches. A swatch written
+out separately is a swatch that eventually disagrees with the field, which is
+worse than no swatch.
+
+Eighteen palettes in four groups. **Sequential**: Spectral (default), Viridis,
+Blue, Turbo, Plasma, Magma, Cividis, Jet (classic), Grayscale. **Diverging**:
+Blue-to-red, Cool-to-warm. **Cyclic**: Hue wheel, Twilight, Phase.
+**Expressive**: Sunset, Ocean, Ember, Neon.
+
+Jet is perceptually poor and invents edges where the field is smooth. It is
+there because decades of fluid-dynamics figures used it and a plot meant to sit
+beside one should be able to match it — an option, not a recommendation.
+
+`cyclic` is a claim about the ramp's two ends being the same colour, held to the
+colours by a test. It matters for `direction`, which colours an angle: 359° and
+1° are neighbours, and a ramp whose ends do not meet draws a hard edge across
+the field along whichever ray happens to be zero — a feature of the picture that
+is not a feature of the field. The hue wheel has no stops at all and is emitted
+from a formula; the swatch samples that same formula.
+
+Turbo needs eight stops, which is what sets `MAX_PALETTE_STOPS`.
 
 ### 4.2 `flow/latexToGLSL.ts`
 
@@ -195,12 +215,51 @@ translate rather than silently drawing a different field.
 Supported: `+ - * / ^`, `\frac`, `\sqrt` (including `\sqrt[n]`), `|…|`,
 parentheses/braces/brackets, implicit multiplication, `\cdot`/`\times`, and the
 functions `sin cos tan cot sec csc arcsin arccos arctan sinh cosh tanh exp ln
-log sqrt abs sign floor ceil round mod min max`. Variables `x`, `y`, `e`, and
-nothing else.
+log sqrt abs sign floor ceil round mod min max`. Variables `x`, `y` and `e`,
+**plus anything the expression list defines** — see 4.3.
 
-**Explicitly refused**: subscripted identifiers (they refer to other
-expressions the GPU cannot reach), lists, sums, integrals, piecewise, actions,
-user-defined functions.
+**Explicitly refused**: lists, sums, integrals, piecewise, actions, and any
+name the expression list does not define.
+
+### 4.3 `environment.ts` — reaching the rest of the graph
+
+A component may reference what the graph defines: a named value (`a`, `k_{1}`,
+a slider) and a function of numbers (`f(u)`, `g(u,v)`). `scanDefinitions` reads
+the expression list for those two shapes and hands the compiler an environment.
+
+The two kinds are treated differently on purpose, and the distinction is the
+whole design:
+
+- **A value becomes a uniform, never a literal.** Baking the number in would
+  mean recompiling and relinking both programs on every frame of a slider drag —
+  exactly the cost `c0dd0cce` removed. `FlowField` deliberately carries the
+  parameter _names_ and not their values, and `setField` compares whole fields,
+  so a slider drag cannot relink a program even by accident.
+- **A definition becomes a real GLSL function**, not an inlining at the call
+  site: a body using its argument twice would otherwise duplicate the whole
+  argument expression at each use, and chains multiply. Every helper takes `p`
+  whether it reads a coordinate or not, so a definition may mention x and y
+  without the caller knowing. Helpers come back dependencies-first.
+
+Values are read through Desmos's own `HelperExpression`, so `a = b + 1` works
+without any of this understanding `b`, and an animating slider reports without
+touching the expression list.
+
+**Recursion is refused**, directly and mutually, because a shader has no call
+stack — missing it is a hang or a driver crash, not a wrong picture. So is
+nesting deeper than twelve, and a call with the wrong number of arguments.
+A definition the compiler cannot follow is **named**, so the message says which
+definition in the graph is the problem.
+
+Two facts found the hard way: `setExpression` does **not** emit
+`set-item-latex` — it emits `add-item-to-end-from-api` and `on-evaluator-changes`,
+and the latter is what a definition typed anywhere in the list arrives as. That
+event also fires on every frame of an animating slider, so the scan reads
+`cc.getAllItemModels()` rather than `getState()`, and coalesces rather than
+debounces (a debounce under a steady stream never comes due).
+
+The generated field's own namespace is skipped: its helpers are built from the
+component, so a component referencing one would be circular.
 
 Guards live in a GLSL prelude: `vtDiv` (epsilon-protected division), `vtPow`
 (real powers of negative bases only for integral exponents), `vtCot`/`vtSec`/
@@ -214,7 +273,7 @@ exact for the quadratics most potentials are built from. (The generated Desmos
 expressions differentiate exactly instead. The two therefore agree numerically
 but not identically.)
 
-### 4.3 `symbolic.ts` — **has no caller yet**
+### 4.4 `symbolic.ts` — **has no caller yet**
 
 Exact symbolic partial differentiation over Desmos's own syntax tree, via
 `text-mode-core`'s Aug layer. No CAS: Desmos's parser already produces the
@@ -267,6 +326,26 @@ starting assumptions to re-test.
 - **Dispatching from inside a dispatcher callback throws** "Cannot dispatch in
   the middle of a dispatch".
 - Desmos reports `graphpaperBounds` on **every pointermove** during a drag.
+- **`setExpression` does not emit `set-item-latex`.** It emits
+  `add-item-to-end-from-api`, `tick`, `evaluator-progress-update` and
+  `on-evaluator-changes`. Listening only for `set-item-latex` catches edits made
+  in the UI and misses every programmatic one — which is how a graph acquires a
+  slider without anyone touching this plugin. `on-evaluator-changes` is the one
+  to watch, and it **also fires on every frame of an animating slider**, so
+  anything hung off it must be cheap and must coalesce rather than debounce.
+- **`Calc.observeEvent("change", …)` heavily throttles**, so it is the wrong
+  instrument for anything that should feel immediate.
+- **`cc.getAllItemModels()` gives id/type/latex without serialising the graph**,
+  which `getState()` does. On a hot path, that difference is most of the cost.
+- **`t` is bound locally inside every parametric.** The generated arrow shafts
+  and arrowhead wings are restricted parametrics in `t` (`{0 ≤ t ≤ 1}`), so a
+  global `t` would be shadowed in exactly the expressions that draw the field.
+  A time variable spelled `t` cannot animate a generated field; it has to be
+  renamed on the way out. (Live rendering is unaffected — there `t` is a
+  uniform, not an expression.)
+- Values are best read through **`Calc.HelperExpression({ latex })`**, which is
+  Desmos's own evaluator: `numericValue` plus `observe("numericValue", …)`. It
+  has no documented teardown, so keep them rather than rebuilding them.
 
 ### 5.2 DCGView (the UI framework)
 
@@ -363,9 +442,42 @@ plugin.
 
 ## 7. What changed most recently
 
-Three commits, all measured in a real Desmos through the integration harness,
-against a 201×201 sampling domain (40,401 arrows) viewed from twelve units
-across, over a hundred simulated slider frames:
+### 7.1 Reaching the rest of the graph, and the panel around it
+
+Five commits, verified in a real Desmos through the integration harness:
+
+1. **`0ba399ef` — Give the equation boxes the width the column already had.**
+   Desmos's inline math input is an inline-block, so it shrink-to-fits, and the
+   MathQuill field inside caps its own max-width against whatever the container
+   reports. A container with nothing to report settled it at **74px inside a
+   338px cell**, clipping the expression rather than wrapping it — unreadable at
+   exactly the point an expression grew long enough to need reading. Now 396px
+   and not overflowing. P and Q stack instead of sharing a fixed two-column grid
+   whenever the panel is too narrow for both.
+2. **`1daa3ce1` — Show the ramp instead of naming it.** Eighteen palettes in
+   four groups, each drawn from the same stops it selects. See 4.1.
+3. **`b82e4d81` — Let a field component reach the rest of the graph.** The
+   compiler takes an environment: values become uniforms, definitions become
+   GLSL functions. See 4.3.
+4. **`b150eef7` — Find what the graph defines, without asking what it equals.**
+   `environment.ts`. Collects names, never values, which is what makes a moving
+   slider incapable of invalidating the scan.
+5. **`dccb93bc` — Let the field actually read the graph.** The wiring, and the
+   two facts it turned up: `setExpression` emits `on-evaluator-changes` rather
+   than `set-item-latex`, and that event also fires per frame of an animating
+   slider, so the scan reads item models rather than `getState()`.
+
+Also **`e7e8a02e`** — both things that draw colours now share the Colour tab,
+each under the name of what it colours, with a **Match arrows** button that
+appears only while pressing it would change something. They stay separately
+settable: one scheme for both is the common case, not the only legitimate one.
+`flowColorModeFor` in `model.ts` owns the correspondence, because an arrow can
+be coloured by an x component while a particle's only scalar is its speed.
+
+### 7.2 The performance work before that
+
+Three commits, measured against a 201×201 sampling domain (40,401 arrows)
+viewed from twelve units across, over a hundred simulated slider frames:
 
 |                                             |    before |      after |
 | ------------------------------------------- | --------: | ---------: |
@@ -431,12 +543,25 @@ Two halves:
   `∂P/∂x + ∂Q/∂y` and `∂Q/∂x - ∂P/∂y`, spelled with `\frac{d}{dx}` on
   two-argument functions per §5.1.
 
-### 6. Time-dependent fields
+### 6. Time-dependent fields — **next, and partly decided**
 
-Add `t` to the GLSL prelude driven by a uniform, wired to a Desmos ticker.
-`P(x,y,t)`. `latexToGLSL`'s `variableToGLSL` currently knows only `x`, `y`, `e`;
-adding `t` → a `u_time` uniform is small. Nothing else in the Desmos ecosystem
-does this.
+`P(x,y,t)`, animated. Nothing else in the Desmos ecosystem does this.
+
+The live half is small: `t` resolves to a `u_time` uniform, the way a named
+value already resolves to `u_vp_<name>` (4.3), and the same argument applies —
+a uniform, not a recompile, or every frame relinks two programs.
+
+The generated half has a decided constraint. **`t` is shadowed inside every
+parametric** (5.1), and the generated arrows _are_ parametrics in `t`, so a
+global `t` cannot animate them. Agreed resolution: the user types `t`, live
+rendering binds it to the uniform, and **the generator rewrites `t` to a
+non-colliding symbol and emits a Desmos ticker driving it**, so a shared graph
+still animates for someone without the extension. The rename is invisible unless
+the folder is opened.
+
+Note `environment.ts` deliberately does **not** reserve `t`: a graph is entitled
+to define it as a slider, and deciding otherwise would be guessing. Whatever
+resolves `t` has to settle that precedence explicitly.
 
 ### 7. Click-to-seed streamlines, and LIC
 
