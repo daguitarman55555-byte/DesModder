@@ -183,10 +183,14 @@
 
   // ---- field tab ----
 
+  // P and Q sit side by side while there is room to type into both, and stack
+  // once there is not. A fixed two-column grid gave each of them half of a
+  // panel that is 320px wide at its narrowest, which is not room to read an
+  // expression in, let alone edit one.
   .dsm-vector-tools-math-row {
     display: grid;
     gap: 7px;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   }
 
   // A gradient field has one input, not two, so it gets the full width rather
@@ -199,6 +203,40 @@
     border: 1px solid #bcbcbc;
     border-radius: 3px;
     min-height: 28px;
+
+    // Desmos's inline math input is an inline-block, so it shrink-to-fits, and
+    // the MathQuill field inside caps its own max-width against whatever width
+    // the container reports. In a column that never handed one down that
+    // settled at 74px inside a 338px cell, and the expression was clipped
+    // rather than wrapped — the box became unreadable exactly when the
+    // expression grew long enough to need reading. Every level down to the
+    // field therefore gets a definite full width, and the field's own cap is
+    // overridden because Desmos writes it as a pixel value on the element.
+    display: block;
+    width: 100%;
+
+    .dcg-mathquill-wrapper,
+    .dcg-typeset-math,
+    .dcg-mq-container {
+      box-sizing: border-box;
+      display: block;
+      width: 100%;
+    }
+
+    .dcg-math-field {
+      box-sizing: border-box;
+      display: block;
+      max-width: 100% !important;
+      width: 100%;
+    }
+
+    // A fraction is taller than a line of text, and the box grows to hold it.
+    // What still cannot fit sideways scrolls, because an expression truncated
+    // out of sight is one the user cannot tell is wrong.
+    .dcg-mq-root-block {
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
   }
 
   .dsm-vector-tools-link-row {

@@ -382,7 +382,7 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
     normalizeSpeed: true,
     renderScale: 1,
   },
-  panel: { width: 360, height: 520, tab: "field" },
+  panel: { width: 420, height: 560, tab: "field" },
 };
 
 export const DENSITY_PRESETS: readonly DensityPreset[] = [
