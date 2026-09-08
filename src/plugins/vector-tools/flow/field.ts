@@ -29,6 +29,14 @@ export interface FieldDependencies {
   helpers?: readonly CompiledHelper[];
   /** Desmos names the field reads, each declared as a uniform. */
   params?: readonly string[];
+  /**
+   * Whether the field reads the clock.
+   *
+   * Part of the field's identity because it decides whether `u_time` is
+   * declared, and read by the overlays because a field that reads the clock has
+   * to keep being drawn rather than settling into a still picture.
+   */
+  usesTime?: boolean;
 }
 
 /**
@@ -59,15 +67,21 @@ export function uploadFieldParameters(
   gl: WebGL2RenderingContext,
   uniforms: Record<string, WebGLUniformLocation | null>,
   field: FlowField | undefined,
-  values: ReadonlyMap<string, number>
+  values: ReadonlyMap<string, number>,
+  time = 0
 ) {
-  for (const name of field?.params ?? []) {
-    const location = uniforms[glslParamName(name)];
+  const upload = (uniformName: string, value: number | undefined) => {
+    const location = uniforms[uniformName];
     // Null when the linker found the uniform unused, which is not an error.
-    if (location === null || location === undefined) continue;
-    const value = values.get(name);
+    if (location === null || location === undefined) return;
     gl.uniform1f(location, value === undefined || !isFinite(value) ? 0 : value);
+  };
+  for (const name of field?.params ?? []) {
+    upload(glslParamName(name), values.get(name));
   }
+  // The clock is a uniform like any other name the field reads. It differs only
+  // in where the number comes from.
+  if (field?.usesTime === true) upload("u_time", time);
 }
 
 /**
@@ -95,9 +109,12 @@ vec2 vtField(vec2 p) {
   // Values the graph binds, as uniforms. Declared before the helpers because a
   // helper may read one, and emitted even when a component reads none, in which
   // case this is empty rather than absent.
-  const uniforms = (field.params ?? [])
-    .map((name) => `uniform float ${glslParamName(name)};`)
-    .join("\n");
+  const uniforms = [
+    ...(field.params ?? []).map(
+      (name) => `uniform float ${glslParamName(name)};`
+    ),
+    ...(field.usesTime === true ? ["uniform float u_time;"] : []),
+  ].join("\n");
   // Dependencies first: the compiler registers a definition only after its own
   // body compiled, so this order is already the one GLSL needs.
   const helpers = (field.helpers ?? []).map((helper) => helper.glsl).join("\n");

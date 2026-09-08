@@ -192,6 +192,8 @@ export class FlowRenderer {
   /** The field currently linked, so its parameter names are to hand each frame. */
   private linkedField?: FlowField;
   private parameters: ReadonlyMap<string, number> = new Map();
+  /** Seconds on the animation clock, uploaded as `u_time` when the field reads it. */
+  private time = 0;
   private frameSeed = 1;
   private destroyed = false;
 
@@ -255,6 +257,10 @@ export class FlowRenderer {
    */
   setParameters(values: ReadonlyMap<string, number>) {
     this.parameters = values;
+  }
+
+  setTime(seconds: number) {
+    this.time = seconds;
   }
 
   /**
@@ -434,7 +440,8 @@ export class FlowRenderer {
       gl,
       program.uniforms,
       this.linkedField,
-      this.parameters
+      this.parameters,
+      this.time
     );
     gl.disable(gl.BLEND);
     gl.bindVertexArray(this.quadArray);
@@ -504,7 +511,8 @@ export class FlowRenderer {
       gl,
       program.uniforms,
       this.linkedField,
-      this.parameters
+      this.parameters,
+      this.time
     );
     this.bindTrailTarget(this.trailFront!);
     gl.enable(gl.BLEND);

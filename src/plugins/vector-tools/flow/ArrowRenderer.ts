@@ -221,6 +221,8 @@ export class ArrowRenderer {
   /** The field currently linked, so its parameter names are to hand each frame. */
   private linkedField?: FlowField;
   private parameters: ReadonlyMap<string, number> = new Map();
+  /** Seconds on the animation clock, uploaded as `u_time` when the field reads it. */
+  private time = 0;
   /** How many instances the last frame actually drew, after culling. */
   drawnArrowCount = 0;
 
@@ -261,6 +263,10 @@ export class ArrowRenderer {
    */
   setParameters(values: ReadonlyMap<string, number>) {
     this.parameters = values;
+  }
+
+  setTime(seconds: number) {
+    this.time = seconds;
   }
 
   setField(field: FlowField) {
@@ -318,7 +324,13 @@ export class ArrowRenderer {
     const { uniforms, program } = this.program;
     gl.useProgram(program);
     gl.bindVertexArray(this.emptyArray);
-    uploadFieldParameters(gl, uniforms, this.linkedField, this.parameters);
+    uploadFieldParameters(
+      gl,
+      uniforms,
+      this.linkedField,
+      this.parameters,
+      this.time
+    );
     gl.enable(gl.BLEND);
     // Premultiplied, matching the flow, so the two layers composite the same way.
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);

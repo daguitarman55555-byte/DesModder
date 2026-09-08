@@ -59,6 +59,11 @@ export type CompileResult =
        * rebuilding.
        */
       params: readonly string[];
+      /**
+       * Whether the expression read the clock, and so whether anything drawing
+       * it has to keep drawing rather than settle into a still picture.
+       */
+      usesTime: boolean;
     }
   | { ok: false; error: string };
 
@@ -82,6 +87,16 @@ const glslIdentifier = (name: string) => name.replace(/[^A-Za-z0-9]/g, "_");
  */
 export const canonicalIdentifier = (name: string) =>
   name.replace(/_\{([A-Za-z0-9]*)\}/, "_$1");
+
+/**
+ * The letter that means the animation clock, and the uniform behind it.
+ *
+ * `t` only because that is what a person writes. It is not reserved: a graph
+ * that defines `t` as a slider keeps that meaning, and the compiler falls
+ * through to the ordinary lookup — see `variableToGLSL`.
+ */
+export const TIME_NAME = "t";
+const GLSL_TIME = "u_time";
 
 /** A referenced value, as a uniform. Desmos names cannot collide once flattened. */
 export const glslParamName = (name: string) => `u_vp_${glslIdentifier(name)}`;
@@ -166,6 +181,7 @@ export function compileFieldComponentToGLSL(
       glsl,
       helpers: context.helpers,
       params: [...context.params],
+      usesTime: context.usesTime,
     };
   } catch (error) {
     return {
@@ -192,6 +208,8 @@ class CompileError extends Error {}
  */
 class CompileContext {
   readonly params = new Set<string>();
+  /** Set by `variableToGLSL` when anything, at any depth, read the clock. */
+  usesTime = false;
   readonly helpers: CompiledHelper[] = [];
   private readonly compiled = new Map<string, string>();
   private readonly expanding: string[] = [];
@@ -591,6 +609,15 @@ class Parser {
         return "2.7182818284590452";
       default:
         break;
+    }
+    // `t` means the animation clock, but only where the graph has not said
+    // otherwise. A definition the user wrote down is an explicit statement of
+    // what the letter means and beats an implicit one — the ordinary scoping
+    // rule, and the one that leaves `t` usable as a plain slider. Falling
+    // through to the lookup below is what implements that.
+    if (name === TIME_NAME && !this.context.env.scalars.has(TIME_NAME)) {
+      this.context.usesTime = true;
+      return GLSL_TIME;
     }
     if (this.context.env.scalars.has(name)) {
       this.context.params.add(name);

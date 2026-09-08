@@ -47,6 +47,7 @@ export class FlowOverlay {
   private lastField?: FlowField;
   /** Kept so a remount after a lost context comes back with the same values. */
   private lastParameters: ReadonlyMap<string, number> = new Map();
+  private lastTime = 0;
   private contextLost = false;
   private readonly onContextLost = (event: Event) => {
     // Without this the browser never restores the context at all.
@@ -115,6 +116,7 @@ export class FlowOverlay {
       this.renderer!.setOptions(this.options);
       this.renderer!.setField(field);
       this.renderer!.setParameters(this.lastParameters);
+      this.renderer!.setTime(this.lastTime);
       this.syncBounds(true);
       this.scheduleFrame();
     } catch (error) {
@@ -146,6 +148,12 @@ export class FlowOverlay {
   setParameters(values: ReadonlyMap<string, number>) {
     this.lastParameters = values;
     this.renderer?.setParameters(values);
+  }
+
+  /** The flow is already redrawing every frame; this only changes what it reads. */
+  setTime(seconds: number) {
+    this.lastTime = seconds;
+    this.renderer?.setTime(seconds);
   }
 
   stop() {

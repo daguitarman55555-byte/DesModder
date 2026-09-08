@@ -21,6 +21,8 @@ import {
   PANEL_MIN_HEIGHT,
   PANEL_MIN_WIDTH,
   PANEL_TABS,
+  TIME_SPEED_MAXIMUM,
+  TIME_SPEED_MINIMUM,
   lengthInputsFor,
   type ArrowMode,
   type ColorPalette,
@@ -225,6 +227,12 @@ function fieldTab(
           </If>
         </div>
       </section>
+
+      {/* Only for a field that reads the clock. A field written without `t` is
+          a still picture and has nothing to play. */}
+      <If predicate={() => vectorTools.fieldUsesTime}>
+        {() => timeControls(vectorTools)}
+      </If>
 
       <section class="dsm-vector-tools-section">
         <div class="dsm-vector-tools-section-head">
@@ -754,6 +762,57 @@ function componentInput(
         readonly={false}
       />
     </div>
+  );
+}
+
+/**
+ * Play, speed and reset for a field written in terms of `t`.
+ *
+ * Deliberately not a scrubber. `t` is unbounded — a field may be interesting at
+ * t=0.4 and at t=400 — so there is no range for a slider to span, and inventing
+ * one would be choosing a story for the field on the user's behalf. Speed and a
+ * reset are the two controls that work whatever the field does with the number.
+ */
+function timeControls(vectorTools: VectorTools) {
+  return (
+    <section class="dsm-vector-tools-section dsm-vector-tools-time">
+      <div class="dsm-vector-tools-section-head">
+        <h3>Time</h3>
+        <Button
+          color="light-gray"
+          class="dsm-vector-tools-time-reset"
+          onTap={() => vectorTools.resetClock()}
+        >
+          Reset to 0
+        </Button>
+      </div>
+      <div class="dsm-vector-tools-actions">
+        <Button
+          color="light-gray"
+          class="dsm-vector-tools-time-play"
+          onTap={() =>
+            vectorTools.setTimePlaying(!vectorTools.timeConfig.playing)
+          }
+        >
+          {() => (vectorTools.timeConfig.playing ? "Pause" : "Play")}
+        </Button>
+      </div>
+      {sliderControl(
+        "dsm-vector-tools-time-speed",
+        "Speed",
+        () => vectorTools.timeConfig.speed,
+        {
+          minimum: TIME_SPEED_MINIMUM,
+          maximum: TIME_SPEED_MAXIMUM,
+          step: 0.05,
+          decimals: 2,
+        },
+        (value) => vectorTools.setTimeSpeed(value)
+      )}
+      <div class="dsm-vector-tools-hint">
+        The arrows and the flow read one clock, so both show the same instant.
+      </div>
+    </section>
   );
 }
 

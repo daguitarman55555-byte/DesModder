@@ -44,6 +44,7 @@ export class ArrowOverlay {
   private lastField?: FlowField;
   /** Kept so a remount after a lost context comes back with the same values. */
   private lastParameters: ReadonlyMap<string, number> = new Map();
+  private lastTime = 0;
   private lastOptions?: ArrowOptions;
   private contextLost = false;
   private readonly onContextLost = (event: Event) => {
@@ -120,6 +121,7 @@ export class ArrowOverlay {
       this.renderer!.setOptions(options);
       this.renderer!.setField(field);
       this.renderer!.setParameters(this.lastParameters);
+      this.renderer!.setTime(this.lastTime);
       this.requestFrame();
     } catch (error) {
       this.stop();
@@ -148,6 +150,14 @@ export class ArrowOverlay {
     this.lastParameters = values;
     if (this.renderer === undefined) return;
     this.renderer.setParameters(values);
+    this.requestFrame();
+  }
+
+  /** Advances the clock and redraws. A still picture only while nothing reads it. */
+  setTime(seconds: number) {
+    this.lastTime = seconds;
+    if (this.renderer === undefined) return;
+    this.renderer.setTime(seconds);
     this.requestFrame();
   }
 

@@ -151,6 +151,24 @@ export const FLOW_PARTICLE_MAXIMUM = 400_000;
 /** Above this, a mid-range GPU starts dropping frames on a large viewport. */
 export const FLOW_PARTICLE_HEAVY = 120_000;
 
+/**
+ * The animation clock, for a field written in terms of `t`.
+ *
+ * Persisted, but the clock's *position* is not: a graph reopened later starts
+ * at zero. Where a time-varying field happens to be when you closed the tab is
+ * not a property of the field, and restoring it would make the same graph open
+ * differently every time.
+ */
+export interface TimeConfig {
+  /** Whether the clock advances. */
+  playing: boolean;
+  /** Clock seconds per real second. */
+  speed: number;
+}
+
+export const TIME_SPEED_MINIMUM = 0.05;
+export const TIME_SPEED_MAXIMUM = 8;
+
 /** Persisted panel geometry, so a resized panel stays resized. */
 export interface PanelConfig {
   width: number;
@@ -299,6 +317,7 @@ export interface VectorFieldConfig {
    */
   arrowDensityLimit: boolean;
   flow: FlowConfig;
+  time: TimeConfig;
   panel: PanelConfig;
 }
 
@@ -405,6 +424,7 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
     normalizeSpeed: true,
     renderScale: 1,
   },
+  time: { playing: true, speed: 1 },
   panel: { width: 420, height: 560, tab: "field" },
 };
 
@@ -519,6 +539,7 @@ export function cloneDefaultConfig(): VectorFieldConfig {
     arrowhead: { ...DEFAULT_VECTOR_FIELD_CONFIG.arrowhead },
     color: { ...DEFAULT_VECTOR_FIELD_CONFIG.color },
     flow: { ...DEFAULT_VECTOR_FIELD_CONFIG.flow },
+    time: { ...DEFAULT_VECTOR_FIELD_CONFIG.time },
     panel: { ...DEFAULT_VECTOR_FIELD_CONFIG.panel },
   };
 }
@@ -701,9 +722,24 @@ export function normalizeVectorFieldConfig(value: unknown): VectorFieldConfig {
         : "live",
     arrowDensityLimit: value.arrowDensityLimit !== false,
     flow: normalizeFlow(value.flow, fallback.flow),
+    time: normalizeTime(value.time, fallback.time),
     panel: normalizePanel(value.panel, fallback.panel),
   };
   return config;
+}
+
+function normalizeTime(value: unknown, fallback: TimeConfig): TimeConfig {
+  const time = asRecord(value);
+  return {
+    playing:
+      typeof time?.playing === "boolean" ? time.playing : fallback.playing,
+    speed: clampNumber(
+      time?.speed,
+      fallback.speed,
+      TIME_SPEED_MINIMUM,
+      TIME_SPEED_MAXIMUM
+    ),
+  };
 }
 
 function normalizePanel(value: unknown, fallback: PanelConfig): PanelConfig {

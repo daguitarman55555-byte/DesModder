@@ -112,6 +112,7 @@ function compileFlowField(
         f: f.glsl,
         helpers: f.helpers,
         params: f.params,
+        usesTime: f.usesTime,
       },
     };
   }
@@ -136,6 +137,7 @@ function compileFlowField(
       q: q.glsl,
       helpers,
       params: [...new Set([...p.params, ...q.params])],
+      usesTime: p.usesTime || q.usesTime,
     },
   };
 }
@@ -222,6 +224,9 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
    */
   private environmentRevision = 0;
   private environmentTimer?: ReturnType<typeof setTimeout>;
+  private clockFrame?: number;
+  private clockLastFrame?: number;
+  private clockSeconds = 0;
   /**
    * One `HelperExpression` per name the field has ever read, and the number it
    * most recently reported.
@@ -264,7 +269,85 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       }
     });
     this.refreshEnvironment();
+    this.syncClock();
   }
+
+  // ---- the animation clock -------------------------------------------------
+
+  /**
+   * Whether anything currently being drawn reads `t`.
+   *
+   * Nothing animates unless the field asks to, so a field written without `t`
+   * costs exactly what it did before this existed: no loop, no uploads, and the
+   * arrows stay the still picture they were.
+   */
+  get fieldUsesTime() {
+    const compiled = this.flowAvailability;
+    return compiled.ok && compiled.field.usesTime === true;
+  }
+
+  get timeConfig() {
+    return this.getConfig().time;
+  }
+
+  setTimePlaying(playing: boolean) {
+    this.updateConfig((config) => {
+      config.time.playing = playing;
+    });
+    this.syncClock();
+  }
+
+  setTimeSpeed(speed: number) {
+    this.updateConfig((config) => {
+      config.time.speed = speed;
+    });
+  }
+
+  /** Back to zero, whether or not the clock is running. */
+  resetClock() {
+    this.clockSeconds = 0;
+    this.arrowOverlay.setTime(0);
+    this.flowOverlay.setTime(0);
+    this.util.tick();
+  }
+
+  /** Seconds on the clock, for the panel to show. */
+  get clockReadout() {
+    return this.clockSeconds;
+  }
+
+  /**
+   * Starts or stops the loop to match what is being drawn.
+   *
+   * Called whenever the field, the play state, or what is mounted changes, so
+   * that the loop's existence is derived from those rather than remembered
+   * separately and left running after the thing that needed it went away.
+   */
+  private syncClock() {
+    const shouldRun = this.fieldUsesTime && this.getConfig().time.playing;
+    if (shouldRun === (this.clockFrame !== undefined)) return;
+    if (shouldRun) {
+      this.clockLastFrame = undefined;
+      this.clockFrame = requestAnimationFrame(this.advanceClock);
+    } else {
+      if (this.clockFrame !== undefined) cancelAnimationFrame(this.clockFrame);
+      this.clockFrame = undefined;
+    }
+  }
+
+  private readonly advanceClock = (now: number) => {
+    this.clockFrame = requestAnimationFrame(this.advanceClock);
+    const previous = this.clockLastFrame ?? now;
+    this.clockLastFrame = now;
+    // Capped, because a backgrounded tab resumes with an enormous gap and an
+    // uncapped step would teleport the field rather than animate it.
+    const elapsed = Math.min(0.1, Math.max(0, (now - previous) / 1000));
+    this.clockSeconds += elapsed * this.getConfig().time.speed;
+    // One clock for both, so the arrows and the particles over them are always
+    // showing the same instant of the same field.
+    this.arrowOverlay.setTime(this.clockSeconds);
+    this.flowOverlay.setTime(this.clockSeconds);
+  };
 
   // ---- what the rest of the graph defines ----------------------------------
 
@@ -309,6 +392,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     if (changed) {
       this.refreshArrows();
       this.refreshFlow();
+      this.syncClock();
       this.util.tick();
     }
   }
@@ -516,8 +600,11 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       this.flowOverlay.setOptions(this.flowOptions);
     // Written settings only reach `this.settings` by the time this runs, so
     // this is where the arrows can read what they have to follow. Every path
-    // that changes the field arrives here, `resetConfig` included.
+    // that changes the field arrives here, `resetConfig` included — which is
+    // also why the clock is synced here rather than at each call site that
+    // might have made the field start or stop reading `t`.
     this.refreshArrows();
+    this.syncClock();
     this.util.tick();
   }
 

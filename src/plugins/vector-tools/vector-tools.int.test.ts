@@ -1025,3 +1025,76 @@ testWithPage(
   },
   90000
 );
+
+testWithPage(
+  "Vector Tools animates a field written in terms of t, and yields t to the graph",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+
+    const clock = async () =>
+      await driver.evaluate(() => {
+        const vt = DSM.enabledPlugins["vector-tools"] as any;
+        const compiled = vt.flowAvailability;
+        return {
+          usesTime: compiled.ok ? compiled.field.usesTime === true : false,
+          seconds: vt.clockReadout as number,
+        };
+      });
+
+    // A field with no `t` in it must cost nothing: no clock, no uniform.
+    expect((await clock()).usesTime).toBe(false);
+
+    await driver.evaluate(() => {
+      const vt = DSM.enabledPlugins["vector-tools"] as any;
+      vt.setSlot("p", "\\sin\\left(y+t\\right)");
+      vt.setSlot("q", "\\cos\\left(x-t\\right)");
+    });
+    await driver.waitForFunction(
+      () =>
+        ((DSM.enabledPlugins["vector-tools"] as any).clockReadout as number) >
+        0.2,
+      { timeout: 8000 }
+    );
+    expect((await clock()).usesTime).toBe(true);
+
+    // Pausing has to actually stop it, not just stop saying it is running.
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).setTimePlaying(false)
+    );
+    const paused = (await clock()).seconds;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect((await clock()).seconds).toBe(paused);
+
+    // A graph that defines `t` itself means that `t`, not the clock: an
+    // explicit definition beats an implicit meaning, which is also what keeps
+    // `t` usable as an ordinary slider.
+    await driver.evaluate(() =>
+      Calc.setExpression({ id: "vt_t_slider", latex: "t=3" })
+    );
+    await driver.waitForFunction(
+      () =>
+        ((DSM.enabledPlugins["vector-tools"] as any).flowAvailability.field
+          ?.usesTime as boolean | undefined) !== true,
+      { timeout: 8000 }
+    );
+    expect((await clock()).usesTime).toBe(false);
+
+    await driver.evaluate(() => Calc.removeExpression({ id: "vt_t_slider" }));
+    await driver.waitForFunction(
+      () =>
+        ((DSM.enabledPlugins["vector-tools"] as any).flowAvailability.field
+          ?.usesTime as boolean | undefined) === true,
+      { timeout: 8000 }
+    );
+
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).resetConfig()
+    );
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);
