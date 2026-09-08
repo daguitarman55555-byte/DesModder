@@ -42,6 +42,8 @@ export class ArrowOverlay {
    * thing that still knows what was being drawn.
    */
   private lastField?: FlowField;
+  /** Kept so a remount after a lost context comes back with the same values. */
+  private lastParameters: ReadonlyMap<string, number> = new Map();
   private lastOptions?: ArrowOptions;
   private contextLost = false;
   private readonly onContextLost = (event: Event) => {
@@ -117,6 +119,7 @@ export class ArrowOverlay {
       if (this.renderer === undefined) this.mount();
       this.renderer!.setOptions(options);
       this.renderer!.setField(field);
+      this.renderer!.setParameters(this.lastParameters);
       this.requestFrame();
     } catch (error) {
       this.stop();
@@ -132,6 +135,19 @@ export class ArrowOverlay {
     this.lastOptions = options;
     if (this.renderer === undefined) return;
     this.renderer.setOptions(options);
+    this.requestFrame();
+  }
+
+  /**
+   * The values behind the names the field reads.
+   *
+   * Kept off `start` because these move whenever a slider does, and the arrows
+   * only have to redraw for that — not relink.
+   */
+  setParameters(values: ReadonlyMap<string, number>) {
+    this.lastParameters = values;
+    if (this.renderer === undefined) return;
+    this.renderer.setParameters(values);
     this.requestFrame();
   }
 

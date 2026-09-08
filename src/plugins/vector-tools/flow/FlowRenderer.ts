@@ -16,12 +16,20 @@
  *    instead of owning the whole screen.
  */
 import { PALETTE_GLSL, paletteUniforms, type PaletteID } from "../palettes";
-import { fieldFunctions, FlowRendererError } from "./field";
+import {
+  fieldFunctions,
+  uploadFieldParameters,
+  FlowRendererError,
+} from "./field";
 import type { FlowBounds, FlowField } from "./field";
 import type { FlowColorMode } from "../model";
 
 // Re-exported so the parts that only ever wanted a field keep one import.
-export { fieldFunctions, FlowRendererError } from "./field";
+export {
+  fieldFunctions,
+  uploadFieldParameters,
+  FlowRendererError,
+} from "./field";
 export type { FlowBounds, FlowField } from "./field";
 
 export interface FlowOptions {
@@ -181,6 +189,9 @@ export class FlowRenderer {
   private options: FlowOptions = { ...DEFAULT_FLOW_OPTIONS };
   private bounds: FlowBounds = { xMin: -10, xMax: 10, yMin: -6, yMax: 6 };
   private fieldSource?: string;
+  /** The field currently linked, so its parameter names are to hand each frame. */
+  private linkedField?: FlowField;
+  private parameters: ReadonlyMap<string, number> = new Map();
   private frameSeed = 1;
   private destroyed = false;
 
@@ -236,6 +247,17 @@ export class FlowRenderer {
   }
 
   /**
+   * The current value of every name the field reads.
+   *
+   * Separate from `setField` on purpose: these change as often as a slider is
+   * dragged, and routing them through the field would rebuild both programs on
+   * every frame of that drag.
+   */
+  setParameters(values: ReadonlyMap<string, number>) {
+    this.parameters = values;
+  }
+
+  /**
    * Swaps in a new field. Throws {@link FlowRendererError} if the GLSL will not
    * compile, which is the last line of defence behind the LaTeX compiler.
    */
@@ -254,6 +276,7 @@ export class FlowRenderer {
     this.deleteProgram(this.drawProgram);
     this.updateProgram = updateProgram;
     this.drawProgram = drawProgram;
+    this.linkedField = field;
     this.fieldSource = key;
     this.seedParticles();
   }
@@ -407,6 +430,12 @@ export class FlowRenderer {
     const { gl } = this;
     const program = this.updateProgram!;
     gl.useProgram(program.program);
+    uploadFieldParameters(
+      gl,
+      program.uniforms,
+      this.linkedField,
+      this.parameters
+    );
     gl.disable(gl.BLEND);
     gl.bindVertexArray(this.quadArray);
 
@@ -471,6 +500,12 @@ export class FlowRenderer {
     const { gl } = this;
     const program = this.drawProgram!;
     gl.useProgram(program.program);
+    uploadFieldParameters(
+      gl,
+      program.uniforms,
+      this.linkedField,
+      this.parameters
+    );
     this.bindTrailTarget(this.trailFront!);
     gl.enable(gl.BLEND);
     // Colors leave the shader premultiplied, which keeps repeated blending

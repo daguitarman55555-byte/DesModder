@@ -37,6 +37,7 @@ import {
   componentExpressionID,
   componentFunctionLatex,
   createVectorFieldPlan,
+  namespaceForField,
   editableSlots,
   parseComponentFromLatex,
   setSlotBody,
@@ -50,7 +51,12 @@ import { buildConfigFromGlobals, parseLatex } from "../../../text-mode-core";
 import { FlowOverlay } from "./flow/FlowOverlay";
 import { ArrowOverlay } from "./flow/ArrowOverlay";
 import type { ArrowOptions } from "./flow/ArrowRenderer";
-import { compileFieldComponentToGLSL } from "./flow/latexToGLSL";
+import {
+  compileFieldComponentToGLSL,
+  EMPTY_ENVIRONMENT,
+} from "./flow/latexToGLSL";
+import type { FieldEnvironment } from "./flow/latexToGLSL";
+import { environmentsDiffer, scanDefinitions } from "./environment";
 import type { FlowField } from "./flow/FlowRenderer";
 import type { ConfigItem } from "..";
 
@@ -68,7 +74,19 @@ type FlowCompilation =
   | { ok: true; field: FlowField }
   | { ok: false; error: string };
 
+/**
+ * As much of Desmos's `HelperExpression` as reading one number needs.
+ *
+ * Structural rather than the real type because only these two members are used,
+ * and the shipped typings for the rest are incomplete.
+ */
+interface ValueHelper {
+  numericValue: number;
+  observe: (event: string, callback: () => void) => void;
+}
+
 const FLOW_REFRESH_DELAY_MS = 300;
+const ENVIRONMENT_REFRESH_DELAY_MS = 80;
 const PANEL_SIZE_SAVE_DELAY_MS = 400;
 const POPOVER_CLASS = "dsm-vector-tools-popover";
 
@@ -80,17 +98,46 @@ function round(value: number) {
   return Math.round(value * 1000) / 1000;
 }
 
-function compileFlowField(config: VectorFieldConfig): FlowCompilation {
+function compileFlowField(
+  config: VectorFieldConfig,
+  environment: FieldEnvironment
+): FlowCompilation {
   if (config.source === "gradient") {
-    const f = compileFieldComponentToGLSL(config.scalar.fLatex);
+    const f = compileFieldComponentToGLSL(config.scalar.fLatex, environment);
     if (!f.ok) return { ok: false, error: `f(x, y): ${f.error}` };
-    return { ok: true, field: { kind: "gradient", f: f.glsl } };
+    return {
+      ok: true,
+      field: {
+        kind: "gradient",
+        f: f.glsl,
+        helpers: f.helpers,
+        params: f.params,
+      },
+    };
   }
-  const p = compileFieldComponentToGLSL(config.components.xLatex);
+  const p = compileFieldComponentToGLSL(config.components.xLatex, environment);
   if (!p.ok) return { ok: false, error: `P(x, y): ${p.error}` };
-  const q = compileFieldComponentToGLSL(config.components.yLatex);
+  const q = compileFieldComponentToGLSL(config.components.yLatex, environment);
   if (!q.ok) return { ok: false, error: `Q(x, y): ${q.error}` };
-  return { ok: true, field: { kind: "components", p: p.glsl, q: q.glsl } };
+  // P and Q share one shader, so their helpers merge. Both lists are already in
+  // dependency order and a name means one definition, so keeping the first of
+  // each name preserves that order for the union.
+  const helpers = [...p.helpers];
+  for (const helper of q.helpers) {
+    if (!helpers.some((existing) => existing.name === helper.name)) {
+      helpers.push(helper);
+    }
+  }
+  return {
+    ok: true,
+    field: {
+      kind: "components",
+      p: p.glsl,
+      q: q.glsl,
+      helpers,
+      params: [...new Set([...p.params, ...q.params])],
+    },
+  };
 }
 
 const TEST_CHECKLIST: readonly {
@@ -166,6 +213,25 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   private panelResizeObserver?: ResizeObserver;
   private panelSizeTimer?: ReturnType<typeof setTimeout>;
   private componentLinkNote = "";
+  /** What the expression list defines, as of the last scan. */
+  private environment: FieldEnvironment = EMPTY_ENVIRONMENT;
+  /**
+   * Bumped only when a scan finds something that changes the compiled output,
+   * so it can join the compilation cache key without a slider moving evicting
+   * it.
+   */
+  private environmentRevision = 0;
+  private environmentTimer?: ReturnType<typeof setTimeout>;
+  /**
+   * One `HelperExpression` per name the field has ever read, and the number it
+   * most recently reported.
+   *
+   * Desmos's own evaluator rather than a second one, which is what makes
+   * `a = b + 1` work here without this understanding `b`. They are kept rather
+   * than rebuilt because a helper has no documented teardown, so the count is
+   * bounded by the names used in a session instead of growing per scan.
+   */
+  private readonly parameterHelpers = new Map<string, ValueHelper>();
 
   afterEnable() {
     this.ensureStoredConfigIsCurrent();
@@ -183,11 +249,136 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
         event.type === "set-item-latex" ||
         event.type === "undo" ||
         event.type === "redo" ||
-        event.type === "set-state"
+        event.type === "set-state" ||
+        // What an API write, a paste, or a definition being typed elsewhere in
+        // the list actually arrives as. `set-item-latex` covers the field's own
+        // expressions but not `setExpression`, which is how a graph gets a
+        // slider without anyone touching this plugin.
+        event.type === "on-evaluator-changes"
       ) {
         this.syncComponentsFromExpressions();
+        // A component may reference anything the list defines, so an edit
+        // anywhere in it — not just to this field's own expressions — can
+        // change what the field means.
+        this.scheduleEnvironmentRefresh();
       }
     });
+    this.refreshEnvironment();
+  }
+
+  // ---- what the rest of the graph defines ----------------------------------
+
+  /**
+   * Rescans the expression list, off the dispatcher's stack.
+   *
+   * Desmos throws on a dispatch made from inside a dispatcher callback, and
+   * reading a value means creating a `HelperExpression`, so none of this may
+   * run inline.
+   *
+   * The delay coalesces rather than debounces — a pending timer is left alone
+   * instead of being pushed back — because the event that drives this also
+   * fires while a slider animates, and a debounce would never come due under a
+   * steady stream of those.
+   */
+  private scheduleEnvironmentRefresh() {
+    if (this.environmentTimer !== undefined) return;
+    this.environmentTimer = setTimeout(() => {
+      this.environmentTimer = undefined;
+      this.refreshEnvironment();
+    }, ENVIRONMENT_REFRESH_DELAY_MS);
+  }
+
+  private refreshEnvironment() {
+    // The item models rather than `getState()`: this runs on evaluator changes,
+    // which include every frame of an animating slider, and serialising the
+    // whole graph that often to read three fields off each expression would be
+    // most of the cost of the feature.
+    const scanned = scanDefinitions(
+      this.cc.getAllItemModels(),
+      namespaceForField(this.getConfig())
+    );
+    const changed = environmentsDiffer(this.environment, scanned);
+    this.environment = scanned;
+    if (changed) {
+      // The same component compiles differently against a different
+      // environment, so the cache key has to move with it.
+      this.environmentRevision++;
+      this.flowCompilationCache = undefined;
+    }
+    this.syncParameterValues();
+    if (changed) {
+      this.refreshArrows();
+      this.refreshFlow();
+      this.util.tick();
+    }
+  }
+
+  /**
+   * Reads the current number behind every name the compiled field reads, and
+   * hands them to both overlays.
+   *
+   * This is the path a slider drag takes, and it deliberately stops short of
+   * the compiler: nothing here can change a shader, only the floats uploaded
+   * into one.
+   */
+  private syncParameterValues() {
+    const compiled = this.flowCompilation;
+    const names = compiled.ok ? (compiled.field.params ?? []) : [];
+    const values = new Map<string, number>();
+    for (const name of names) {
+      let helper = this.parameterHelpers.get(name);
+      if (helper === undefined) {
+        helper = this.calc.HelperExpression({
+          latex: name,
+        }) as unknown as ValueHelper;
+        // A slider being dragged reports through here rather than through the
+        // expression list, so this is what keeps the picture moving with it.
+        helper.observe("numericValue", () => this.pushParameterValues());
+        this.parameterHelpers.set(name, helper);
+      }
+      values.set(name, helper.numericValue);
+    }
+    this.arrowOverlay.setParameters(values);
+    this.flowOverlay.setParameters(values);
+  }
+
+  /**
+   * Re-reads the helpers already made, without rescanning or recompiling.
+   *
+   * Deliberately does not re-render the panel. This runs on every frame of a
+   * slider drag, and the panel has nothing on it that changes with a value —
+   * which is the reason the reference line names what is being used without
+   * quoting what it currently equals. The number is already on screen, in the
+   * expression that defines it.
+   */
+  private pushParameterValues() {
+    const values = new Map<string, number>();
+    for (const [name, helper] of this.parameterHelpers) {
+      values.set(name, helper.numericValue);
+    }
+    this.arrowOverlay.setParameters(values);
+    this.flowOverlay.setParameters(values);
+  }
+
+  /**
+   * What this field borrows from the rest of the graph.
+   *
+   * Worth saying out loud: a component that reads `a` looks exactly like one
+   * that does not, right up until somebody deletes `a` and the whole field
+   * stops drawing for a reason that is nowhere near where they were working.
+   *
+   * Names only, never their values. The value is already on screen in the
+   * expression that defines it, and quoting it here would mean re-rendering
+   * the panel on every frame of a slider drag to keep the quote honest.
+   */
+  get fieldReferenceStatus(): string {
+    const compiled = this.flowCompilation;
+    if (!compiled.ok) return "";
+    const helpers = compiled.field.helpers ?? [];
+    const params = compiled.field.params ?? [];
+    if (helpers.length === 0 && params.length === 0) return "";
+    const names = [...helpers.map((helper) => `${helper.name}()`), ...params];
+    return `Using from the expression list: ${names.join(", ")}.`;
   }
 
   get arrowMode() {
@@ -308,6 +499,8 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   afterDisable() {
     if (this.flowRefreshTimer !== undefined)
       clearTimeout(this.flowRefreshTimer);
+    if (this.environmentTimer !== undefined)
+      clearTimeout(this.environmentTimer);
     if (this.panelSizeTimer !== undefined) clearTimeout(this.panelSizeTimer);
     if (this.dispatcherID !== undefined)
       this.cc.dispatcher.unregister(this.dispatcherID);
@@ -821,13 +1014,16 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       config.components.xLatex,
       config.components.yLatex,
       config.scalar.fLatex,
+      // The same component compiles to different GLSL against a different set
+      // of definitions, so the environment is part of what this identifies.
+      this.environmentRevision,
     ]);
     // The panel reads this several times per render pass, so compile once per
     // distinct field rather than once per read.
     if (this.flowCompilationCache?.key === key) {
       return this.flowCompilationCache.result;
     }
-    const result = compileFlowField(config);
+    const result = compileFlowField(config, this.environment);
     this.flowCompilationCache = { key, result };
     return result;
   }

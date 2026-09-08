@@ -950,3 +950,78 @@ testWithPage(
   },
   90000
 );
+
+testWithPage(
+  "Vector Tools compiles a field against what the rest of the graph defines",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+
+    // Neither of these belongs to the plugin. A component may still use them.
+    await driver.evaluate(() => {
+      Calc.setExpression({ id: "vt_slider_a", latex: "a=2" });
+      Calc.setExpression({ id: "vt_fn_f", latex: "f\\left(u\\right)=u^{2}" });
+    });
+    await driver.evaluate(() => {
+      const vt = DSM.enabledPlugins["vector-tools"] as any;
+      vt.setSlot("p", "ay");
+      vt.setSlot("q", "f\\left(x\\right)");
+    });
+
+    const compiled = async () =>
+      await driver.evaluate(() => {
+        const result = (DSM.enabledPlugins["vector-tools"] as any)
+          .flowAvailability;
+        return {
+          ok: result.ok,
+          error: result.ok ? "" : result.error,
+          params: result.ok ? (result.field.params ?? []) : [],
+          helpers: result.ok
+            ? (result.field.helpers ?? []).map((h: any) => h.name)
+            : [],
+        };
+      });
+
+    // The scan is coalesced off the dispatcher, so this settles rather than
+    // being immediate.
+    await driver.waitForFunction(
+      () =>
+        ((DSM.enabledPlugins["vector-tools"] as any).flowAvailability.ok as
+          | boolean
+          | undefined) === true,
+      { timeout: 8000 }
+    );
+
+    const used = await compiled();
+    // The value is a uniform and the definition is a compiled GLSL function:
+    // the two halves of what the environment is for.
+    expect(used.params).toEqual(["a"]);
+    expect(used.helpers).toEqual(["f"]);
+    expect(
+      await driver.evaluate(
+        () => (DSM.enabledPlugins["vector-tools"] as any).fieldReferenceStatus
+      )
+    ).toContain("f()");
+
+    // Deleting a definition the field depends on must say which name went, not
+    // fail somewhere unrecognisable.
+    await driver.evaluate(() => Calc.removeExpression({ id: "vt_fn_f" }));
+    await driver.waitForFunction(
+      () =>
+        ((DSM.enabledPlugins["vector-tools"] as any).flowAvailability.ok as
+          | boolean
+          | undefined) === false,
+      { timeout: 8000 }
+    );
+    expect((await compiled()).error).toContain('"f" is not defined');
+
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).resetConfig()
+    );
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);

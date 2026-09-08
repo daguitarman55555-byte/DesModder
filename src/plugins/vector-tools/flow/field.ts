@@ -4,13 +4,31 @@
  * Split out from `FlowRenderer` because the range probe reads a field too, and
  * the renderer reads the probe — a cycle if either owned these.
  */
-import { GLSL_PRELUDE } from "./latexToGLSL";
+import { GLSL_PRELUDE, glslParamName } from "./latexToGLSL";
+import type { CompiledHelper } from "./latexToGLSL";
 
 export interface FlowBounds {
   xMin: number;
   xMax: number;
   yMin: number;
   yMax: number;
+}
+
+/**
+ * What a component needed from the rest of the graph, compiled.
+ *
+ * These are part of the field's identity rather than settings alongside it,
+ * because changing either means a different shader. What is deliberately *not*
+ * here is any parameter's value: a value is a uniform, uploaded per frame, so
+ * that moving a slider does not rebuild a program. `setField` compares whole
+ * fields, so leaving values out of this type is what makes that true rather
+ * than something each renderer has to remember.
+ */
+export interface FieldDependencies {
+  /** Definitions compiled to GLSL functions, dependencies first. */
+  helpers?: readonly CompiledHelper[];
+  /** Desmos names the field reads, each declared as a uniform. */
+  params?: readonly string[];
 }
 
 /**
@@ -21,10 +39,36 @@ export interface FlowBounds {
  * generated Desmos expressions do — it has to sample instead.
  */
 export type FlowField =
-  | { kind: "components"; p: string; q: string }
-  | { kind: "gradient"; f: string };
+  | ({ kind: "components"; p: string; q: string } & FieldDependencies)
+  | ({ kind: "gradient"; f: string } & FieldDependencies);
 
 export class FlowRendererError extends Error {}
+
+/**
+ * Uploads the current value of every name the field reads.
+ *
+ * Both renderers do this identically and must keep agreeing, since they draw
+ * the same field from the same graph; a name that went to one and not the other
+ * would show as the arrows and the flow disagreeing about where the field is.
+ *
+ * A name with no value yet uploads zero rather than being skipped, because a
+ * skipped uniform keeps whatever the last frame left in it — which would be a
+ * stale number that looks like a real one.
+ */
+export function uploadFieldParameters(
+  gl: WebGL2RenderingContext,
+  uniforms: Record<string, WebGLUniformLocation | null>,
+  field: FlowField | undefined,
+  values: ReadonlyMap<string, number>
+) {
+  for (const name of field?.params ?? []) {
+    const location = uniforms[glslParamName(name)];
+    // Null when the linker found the uniform unused, which is not an error.
+    if (location === null || location === undefined) continue;
+    const value = values.get(name);
+    gl.uniform1f(location, value === undefined || !isFinite(value) ? 0 : value);
+  }
+}
 
 /**
  * Both shaders that evaluate the field include this, and both declare `u_min`
@@ -48,8 +92,19 @@ vec2 vtField(vec2 p) {
 vec2 vtField(vec2 p) {
   float u = ${field.p};
   float v = ${field.q};`;
+  // Values the graph binds, as uniforms. Declared before the helpers because a
+  // helper may read one, and emitted even when a component reads none, in which
+  // case this is empty rather than absent.
+  const uniforms = (field.params ?? [])
+    .map((name) => `uniform float ${glslParamName(name)};`)
+    .join("\n");
+  // Dependencies first: the compiler registers a definition only after its own
+  // body compiled, so this order is already the one GLSL needs.
+  const helpers = (field.helpers ?? []).map((helper) => helper.glsl).join("\n");
   return `
 ${GLSL_PRELUDE}
+${uniforms}
+${helpers}
 ${body}
   if (isnan(u) || isinf(u)) u = 0.0;
   if (isnan(v) || isinf(v)) v = 0.0;

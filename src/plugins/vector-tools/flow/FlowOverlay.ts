@@ -45,6 +45,8 @@ export class FlowOverlay {
    * context to carry over.
    */
   private lastField?: FlowField;
+  /** Kept so a remount after a lost context comes back with the same values. */
+  private lastParameters: ReadonlyMap<string, number> = new Map();
   private contextLost = false;
   private readonly onContextLost = (event: Event) => {
     // Without this the browser never restores the context at all.
@@ -112,6 +114,7 @@ export class FlowOverlay {
       if (this.renderer === undefined) this.mount();
       this.renderer!.setOptions(this.options);
       this.renderer!.setField(field);
+      this.renderer!.setParameters(this.lastParameters);
       this.syncBounds(true);
       this.scheduleFrame();
     } catch (error) {
@@ -131,6 +134,18 @@ export class FlowOverlay {
     // Render scale is the one option that changes the size of the drawing
     // buffer, and nothing else will notice on its own — no element resized.
     if (scaleChanged) this.resizeToBox();
+  }
+
+  /**
+   * The values behind the names the field reads.
+   *
+   * Kept off `start` because these move whenever a slider does, and the flow is
+   * already redrawing every frame — it only needs the new number, not a new
+   * pair of programs.
+   */
+  setParameters(values: ReadonlyMap<string, number>) {
+    this.lastParameters = values;
+    this.renderer?.setParameters(values);
   }
 
   stop() {

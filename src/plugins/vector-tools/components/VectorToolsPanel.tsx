@@ -214,6 +214,15 @@ function fieldTab(
           <div class="dsm-vector-tools-hint">
             {() => vectorTools.componentLinkStatus}
           </div>
+          {/* A component that reads a slider looks exactly like one that does
+              not, until the slider moves. */}
+          <If predicate={() => vectorTools.fieldReferenceStatus !== ""}>
+            {() => (
+              <div class="dsm-vector-tools-hint">
+                {() => vectorTools.fieldReferenceStatus}
+              </div>
+            )}
+          </If>
         </div>
       </section>
 

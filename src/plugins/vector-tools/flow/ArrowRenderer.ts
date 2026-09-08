@@ -19,6 +19,7 @@
  */
 import {
   fieldFunctions,
+  uploadFieldParameters,
   FlowRendererError,
   hexToUnitRGB,
 } from "./FlowRenderer";
@@ -217,6 +218,9 @@ export class ArrowRenderer {
    * reason.
    */
   private fieldSource?: string;
+  /** The field currently linked, so its parameter names are to hand each frame. */
+  private linkedField?: FlowField;
+  private parameters: ReadonlyMap<string, number> = new Map();
   /** How many instances the last frame actually drew, after culling. */
   drawnArrowCount = 0;
 
@@ -248,12 +252,24 @@ export class ArrowRenderer {
     this.bounds = bounds;
   }
 
+  /**
+   * The current value of every name the field reads.
+   *
+   * Separate from `setField` on purpose: these change as often as a slider is
+   * dragged, and routing them through the field would relink a shader per
+   * frame of that drag.
+   */
+  setParameters(values: ReadonlyMap<string, number>) {
+    this.parameters = values;
+  }
+
   setField(field: FlowField) {
     const { gl } = this;
     const key = JSON.stringify(field);
     if (this.fieldSource === key && this.program !== undefined) return;
     if (this.program !== undefined) gl.deleteProgram(this.program.program);
     this.program = this.createProgram(field);
+    this.linkedField = field;
     this.fieldSource = key;
   }
 
@@ -302,6 +318,7 @@ export class ArrowRenderer {
     const { uniforms, program } = this.program;
     gl.useProgram(program);
     gl.bindVertexArray(this.emptyArray);
+    uploadFieldParameters(gl, uniforms, this.linkedField, this.parameters);
     gl.enable(gl.BLEND);
     // Premultiplied, matching the flow, so the two layers composite the same way.
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
