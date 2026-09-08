@@ -7,6 +7,7 @@ import {
 import {
   configForPreset,
   DENSITY_PRESETS,
+  flowColorModeFor,
   isDevelopmentBuild,
   getAxisSampleCount,
   thinArrowGrid,
@@ -677,6 +678,35 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.updateConfig((config) => {
       config.flow[key] = value;
     });
+  }
+
+  /**
+   * Points the flow at the same colors as the arrows, in one press.
+   *
+   * The two stay separately settable on purpose — colouring arrows by magnitude
+   * while the flow runs a quiet single hue is a legitimate picture, and taking
+   * that away would be imposing a limit where an option belongs. But wanting one
+   * scheme for both is the common case, and matching them by hand meant setting
+   * a mode and a palette twice and knowing which particle mode corresponds to
+   * which arrow mode.
+   *
+   * The fixed swatch is not copied because there is only one of it: both halves
+   * already read `color.fixedColor`.
+   */
+  matchFlowColorToArrows() {
+    this.updateConfig((config) => {
+      config.flow.colorMode = flowColorModeFor(config.color.mode);
+      config.flow.palette = config.color.palette;
+    });
+  }
+
+  /** Whether the flow would look any different after matching. */
+  get flowColorMatchesArrows() {
+    const config = this.getConfig();
+    return (
+      config.flow.colorMode === flowColorModeFor(config.color.mode) &&
+      config.flow.palette === config.color.palette
+    );
   }
 
   // ---- symbolic differentiation ------------------------------------------

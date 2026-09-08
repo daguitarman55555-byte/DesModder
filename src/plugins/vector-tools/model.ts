@@ -191,6 +191,29 @@ export interface VectorLengthConfig {
 }
 
 /**
+ * The particle color mode that means the same thing as an arrow color mode.
+ *
+ * The two vocabularies are deliberately different sizes. An arrow is a vector
+ * at a fixed point, so it can be colored by its x component or by a signed
+ * magnitude; a particle is a moving dot whose only scalar is how fast it is
+ * going. Every arrow mode that reads some measure of size therefore lands on
+ * `speed`, and only direction and fixed survive as themselves.
+ *
+ * It lives here rather than in the panel because it is a fact about what the
+ * modes mean, not about how the button that uses it is drawn.
+ */
+export function flowColorModeFor(mode: VectorColorMode): FlowColorMode {
+  switch (mode) {
+    case "direction":
+      return "direction";
+    case "fixed":
+      return "fixed";
+    default:
+      return "speed";
+  }
+}
+
+/**
  * Which of the four length numbers a mode actually reads.
  *
  * Both halves of the plugin scale a vector by the same factor — the shader's

@@ -373,50 +373,76 @@ function arrowsTab(vectorTools: VectorTools, config: ConfigGetter) {
   );
 }
 
+/**
+ * Everything that decides what colour anything is, for both things that draw.
+ *
+ * The flow's colour controls used to live on the Flow tab, beside the settings
+ * that decide how the particles move. That split the question "what colour is
+ * this picture" across two tabs and left the Colour tab quietly meaning "the
+ * arrows only" while never saying so. They are here together now, each under
+ * the name of the thing it colours.
+ *
+ * They stay separately settable: colouring arrows by magnitude while the flow
+ * runs a quiet single hue is a legitimate picture, and collapsing them into one
+ * setting would impose a limit where an option belongs. Wanting one scheme for
+ * both is the common case though, so that is one press rather than a mode and a
+ * palette set twice.
+ */
 function colorTab(vectorTools: VectorTools, config: ConfigGetter) {
   const color = () => config().color;
+  const flow = () => config().flow;
   const usesPalette = () =>
     color().mode === "magnitude" || color().mode === "log-magnitude";
   // One swatch, two users: the arrows read it in fixed mode and so does the
   // flow, so it stays while either of them still needs it.
-  const flowUsesFixed = () => config().flow.colorMode === "fixed";
-  const usesFixed = () => color().mode === "fixed" || flowUsesFixed();
+  const flowUsesFixed = () => flow().colorMode === "fixed";
+  const arrowsUseFixed = () => color().mode === "fixed";
+  const usesFixed = () => arrowsUseFixed() || flowUsesFixed();
+  const fixedUsers = () => {
+    if (arrowsUseFixed() && flowUsesFixed())
+      return "The arrows and the flow's particles are both set to this color.";
+    if (flowUsesFixed()) return "The flow's particles are set to this color.";
+    return "The arrows are set to this color.";
+  };
   return (
     <div>
       <section class="dsm-vector-tools-section">
+        <h3>Arrows</h3>
         {chipGroup(
           "Color mode",
           () => color().mode,
           COLOR_MODES,
           (value) => vectorTools.setColor("mode", value)
         )}
-        <If predicate={usesFixed}>
+        <If predicate={usesPalette}>
           {() => (
             <div>
-              <label
-                class="dsm-vector-tools-label"
-                for="dsm-vector-tools-fixed-color"
-              >
-                Fixed color
-              </label>
-              <input
-                id="dsm-vector-tools-fixed-color"
-                type="color"
-                onUpdate={(element: HTMLInputElement) => {
-                  if (document.activeElement !== element)
-                    element.value = color().fixedColor;
-                }}
-                onInput={(event: Event) =>
-                  vectorTools.setColor(
-                    "fixedColor",
-                    (event.target as HTMLInputElement).value
-                  )
-                }
-              />
-              <If predicate={() => color().mode !== "fixed" && flowUsesFixed()}>
+              {paletteChooser(
+                "Palette",
+                () => color().palette,
+                (value) => vectorTools.setColor("palette", value)
+              )}
+              {chipGroup(
+                "Color range",
+                () => color().rangeMode,
+                RANGE_MODES,
+                (value) => vectorTools.setColor("rangeMode", value)
+              )}
+              <If predicate={() => color().rangeMode === "manual"}>
                 {() => (
-                  <div class="dsm-vector-tools-hint">
-                    The flow's particles are set to this color.
+                  <div class="dsm-vector-tools-number-grid">
+                    {numberControl(
+                      "dsm-vector-tools-range-minimum",
+                      "Range minimum",
+                      () => color().minimum,
+                      (value) => vectorTools.setColor("minimum", value)
+                    )}
+                    {numberControl(
+                      "dsm-vector-tools-range-maximum",
+                      "Range maximum",
+                      () => color().maximum,
+                      (value) => vectorTools.setColor("maximum", value)
+                    )}
                   </div>
                 )}
               </If>
@@ -425,38 +451,70 @@ function colorTab(vectorTools: VectorTools, config: ConfigGetter) {
         </If>
       </section>
 
-      <If predicate={usesPalette}>
+      <section class="dsm-vector-tools-section">
+        <div class="dsm-vector-tools-section-head">
+          <h3>Flow particles</h3>
+          {/* Shown only while pressing it would change something. A button that
+              is offered and does nothing is the same problem as a control that
+              takes input and changes nothing. */}
+          <If predicate={() => !vectorTools.flowColorMatchesArrows}>
+            {() => (
+              <Button
+                color="light-gray"
+                class="dsm-vector-tools-match-colors"
+                onTap={() => vectorTools.matchFlowColorToArrows()}
+              >
+                Match arrows
+              </Button>
+            )}
+          </If>
+        </div>
+        {chipGroup(
+          "Particle color",
+          () => flow().colorMode,
+          FLOW_COLOR_MODES,
+          (value) => vectorTools.setFlow("colorMode", value)
+        )}
+        {/* Direction runs along a cyclic ramp of its own and fixed takes the
+            shared swatch, so only speed has a ramp to choose. */}
+        <If predicate={() => flow().colorMode === "speed"}>
+          {() =>
+            paletteChooser(
+              "Particle palette",
+              () => flow().palette,
+              (value) => vectorTools.setFlow("palette", value)
+            )
+          }
+        </If>
+        <If predicate={() => vectorTools.flowColorMatchesArrows}>
+          {() => <div class="dsm-vector-tools-hint">Matching the arrows.</div>}
+        </If>
+      </section>
+
+      <If predicate={usesFixed}>
         {() => (
           <section class="dsm-vector-tools-section">
-            {paletteChooser(
-              "Palette",
-              () => color().palette,
-              (value) => vectorTools.setColor("palette", value)
-            )}
-            {chipGroup(
-              "Color range",
-              () => color().rangeMode,
-              RANGE_MODES,
-              (value) => vectorTools.setColor("rangeMode", value)
-            )}
-            <If predicate={() => color().rangeMode === "manual"}>
-              {() => (
-                <div class="dsm-vector-tools-number-grid">
-                  {numberControl(
-                    "dsm-vector-tools-range-minimum",
-                    "Range minimum",
-                    () => color().minimum,
-                    (value) => vectorTools.setColor("minimum", value)
-                  )}
-                  {numberControl(
-                    "dsm-vector-tools-range-maximum",
-                    "Range maximum",
-                    () => color().maximum,
-                    (value) => vectorTools.setColor("maximum", value)
-                  )}
-                </div>
-              )}
-            </If>
+            <label
+              class="dsm-vector-tools-label"
+              for="dsm-vector-tools-fixed-color"
+            >
+              Fixed color
+            </label>
+            <input
+              id="dsm-vector-tools-fixed-color"
+              type="color"
+              onUpdate={(element: HTMLInputElement) => {
+                if (document.activeElement !== element)
+                  element.value = color().fixedColor;
+              }}
+              onInput={(event: Event) =>
+                vectorTools.setColor(
+                  "fixedColor",
+                  (event.target as HTMLInputElement).value
+                )
+              }
+            />
+            <div class="dsm-vector-tools-hint">{fixedUsers}</div>
           </section>
         )}
       </If>
@@ -521,23 +579,11 @@ function flowTab(vectorTools: VectorTools, config: ConfigGetter) {
           () => flow().normalizeSpeed,
           (checked) => vectorTools.setFlow("normalizeSpeed", checked)
         )}
-        {chipGroup(
-          "Particle color",
-          () => flow().colorMode,
-          FLOW_COLOR_MODES,
-          (value) => vectorTools.setFlow("colorMode", value)
-        )}
-        {/* Direction runs along the hue wheel and fixed takes the Color tab's
-            swatch, so only speed has a ramp to choose. */}
-        <If predicate={() => flow().colorMode === "speed"}>
-          {() =>
-            paletteChooser(
-              "Particle palette",
-              () => flow().palette,
-              (value) => vectorTools.setFlow("palette", value)
-            )
-          }
-        </If>
+        {/* The particles' colour is set on the Color tab, beside the arrows',
+            so that what colour the picture is has one place to be answered. */}
+        <div class="dsm-vector-tools-hint">
+          Particle color is on the Color tab, with the arrows'.
+        </div>
       </section>
 
       {/* Everything below is a refinement of what Look already set, or a
