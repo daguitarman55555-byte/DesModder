@@ -9,9 +9,84 @@
  * field that is not the one in the expression list.
  */
 
+/** A single-expression definition read out of the expression list. */
+export interface FunctionDefinition {
+  /** Canonical parameter names, in order. */
+  params: readonly string[];
+  /** The right-hand side, as LaTeX. */
+  latex: string;
+}
+
+/**
+ * What a field component may reference beyond `x`, `y` and `e`.
+ *
+ * The shader cannot call back into Desmos, so anything the expression list
+ * defines has to be carried across the boundary before compiling: a function
+ * arrives as the LaTeX of its body and is compiled into a GLSL function
+ * alongside the field, and a named value arrives as a name alone and becomes a
+ * uniform. The value itself deliberately does not appear here — see
+ * `CompileResult.params`.
+ */
+export interface FieldEnvironment {
+  functions: ReadonlyMap<string, FunctionDefinition>;
+  scalars: ReadonlySet<string>;
+}
+
+export const EMPTY_ENVIRONMENT: FieldEnvironment = {
+  functions: new Map(),
+  scalars: new Set(),
+};
+
+/** A GLSL function compiled from an expression-list definition. */
+export interface CompiledHelper {
+  /** The Desmos name, so two components can merge helpers without duplicates. */
+  name: string;
+  glsl: string;
+}
+
 export type CompileResult =
-  | { ok: true; glsl: string }
+  | {
+      ok: true;
+      glsl: string;
+      /** Dependencies first, so the shader can emit them in this order. */
+      helpers: readonly CompiledHelper[];
+      /**
+       * The named values the expression read, as Desmos names.
+       *
+       * These become uniforms rather than baked-in literals so that dragging a
+       * slider uploads a float instead of recompiling and relinking the two
+       * shader programs — the same reason `setField` compares fields before
+       * rebuilding.
+       */
+      params: readonly string[];
+    }
   | { ok: false; error: string };
+
+/**
+ * How deep a chain of definitions may go before this gives up.
+ *
+ * A chain that long is far more likely to be a mistake than an intent, and the
+ * limit is what stops a pathological graph from expanding into a shader no
+ * driver will compile.
+ */
+const MAX_DEFINITION_DEPTH = 12;
+
+const glslIdentifier = (name: string) => name.replace(/[^A-Za-z0-9]/g, "_");
+
+/**
+ * One spelling for an identifier, so `a_{1}` and `a_1` are the same name.
+ *
+ * MathQuill writes the braced form and a hand-typed expression may not, and the
+ * two have to agree or a field would reference a slider the environment looks
+ * up under the other spelling and fails to find.
+ */
+export const canonicalIdentifier = (name: string) =>
+  name.replace(/_\{([A-Za-z0-9]*)\}/, "_$1");
+
+/** A referenced value, as a uniform. Desmos names cannot collide once flattened. */
+export const glslParamName = (name: string) => `u_vp_${glslIdentifier(name)}`;
+const glslFunctionName = (name: string) => `vtu_${glslIdentifier(name)}`;
+const glslLocalName = (name: string) => `vl_${glslIdentifier(name)}`;
 
 /** Emitted once per shader; every compiled expression may reference these. */
 export const GLSL_PRELUDE = `
@@ -77,13 +152,21 @@ function naryEmit(name: string) {
     args.length === 1 ? args[0] : args.reduce((a, b) => `${name}(${a}, ${b})`);
 }
 
-export function compileFieldComponentToGLSL(latex: string): CompileResult {
+export function compileFieldComponentToGLSL(
+  latex: string,
+  env: FieldEnvironment = EMPTY_ENVIRONMENT
+): CompileResult {
   try {
-    const tokens = tokenize(latex);
-    const parser = new Parser(tokens);
+    const context = new CompileContext(env);
+    const parser = new Parser(tokenize(latex), context, new Map());
     const glsl = parser.parseExpression();
     parser.expectEnd();
-    return { ok: true, glsl };
+    return {
+      ok: true,
+      glsl,
+      helpers: context.helpers,
+      params: [...context.params],
+    };
   } catch (error) {
     return {
       ok: false,
@@ -96,6 +179,65 @@ export function compileFieldComponentToGLSL(latex: string): CompileResult {
 }
 
 class CompileError extends Error {}
+
+/**
+ * What one compilation accumulates: the helper functions it had to build, and
+ * the named values it read.
+ *
+ * A referenced function becomes a real GLSL function rather than being inlined
+ * at the call site, because a body that uses its argument more than once would
+ * otherwise duplicate the whole argument expression each time, and a chain of
+ * such calls multiplies. Compiling it once also means the shader reads the way
+ * the graph does.
+ */
+class CompileContext {
+  readonly params = new Set<string>();
+  readonly helpers: CompiledHelper[] = [];
+  private readonly compiled = new Map<string, string>();
+  private readonly expanding: string[] = [];
+
+  constructor(readonly env: FieldEnvironment) {}
+
+  /** The GLSL function for a definition, compiling it the first time it is used. */
+  declare(name: string, definition: FunctionDefinition): string {
+    const already = this.compiled.get(name);
+    if (already !== undefined) return already;
+    if (this.expanding.includes(name)) {
+      throw new CompileError(
+        `"${name}" is defined in terms of itself, and a shader cannot evaluate a recursive definition.`
+      );
+    }
+    if (this.expanding.length >= MAX_DEFINITION_DEPTH) {
+      throw new CompileError(
+        `Definitions starting at "${name}" nest more than ${MAX_DEFINITION_DEPTH} deep.`
+      );
+    }
+    this.expanding.push(name);
+    const scope = new Map(
+      definition.params.map((param) => [param, glslLocalName(param)] as const)
+    );
+    const parser = new Parser(tokenize(definition.latex), this, scope);
+    const body = parser.parseExpression();
+    parser.expectEnd();
+    this.expanding.pop();
+
+    // `p` is passed to every helper whether it reads a coordinate or not, so a
+    // definition is free to mention x and y without the caller knowing whether
+    // it does. Registered only now, after its own body compiled, so anything it
+    // called is already ahead of it and the shader can emit them in order.
+    const glslName = glslFunctionName(name);
+    const signature = [
+      "vec2 p",
+      ...definition.params.map((param) => `float ${glslLocalName(param)}`),
+    ].join(", ");
+    this.helpers.push({
+      name,
+      glsl: `float ${glslName}(${signature}) { return ${body}; }`,
+    });
+    this.compiled.set(name, glslName);
+    return glslName;
+  }
+}
 
 type Token =
   | { kind: "number"; value: string }
@@ -210,15 +352,14 @@ function tokenize(latex: string): Token[] {
       );
     }
     if (/[A-Za-z]/.test(char)) {
-      // Reject subscripted identifiers: they refer to other expressions that
-      // the GPU shader has no way to resolve.
-      if (latex[i + 1] === "_") {
-        throw new CompileError(
-          `The variable "${char}_..." refers to another expression, which the flow visualizer cannot evaluate.`
-        );
-      }
-      tokens.push({ kind: "variable", value: char });
-      i++;
+      // A Desmos identifier is one letter and an optional subscript, and both
+      // forms MathQuill can produce are accepted. These used to be refused
+      // outright as unreachable; they are now looked up in the environment the
+      // caller read out of the expression list.
+      const [identifier] =
+        /^[A-Za-z](?:_(?:\{[A-Za-z0-9]*\}|[A-Za-z0-9]))?/.exec(latex.slice(i))!;
+      tokens.push({ kind: "variable", value: canonicalIdentifier(identifier) });
+      i += identifier.length;
       continue;
     }
     i++;
@@ -273,7 +414,12 @@ class Parser {
    */
   private barDepth = 0;
 
-  constructor(private readonly tokens: readonly Token[]) {}
+  constructor(
+    private readonly tokens: readonly Token[],
+    private readonly context: CompileContext,
+    /** Parameter names bound by the definition being compiled, if any. */
+    private readonly scope: ReadonlyMap<string, string>
+  ) {}
 
   expectEnd() {
     if (this.index < this.tokens.length) {
@@ -370,9 +516,16 @@ class Parser {
       case "number":
         this.index++;
         return glslFloat(token.value);
-      case "variable":
+      case "variable": {
         this.index++;
-        return variableToGLSL(token.value);
+        // `f(...)` is a call when f is a definition and a multiplication when
+        // it is a value, which is exactly how Desmos reads it too.
+        const definition = this.context.env.functions.get(token.value);
+        if (definition !== undefined && this.peek()?.kind === "open") {
+          return this.parseDefinedCall(token.value, definition);
+        }
+        return this.variableToGLSL(token.value);
+      }
       case "open": {
         this.index++;
         const inner = this.parseExpression();
@@ -419,6 +572,52 @@ class Parser {
           "The expression has a bracket or symbol in an unexpected place."
         );
     }
+  }
+
+  /**
+   * A name the caller resolved out of the expression list: a coordinate, the
+   * constant e, a parameter of the definition being compiled, or a value the
+   * graph binds — which becomes a uniform rather than a literal.
+   */
+  private variableToGLSL(name: string): string {
+    const bound = this.scope.get(name);
+    if (bound !== undefined) return bound;
+    switch (name) {
+      case "x":
+        return "p.x";
+      case "y":
+        return "p.y";
+      case "e":
+        return "2.7182818284590452";
+      default:
+        break;
+    }
+    if (this.context.env.scalars.has(name)) {
+      this.context.params.add(name);
+      return glslParamName(name);
+    }
+    throw new CompileError(
+      `"${name}" is not defined. The flow visualizer knows x and y, and anything the expression list defines as a number or a function of numbers.`
+    );
+  }
+
+  private parseDefinedCall(name: string, definition: FunctionDefinition) {
+    this.index++;
+    const args = [this.parseExpression()];
+    while (this.peek()?.kind === "comma") {
+      this.index++;
+      args.push(this.parseExpression());
+    }
+    this.expect("close", "a closing parenthesis");
+    if (args.length !== definition.params.length) {
+      throw new CompileError(
+        `"${name}" takes ${definition.params.length} argument${
+          definition.params.length === 1 ? "" : "s"
+        }, but was given ${args.length}.`
+      );
+    }
+    const glslName = this.context.declare(name, definition);
+    return `${glslName}(p${args.map((arg) => `, ${arg}`).join("")})`;
   }
 
   private parseFunctionCall(name: string): string {
@@ -509,21 +708,6 @@ function powerGLSL(base: string, exponent: string) {
     return literal > 0 ? product : `vtDiv(1.0, ${product})`;
   }
   return `vtPow(${base}, ${exponent})`;
-}
-
-function variableToGLSL(name: string) {
-  switch (name) {
-    case "x":
-      return "p.x";
-    case "y":
-      return "p.y";
-    case "e":
-      return "2.7182818284590452";
-    default:
-      throw new CompileError(
-        `"${name}" is not a coordinate. The flow visualizer only knows x and y.`
-      );
-  }
 }
 
 function glslFloat(value: string) {
