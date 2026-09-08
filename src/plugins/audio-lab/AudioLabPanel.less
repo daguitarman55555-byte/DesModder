@@ -1,0 +1,140 @@
+.dcg-container .dsm-pillbox-popover.dsm-audio-lab-popover {
+  max-width: none;
+  width: auto;
+}
+
+.dsm-audio-lab-menu {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  height: min(760px, 84vh);
+  overflow: hidden;
+  width: min(430px, 88vw);
+
+  .dsm-audio-lab-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 3px;
+  }
+
+  section {
+    margin-top: 8px;
+  }
+
+  section + section {
+    border-top: 1px solid #e6e6e6;
+    padding-top: 9px;
+  }
+
+  label,
+  .dsm-audio-lab-plot-title {
+    font-size: 11px;
+    font-weight: bold;
+  }
+
+  input[type="url"] {
+    border: 1px solid #bcbcbc;
+    border-radius: 3px;
+    box-sizing: border-box;
+    min-height: 28px;
+    min-width: 0;
+    padding: 4px 6px;
+    width: 100%;
+  }
+
+  button {
+    border: 0;
+    border-radius: 3px;
+    cursor: pointer;
+    min-height: 28px;
+    padding: 4px 10px;
+  }
+
+  button:disabled {
+    cursor: default;
+    opacity: 0.55;
+  }
+}
+
+.dsm-audio-lab-inline {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.dsm-audio-lab-inline input[type="range"] {
+  flex: 1;
+}
+
+.dsm-audio-lab-wide {
+  box-sizing: border-box;
+  margin-top: 7px;
+  width: 100%;
+}
+
+.dsm-audio-lab-player {
+  border: 0;
+  border-radius: 6px;
+  height: 152px;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.dsm-audio-lab-hint,
+.dsm-audio-lab-status {
+  color: #666;
+  font-size: 11px;
+  line-height: 1.35;
+  margin: 4px 0 0;
+}
+
+.dsm-audio-lab-file {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.dsm-audio-lab-canvas {
+  background-color: #fafafa;
+  background-image:
+    linear-gradient(#e5e5e5 1px, transparent 1px),
+    linear-gradient(90deg, #e5e5e5 1px, transparent 1px);
+  background-size: 24px 24px;
+  border: 1px solid #d8d8d8;
+  border-radius: 3px;
+  box-sizing: border-box;
+  display: block;
+  height: 112px;
+  margin: 4px 0 9px;
+  width: 100%;
+}
+
+.dsm-audio-lab-plot-title,
+.dsm-audio-lab-metrics {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.dsm-audio-lab-plot-title span,
+.dsm-audio-lab-metrics {
+  color: #666;
+  font-size: 11px;
+}
+
+.dsm-audio-lab-metrics {
+  gap: 8px;
+}
+
+.dsm-audio-lab-footer {
+  border-top: 1px solid #ddd;
+  flex: none;
+  margin-top: 7px;
+  padding-top: 7px;
+}
+
+.dsm-audio-lab-error {
+  color: #c74440;
+}
