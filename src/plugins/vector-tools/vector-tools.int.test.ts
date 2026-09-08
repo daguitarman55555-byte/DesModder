@@ -1098,3 +1098,68 @@ testWithPage(
   },
   90000
 );
+
+testWithPage(
+  "Vector Tools can stop matching the flow's colours to the arrows'",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+    await openTab(driver, 2);
+
+    // Set the two apart, so matching has something visible to do.
+    await driver.evaluate(() => {
+      const vt = DSM.enabledPlugins["vector-tools"] as any;
+      vt.setColor("mode", "magnitude");
+      vt.setColor("palette", "turbo");
+      vt.setFlow("colorMode", "direction");
+      vt.setFlow("palette", "ocean");
+    });
+    await driver.waitForSync();
+
+    const flowColor = async () =>
+      await driver.evaluate(
+        () => (DSM.enabledPlugins["vector-tools"] as any).flowColor
+      );
+
+    // The arrows' half is open by default and the flow's is closed.
+    expect(
+      await driver.evaluate(() =>
+        [
+          ...document.querySelectorAll<HTMLDetailsElement>(
+            ".dsm-vector-tools-menu details"
+          ),
+        ].map((section) => section.open)
+      )
+    ).toEqual([true, false]);
+
+    expect(await flowColor()).toEqual({
+      colorMode: "direction",
+      palette: "ocean",
+    });
+
+    const toggle = ".dsm-vector-tools-match-colors input";
+    await driver.click(toggle);
+    await driver.waitForSync();
+    expect(await flowColor()).toEqual({ colorMode: "speed", palette: "turbo" });
+
+    // The point of the toggle. An earlier version copied the settings across
+    // and then hid the button, so there was no way back and the flow's own
+    // choices were gone; matching overrides instead, and turning it off puts
+    // them back.
+    await driver.click(toggle);
+    await driver.waitForSync();
+    expect(await flowColor()).toEqual({
+      colorMode: "direction",
+      palette: "ocean",
+    });
+
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).resetConfig()
+    );
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);

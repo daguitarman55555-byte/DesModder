@@ -232,6 +232,29 @@ export function flowColorModeFor(mode: VectorColorMode): FlowColorMode {
 }
 
 /**
+ * The colours the flow is actually drawn with, once the match is accounted for.
+ *
+ * The single answer to that question, for the same reason `lengthInputsFor` is
+ * the single answer to which length numbers a mode reads: the panel decides
+ * what to show from it and the renderer decides what to draw from it, and if
+ * those two disagreed the controls would describe a picture nobody is looking
+ * at. Matching overrides rather than overwrites, so `config.flow` still holds
+ * what the user last chose for themselves.
+ */
+export function effectiveFlowColor(config: VectorFieldConfig): {
+  colorMode: FlowColorMode;
+  palette: ColorPalette;
+} {
+  if (!config.color.matchFlow) {
+    return { colorMode: config.flow.colorMode, palette: config.flow.palette };
+  }
+  return {
+    colorMode: flowColorModeFor(config.color.mode),
+    palette: config.color.palette,
+  };
+}
+
+/**
  * Which of the four length numbers a mode actually reads.
  *
  * Both halves of the plugin scale a vector by the same factor — the shader's
@@ -283,6 +306,15 @@ export interface VectorColorConfig {
   minimum: number;
   maximum: number;
   fixedColor: string;
+  /**
+   * Whether the flow's colours follow the arrows'.
+   *
+   * A standing link rather than a copy, and that is the whole point: the flow's
+   * own settings are left where they are and merely overridden while this is on,
+   * so turning it off puts back what was there instead of leaving the user to
+   * reconstruct it. A one-press copy could not be undone.
+   */
+  matchFlow: boolean;
 }
 
 export interface VectorFieldConfig {
@@ -405,6 +437,7 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
     minimum: 0,
     maximum: 1,
     fixedColor: "#6042a6",
+    matchFlow: false,
   },
   zeroVectorMode: "hide",
   arrowMode: "live",
@@ -714,6 +747,10 @@ export function normalizeVectorFieldConfig(value: unknown): VectorFieldConfig {
         typeof color?.fixedColor === "string"
           ? color.fixedColor
           : fallback.color.fixedColor,
+      matchFlow:
+        typeof color?.matchFlow === "boolean"
+          ? color.matchFlow
+          : fallback.color.matchFlow,
     },
     zeroVectorMode: value.zeroVectorMode === "point" ? "point" : "hide",
     arrowMode:

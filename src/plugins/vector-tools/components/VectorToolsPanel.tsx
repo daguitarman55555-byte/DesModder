@@ -402,17 +402,26 @@ function arrowsTab(vectorTools: VectorTools, config: ConfigGetter) {
  * They stay separately settable: colouring arrows by magnitude while the flow
  * runs a quiet single hue is a legitimate picture, and collapsing them into one
  * setting would impose a limit where an option belongs. Wanting one scheme for
- * both is the common case though, so that is one press rather than a mode and a
- * palette set twice.
+ * both is the common case though, so the match is a checkbox at the top.
+ *
+ * It is a standing link and not a one-press copy, which the first version was
+ * and which was a mistake: that button hid itself once it had nothing left to
+ * do, taking with it the only way back to what the flow had been set to. This
+ * one overrides rather than overwrites, so unticking it restores exactly what
+ * was there.
+ *
+ * Each half is a disclosure. Eighteen palettes twice over is a very long tab,
+ * and the flow's half is closed by default because a graph without the flow
+ * running has no use for it — the same reasoning as the Flow tab's Fine tuning.
  */
 function colorTab(vectorTools: VectorTools, config: ConfigGetter) {
   const color = () => config().color;
-  const flow = () => config().flow;
   const usesPalette = () =>
     color().mode === "magnitude" || color().mode === "log-magnitude";
   // One swatch, two users: the arrows read it in fixed mode and so does the
-  // flow, so it stays while either of them still needs it.
-  const flowUsesFixed = () => flow().colorMode === "fixed";
+  // flow, so it stays while either of them still needs it. Which mode the flow
+  // is *actually* in depends on the match, so this asks for the effective one.
+  const flowUsesFixed = () => vectorTools.flowColor.colorMode === "fixed";
   const arrowsUseFixed = () => color().mode === "fixed";
   const usesFixed = () => arrowsUseFixed() || flowUsesFixed();
   const fixedUsers = () => {
@@ -423,8 +432,15 @@ function colorTab(vectorTools: VectorTools, config: ConfigGetter) {
   };
   return (
     <div>
-      <section class="dsm-vector-tools-section">
-        <h3>Arrows</h3>
+      {checkboxControl(
+        "Use the same colors for the flow as for the arrows",
+        () => vectorTools.matchFlowColor,
+        (checked) => vectorTools.setMatchFlowColor(checked),
+        "dsm-vector-tools-match-colors"
+      )}
+
+      <details class="dsm-vector-tools-more" open>
+        <summary>Arrows</summary>
         {chipGroup(
           "Color mode",
           () => color().mode,
@@ -466,47 +482,43 @@ function colorTab(vectorTools: VectorTools, config: ConfigGetter) {
             </div>
           )}
         </If>
-      </section>
+      </details>
 
-      <section class="dsm-vector-tools-section">
-        <div class="dsm-vector-tools-section-head">
-          <h3>Flow particles</h3>
-          {/* Shown only while pressing it would change something. A button that
-              is offered and does nothing is the same problem as a control that
-              takes input and changes nothing. */}
-          <If predicate={() => !vectorTools.flowColorMatchesArrows}>
-            {() => (
-              <Button
-                color="light-gray"
-                class="dsm-vector-tools-match-colors"
-                onTap={() => vectorTools.matchFlowColorToArrows()}
-              >
-                Match arrows
-              </Button>
-            )}
-          </If>
-        </div>
-        {chipGroup(
-          "Particle color",
-          () => flow().colorMode,
-          FLOW_COLOR_MODES,
-          (value) => vectorTools.setFlow("colorMode", value)
-        )}
-        {/* Direction runs along a cyclic ramp of its own and fixed takes the
-            shared swatch, so only speed has a ramp to choose. */}
-        <If predicate={() => flow().colorMode === "speed"}>
-          {() =>
-            paletteChooser(
-              "Particle palette",
-              () => flow().palette,
-              (value) => vectorTools.setFlow("palette", value)
-            )
-          }
-        </If>
-        <If predicate={() => vectorTools.flowColorMatchesArrows}>
-          {() => <div class="dsm-vector-tools-hint">Matching the arrows.</div>}
-        </If>
-      </section>
+      <details class="dsm-vector-tools-more dsm-vector-tools-flow-colors">
+        <summary>Flow particles</summary>
+        {IfElse(() => vectorTools.matchFlowColor, {
+          // Its own controls are not shown while the link is on, because they
+          // would be describing a picture nobody is looking at. They are not
+          // gone — unticking the box above brings them back as they were.
+          true: () => (
+            <div class="dsm-vector-tools-hint">
+              Following the arrows. Untick the box above to set these
+              separately; whatever was chosen before is still here.
+            </div>
+          ),
+          false: () => (
+            <div>
+              {chipGroup(
+                "Particle color",
+                () => config().flow.colorMode,
+                FLOW_COLOR_MODES,
+                (value) => vectorTools.setFlow("colorMode", value)
+              )}
+              {/* Direction runs along a cyclic ramp of its own and fixed takes
+                  the shared swatch, so only speed has a ramp to choose. */}
+              <If predicate={() => config().flow.colorMode === "speed"}>
+                {() =>
+                  paletteChooser(
+                    "Particle palette",
+                    () => config().flow.palette,
+                    (value) => vectorTools.setFlow("palette", value)
+                  )
+                }
+              </If>
+            </div>
+          ),
+        })}
+      </details>
 
       <If predicate={usesFixed}>
         {() => (
@@ -1165,10 +1177,16 @@ function textControl(
 function checkboxControl(
   label: string,
   checked: () => boolean,
-  onChange: (checked: boolean) => void
+  onChange: (checked: boolean) => void,
+  className?: string
 ) {
   return (
-    <label class="dsm-vector-tools-checkbox">
+    <label
+      class={() => ({
+        "dsm-vector-tools-checkbox": true,
+        ...(className === undefined ? {} : { [className]: true }),
+      })}
+    >
       <input
         type="checkbox"
         onUpdate={(element: HTMLInputElement) => {

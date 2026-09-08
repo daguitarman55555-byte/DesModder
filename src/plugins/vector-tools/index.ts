@@ -7,7 +7,7 @@ import {
 import {
   configForPreset,
   DENSITY_PRESETS,
-  flowColorModeFor,
+  effectiveFlowColor,
   isDevelopmentBuild,
   getAxisSampleCount,
   thinArrowGrid,
@@ -961,32 +961,35 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   }
 
   /**
-   * Points the flow at the same colors as the arrows, in one press.
+   * Whether the flow's colours are following the arrows'.
    *
-   * The two stay separately settable on purpose — colouring arrows by magnitude
+   * A standing link, not a one-press copy. The first version of this was a
+   * button that copied the arrow settings across and then hid itself, having
+   * nothing left to do — which meant there was no way back: the flow's own
+   * settings were gone and the control that would have restored them was the
+   * one that had just disappeared. A toggle overrides instead of overwriting,
+   * so turning it off puts back exactly what was there.
+   *
+   * The two stay separately settable underneath. Colouring arrows by magnitude
    * while the flow runs a quiet single hue is a legitimate picture, and taking
-   * that away would be imposing a limit where an option belongs. But wanting one
-   * scheme for both is the common case, and matching them by hand meant setting
-   * a mode and a palette twice and knowing which particle mode corresponds to
-   * which arrow mode.
+   * that away would impose a limit where an option belongs.
    *
-   * The fixed swatch is not copied because there is only one of it: both halves
-   * already read `color.fixedColor`.
+   * The fixed swatch is outside all of this because there is only one of it:
+   * both halves already read `color.fixedColor`.
    */
-  matchFlowColorToArrows() {
+  get matchFlowColor() {
+    return this.getConfig().color.matchFlow;
+  }
+
+  setMatchFlowColor(match: boolean) {
     this.updateConfig((config) => {
-      config.flow.colorMode = flowColorModeFor(config.color.mode);
-      config.flow.palette = config.color.palette;
+      config.color.matchFlow = match;
     });
   }
 
-  /** Whether the flow would look any different after matching. */
-  get flowColorMatchesArrows() {
-    const config = this.getConfig();
-    return (
-      config.flow.colorMode === flowColorModeFor(config.color.mode) &&
-      config.flow.palette === config.color.palette
-    );
+  /** What the flow is drawn with right now, match accounted for. */
+  get flowColor() {
+    return effectiveFlowColor(this.getConfig());
   }
 
   // ---- symbolic differentiation ------------------------------------------
@@ -1154,7 +1157,13 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
 
   private get flowOptions() {
     const config = this.getConfig();
-    return { ...config.flow, fixedColor: config.color.fixedColor };
+    // The match overrides here rather than in the stored config, which is what
+    // lets turning it off restore what the flow was set to before.
+    return {
+      ...config.flow,
+      ...effectiveFlowColor(config),
+      fixedColor: config.color.fixedColor,
+    };
   }
 
   get validation() {

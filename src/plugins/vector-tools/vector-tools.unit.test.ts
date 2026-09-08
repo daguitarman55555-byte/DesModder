@@ -15,6 +15,7 @@ import {
   cloneDefaultConfig,
   configForPreset,
   DENSITY_PRESETS,
+  effectiveFlowColor,
   FLOW_PARTICLE_MAXIMUM,
   FLOW_RENDER_SCALE_MINIMUM,
   FLOW_PARTICLE_MINIMUM,
@@ -694,6 +695,67 @@ describe("Vector Tools length inputs", () => {
       // mode has at least one number, or its section would be empty.
       if (mode === "actual") expect(shown).toBe(0);
       else expect(shown).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("Vector Tools flow colour matching", () => {
+  const configWith = (matchFlow: boolean) => {
+    const config = cloneDefaultConfig();
+    config.color.mode = "magnitude";
+    config.color.palette = "turbo";
+    config.color.matchFlow = matchFlow;
+    config.flow.colorMode = "direction";
+    config.flow.palette = "ocean";
+    return config;
+  };
+
+  test("overrides the flow's colours without overwriting them", () => {
+    // This is the whole design. The first version copied the arrow settings
+    // over the flow's and then hid the button that had done it, leaving no way
+    // back — the flow's own choices were gone. Matching must be a view, so that
+    // turning it off restores exactly what was there.
+    const matched = configWith(true);
+    expect(effectiveFlowColor(matched)).toEqual({
+      colorMode: "speed",
+      palette: "turbo",
+    });
+    expect(matched.flow.colorMode).toBe("direction");
+    expect(matched.flow.palette).toBe("ocean");
+
+    matched.color.matchFlow = false;
+    expect(effectiveFlowColor(matched)).toEqual({
+      colorMode: "direction",
+      palette: "ocean",
+    });
+  });
+
+  test("unmatched, the flow answers for itself", () => {
+    expect(effectiveFlowColor(configWith(false))).toEqual({
+      colorMode: "direction",
+      palette: "ocean",
+    });
+  });
+
+  test("every arrow mode maps to a particle mode", () => {
+    // An arrow can be coloured by its x component; a particle's only scalar is
+    // its speed. Anything that reads some measure of size has to land there, or
+    // matching would silently pick a mode the flow cannot draw.
+    const config = configWith(true);
+    for (const mode of [
+      "fixed",
+      "magnitude",
+      "log-magnitude",
+      "direction",
+      "x-component",
+      "y-component",
+    ] as const) {
+      config.color.mode = mode;
+      const { colorMode } = effectiveFlowColor(config);
+      expect([mode, colorMode]).toEqual([
+        mode,
+        expect.stringMatching(/^(speed|direction|fixed)$/),
+      ]);
     }
   });
 });
