@@ -28,14 +28,57 @@ export type PaletteID =
   | "spectral"
   | "sequential-a"
   | "sequential-b"
+  | "turbo"
+  | "plasma"
+  | "magma"
+  | "cividis"
+  | "jet"
   | "blue-red"
+  | "coolwarm"
   | "grayscale"
-  | "direction-hue";
+  | "sunset"
+  | "ocean"
+  | "ember"
+  | "neon"
+  | "direction-hue"
+  | "twilight"
+  | "phase";
+
+/**
+ * Which shelf a palette belongs on in the picker.
+ *
+ * There are enough ramps now that one flat row of chips is a wall to read
+ * rather than a choice to make, and the four groups are the question the user
+ * is actually answering: do I want the conventional one, one that separates a
+ * sign, one that wraps, or one that simply looks the way I want.
+ */
+export type PaletteGroup = "sequential" | "diverging" | "cyclic" | "expressive";
+
+export const PALETTE_GROUPS: readonly {
+  id: PaletteGroup;
+  label: string;
+}[] = [
+  { id: "sequential", label: "Sequential" },
+  { id: "diverging", label: "Diverging" },
+  { id: "cyclic", label: "Cyclic" },
+  { id: "expressive", label: "Expressive" },
+];
 
 export interface Palette {
   name: string;
+  group: PaletteGroup;
   /** Undefined for a palette that is not a ramp at all; see `direction-hue`. */
   stops?: readonly PaletteStop[];
+  /**
+   * True when the ramp's two ends are the same colour, so it can be walked
+   * round without a seam.
+   *
+   * This is what makes a palette honest for `direction`, where the value being
+   * coloured is an angle: 359° and 1° are neighbours, and a ramp whose ends do
+   * not meet draws a hard edge across the field along whichever ray happens to
+   * be zero.
+   */
+  cyclic?: boolean;
 }
 
 export const PALETTES: Record<PaletteID, Palette> = {
@@ -45,6 +88,7 @@ export const PALETTES: Record<PaletteID, Palette> = {
    */
   spectral: {
     name: "Spectral",
+    group: "sequential",
     stops: [
       { at: 0, rgb: [38, 77, 173] },
       { at: 0.35, rgb: [41, 173, 158] },
@@ -55,6 +99,7 @@ export const PALETTES: Record<PaletteID, Palette> = {
   /** Viridis, which is perceptually even and readable to color-blind eyes. */
   "sequential-a": {
     name: "Viridis",
+    group: "sequential",
     stops: [
       { at: 0, rgb: [68, 1, 84] },
       { at: 0.25, rgb: [59, 82, 139] },
@@ -66,10 +111,83 @@ export const PALETTES: Record<PaletteID, Palette> = {
   /** A single-hue ramp, for a field that should not shout. */
   "sequential-b": {
     name: "Blue",
+    group: "sequential",
     stops: [
       { at: 0, rgb: [8, 29, 88] },
       { at: 0.5, rgb: [34, 94, 168] },
       { at: 1, rgb: [127, 205, 255] },
+    ],
+  },
+  /**
+   * Turbo, Google's replacement for jet: the same rainbow sweep people read
+   * fluently, without the bands of false detail jet invents at cyan and yellow.
+   * The most stops of any ramp here, and so the one that sets the shader's
+   * array size.
+   */
+  turbo: {
+    name: "Turbo",
+    group: "sequential",
+    stops: [
+      { at: 0, rgb: [48, 18, 59] },
+      { at: 0.14, rgb: [66, 120, 240] },
+      { at: 0.29, rgb: [39, 181, 225] },
+      { at: 0.43, rgb: [49, 231, 153] },
+      { at: 0.57, rgb: [149, 255, 64] },
+      { at: 0.71, rgb: [231, 222, 38] },
+      { at: 0.86, rgb: [253, 141, 39] },
+      { at: 1, rgb: [122, 4, 3] },
+    ],
+  },
+  plasma: {
+    name: "Plasma",
+    group: "sequential",
+    stops: [
+      { at: 0, rgb: [13, 8, 135] },
+      { at: 0.25, rgb: [126, 3, 168] },
+      { at: 0.5, rgb: [204, 71, 120] },
+      { at: 0.75, rgb: [248, 149, 64] },
+      { at: 1, rgb: [240, 249, 33] },
+    ],
+  },
+  /** Near-black at the bottom, so a quiet region of the field stays quiet. */
+  magma: {
+    name: "Magma",
+    group: "sequential",
+    stops: [
+      { at: 0, rgb: [0, 0, 4] },
+      { at: 0.25, rgb: [81, 18, 124] },
+      { at: 0.5, rgb: [183, 55, 121] },
+      { at: 0.75, rgb: [252, 137, 97] },
+      { at: 1, rgb: [252, 253, 191] },
+    ],
+  },
+  /** Built to survive both common forms of red-green colour blindness. */
+  cividis: {
+    name: "Cividis",
+    group: "sequential",
+    stops: [
+      { at: 0, rgb: [0, 32, 76] },
+      { at: 0.25, rgb: [28, 71, 117] },
+      { at: 0.5, rgb: [96, 109, 116] },
+      { at: 0.75, rgb: [158, 150, 109] },
+      { at: 1, rgb: [253, 231, 55] },
+    ],
+  },
+  /**
+   * The classic. It is perceptually poor — it invents edges where the field is
+   * smooth — but it is what decades of fluid-dynamics figures used, and a plot
+   * meant to sit beside one of those should be able to match it.
+   */
+  jet: {
+    name: "Jet (classic)",
+    group: "sequential",
+    stops: [
+      { at: 0, rgb: [0, 0, 131] },
+      { at: 0.125, rgb: [0, 60, 170] },
+      { at: 0.375, rgb: [5, 255, 255] },
+      { at: 0.625, rgb: [255, 255, 0] },
+      { at: 0.875, rgb: [250, 0, 0] },
+      { at: 1, rgb: [128, 0, 0] },
     ],
   },
   /**
@@ -78,33 +196,162 @@ export const PALETTES: Record<PaletteID, Palette> = {
    */
   "blue-red": {
     name: "Blue to red",
+    group: "diverging",
     stops: [
       { at: 0, rgb: [33, 102, 172] },
       { at: 0.5, rgb: [247, 247, 247] },
       { at: 1, rgb: [178, 24, 43] },
     ],
   },
+  /**
+   * Moreland's cool-warm, the diverging ramp that keeps an even lightness on
+   * both arms. That evenness is what a signed quantity needs — divergence and
+   * curl are the ones coming — because it stops one sign looking stronger than
+   * the other purely by being darker.
+   */
+  coolwarm: {
+    name: "Cool to warm",
+    group: "diverging",
+    stops: [
+      { at: 0, rgb: [59, 76, 192] },
+      { at: 0.5, rgb: [221, 221, 221] },
+      { at: 1, rgb: [180, 4, 38] },
+    ],
+  },
   grayscale: {
     name: "Grayscale",
+    group: "sequential",
     stops: [
       { at: 0, rgb: [30, 30, 30] },
       { at: 1, rgb: [240, 240, 240] },
+    ],
+  },
+  sunset: {
+    name: "Sunset",
+    group: "expressive",
+    stops: [
+      { at: 0, rgb: [35, 17, 72] },
+      { at: 0.3, rgb: [129, 41, 110] },
+      { at: 0.6, rgb: [226, 90, 86] },
+      { at: 0.85, rgb: [249, 163, 80] },
+      { at: 1, rgb: [255, 232, 150] },
+    ],
+  },
+  ocean: {
+    name: "Ocean",
+    group: "expressive",
+    stops: [
+      { at: 0, rgb: [2, 18, 54] },
+      { at: 0.35, rgb: [3, 80, 120] },
+      { at: 0.7, rgb: [38, 160, 167] },
+      { at: 1, rgb: [160, 231, 206] },
+    ],
+  },
+  ember: {
+    name: "Ember",
+    group: "expressive",
+    stops: [
+      { at: 0, rgb: [10, 4, 8] },
+      { at: 0.3, rgb: [120, 20, 20] },
+      { at: 0.6, rgb: [230, 90, 15] },
+      { at: 0.85, rgb: [250, 190, 60] },
+      { at: 1, rgb: [255, 247, 214] },
+    ],
+  },
+  neon: {
+    name: "Neon",
+    group: "expressive",
+    stops: [
+      { at: 0, rgb: [15, 2, 40] },
+      { at: 0.3, rgb: [120, 10, 180] },
+      { at: 0.6, rgb: [240, 30, 140] },
+      { at: 0.8, rgb: [60, 240, 220] },
+      { at: 1, rgb: [230, 255, 120] },
     ],
   },
   /**
    * The hue wheel, which is a cycle rather than a ramp — it has no ends to
    * interpolate between, so it is emitted as `hsv` instead of from stops.
    */
-  "direction-hue": { name: "Hue wheel" },
+  "direction-hue": { name: "Hue wheel", group: "cyclic", cyclic: true },
+  /**
+   * Twilight: dark through both halves and pale where they meet, so a direction
+   * and its opposite are told apart by hue rather than by brightness.
+   */
+  twilight: {
+    name: "Twilight",
+    group: "cyclic",
+    cyclic: true,
+    stops: [
+      { at: 0, rgb: [226, 217, 226] },
+      { at: 0.15, rgb: [140, 160, 215] },
+      { at: 0.3, rgb: [70, 95, 175] },
+      { at: 0.45, rgb: [48, 45, 100] },
+      { at: 0.6, rgb: [95, 38, 78] },
+      { at: 0.75, rgb: [175, 75, 88] },
+      { at: 0.9, rgb: [216, 152, 152] },
+      { at: 1, rgb: [226, 217, 226] },
+    ],
+  },
+  /**
+   * A saturated wheel through six hues, louder than `direction-hue` and easier
+   * to read a rotation off at a glance.
+   */
+  phase: {
+    name: "Phase",
+    group: "cyclic",
+    cyclic: true,
+    stops: [
+      { at: 0, rgb: [255, 64, 64] },
+      { at: 0.17, rgb: [255, 214, 51] },
+      { at: 0.33, rgb: [77, 219, 84] },
+      { at: 0.5, rgb: [58, 217, 217] },
+      { at: 0.67, rgb: [72, 94, 240] },
+      { at: 0.83, rgb: [219, 71, 219] },
+      { at: 1, rgb: [255, 64, 64] },
+    ],
+  },
 };
 
 export const PALETTE_IDS = Object.keys(PALETTES) as PaletteID[];
 
 /** The most stops any palette has, which is what the shader has room for. */
-export const MAX_PALETTE_STOPS = 5;
+export const MAX_PALETTE_STOPS = 8;
 
 export function paletteStops(id: PaletteID): readonly PaletteStop[] {
   return PALETTES[id].stops ?? PALETTES.spectral.stops!;
+}
+
+/** The hue wheel evaluated on the CPU, matching `vtHueRamp` in the shader. */
+function hueRamp(hue: number): [number, number, number] {
+  const channel = (offset: number) => {
+    const k = (((hue * 6 + offset) % 6) + 6) % 6;
+    return Math.round(255 * Math.min(Math.max(Math.min(k, 4 - k), 0), 1));
+  };
+  return [channel(0), channel(4), channel(2)];
+}
+
+/**
+ * The same ramp again, as a CSS `linear-gradient`, so the picker can show what
+ * a palette looks like instead of naming it.
+ *
+ * This is the third place a ramp is emitted, and it is built from the same
+ * stops as the other two for the reason stated at the top of this file: a ramp
+ * written out by hand a second time is a ramp that drifts, and a swatch that
+ * disagrees with the field is worse than no swatch at all. The hue wheel has no
+ * stops to walk, so it is sampled from the same formula the shader uses.
+ */
+export function paletteCSSGradient(id: PaletteID): string {
+  const rgb = (color: readonly [number, number, number], at: number) =>
+    `rgb(${color[0]},${color[1]},${color[2]}) ${Math.round(at * 100)}%`;
+  const stops =
+    PALETTES[id].stops === undefined
+      ? Array.from({ length: 13 }, (_, i) => {
+          const at = i / 12;
+          return rgb(hueRamp(at), at);
+        })
+      : paletteStops(id).map((stop) => rgb(stop.rgb, stop.at));
+  return `linear-gradient(to right, ${stops.join(", ")})`;
 }
 
 /**

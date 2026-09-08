@@ -145,6 +145,56 @@
     color: #fff;
   }
 
+  // ---- palette picker ----
+  //
+  // Palettes are chips too — they share the selected state above — but each
+  // carries the ramp it selects, so they need room for a swatch and are laid
+  // out in a grid rather than left to wrap into ragged rows.
+
+  .dsm-vector-tools-palettes {
+    margin-top: 6px;
+  }
+
+  .dsm-vector-tools-palette-group + .dsm-vector-tools-palette-group {
+    margin-top: 7px;
+  }
+
+  .dsm-vector-tools-palette-group-label {
+    color: #777;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    margin: 0 0 3px;
+    text-transform: uppercase;
+  }
+
+  .dsm-vector-tools-palette-grid {
+    display: grid;
+    gap: 4px;
+    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  }
+
+  .dsm-vector-tools-palette {
+    align-items: center;
+    border-radius: 4px;
+    display: flex;
+    gap: 6px;
+    overflow: hidden;
+    padding: 3px 6px;
+  }
+
+  .dsm-vector-tools-palette-swatch {
+    border: 1px solid rgba(0, 0, 0, 0.25);
+    border-radius: 2px;
+    flex: none;
+    height: 12px;
+    width: 34px;
+  }
+
+  .dsm-vector-tools-palette-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   // ---- sliders ----
 
   .dsm-vector-tools-slider-row,

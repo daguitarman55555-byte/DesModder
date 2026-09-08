@@ -2,6 +2,7 @@ import {
   MAX_PALETTE_STOPS,
   PALETTE_IDS,
   PALETTES,
+  paletteCSSGradient,
   paletteLatex,
   paletteStops,
   paletteUniforms,
@@ -138,6 +139,46 @@ describe("Vector Tools palettes", () => {
           5
         );
       }
+    }
+  });
+
+  test("the swatch shows the ramp it selects", () => {
+    // The picker draws the palette rather than naming it, which is only worth
+    // doing while the drawing is the same ramp the field gets. This is the
+    // third emission of the same stops, and the one a person looks at.
+    for (const id of PALETTE_IDS) {
+      const gradient = paletteCSSGradient(id);
+      expect(gradient.startsWith("linear-gradient(to right, ")).toBe(true);
+      if (PALETTES[id].stops === undefined) {
+        // The hue wheel has no stops, so it is sampled; it still has to be a
+        // ramp with something in the middle rather than two endpoints.
+        expect(gradient.split("rgb(").length).toBeGreaterThan(4);
+        continue;
+      }
+      for (const stop of paletteStops(id)) {
+        expect(gradient).toContain(
+          `rgb(${stop.rgb[0]},${stop.rgb[1]},${stop.rgb[2]}) ${Math.round(
+            stop.at * 100
+          )}%`
+        );
+      }
+    }
+  });
+
+  test("a cyclic palette has no seam", () => {
+    // `direction` colors an angle, and 359 degrees is next to 1 degree. A ramp
+    // whose ends do not meet draws a hard edge across the field along whichever
+    // ray happens to be zero, which reads as a feature of the field that is not
+    // there. Claiming to be cyclic is therefore a claim about the two ends.
+    const cyclic = PALETTE_IDS.filter((id) => PALETTES[id].cyclic);
+    expect(cyclic.length).toBeGreaterThan(1);
+    for (const id of cyclic) {
+      const { stops } = PALETTES[id];
+      if (stops === undefined) continue;
+      expect({ id, ends: [...stops[0].rgb] }).toEqual({
+        id,
+        ends: [...stops[stops.length - 1].rgb],
+      });
     }
   });
 });

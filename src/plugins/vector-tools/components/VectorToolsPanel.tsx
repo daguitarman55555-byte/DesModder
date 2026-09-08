@@ -34,6 +34,12 @@ import {
   type VectorLengthMode,
   type ZeroVectorMode,
 } from "../model";
+import {
+  PALETTES,
+  PALETTE_GROUPS,
+  PALETTE_IDS,
+  paletteCSSGradient,
+} from "../palettes";
 import type { ComponentSlot } from "../generator";
 import "./VectorToolsPanel.less";
 
@@ -58,15 +64,6 @@ const COLOR_MODES: readonly Choice<VectorColorMode>[] = [
   { value: "direction", label: "Direction" },
   { value: "x-component", label: "x component" },
   { value: "y-component", label: "y component" },
-];
-
-const PALETTES: readonly Choice<ColorPalette>[] = [
-  { value: "spectral", label: "Spectral" },
-  { value: "sequential-a", label: "Viridis" },
-  { value: "sequential-b", label: "Blue" },
-  { value: "blue-red", label: "Blue to red" },
-  { value: "grayscale", label: "Grayscale" },
-  { value: "direction-hue", label: "Hue wheel" },
 ];
 
 const ARROW_MODES: readonly Choice<ArrowMode>[] = [
@@ -431,10 +428,9 @@ function colorTab(vectorTools: VectorTools, config: ConfigGetter) {
       <If predicate={usesPalette}>
         {() => (
           <section class="dsm-vector-tools-section">
-            {chipGroup(
+            {paletteChooser(
               "Palette",
               () => color().palette,
-              PALETTES,
               (value) => vectorTools.setColor("palette", value)
             )}
             {chipGroup(
@@ -535,10 +531,9 @@ function flowTab(vectorTools: VectorTools, config: ConfigGetter) {
             swatch, so only speed has a ramp to choose. */}
         <If predicate={() => flow().colorMode === "speed"}>
           {() =>
-            chipGroup(
+            paletteChooser(
               "Particle palette",
               () => flow().palette,
-              PALETTES,
               (value) => vectorTools.setFlow("palette", value)
             )
           }
@@ -921,6 +916,68 @@ function chipGroup<T extends string>(
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The palette picker, which shows each ramp rather than naming it.
+ *
+ * A name is a poor handle for a colour ramp — "Cividis" and "Parula" tell you
+ * nothing you can act on — and there are now enough of them that reading a row
+ * of names is slower than looking at a row of gradients. The swatch is built
+ * from the same stops the field is drawn from, so it cannot describe a ramp
+ * that is not the one it selects.
+ *
+ * They are grouped because the four groups are the question actually being
+ * answered: the conventional ramp, one that separates a sign, one that wraps
+ * without a seam, or one chosen because of how it looks.
+ */
+function paletteChooser(
+  label: string,
+  value: () => ColorPalette,
+  onChange: (value: ColorPalette) => void,
+  id?: string
+) {
+  return (
+    <div
+      class="dsm-vector-tools-palettes"
+      id={id}
+      role="group"
+      aria-label={label}
+    >
+      <div class="dsm-vector-tools-label">{label}</div>
+      {PALETTE_GROUPS.map((group) => (
+        <div class="dsm-vector-tools-palette-group">
+          <div class="dsm-vector-tools-palette-group-label">{group.label}</div>
+          <div class="dsm-vector-tools-palette-grid">
+            {PALETTE_IDS.filter((pid) => PALETTES[pid].group === group.id).map(
+              (pid) => (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  data-value={pid}
+                  class={() => ({
+                    "dsm-vector-tools-chip": true,
+                    "dsm-vector-tools-palette": true,
+                    "dsm-vector-tools-chip-selected": value() === pid,
+                  })}
+                  aria-pressed={() => (value() === pid ? "true" : "false")}
+                  onTap={() => onChange(pid)}
+                >
+                  <span
+                    class="dsm-vector-tools-palette-swatch"
+                    style={{ background: paletteCSSGradient(pid) }}
+                  />
+                  <span class="dsm-vector-tools-palette-name">
+                    {PALETTES[pid].name}
+                  </span>
+                </span>
+              )
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
