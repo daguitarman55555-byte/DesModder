@@ -652,7 +652,9 @@ testWithPage(
     expect((await storedConfig(driver)).flow.particleCount).toBe(37500);
 
     // A component the GPU cannot evaluate must disable the button with a
-    // reason rather than failing when it is pressed.
+    // reason rather than failing when it is pressed. `a_{1}` is refused now
+    // for being undefined rather than for being subscripted: a name the graph
+    // does define is compiled, so the reason has to name the name.
     await driver.evaluate(() => {
       const config = JSON.parse(
         DSM.pluginSettings["vector-tools"]!.serializedFieldConfig as string
@@ -672,7 +674,7 @@ testWithPage(
             ".dsm-vector-tools-flow .dsm-vector-tools-warning"
           )?.textContent
       )
-    ).toContain("refers to another expression");
+    ).toContain("is not defined");
 
     await driver.disablePlugin("vector-tools");
     await driver.assertSelectorNot(FLOW_CANVAS);
