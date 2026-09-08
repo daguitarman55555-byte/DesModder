@@ -657,3 +657,63 @@ A proposal is useful here only if it clears all of these:
 Commit messages explain **why**, in prose — not a bulleted changelog. Comments
 do the same: dense, deliberate, explaining the reason a thing is the way it is,
 especially where the obvious approach was tried and failed. Match it.
+
+---
+
+## 11. Known defects, verified and open
+
+An outside review of `origin/main` (2026-09-08) raised twenty-two points. `main`
+was several commits behind this branch, so a number of them were already fixed
+here; the rest were checked against the branch tip one at a time. This section
+records only what was **confirmed against the code**, so the list is a work
+queue rather than a set of suggestions.
+
+Fixed in response: expressions sharing the field's namespace were being deleted
+by generation and by Remove — `cad6b0c9`.
+
+### Confirmed open
+
+1. **Flow animation is frame-rate dependent.** There is no `dt` anywhere in
+   `FlowRenderer`: the RK4 step, `u_dropRate` and `u_fade` are all applied once
+   per frame with per-frame constants. A 144 Hz display therefore advects the
+   field about 2.4× faster than a 60 Hz one, with correspondingly shorter trails
+   and shorter particle lifetimes. The fix is to pass the `requestAnimationFrame`
+   timestamp into `frame()`, scale the step by elapsed time, and convert the two
+   probabilities to a rate — `p_dt = 1 - (1 - p_60)^(60 dt)` — clamping elapsed
+   time so a backgrounded tab does not teleport every particle on resume.
+   Note this **changes how existing saved graphs animate**, which makes it a
+   decision and not just a fix.
+2. **Live arrows ignore `zeroVectorMode`.** It is not in `ArrowOptions` and
+   never reaches the shader, which always sends zero vectors outside the clip
+   volume. So "show zero vectors as points" works for generated expressions and
+   silently does nothing for the default renderer.
+3. **Palette uniforms are rebuilt and uploaded every frame.** `paletteUniforms`
+   allocates two `Float32Array`s and is called from inside both renderers' frame
+   paths. It should be cached against the palette ID and uploaded on change.
+4. **The whole configuration is serialised on every `input` event.** Dragging a
+   slider stringifies and re-parses the config per pointermove, and drives a
+   panel render and an arrow refresh with it. A transient value while dragging,
+   persisted on change or after a debounce, would remove that.
+
+### Raised, and deliberate rather than broken
+
+- **The GPU guards change the mathematics near singularities** (§4.2): division
+  by zero becomes division by ε, `sqrt` of a negative is zero, NaN and Inf
+  become zero components. This is real and it is on purpose — but the review's
+  underlying point stands and is worth a decision: the overlay currently draws a
+  _stationary finite arrow_ where Desmos considers the field undefined, rather
+  than drawing nothing. A validity flag that hides invalid arrows and respawns
+  particles that land on them would be more honest than ε, and would not cost
+  the guards.
+- **The gradient step follows the viewport** (§4.2). Deliberate. The review's
+  refinement is fair though: one step for both axes lets a wide aspect ratio
+  degrade the smaller one, and separate `h_x`/`h_y` would be strictly better.
+- **Two WebGL contexts** (§5.3). Deliberate, and the review agrees it is lower
+  priority than anything above.
+
+### Already fixed before the review ran
+
+Shader relinking on settings-only changes (`c0dd0cce`), WebGL context loss and
+restoration (`c5898a92`), and referencing expression-list constants and
+functions (`b82e4d81`, `b150eef7`, `dccb93bc`). A review that names any of these
+is looking at `main`, not at this branch.
