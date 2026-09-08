@@ -9,6 +9,8 @@
  * field that is not the one in the expression list.
  */
 
+import { canonicalIdentifier, IDENTIFIER_SOURCE } from "../identifiers";
+
 /** A single-expression definition read out of the expression list. */
 export interface FunctionDefinition {
   /** Canonical parameter names, in order. */
@@ -78,15 +80,10 @@ const MAX_DEFINITION_DEPTH = 12;
 
 const glslIdentifier = (name: string) => name.replace(/[^A-Za-z0-9]/g, "_");
 
-/**
- * One spelling for an identifier, so `a_{1}` and `a_1` are the same name.
- *
- * MathQuill writes the braced form and a hand-typed expression may not, and the
- * two have to agree or a field would reference a slider the environment looks
- * up under the other spelling and fails to find.
- */
-export const canonicalIdentifier = (name: string) =>
-  name.replace(/_\{([A-Za-z0-9]*)\}/, "_$1");
+/** One grammar for what a name is, shared with the scanner and the generator. */
+const IDENTIFIER_AT_START = new RegExp(`^${IDENTIFIER_SOURCE}`);
+
+export { canonicalIdentifier } from "../identifiers";
 
 /**
  * The letter that means the animation clock, and the uniform behind it.
@@ -374,8 +371,7 @@ function tokenize(latex: string): Token[] {
       // forms MathQuill can produce are accepted. These used to be refused
       // outright as unreachable; they are now looked up in the environment the
       // caller read out of the expression list.
-      const [identifier] =
-        /^[A-Za-z](?:_(?:\{[A-Za-z0-9]*\}|[A-Za-z0-9]))?/.exec(latex.slice(i))!;
+      const [identifier] = IDENTIFIER_AT_START.exec(latex.slice(i))!;
       tokens.push({ kind: "variable", value: canonicalIdentifier(identifier) });
       i += identifier.length;
       continue;

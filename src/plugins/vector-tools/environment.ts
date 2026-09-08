@@ -10,10 +10,12 @@
  * own evaluator when it is needed, so `a = b + 1` works without this having to
  * understand `b`, and a slider that moves does not make this scan stale.
  */
-import { canonicalIdentifier } from "./flow/latexToGLSL";
+import { canonicalIdentifier, IDENTIFIER_SOURCE } from "./identifiers";
 import type { FieldEnvironment, FunctionDefinition } from "./flow/latexToGLSL";
 
-const IDENTIFIER = String.raw`[A-Za-z](?:_(?:\{[A-Za-z0-9]*\}|[A-Za-z0-9]))?`;
+// The grammar lives in identifiers.ts, so the scan and the compiler cannot
+// disagree about where one name ends and the next begins.
+const IDENTIFIER = IDENTIFIER_SOURCE;
 
 /**
  * Names that already mean something, so `x = 3` is a vertical line rather than
