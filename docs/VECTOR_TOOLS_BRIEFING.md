@@ -52,8 +52,8 @@ Two design commitments follow from that and constrain everything:
 
 ```
 npm run lint            # prettier --check, tsc --build, eslint
-npm run test:unit       # 1582 tests
-npm run test:integration  # 50 tests, real Desmos in headless Chrome
+npm run test:unit       # 1586 tests
+npm run test:integration  # 52 tests, real Desmos in headless Chrome
 ```
 
 The integration harness loads the built extension (`npm run build` → `dist/`)
