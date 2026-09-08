@@ -1276,19 +1276,33 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     return this.pendingGeneration !== undefined;
   }
 
+  /** Every ID a plan owns: the folder and each expression in it. */
+  private static planIDs(plan: VectorFieldPlan) {
+    return [plan.folder.id, ...plan.expressions.map((e) => e.id)];
+  }
+
   removeProductionField() {
-    this.expressions.removeGeneratedSet(
-      createVectorFieldPlan(this.getConfig()).namespace
+    const plan = createVectorFieldPlan(this.getConfig());
+    const { strays } = this.expressions.removeGeneratedSet(
+      plan.namespace,
+      VectorTools.planIDs(plan)
     );
     this.pendingGeneration = undefined;
-    this.lastActionMessage = "Removed only this Vector Tools field.";
+    this.lastActionMessage =
+      strays === 0
+        ? "Removed only this Vector Tools field."
+        : `Removed this Vector Tools field. ${strays} item${
+            strays === 1 ? "" : "s"
+          } sharing its name were left alone, because they are not part of it.`;
     this.util.tick();
   }
 
   removeTestField() {
     if (!this.isTestLabVisible) return;
+    const plan = createVectorFieldPlan(this.testConfig);
     this.expressions.removeGeneratedSet(
-      createVectorFieldPlan(this.testConfig).namespace
+      plan.namespace,
+      VectorTools.planIDs(plan)
     );
     this.pendingGeneration = undefined;
     this.lastActionMessage = "Removed the development test field.";

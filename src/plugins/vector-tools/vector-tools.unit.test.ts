@@ -207,11 +207,47 @@ describe("Vector Tools expression adapter", () => {
       latex: "y=x^2",
     });
 
-    adapter.removeGeneratedSet(TEST_NAMESPACE);
+    adapter.removeGeneratedSet(TEST_NAMESPACE, [TEST_FOLDER_ID, TEST_LINE_ID]);
 
     expect(fakeCalculator.items).toEqual([
       { id: "unrelated_line", type: "expression", latex: "y=x^2" },
     ]);
+  });
+
+  test("will not delete a stray item that merely shares the namespace", () => {
+    // The namespace is a prefix, not a claim of ownership. An expression the
+    // user happens to name `<namespace>_scratch` matched it and was being
+    // deleted by both generation and removal — silently, and in the case of
+    // generation while a comment two functions away promised it would be
+    // reported instead.
+    const { adapter, fakeCalculator } = makeAdapter();
+    adapter.applyGeneratedSet(TEST_NAMESPACE, TEST_FOLDER, [
+      { id: TEST_LINE_ID, latex: "y=x", folderId: TEST_FOLDER_ID },
+    ]);
+    const stray = {
+      id: `${TEST_NAMESPACE}_scratch`,
+      type: "expression" as const,
+      latex: "y=99",
+    };
+    fakeCalculator.items.push({ ...stray });
+
+    // Regenerating over it is refused, and refused before anything is written.
+    const before = fakeCalculator.setStateCalls;
+    expect(() =>
+      adapter.applyGeneratedSet(TEST_NAMESPACE, TEST_FOLDER, [
+        { id: TEST_LINE_ID, latex: "y=2x", folderId: TEST_FOLDER_ID },
+      ])
+    ).toThrow("shares its namespace");
+    expect(fakeCalculator.setStateCalls).toBe(before);
+    expect(fakeCalculator.getItem(stray.id)).toEqual(stray);
+
+    // Removing the field leaves it behind, and says so.
+    const { strays } = adapter.removeGeneratedSet(TEST_NAMESPACE, [
+      TEST_FOLDER_ID,
+      TEST_LINE_ID,
+    ]);
+    expect(strays).toBe(1);
+    expect(fakeCalculator.items).toEqual([stray]);
   });
 
   test("rejects malformed generated specs before touching calculator state", () => {

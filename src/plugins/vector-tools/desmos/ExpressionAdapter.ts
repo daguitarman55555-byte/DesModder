@@ -45,7 +45,10 @@ export interface DesmosExpressionAdapter {
     folder: GeneratedFolderSpec,
     expressions: readonly GeneratedExpressionSpec[]
   ) => void;
-  removeGeneratedSet: (namespace: string) => void;
+  removeGeneratedSet: (
+    namespace: string,
+    ownedIDs: readonly string[]
+  ) => { strays: number };
   expressionExists: (id: string) => boolean;
   getGeneratedItems: (namespace: string) => GeneratedItemSnapshot[];
 }
@@ -116,15 +119,32 @@ export class CalculatorExpressionAdapter implements DesmosExpressionAdapter {
     this.setState(state);
   }
 
-  removeGeneratedSet(namespace: string) {
+  /**
+   * Removes exactly the items this field generated, and nothing else.
+   *
+   * `ownedIDs` rather than the namespace alone, because sharing a prefix is not
+   * the same as being ours: an expression the user named
+   * `vector_tools_vf_default_scratch` matches the namespace and was being
+   * deleted along with the field. Anything left inside the namespace afterwards
+   * is reported back rather than removed, so a stray item survives Remove and
+   * the caller can say it is still there.
+   */
+  removeGeneratedSet(namespace: string, ownedIDs: readonly string[]) {
     assertValidID(namespace, "generated namespace");
+    const removable = new Set(
+      ownedIDs.filter((id) => isWithinNamespace(id, namespace))
+    );
     const state = this.calc.getState();
     const remaining = state.expressions.list.filter(
-      (item) => !isWithinNamespace(item.id, namespace)
+      (item) => !removable.has(item.id)
     );
-    if (remaining.length === state.expressions.list.length) return;
+    const strays = remaining.filter((item) =>
+      isWithinNamespace(item.id, namespace)
+    ).length;
+    if (remaining.length === state.expressions.list.length) return { strays };
     state.expressions.list = remaining;
     this.setState(state);
+    return { strays };
   }
 
   expressionExists(id: string) {
@@ -204,7 +224,15 @@ function assertOwnedItemsAreReplaceable(
   ]);
   for (const item of owned) {
     const expectedType = expected.get(item.id);
-    if (expectedType === undefined) continue;
+    // An item inside the namespace that this write does not account for is not
+    // this field's to replace. It used to be skipped here and then dropped by
+    // the rebuild below, which deleted it — the exact outcome the paragraph
+    // above promises does not happen. Refusing is what makes that true.
+    if (expectedType === undefined) {
+      throw new Error(
+        `${item.id} is not part of this field, but shares its namespace. Rename or remove it, or rename the field, and try again.`
+      );
+    }
     if (item.type !== expectedType) {
       throw new Error(
         `Generated ID ${item.id} is already used by a ${item.type}.`
