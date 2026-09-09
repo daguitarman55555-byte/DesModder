@@ -4,6 +4,7 @@ import type {
   FolderState,
   GraphState,
   ItemState,
+  Ticker,
 } from "graph-state/state";
 
 const VALID_ID = /^[A-Za-z][A-Za-z0-9_]*$/;
@@ -39,16 +40,25 @@ export interface GeneratedItemSnapshot {
   folderId?: string;
 }
 
+/** A ticker to install alongside a generated field. */
+export interface GeneratedTickerSpec {
+  handlerLatex: string;
+  minStepLatex: string;
+}
+
 export interface DesmosExpressionAdapter {
   applyGeneratedSet: (
     namespace: string,
     folder: GeneratedFolderSpec,
-    expressions: readonly GeneratedExpressionSpec[]
+    expressions: readonly GeneratedExpressionSpec[],
+    ticker?: GeneratedTickerSpec | null
   ) => void;
   removeGeneratedSet: (
     namespace: string,
-    ownedIDs: readonly string[]
+    ownedIDs: readonly string[],
+    clearTicker?: boolean
   ) => { strays: number };
+  getTicker: () => Ticker | undefined;
   expressionExists: (id: string) => boolean;
   getGeneratedItems: (namespace: string) => GeneratedItemSnapshot[];
 }
@@ -69,10 +79,24 @@ export interface DesmosExpressionAdapter {
 export class CalculatorExpressionAdapter implements DesmosExpressionAdapter {
   constructor(private readonly calc: Calc) {}
 
+  /** The graph's ticker, for a caller that has to decide whether it owns it. */
+  getTicker(): Ticker | undefined {
+    return this.calc.getState().expressions.ticker;
+  }
+
+  /**
+   * @param ticker `undefined` leaves the graph's ticker alone, `null` clears
+   * it, and an object installs it. Three states rather than two because a field
+   * that does not animate must not disturb a ticker the user set up for
+   * something else, and "no ticker wanted" and "clear the ticker" are different
+   * intentions. Whether installing one is allowed is the caller's decision —
+   * a ticker is graph-level, so this cannot tell ownership from the namespace.
+   */
   applyGeneratedSet(
     namespace: string,
     folder: GeneratedFolderSpec,
-    expressions: readonly GeneratedExpressionSpec[]
+    expressions: readonly GeneratedExpressionSpec[],
+    ticker?: GeneratedTickerSpec | null
   ) {
     assertValidID(namespace, "generated namespace");
     assertFolderSpec(folder);
@@ -116,6 +140,10 @@ export class CalculatorExpressionAdapter implements DesmosExpressionAdapter {
             ...generated,
             ...others.slice(insertionIndex),
           ];
+    if (ticker === null) delete state.expressions.ticker;
+    else if (ticker !== undefined) {
+      state.expressions.ticker = { ...ticker, playing: true, open: true };
+    }
     this.setState(state);
   }
 
@@ -129,7 +157,11 @@ export class CalculatorExpressionAdapter implements DesmosExpressionAdapter {
    * is reported back rather than removed, so a stray item survives Remove and
    * the caller can say it is still there.
    */
-  removeGeneratedSet(namespace: string, ownedIDs: readonly string[]) {
+  removeGeneratedSet(
+    namespace: string,
+    ownedIDs: readonly string[],
+    clearTicker = false
+  ) {
     assertValidID(namespace, "generated namespace");
     const removable = new Set(
       ownedIDs.filter((id) => isWithinNamespace(id, namespace))
@@ -141,8 +173,14 @@ export class CalculatorExpressionAdapter implements DesmosExpressionAdapter {
     const strays = remaining.filter((item) =>
       isWithinNamespace(item.id, namespace)
     ).length;
-    if (remaining.length === state.expressions.list.length) return { strays };
+    const removedTicker = clearTicker && state.expressions.ticker !== undefined;
+    if (remaining.length === state.expressions.list.length && !removedTicker) {
+      return { strays };
+    }
     state.expressions.list = remaining;
+    // A ticker is graph-level, so removing the expressions would otherwise
+    // leave one running against a variable that no longer exists.
+    if (removedTicker) delete state.expressions.ticker;
     this.setState(state);
     return { strays };
   }

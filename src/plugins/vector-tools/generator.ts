@@ -7,6 +7,8 @@ import {
   ZERO_VECTOR_TOLERANCE,
 } from "./model";
 import { paletteLatex } from "./palettes";
+import { renameIdentifier } from "./identifiers";
+import { TIME_NAME } from "./flow/latexToGLSL";
 import type {
   GeneratedExpressionSpec,
   GeneratedFolderSpec,
@@ -33,17 +35,42 @@ export type VectorFieldPurpose =
   | "shafts"
   | "first arrowhead wing"
   | "second arrowhead wing"
-  | "zero vector markers";
+  | "zero vector markers"
+  | "animation clock";
 
 export interface GeneratedVectorFieldExpression
   extends GeneratedExpressionSpec {
   purpose: VectorFieldPurpose;
 }
 
+/** The graph-level ticker a generated field needs, if it needs one. */
+export interface GeneratedTicker {
+  handlerLatex: string;
+  minStepLatex: string;
+}
+
 export interface VectorFieldPlan {
   namespace: string;
   folder: GeneratedFolderSpec;
   expressions: GeneratedVectorFieldExpression[];
+  /**
+   * Present only for a field written in terms of `t`.
+   *
+   * A ticker is graph-level rather than an expression, so it does not live in
+   * the list and cannot be namespaced. That makes it the one part of a
+   * generated field that can collide with something the user set up themselves.
+   */
+  ticker?: GeneratedTicker;
+}
+
+export interface GenerationOptions {
+  /**
+   * Rewrite `t` onto the field's own symbol and drive it with a ticker.
+   *
+   * Decided by the caller rather than here, because it depends on whether the
+   * graph defines `t` itself — which the generator has no view of.
+   */
+  animateTime?: boolean;
 }
 
 export interface ExpressionAuditRow {
@@ -69,6 +96,11 @@ export interface ExpressionAudit {
 
 export function namespaceForField(config: VectorFieldConfig): string {
   return `vector_tools_vf_${config.id}`;
+}
+
+/** The symbol a generated field advances as its clock. */
+export function timeSymbolFor(config: VectorFieldConfig) {
+  return createSymbols(config.id).time;
 }
 
 export type ComponentSlot = "p" | "q" | "f";
@@ -115,13 +147,15 @@ export function componentExpressionID(
 /** The full `v_{tfdp}\left(x,y\right)=...` definition for one slot. */
 export function componentFunctionLatex(
   config: VectorFieldConfig,
-  slot: ComponentSlot
+  slot: ComponentSlot,
+  animateTime = false
 ) {
   const symbols = createSymbols(config.id);
   return `${slotSymbol(symbols, slot)}\\left(x,y\\right)=\\left(${componentBodyLatex(
     config,
     slot,
-    symbols
+    symbols,
+    animateTime
   )}\\right)`;
 }
 
@@ -131,6 +165,28 @@ function slotSymbol(
 ) {
   if (slot === "f") return symbols.scalarFunction;
   return slot === "p" ? symbols.xFunction : symbols.yFunction;
+}
+
+/**
+ * Moves a component off `t` on its way into the expression list.
+ *
+ * A global `t` cannot be defined in a graph that draws arrows, because the
+ * shafts and wings are restricted parametrics *in* `t`. Defining it does not
+ * error — which is why this was nearly missed — it quietly stops them being
+ * parametrics: Desmos evaluates them at the global value and draws a point per
+ * arrow instead of a segment. `isGraphable` stays true throughout. The
+ * difference is only visible in a picture, and it is the difference between a
+ * field of arrows and a field of dots.
+ *
+ * So the user's `t` becomes the field's own `v_{tf?t}`, which nothing else
+ * binds, and a ticker drives that instead.
+ */
+function withTimeRenamed(
+  latex: string,
+  symbols: ReturnType<typeof createSymbols>,
+  animateTime: boolean
+) {
+  return animateTime ? renameIdentifier(latex, TIME_NAME, symbols.time) : latex;
 }
 
 /**
@@ -145,14 +201,21 @@ function slotSymbol(
 function componentBodyLatex(
   config: VectorFieldConfig,
   slot: ComponentSlot,
-  symbols: ReturnType<typeof createSymbols>
+  symbols: ReturnType<typeof createSymbols>,
+  animateTime = false
 ) {
-  if (slot === "f") return config.scalar.fLatex;
+  const rename = (latex: string) =>
+    withTimeRenamed(latex, symbols, animateTime);
+  if (slot === "f") return rename(config.scalar.fLatex);
   if (config.source === "gradient") {
+    // Derived from the scalar, which has already been rewritten, so there is
+    // nothing here for the rename to find.
     const variable = slot === "p" ? "dx" : "dy";
     return `\\frac{d}{${variable}}${symbols.scalarFunction}\\left(x,y\\right)`;
   }
-  return slot === "p" ? config.components.xLatex : config.components.yLatex;
+  return rename(
+    slot === "p" ? config.components.xLatex : config.components.yLatex
+  );
 }
 
 /**
@@ -166,7 +229,8 @@ function componentBodyLatex(
 export function parseComponentFromLatex(
   config: VectorFieldConfig,
   slot: ComponentSlot,
-  latex: string | undefined
+  latex: string | undefined,
+  animateTime = false
 ): string | undefined {
   if (latex === undefined) return undefined;
   const symbols = createSymbols(config.id);
@@ -179,7 +243,13 @@ export function parseComponentFromLatex(
   ];
   const prefix = prefixes.find((candidate) => normalized.startsWith(candidate));
   if (prefix === undefined) return undefined;
-  return stripOuterParens(normalized.slice(prefix.length));
+  const body = stripOuterParens(normalized.slice(prefix.length));
+  // Undo the rename on the way back, so what the panel shows is what the user
+  // wrote. Without this, editing the definition in the expression list once
+  // would replace `t` with the generated symbol in the stored configuration,
+  // and the field would stop being time-varying from the plugin's point of
+  // view while still animating.
+  return animateTime ? renameIdentifier(body, symbols.time, TIME_NAME) : body;
 }
 
 /** Remove one layer of `\left(...\right)` or `(...)` wrapping the whole value. */
@@ -205,8 +275,29 @@ function stripOuterParens(value: string): string {
   return value;
 }
 
+/**
+ * The graph-level ticker that advances a generated field's clock.
+ *
+ * `\operatorname{dt}` is the milliseconds since the last tick, so the clock
+ * gains `speed` per real second whatever rate Desmos happens to tick at. A
+ * fixed step per tick would have made the generated animation run at whatever
+ * the tick rate turned out to be — measured at about 27 ticks a second in the
+ * test harness rather than the 62 a 16ms minimum step suggests — and so at a
+ * different speed from the live overlay, which is paced by elapsed time.
+ *
+ * The minimum step is zero: `dt` already makes the rate independent of how
+ * often this runs, so there is nothing to gain by running it less often.
+ */
+function tickerFor(symbol: string, speed: number) {
+  return {
+    handlerLatex: `${symbol}\\to ${symbol}+${numberLatex(speed)}\\cdot\\frac{\\operatorname{dt}}{1000}`,
+    minStepLatex: "0",
+  };
+}
+
 export function createVectorFieldPlan(
-  config: VectorFieldConfig
+  config: VectorFieldConfig,
+  { animateTime = false }: GenerationOptions = {}
 ): VectorFieldPlan {
   const namespace = namespaceForField(config);
   const symbols = createSymbols(config.id);
@@ -297,17 +388,26 @@ export function createVectorFieldPlan(
           expression(
             "f_function",
             "scalar function",
-            componentFunctionLatex(config, "f")
+            componentFunctionLatex(config, "f", animateTime)
           ),
         ]
       : [];
 
+  // The clock the ticker drives, and which the components were rewritten onto.
+  const timeExpressions = animateTime
+    ? [expression("time", "animation clock", `${symbols.time}=0`)]
+    : [];
+
   return {
     namespace,
     folder,
+    ticker: animateTime
+      ? tickerFor(symbols.time, config.time.speed)
+      : undefined,
     expressions: [
       expression("x_samples", "x samples", xSamples),
       expression("y_samples", "y samples", ySamples),
+      ...timeExpressions,
       ...scalarExpressions,
       expression(
         "grid_x",
@@ -322,12 +422,12 @@ export function createVectorFieldPlan(
       expression(
         "p_function",
         "x component function",
-        componentFunctionLatex(config, "p")
+        componentFunctionLatex(config, "p", animateTime)
       ),
       expression(
         "q_function",
         "y component function",
-        componentFunctionLatex(config, "q")
+        componentFunctionLatex(config, "q", animateTime)
       ),
       expression(
         "u",
@@ -472,6 +572,8 @@ function createSymbols(instanceID: string) {
     endX: symbol("ex"),
     endY: symbol("ey"),
     colors: symbol("c"),
+    // The clock a time-varying field is rewritten onto. See `renameIdentifier`.
+    time: symbol("t"),
   };
 }
 

@@ -1163,3 +1163,91 @@ testWithPage(
   },
   90000
 );
+
+testWithPage(
+  "Vector Tools generates a field that animates itself, off a renamed clock",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+
+    await driver.evaluate(() => {
+      const vt = DSM.enabledPlugins["vector-tools"] as any;
+      vt.setSlot("p", "\\sin\\left(y+t\\right)");
+      vt.setSlot("q", "x");
+      vt.setArrowMode("off");
+    });
+    await driver.waitForFunction(
+      () =>
+        ((DSM.enabledPlugins["vector-tools"] as any).fieldAnimatesTime as
+          | boolean
+          | undefined) === true,
+      { timeout: 8000 }
+    );
+
+    await driver.click(GENERATE);
+    await driver.waitForSync();
+
+    const graph = async () =>
+      await driver.evaluate((ns: string) => {
+        const state = Calc.getState() as any;
+        const item = (id: string) =>
+          state.expressions.list.find((i: any) => i.id === id)?.latex as
+            | string
+            | undefined;
+        const analysis = (Calc as any).expressionAnalysis ?? {};
+        return {
+          pFunction: item(`${ns}_p_function`),
+          clock: item(`${ns}_time`),
+          ticker: (state.expressions.ticker?.handlerLatex ?? null) as
+            | string
+            | null,
+          shaftsError: (analysis[`${ns}_shafts`]?.errorMessage ?? null) as
+            | string
+            | null,
+          shaftsEvaluated:
+            analysis[`${ns}_shafts`]?.evaluationDisplayed ?? null,
+        };
+      }, NAMESPACE);
+
+    const generated = await graph();
+
+    // `t` must not reach the graph. Defining a global `t` does not error — it
+    // quietly stops the shafts being parametrics, and Desmos draws a point per
+    // arrow instead of a segment. `evaluationDisplayed` turning true is the
+    // only assertable trace of that; the rest of the difference is visual.
+    expect(generated.pFunction).toContain("v_{tfdt}");
+    expect(generated.shaftsError).toBeNull();
+    expect(generated.shaftsEvaluated).not.toBe(true);
+    expect(generated.ticker).toContain("\\operatorname{dt}");
+
+    // The clock advances on its own, with no help from the extension.
+    const before = generated.clock;
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    expect((await graph()).clock).not.toBe(before);
+
+    // The panel keeps showing what the user wrote, not the rewritten form.
+    expect(
+      await driver.evaluate(
+        () => (DSM.enabledPlugins["vector-tools"] as any).getConfig().components
+      )
+    ).toMatchObject({ xLatex: "\\sin\\left(y+t\\right)" });
+
+    // A ticker is graph-level, so removing the field has to take it away too.
+    await driver.click(REMOVE);
+    await driver.waitForSync();
+    expect(
+      await driver.evaluate(
+        () => (Calc.getState() as any).expressions.ticker ?? null
+      )
+    ).toBeNull();
+
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).resetConfig()
+    );
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);

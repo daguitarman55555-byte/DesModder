@@ -38,6 +38,8 @@ import {
   componentFunctionLatex,
   createVectorFieldPlan,
   namespaceForField,
+  timeSymbolFor,
+  type GenerationOptions,
   editableSlots,
   parseComponentFromLatex,
   setSlotBody,
@@ -54,7 +56,9 @@ import type { ArrowOptions } from "./flow/ArrowRenderer";
 import {
   compileFieldComponentToGLSL,
   EMPTY_ENVIRONMENT,
+  TIME_NAME,
 } from "./flow/latexToGLSL";
+import { mentions } from "./identifiers";
 import type { FieldEnvironment } from "./flow/latexToGLSL";
 import { environmentsDiffer, scanDefinitions } from "./environment";
 import type { FlowField } from "./flow/FlowRenderer";
@@ -288,6 +292,46 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
 
   get timeConfig() {
     return this.getConfig().time;
+  }
+
+  /**
+   * Whether `t` in this field's components means the clock, for generation.
+   *
+   * Asked of the LaTeX rather than of `fieldUsesTime`, which is what the shader
+   * compiler concluded: generation has to work for fields the GPU cannot draw
+   * at all, and refusing to animate a generated field because the compiler
+   * choked on a list would be answering the wrong question.
+   *
+   * The precedence is the same one the compiler uses — a `t` the graph defines
+   * for itself is that `t`, not the clock.
+   */
+  get fieldAnimatesTime() {
+    const config = this.getConfig();
+    if (this.environment.scalars.has(TIME_NAME)) return false;
+    const bodies =
+      config.source === "gradient"
+        ? [config.scalar.fLatex]
+        : [config.components.xLatex, config.components.yLatex];
+    return bodies.some((latex) => mentions(latex, TIME_NAME));
+  }
+
+  /** Options every plan for the production field is built with. */
+  private get generationOptions(): GenerationOptions {
+    return { animateTime: this.fieldAnimatesTime };
+  }
+
+  /**
+   * Whether the graph's ticker is the one this field installed.
+   *
+   * A ticker is graph-level and cannot be namespaced, so it is the one piece of
+   * a generated field whose ownership has to be recognised rather than looked
+   * up. Its handler advances the field's own clock symbol, which nothing else
+   * would mention.
+   */
+  private ownsCurrentTicker() {
+    const handler = this.expressions.getTicker()?.handlerLatex;
+    if (handler === undefined || handler === "") return false;
+    return mentions(handler, timeSymbolFor(this.getConfig()));
   }
 
   setTimePlaying(playing: boolean) {
@@ -719,7 +763,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     const slots = editableSlots(config);
     try {
       if (!this.hasComponentExpressions) {
-        const plan = createVectorFieldPlan(config);
+        const plan = createVectorFieldPlan(config, this.generationOptions);
         const componentIDs = new Set(
           slots.map((slot) => componentExpressionID(config, slot))
         );
@@ -760,7 +804,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     // colorLatex on the rest of the field are untouched.
     this.calc.setExpression({
       id,
-      latex: componentFunctionLatex(config, slot),
+      latex: componentFunctionLatex(config, slot, this.fieldAnimatesTime),
     });
   }
 
@@ -780,7 +824,12 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       const id = componentExpressionID(config, slot);
       const model = this.cc.getItemModel(id);
       if (model?.type !== "expression") continue;
-      const body = parseComponentFromLatex(config, slot, model.latex);
+      const body = parseComponentFromLatex(
+        config,
+        slot,
+        model.latex,
+        this.fieldAnimatesTime
+      );
       if (body === undefined) {
         detached = true;
         continue;
@@ -1282,10 +1331,16 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   }
 
   removeProductionField() {
-    const plan = createVectorFieldPlan(this.getConfig());
+    const plan = createVectorFieldPlan(
+      this.getConfig(),
+      this.generationOptions
+    );
     const { strays } = this.expressions.removeGeneratedSet(
       plan.namespace,
-      VectorTools.planIDs(plan)
+      VectorTools.planIDs(plan),
+      // Only if it is ours: a ticker the user set up for something else must
+      // survive removing this field.
+      this.ownsCurrentTicker()
     );
     this.pendingGeneration = undefined;
     this.lastActionMessage =
@@ -1310,7 +1365,9 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   }
 
   get productionAudit(): ExpressionAudit {
-    return this.audit(createVectorFieldPlan(this.getConfig()));
+    return this.audit(
+      createVectorFieldPlan(this.getConfig(), this.generationOptions)
+    );
   }
 
   get testAudit(): ExpressionAudit {
@@ -1358,7 +1415,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       return;
     }
 
-    const plan = createVectorFieldPlan(config);
+    const plan = createVectorFieldPlan(config, this.generationOptions);
     try {
       this.applyPlan(plan);
       this.pendingGeneration = undefined;
@@ -1374,8 +1431,36 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.expressions.applyGeneratedSet(
       plan.namespace,
       plan.folder,
-      plan.expressions
+      plan.expressions,
+      this.tickerToWrite(plan)
     );
+  }
+
+  /**
+   * What to do with the graph's ticker when writing this plan.
+   *
+   * A ticker is graph-level, so it is the one part of a generated field that
+   * can collide with something the user built. Taking one over silently would
+   * stop whatever it was animating, so a foreign ticker is refused — and since
+   * the whole write is one `setState`, refusing here means nothing is written
+   * at all rather than a field landing next to a broken animation.
+   *
+   * A field that does not animate leaves the ticker alone rather than clearing
+   * it, because not wanting one is not the same as wanting none.
+   */
+  private tickerToWrite(plan: VectorFieldPlan) {
+    if (plan.ticker === undefined) {
+      return this.ownsCurrentTicker() ? null : undefined;
+    }
+    const existing = this.expressions.getTicker();
+    const inUse =
+      existing?.handlerLatex !== undefined && existing.handlerLatex !== "";
+    if (inUse && !this.ownsCurrentTicker()) {
+      throw new Error(
+        "this graph already has a ticker doing something else, and a field written in terms of t needs it. Remove that ticker, or rename t in the field."
+      );
+    }
+    return plan.ticker;
   }
 
   private audit(plan: VectorFieldPlan) {
