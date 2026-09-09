@@ -1,11 +1,6 @@
 import type AudioLab from ".";
-import {
-  downsample,
-  peakFrequency,
-  pointsLatex,
-  rms,
-  spotifyEmbedUrl,
-} from "./dsp";
+import { listenToMessageDown, postMessageUp } from "#utils/messages.ts";
+import { downsample, peakFrequency, pointsLatex, rms, spotifyUri } from "./dsp";
 
 const QUALITY = {
   performance: { fftSize: 1024, interval: 1000 / 24 },
@@ -29,6 +24,13 @@ export default class AudioLabRuntime {
   private readonly audio: HTMLAudioElement;
   private readonly wave: HTMLCanvasElement;
   private readonly spectrum: HTMLCanvasElement;
+  private readonly spotifyResponses = new Map<
+    string,
+    {
+      resolve: (value?: { name: string }) => void;
+      reject: (error: Error) => void;
+    }
+  >();
 
   constructor(
     private readonly plugin: AudioLab,
@@ -39,7 +41,18 @@ export default class AudioLabRuntime {
     this.wave = this.find<HTMLCanvasElement>("wave");
     this.spectrum = this.find<HTMLCanvasElement>("spectrum");
     this.bind();
+    listenToMessageDown((message) => {
+      if (message.type !== "audio-lab-spotify-response") return false;
+      const pending = this.spotifyResponses.get(message.requestId);
+      if (pending === undefined) return false;
+      this.spotifyResponses.delete(message.requestId);
+      if (message.ok) pending.resolve(message.value);
+      else
+        pending.reject(new Error(message.error ?? "Spotify request failed."));
+      return false;
+    });
     this.frame = requestAnimationFrame(this.draw);
+    void this.refreshSpotifyStatus();
   }
 
   private hydrateMediaElements() {
@@ -49,13 +62,6 @@ export default class AudioLabRuntime {
         .querySelector(`[data-audio-lab-placeholder="${name}"]`)
         ?.replaceWith(element);
     };
-    const player = document.createElement("iframe");
-    player.className = "dsm-audio-lab-player";
-    player.title = "Spotify player";
-    player.allow =
-      "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
-    player.hidden = true;
-    replace("spotify-player", player);
     const audio = document.createElement("audio");
     audio.preload = "metadata";
     replace("audio", audio);
@@ -83,20 +89,30 @@ export default class AudioLabRuntime {
   private bind() {
     const url = this.find<HTMLInputElement>("spotify-url");
     url.value = this.plugin.spotifyUrl;
+    this.find<HTMLButtonElement>("sign-in").addEventListener("click", () => {
+      void this.signIn();
+    });
+    this.find<HTMLButtonElement>("sign-out").addEventListener("click", () => {
+      void this.signOut();
+    });
     this.find<HTMLButtonElement>("spotify-load").addEventListener(
       "click",
       () => {
-        const embed = spotifyEmbedUrl(url.value);
-        if (embed === undefined) {
+        const uri = spotifyUri(url.value);
+        if (uri === undefined) {
           this.status("Paste a valid Spotify link.", true);
           return;
         }
         this.plugin.setSpotifyUrl(url.value.trim());
-        const player = this.find<HTMLIFrameElement>("spotify-player");
-        player.src = embed;
-        player.hidden = false;
-        this.status(
-          "Player loaded. If Spotify blocks the embed, open the song in Spotify and use Analyze tab audio."
+        void this.spotifyRequest("play", uri).then(
+          () => this.status("Spotify playback started."),
+          (error: unknown) =>
+            this.status(
+              error instanceof Error
+                ? error.message
+                : "Spotify playback failed.",
+              true
+            )
         );
       }
     );
@@ -123,6 +139,79 @@ export default class AudioLabRuntime {
     this.find<HTMLButtonElement>("export").addEventListener("click", () =>
       this.exportSnapshot()
     );
+  }
+
+  private async spotifyRequest(
+    action: "sign-in" | "status" | "sign-out" | "play",
+    uri?: string
+  ) {
+    const requestId = crypto.randomUUID();
+    return await new Promise<{ name: string } | undefined>(
+      (resolve, reject) => {
+        this.spotifyResponses.set(requestId, { resolve, reject });
+        postMessageUp({
+          type: "audio-lab-spotify",
+          requestId,
+          action,
+          ...(uri === undefined ? {} : { uri }),
+        });
+        setTimeout(() => {
+          if (!this.spotifyResponses.delete(requestId)) return;
+          reject(
+            new Error(
+              "Spotify did not respond. Reload the extension and retry."
+            )
+          );
+        }, 120_000);
+      }
+    );
+  }
+
+  private async refreshSpotifyStatus() {
+    try {
+      const profile = await this.spotifyRequest("status");
+      this.setSignedIn(profile?.name);
+    } catch {
+      this.setSignedIn();
+    }
+  }
+
+  private async signIn() {
+    this.status("Opening Spotify sign-in…");
+    try {
+      const profile = await this.spotifyRequest("sign-in");
+      this.setSignedIn(profile?.name);
+      this.status("Spotify connected successfully.");
+    } catch (error) {
+      this.setSignedIn();
+      this.status(
+        error instanceof Error ? error.message : "Spotify sign-in failed.",
+        true
+      );
+    }
+  }
+
+  private async signOut() {
+    try {
+      await this.spotifyRequest("sign-out");
+      this.setSignedIn();
+      this.status("Signed out of Spotify.");
+    } catch (error) {
+      this.status(
+        error instanceof Error ? error.message : "Spotify sign-out failed.",
+        true
+      );
+    }
+  }
+
+  private setSignedIn(name?: string) {
+    const signedIn = name !== undefined;
+    this.find<HTMLElement>("account").textContent = signedIn
+      ? `Signed in as ${name}`
+      : "Not signed in";
+    this.find<HTMLButtonElement>("sign-in").hidden = signedIn;
+    this.find<HTMLButtonElement>("sign-out").hidden = !signedIn;
+    this.find<HTMLButtonElement>("spotify-load").disabled = !signedIn;
   }
 
   private async analyzeTab() {

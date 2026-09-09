@@ -22,14 +22,32 @@ export class AudioLabPanel extends Component<{ audioLab: () => AudioLab }> {
         <div class="dcg-popover-title">{format("audio-lab-name")}</div>
         <div class="dsm-audio-lab-body">
           <section>
+            <div class="dsm-audio-lab-account">
+              <span data-audio-lab="account">Not signed in</span>
+              <button data-audio-lab="sign-in" class="dcg-btn-blue">
+                Sign in to Spotify
+              </button>
+              <button
+                data-audio-lab="sign-out"
+                class="dcg-btn-light-gray"
+                hidden
+              >
+                Sign out
+              </button>
+            </div>
+          </section>
+          <section>
             <label>Spotify link</label>
             <div class="dsm-audio-lab-inline">
               <input data-audio-lab="spotify-url" type="url" />
-              <button data-audio-lab="spotify-load" class="dcg-btn-blue">
-                Load
+              <button
+                data-audio-lab="spotify-load"
+                class="dcg-btn-blue"
+                disabled
+              >
+                Play
               </button>
             </div>
-            <div data-audio-lab-placeholder="spotify-player" />
             <button
               data-audio-lab="analyze"
               class="dcg-btn-light-gray dsm-audio-lab-wide"
@@ -37,7 +55,8 @@ export class AudioLabPanel extends Component<{ audioLab: () => AudioLab }> {
               Analyze tab audio
             </button>
             <p class="dsm-audio-lab-hint">
-              Select the tab playing the song and enable Share tab audio.
+              Spotify plays through an active Spotify tab or app. For live
+              graphs, select that tab and enable Share tab audio.
             </p>
           </section>
           <section>

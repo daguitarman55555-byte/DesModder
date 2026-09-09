@@ -39,13 +39,19 @@ export function downsample(samples: Float32Array, requested: number) {
 }
 
 export function spotifyEmbedUrl(input: string) {
+  const uri = spotifyUri(input);
+  if (uri === undefined) return undefined;
+  const [, type, id] = uri.split(":");
+  return `https://open.spotify.com/embed/${type}/${id}?utm_source=generator`;
+}
+
+export function spotifyUri(input: string) {
   const trimmed = input.trim();
   const uri =
     /^spotify:(track|album|playlist|episode|show):([A-Za-z0-9]+)$/i.exec(
       trimmed
     );
-  if (uri !== null)
-    return `https://open.spotify.com/embed/${uri[1].toLowerCase()}/${uri[2]}?utm_source=generator`;
+  if (uri !== null) return `spotify:${uri[1].toLowerCase()}:${uri[2]}`;
   try {
     const url = new URL(trimmed);
     if (url.hostname !== "open.spotify.com") return undefined;
@@ -58,7 +64,7 @@ export function spotifyEmbedUrl(input: string) {
       !/^[A-Za-z0-9]+$/.test(id ?? "")
     )
       return undefined;
-    return `https://open.spotify.com/embed/${type}/${id}?utm_source=generator`;
+    return `spotify:${type}:${id}`;
   } catch {
     return undefined;
   }

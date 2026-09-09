@@ -27,6 +27,12 @@ type MessageWindowToContent =
   | {
       type: "send-heartbeat";
       options: WindowHeartbeatOptions;
+    }
+  | {
+      type: "audio-lab-spotify";
+      requestId: string;
+      action: "sign-in" | "status" | "sign-out" | "play";
+      uri?: string;
     };
 
 type MessageContentToWindow =
@@ -37,7 +43,16 @@ type MessageContentToWindow =
       pluginSettings: Record<PluginID, GenericSettings | undefined>;
       scriptURL: string;
     }
-  | HeartbeatError;
+  | HeartbeatError
+  | SpotifyResponse;
+
+export interface SpotifyResponse {
+  type: "audio-lab-spotify-response";
+  requestId: string;
+  ok: boolean;
+  value?: { name: string };
+  error?: string;
+}
 
 export interface HeartbeatError {
   type: "heartbeat-error";

@@ -4,6 +4,7 @@ import {
   pointsLatex,
   rms,
   spotifyEmbedUrl,
+  spotifyUri,
 } from "./dsp";
 
 describe("Audio Lab DSP", () => {
@@ -19,6 +20,9 @@ describe("Audio Lab DSP", () => {
       "https://open.spotify.com/embed/album/abc123?utm_source=generator"
     );
     expect(spotifyEmbedUrl("https://example.com/track/abc")).toBeUndefined();
+    expect(
+      spotifyUri("https://open.spotify.com/track/0USK9GYk8n1FQg5rUTWadD")
+    ).toBe("spotify:track:0USK9GYk8n1FQg5rUTWadD");
   });
 
   test("computes RMS and peak frequency", () => {
