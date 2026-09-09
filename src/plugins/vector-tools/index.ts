@@ -17,6 +17,7 @@ import {
   type DensityPreset,
   type FieldSource,
   type ArrowMode,
+  type CurveConfig,
   type FlowConfig,
   type FlowLook,
   FLOW_LOOK_PRESETS,
@@ -37,6 +38,7 @@ import {
   componentExpressionID,
   componentFunctionLatex,
   createVectorFieldPlan,
+  allGeneratedIDs,
   namespaceForField,
   timeSymbolFor,
   type GenerationOptions,
@@ -72,6 +74,14 @@ interface VectorToolsSettings {
 
 type GenerationTarget = "production" | "test";
 type TestChecklistID = "visual" | "zero" | "colors" | "responsiveness";
+
+/**
+ * The math inputs this plugin owns, as focus locations.
+ *
+ * The field's three slots plus the curve's two. Mirrors the union in
+ * `globals/Calc.ts`, which is where the calculator learns about them.
+ */
+export type VectorToolsFocusKind = ComponentSlot | "curve-x" | "curve-y";
 
 /** The compiled shader field, or the reason it could not be put on the GPU. */
 type FlowCompilation =
@@ -652,7 +662,13 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.util.tick();
   }
 
-  isFocused(id: ComponentSlot) {
+  /**
+   * Whether one of this plugin's math inputs currently holds focus.
+   *
+   * Takes the focus kind rather than a component slot, because the curve's two
+   * inputs are focus locations too and are not slots of the field.
+   */
+  isFocused(id: VectorToolsFocusKind) {
     const focused = this.cc.getFocusLocation();
     return (
       focused?.type === "dsm-focus" &&
@@ -778,7 +794,14 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
           (expression) =>
             componentIDs.has(expression.id) || existing.has(expression.id)
         );
-        this.expressions.applyGeneratedSet(plan.namespace, plan.folder, wanted);
+        this.expressions.applyGeneratedSet(
+          plan.namespace,
+          plan.folder,
+          wanted,
+          {
+            knownIDs: allGeneratedIDs(config),
+          }
+        );
       }
       this.componentLinkNote = "";
       this.scrollToComponent(slots[0]);
@@ -981,6 +1004,14 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.updateConfig((config) => {
       config.color[key] = value as never;
     });
+  }
+
+  /** One setter for the curve, which is a plain record of its own. */
+  setCurve<K extends keyof CurveConfig>(key: K, value: CurveConfig[K]) {
+    this.updateConfig((config) => {
+      config.curve[key] = value;
+    });
+    this.syncClock();
   }
 
   setZeroVectorMode(mode: ZeroVectorMode) {
@@ -1337,7 +1368,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     );
     const { strays } = this.expressions.removeGeneratedSet(
       plan.namespace,
-      VectorTools.planIDs(plan),
+      allGeneratedIDs(this.getConfig()),
       // Only if it is ours: a ticker the user set up for something else must
       // survive removing this field.
       this.ownsCurrentTicker()
@@ -1432,7 +1463,10 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       plan.namespace,
       plan.folder,
       plan.expressions,
-      this.tickerToWrite(plan)
+      {
+        ticker: this.tickerToWrite(plan),
+        knownIDs: allGeneratedIDs(this.getConfig()),
+      }
     );
   }
 

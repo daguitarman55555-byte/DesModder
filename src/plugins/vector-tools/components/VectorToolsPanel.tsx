@@ -21,6 +21,8 @@ import {
   PANEL_MIN_HEIGHT,
   PANEL_MIN_WIDTH,
   PANEL_TABS,
+  CURVE_LINE_WIDTH_MAXIMUM,
+  CURVE_LINE_WIDTH_MINIMUM,
   TIME_SPEED_MAXIMUM,
   TIME_SPEED_MINIMUM,
   lengthInputsFor,
@@ -142,6 +144,7 @@ export class VectorToolsPanel extends Component<{
             field: () => fieldTab(vectorTools, config, validation),
             arrows: () => arrowsTab(vectorTools, config),
             color: () => colorTab(vectorTools, config),
+            curve: () => curveTab(vectorTools, config),
             flow: () => flowTab(vectorTools, config),
           })}
           <If predicate={() => vectorTools.isTestLabVisible}>
@@ -547,6 +550,140 @@ function colorTab(vectorTools: VectorTools, config: ConfigGetter) {
           </section>
         )}
       </If>
+    </div>
+  );
+}
+
+/**
+ * A parametrized curve over the field.
+ *
+ * Its own tab rather than a section of Field, because a curve is not the field:
+ * it has its own definition, its own parameter range, and its own colour, and
+ * filing it under the thing it is drawn on top of would suggest otherwise.
+ *
+ * There is no live preview, and that is the point rather than an omission —
+ * Desmos draws parametrics natively and better than a line-strip pipeline of
+ * ours would, and a generated curve is still there for someone without the
+ * extension. It appears on Generate, with the rest of the field.
+ */
+function curveTab(vectorTools: VectorTools, config: ConfigGetter) {
+  const curve = () => config().curve;
+  return (
+    <div>
+      <section class="dsm-vector-tools-section">
+        {checkboxControl(
+          "Draw a parametric curve over the field",
+          () => curve().enabled,
+          (checked) => vectorTools.setCurve("enabled", checked),
+          "dsm-vector-tools-curve-enabled"
+        )}
+        <div class="dsm-vector-tools-hint">
+          Written into the graph as one Desmos parametric, so it survives
+          without the extension. `t` here is the curve's own parameter.
+        </div>
+      </section>
+
+      <If predicate={() => curve().enabled}>
+        {() => (
+          <div>
+            <section class="dsm-vector-tools-section">
+              <div class="dsm-vector-tools-math-row">
+                {curveInput(vectorTools, "X(t)", "x")}
+                {curveInput(vectorTools, "Y(t)", "y")}
+              </div>
+              <div class="dsm-vector-tools-number-grid">
+                {numberControl(
+                  "dsm-vector-tools-curve-t-min",
+                  "t minimum",
+                  () => curve().tMin,
+                  (value) => vectorTools.setCurve("tMin", value)
+                )}
+                {numberControl(
+                  "dsm-vector-tools-curve-t-max",
+                  "t maximum",
+                  () => curve().tMax,
+                  (value) => vectorTools.setCurve("tMax", value)
+                )}
+              </div>
+            </section>
+
+            <section class="dsm-vector-tools-section">
+              <label
+                class="dsm-vector-tools-label"
+                for="dsm-vector-tools-curve-color"
+              >
+                Curve color
+              </label>
+              <input
+                id="dsm-vector-tools-curve-color"
+                type="color"
+                onUpdate={(element: HTMLInputElement) => {
+                  if (document.activeElement !== element)
+                    element.value = curve().color;
+                }}
+                onInput={(event: Event) =>
+                  vectorTools.setCurve(
+                    "color",
+                    (event.target as HTMLInputElement).value
+                  )
+                }
+              />
+              {sliderControl(
+                "dsm-vector-tools-curve-width",
+                "Line width",
+                () => curve().lineWidth,
+                {
+                  minimum: CURVE_LINE_WIDTH_MINIMUM,
+                  maximum: CURVE_LINE_WIDTH_MAXIMUM,
+                  step: 0.5,
+                  decimals: 1,
+                },
+                (value) => vectorTools.setCurve("lineWidth", value)
+              )}
+              {checkboxControl(
+                "Show a point travelling along it",
+                () => curve().showPoint,
+                (checked) => vectorTools.setCurve("showPoint", checked),
+                "dsm-vector-tools-curve-point"
+              )}
+              {/* The dot reads the same X and Y at the clock rather than
+                  keeping a second copy of the curve, so it cannot drift off it.
+                  Asking for one is also what gives a static field a clock. */}
+              <div class="dsm-vector-tools-hint">
+                The point sits at the curve's position at the current time, and
+                gives the graph a clock even when the field itself is static.
+              </div>
+            </section>
+          </div>
+        )}
+      </If>
+    </div>
+  );
+}
+
+function curveInput(vectorTools: VectorTools, label: string, axis: "x" | "y") {
+  const key = axis === "x" ? "xLatex" : "yLatex";
+  return (
+    <div>
+      <label class="dsm-vector-tools-label">{label}</label>
+      <InlineMathInputViewGeneral
+        containerClass={() => ({ "dsm-vector-tools-math-input": true })}
+        placeholder={axis === "x" ? "\\cos(t)" : "\\sin(t)"}
+        ariaLabel={`${label} of the curve`}
+        latex={() => vectorTools.getConfig().curve[key]}
+        handleLatexChanged={(latex: string) => vectorTools.setCurve(key, latex)}
+        hasError={() => false}
+        manageFocus={mathquillFocusHelper({
+          controller: vectorTools.cc,
+          location: {
+            type: "dsm-focus",
+            plugin: "vector-tools",
+            kind: `curve-${axis}`,
+          },
+        })}
+        controller={vectorTools.cc}
+        readonly={false}
+      />
     </div>
   );
 }

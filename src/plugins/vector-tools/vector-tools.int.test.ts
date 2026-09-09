@@ -5,6 +5,7 @@ import {
   testWithPageAndOpts,
 } from "../../tests/puppeteer-utils";
 import type { Calc as CalcType } from "#globals";
+import { PANEL_TABS, type PanelTab } from "./model";
 
 declare let Calc: CalcType;
 declare let DSM: Window["DSM"];
@@ -142,7 +143,17 @@ const storedConfig = async (driver: Driver) =>
     )
   );
 
-async function openTab(driver: Driver, index: number) {
+/**
+ * Opens a tab by name rather than by position.
+ *
+ * These used to take an index, and inserting the Curve tab between Color and
+ * Flow silently pointed three flow tests at the wrong panel — they went on
+ * querying for controls that were no longer rendered and failed on `undefined`.
+ * A name cannot be shifted by adding a tab somewhere else.
+ */
+async function openTab(driver: Driver, id: PanelTab) {
+  const index = PANEL_TABS.findIndex((tab) => tab.id === id);
+  if (index < 0) throw new Error(`No such panel tab: ${id}`);
   await driver.click(
     `.dsm-vector-tools-tabs .dcg-segmented-control-btn:nth-child(${index + 1})`
   );
@@ -188,7 +199,7 @@ testWithPage(
     await driver.waitForSync();
     expect((await storedConfig(driver)).domain.x.min).toBe(-4);
 
-    await openTab(driver, 1);
+    await openTab(driver, "arrows");
     expect(await driver.evaluate(selectedChip, "Length mode")).toBe(
       "normalized"
     );
@@ -358,7 +369,7 @@ testWithPage(
     await driver.enablePlugin("vector-tools");
     await driver.assertSelectorEventually(BUTTON);
     await driver.click(BUTTON);
-    await openTab(driver, 0);
+    await openTab(driver, "field");
 
     await driver.click('[aria-label="Field from"] [data-value="gradient"]');
     await driver.waitForSync();
@@ -472,7 +483,7 @@ testWithPage(
     await driver.click(BUTTON);
     // The open tab is persisted, so this test cannot assume the panel opens on
     // the tab that holds the sampling domain.
-    await openTab(driver, 0);
+    await openTab(driver, "field");
 
     await driver.evaluate(() =>
       Calc.setMathBounds({ left: -3, right: 7, bottom: -2, top: 5 })
@@ -524,7 +535,7 @@ testWithPageAndOpts(
     await driver.enablePlugin("vector-tools");
     await driver.assertSelectorEventually(BUTTON);
     await driver.click(BUTTON);
-    await openTab(driver, 3);
+    await openTab(driver, "flow");
 
     await driver.click(VISUALIZE);
     await driver.assertSelectorEventually(FLOW_CANVAS);
@@ -566,7 +577,7 @@ testWithPageAndOpts(
     await driver.enablePlugin("vector-tools");
     await driver.assertSelectorEventually(BUTTON);
     await driver.click(BUTTON);
-    await openTab(driver, 3);
+    await openTab(driver, "flow");
 
     // The overlay maps math coordinates linearly onto the graph paper's rect,
     // which the 3D product's rotatable x/y/z box does not support — and the 3D
@@ -608,7 +619,7 @@ testWithPage(
     await driver.enablePlugin("vector-tools");
     await driver.assertSelectorEventually(BUTTON);
     await driver.click(BUTTON);
-    await openTab(driver, 3);
+    await openTab(driver, "flow");
 
     await driver.assertSelectorNot(FLOW_CANVAS);
     await driver.click(VISUALIZE);
@@ -1105,7 +1116,7 @@ testWithPage(
     await driver.enablePlugin("vector-tools");
     await driver.assertSelectorEventually(BUTTON);
     await driver.click(BUTTON);
-    await openTab(driver, 2);
+    await openTab(driver, "color");
 
     // Set the two apart, so matching has something visible to do.
     await driver.evaluate(() => {
@@ -1245,6 +1256,87 @@ testWithPage(
     await driver.evaluate(() =>
       (DSM.enabledPlugins["vector-tools"] as any).resetConfig()
     );
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);
+
+testWithPage(
+  "Vector Tools draws a parametric curve, and takes it away again",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+
+    // A static field, so anything that moves is the curve's doing.
+    await driver.evaluate(() => {
+      const vt = DSM.enabledPlugins["vector-tools"] as any;
+      vt.setArrowMode("off");
+      vt.setCurve("enabled", true);
+      vt.setCurve("xLatex", "3\\cos\\left(t\\right)");
+      vt.setCurve("yLatex", "2\\sin\\left(t\\right)");
+      vt.setCurve("showPoint", true);
+    });
+    await driver.waitForSync();
+    await driver.click(GENERATE);
+    await driver.waitForSync();
+
+    const curve = async () =>
+      await driver.evaluate((ns: string) => {
+        const state = Calc.getState() as any;
+        const item = (id: string) =>
+          state.expressions.list.find((i: any) => i.id === id);
+        const analysis = (Calc as any).expressionAnalysis ?? {};
+        return {
+          latex: item(`${ns}_curve`)?.latex as string | undefined,
+          color: item(`${ns}_curve`)?.color as string | undefined,
+          point: item(`${ns}_curve_point`)?.latex as string | undefined,
+          clock: item(`${ns}_time`)?.latex as string | undefined,
+          ticker: (state.expressions.ticker?.handlerLatex ?? null) as
+            | string
+            | null,
+          error: (analysis[`${ns}_curve`]?.errorMessage ?? null) as
+            | string
+            | null,
+          evaluated: analysis[`${ns}_curve`]?.evaluationDisplayed ?? null,
+        };
+      }, NAMESPACE);
+
+    const drawn = await curve();
+    // One parametric with its own `t`, which is only safe because a
+    // time-varying field is rewritten off `t` first.
+    expect(drawn.latex).toContain("\\le t\\le");
+    expect(drawn.error).toBeNull();
+    expect(drawn.evaluated).not.toBe(true);
+    expect(drawn.color).toBe("#c74440");
+    // The dot reads the same two functions at the clock, so it cannot drift off
+    // the curve. Wanting it is also what gives a static field a clock at all.
+    expect(drawn.point).toContain("v_{tfdt}");
+    expect(drawn.ticker).toContain("\\operatorname{dt}");
+    const before = drawn.clock;
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    expect((await curve()).clock).not.toBe(before);
+
+    // Switching the curve off has to remove both of its expressions on the next
+    // generate. They are the plugin's own, so this is a removal rather than the
+    // refusal a stray sharing the namespace would get.
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).setCurve("enabled", false)
+    );
+    await driver.waitForSync();
+    await driver.click(GENERATE);
+    await driver.waitForSync();
+    const gone = await curve();
+    expect(gone.latex).toBeUndefined();
+    expect(gone.point).toBeUndefined();
+    expect(gone.ticker).toBeNull();
+
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).resetConfig()
+    );
+    await driver.click(REMOVE);
     await driver.disablePlugin("vector-tools");
     await driver.setBlank();
     await driver.waitForSync();

@@ -36,7 +36,9 @@ export type VectorFieldPurpose =
   | "first arrowhead wing"
   | "second arrowhead wing"
   | "zero vector markers"
-  | "animation clock";
+  | "animation clock"
+  | "parametric curve"
+  | "curve position";
 
 export interface GeneratedVectorFieldExpression
   extends GeneratedExpressionSpec {
@@ -101,6 +103,54 @@ export function namespaceForField(config: VectorFieldConfig): string {
 /** The symbol a generated field advances as its clock. */
 export function timeSymbolFor(config: VectorFieldConfig) {
   return createSymbols(config.id).time;
+}
+
+/**
+ * Every ID this generator can ever emit, whatever the configuration.
+ *
+ * Not the same as the IDs in one plan, and the difference is load-bearing. A
+ * plan varies: a gradient field has `f_function` and a component field does
+ * not, the curve's two expressions come and go with a checkbox, and the clock
+ * appears only when something needs one. Regenerating with fewer expressions
+ * has to *remove* the ones no longer wanted — but an item in the namespace that
+ * this generator could never have produced is somebody else's, and deleting it
+ * is the bug `cad6b0c9` fixed.
+ *
+ * So the two questions are different: "is this mine?" is asked of this list,
+ * and "do I still want it?" is asked of the plan. Held to the plans by a test,
+ * because a suffix added to the generator and forgotten here would come back as
+ * an expression that cannot be removed.
+ */
+const GENERATED_SUFFIXES = [
+  "folder",
+  "x_samples",
+  "y_samples",
+  "time",
+  "curve",
+  "curve_point",
+  "f_function",
+  "grid_x",
+  "grid_y",
+  "p_function",
+  "q_function",
+  "u",
+  "v",
+  "magnitude",
+  "direction",
+  "display_u",
+  "display_v",
+  "end_x",
+  "end_y",
+  "colors",
+  "shafts",
+  "head_1",
+  "head_2",
+  "zero_points",
+] as const;
+
+export function allGeneratedIDs(config: VectorFieldConfig): string[] {
+  const namespace = namespaceForField(config);
+  return GENERATED_SUFFIXES.map((suffix) => `${namespace}_${suffix}`);
 }
 
 export type ComponentSlot = "p" | "q" | "f";
@@ -393,21 +443,66 @@ export function createVectorFieldPlan(
         ]
       : [];
 
-  // The clock the ticker drives, and which the components were rewritten onto.
-  const timeExpressions = animateTime
+  // A curve is one parametric expression, because Desmos draws parametrics and
+  // there is nothing to gain by drawing one ourselves. Its `t` is the
+  // parametric's own, bound inside the expression — safe only because a
+  // time-varying field was rewritten off `t` above.
+  const { curve } = config;
+  const movingPoint = curve.enabled && curve.showPoint;
+  const curveExpressions = curve.enabled
+    ? [
+        expression(
+          "curve",
+          "parametric curve",
+          `\\left(${curve.xLatex},${curve.yLatex}\\right)\\left\\{${numberLatex(
+            curve.tMin
+          )}\\le t\\le${numberLatex(curve.tMax)}\\right\\}`,
+          {
+            hidden: false,
+            color: curve.color,
+            lineWidth: numberLatex(curve.lineWidth),
+          }
+        ),
+        ...(movingPoint
+          ? [
+              // The same two functions read at the clock instead of swept, so
+              // the dot is on the curve by construction rather than by keeping
+              // a second copy of it in step.
+              expression(
+                "curve_point",
+                "curve position",
+                `\\left(${renameIdentifier(
+                  curve.xLatex,
+                  TIME_NAME,
+                  symbols.time
+                )},${renameIdentifier(
+                  curve.yLatex,
+                  TIME_NAME,
+                  symbols.time
+                )}\\right)`,
+                { hidden: false, color: curve.color }
+              ),
+            ]
+          : []),
+      ]
+    : [];
+
+  // The clock the ticker drives. Two things can call for one: the field being
+  // written in terms of `t`, and a curve wanting a dot that moves along it.
+  const needsClock = animateTime || movingPoint;
+  const timeExpressions = needsClock
     ? [expression("time", "animation clock", `${symbols.time}=0`)]
     : [];
 
   return {
     namespace,
     folder,
-    ticker: animateTime
-      ? tickerFor(symbols.time, config.time.speed)
-      : undefined,
+    ticker: needsClock ? tickerFor(symbols.time, config.time.speed) : undefined,
     expressions: [
       expression("x_samples", "x samples", xSamples),
       expression("y_samples", "y samples", ySamples),
       ...timeExpressions,
+      ...curveExpressions,
       ...scalarExpressions,
       expression(
         "grid_x",

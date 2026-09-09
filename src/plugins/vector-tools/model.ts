@@ -152,6 +152,39 @@ export const FLOW_PARTICLE_MAXIMUM = 400_000;
 export const FLOW_PARTICLE_HEAVY = 120_000;
 
 /**
+ * A parametrized curve drawn over the field.
+ *
+ * Deliberately generated rather than drawn on our own canvas. Desmos draws
+ * parametrics natively, and well — building a second renderer for something the
+ * host already does would buy nothing, cost a line-strip pipeline, and produce
+ * a curve that vanishes for anyone without the extension. This is the half of
+ * the plugin where the right answer is to write an expression.
+ *
+ * Its `t` is the parametric's own, bound inside the expression. That is only
+ * safe because a time-varying field is rewritten off `t` onto the field's clock
+ * symbol first — the two would otherwise be the same letter meaning two things.
+ */
+export interface CurveConfig {
+  enabled: boolean;
+  xLatex: string;
+  yLatex: string;
+  tMin: number;
+  tMax: number;
+  color: string;
+  lineWidth: number;
+  /**
+   * Draw a point at the curve's position at the current clock.
+   *
+   * Needs a clock, so switching this on is one of the two things that makes the
+   * generated field carry one; the other is the field itself using `t`.
+   */
+  showPoint: boolean;
+}
+
+export const CURVE_LINE_WIDTH_MINIMUM = 1;
+export const CURVE_LINE_WIDTH_MAXIMUM = 12;
+
+/**
  * The animation clock, for a field written in terms of `t`.
  *
  * Persisted, but the clock's *position* is not: a graph reopened later starts
@@ -177,12 +210,13 @@ export interface PanelConfig {
   tab: PanelTab;
 }
 
-export type PanelTab = "field" | "arrows" | "color" | "flow";
+export type PanelTab = "field" | "arrows" | "color" | "curve" | "flow";
 
 export const PANEL_TABS: readonly { id: PanelTab; label: string }[] = [
   { id: "field", label: "Field" },
   { id: "arrows", label: "Arrows" },
   { id: "color", label: "Color" },
+  { id: "curve", label: "Curve" },
   { id: "flow", label: "Flow" },
 ];
 
@@ -349,6 +383,7 @@ export interface VectorFieldConfig {
    */
   arrowDensityLimit: boolean;
   flow: FlowConfig;
+  curve: CurveConfig;
   time: TimeConfig;
   panel: PanelConfig;
 }
@@ -456,6 +491,18 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
     look: "streamlines",
     normalizeSpeed: true,
     renderScale: 1,
+  },
+  curve: {
+    enabled: false,
+    // The unit circle, so switching the curve on draws something recognisable
+    // rather than nothing.
+    xLatex: "\\cos\\left(t\\right)",
+    yLatex: "\\sin\\left(t\\right)",
+    tMin: 0,
+    tMax: 6.283185307179586,
+    color: "#c74440",
+    lineWidth: 2.5,
+    showPoint: true,
   },
   time: { playing: true, speed: 1 },
   panel: { width: 420, height: 560, tab: "field" },
@@ -572,6 +619,7 @@ export function cloneDefaultConfig(): VectorFieldConfig {
     arrowhead: { ...DEFAULT_VECTOR_FIELD_CONFIG.arrowhead },
     color: { ...DEFAULT_VECTOR_FIELD_CONFIG.color },
     flow: { ...DEFAULT_VECTOR_FIELD_CONFIG.flow },
+    curve: { ...DEFAULT_VECTOR_FIELD_CONFIG.curve },
     time: { ...DEFAULT_VECTOR_FIELD_CONFIG.time },
     panel: { ...DEFAULT_VECTOR_FIELD_CONFIG.panel },
   };
@@ -611,6 +659,22 @@ export function validateVectorFieldConfig(
   }
   validateAxis(config.domain.x, "x", issues);
   validateAxis(config.domain.y, "y", issues);
+  // Only when it is switched on: a curve nobody asked for must not be able to
+  // stop the field being generated.
+  if (config.curve.enabled) {
+    validateComponent(config.curve.xLatex, "X(t)", issues);
+    validateComponent(config.curve.yLatex, "Y(t)", issues);
+    if (
+      !Number.isFinite(config.curve.tMin) ||
+      !Number.isFinite(config.curve.tMax) ||
+      config.curve.tMax <= config.curve.tMin
+    ) {
+      issues.push({
+        level: "error",
+        message: "The curve's t maximum must exceed its minimum.",
+      });
+    }
+  }
   validateFinitePositive(config.length.targetLength, "Target length", issues);
   validateFinitePositive(config.length.scale, "Length scale", issues);
   validateFinitePositive(config.length.maximumLength, "Maximum length", issues);
@@ -759,10 +823,37 @@ export function normalizeVectorFieldConfig(value: unknown): VectorFieldConfig {
         : "live",
     arrowDensityLimit: value.arrowDensityLimit !== false,
     flow: normalizeFlow(value.flow, fallback.flow),
+    curve: normalizeCurve(value.curve, fallback.curve),
     time: normalizeTime(value.time, fallback.time),
     panel: normalizePanel(value.panel, fallback.panel),
   };
   return config;
+}
+
+function normalizeCurve(value: unknown, fallback: CurveConfig): CurveConfig {
+  const curve = asRecord(value);
+  const text = (key: keyof CurveConfig, from: string) => {
+    const stored = curve?.[key];
+    return typeof stored === "string" ? stored : from;
+  };
+  return {
+    enabled: typeof curve?.enabled === "boolean" ? curve.enabled : false,
+    xLatex: text("xLatex", fallback.xLatex),
+    yLatex: text("yLatex", fallback.yLatex),
+    tMin: finiteOr(curve?.tMin, fallback.tMin),
+    tMax: finiteOr(curve?.tMax, fallback.tMax),
+    color: text("color", fallback.color),
+    lineWidth: clampNumber(
+      curve?.lineWidth,
+      fallback.lineWidth,
+      CURVE_LINE_WIDTH_MINIMUM,
+      CURVE_LINE_WIDTH_MAXIMUM
+    ),
+    showPoint:
+      typeof curve?.showPoint === "boolean"
+        ? curve.showPoint
+        : fallback.showPoint,
+  };
 }
 
 function normalizeTime(value: unknown, fallback: TimeConfig): TimeConfig {

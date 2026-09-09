@@ -1,5 +1,6 @@
 import { CalculatorExpressionAdapter } from "./desmos/ExpressionAdapter";
 import {
+  allGeneratedIDs,
   auditVectorFieldPlan,
   componentExpressionID,
   componentFunctionLatex,
@@ -732,6 +733,59 @@ describe("Vector Tools length inputs", () => {
       if (mode === "actual") expect(shown).toBe(0);
       else expect(shown).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("Vector Tools generated-ID vocabulary", () => {
+  test("covers every ID any configuration can produce", () => {
+    // `allGeneratedIDs` is how the adapter tells "mine, no longer wanted" from
+    // "somebody else's". A suffix the generator emits but this list forgets
+    // would be treated as a stray: it could not be removed, and regenerating
+    // over it would be refused. So every plan the generator can make is checked
+    // against it rather than the list being trusted.
+    const configs = [
+      cloneDefaultConfig(),
+      (() => {
+        const config = cloneDefaultConfig();
+        config.source = "gradient";
+        return config;
+      })(),
+      (() => {
+        const config = cloneDefaultConfig();
+        config.zeroVectorMode = "point";
+        config.curve.enabled = true;
+        config.curve.showPoint = true;
+        return config;
+      })(),
+    ];
+    for (const config of configs) {
+      for (const animateTime of [false, true]) {
+        const plan = createVectorFieldPlan(config, { animateTime });
+        const known = new Set(allGeneratedIDs(config));
+        const produced = [plan.folder.id, ...plan.expressions.map((e) => e.id)];
+        for (const id of produced) {
+          expect([id, known.has(id)]).toEqual([id, true]);
+        }
+      }
+    }
+  });
+
+  test("a plan is a subset, not the whole vocabulary", () => {
+    // The distinction only earns its keep because plans really do vary.
+    const components = cloneDefaultConfig();
+    const gradient = cloneDefaultConfig();
+    gradient.source = "gradient";
+    const idsOf = (config: ReturnType<typeof cloneDefaultConfig>) =>
+      new Set(createVectorFieldPlan(config).expressions.map((e) => e.id));
+    expect(idsOf(components).size).toBeLessThan(
+      allGeneratedIDs(components).length
+    );
+    expect([...idsOf(gradient)]).toContain(
+      `${namespaceForField(gradient)}_f_function`
+    );
+    expect([...idsOf(components)]).not.toContain(
+      `${namespaceForField(components)}_f_function`
+    );
   });
 });
 

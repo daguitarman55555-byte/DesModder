@@ -23,7 +23,11 @@ export type FocusLocation =
       /** Should be unreachable; just using to guarantee compatability with `manageFocusHelper`. */
       kind: "dummy-mq";
     }
-  | { type: "dsm-focus"; plugin: "vector-tools"; kind: "p" | "q" | "f" }
+  | {
+      type: "dsm-focus";
+      plugin: "vector-tools";
+      kind: "p" | "q" | "f" | "curve-x" | "curve-y";
+    }
   | { type: "search-expressions" }
   | {
       /**

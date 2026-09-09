@@ -51,7 +51,10 @@ export interface DesmosExpressionAdapter {
     namespace: string,
     folder: GeneratedFolderSpec,
     expressions: readonly GeneratedExpressionSpec[],
-    ticker?: GeneratedTickerSpec | null
+    options?: {
+      ticker?: GeneratedTickerSpec | null;
+      knownIDs?: readonly string[];
+    }
   ) => void;
   removeGeneratedSet: (
     namespace: string,
@@ -85,19 +88,28 @@ export class CalculatorExpressionAdapter implements DesmosExpressionAdapter {
   }
 
   /**
-   * @param ticker `undefined` leaves the graph's ticker alone, `null` clears
-   * it, and an object installs it. Three states rather than two because a field
-   * that does not animate must not disturb a ticker the user set up for
+   * @param options.ticker `undefined` leaves the graph's ticker alone, `null`
+   * clears it, and an object installs it. Three states rather than two because a
+   * field that does not animate must not disturb a ticker the user set up for
    * something else, and "no ticker wanted" and "clear the ticker" are different
-   * intentions. Whether installing one is allowed is the caller's decision —
-   * a ticker is graph-level, so this cannot tell ownership from the namespace.
+   * intentions. Whether installing one is allowed is the caller's decision — a
+   * ticker is graph-level, so this cannot tell ownership from the namespace.
+   *
+   * @param options.knownIDs every ID the caller's generator can produce, which
+   * is not the same as the IDs it is writing now. One of them missing from
+   * `expressions` means it is no longer wanted and should go; an ID in the
+   * namespace that is *not* in this list belongs to somebody else.
    */
   applyGeneratedSet(
     namespace: string,
     folder: GeneratedFolderSpec,
     expressions: readonly GeneratedExpressionSpec[],
-    ticker?: GeneratedTickerSpec | null
+    options: {
+      ticker?: GeneratedTickerSpec | null;
+      knownIDs?: readonly string[];
+    } = {}
   ) {
+    const { ticker, knownIDs } = options;
     assertValidID(namespace, "generated namespace");
     assertFolderSpec(folder);
     assertWithinNamespace(folder.id, namespace, "generated folder");
@@ -125,7 +137,12 @@ export class CalculatorExpressionAdapter implements DesmosExpressionAdapter {
     for (const item of state.expressions.list) {
       (isWithinNamespace(item.id, namespace) ? owned : others).push(item);
     }
-    assertOwnedItemsAreReplaceable(owned, folder, expressions);
+    assertOwnedItemsAreReplaceable(
+      owned,
+      folder,
+      expressions,
+      new Set(knownIDs ?? [])
+    );
 
     const insertionIndex = firstOwnedIndex(state.expressions.list, namespace);
     const generated: ItemState[] = [
@@ -254,7 +271,8 @@ function expressionState(spec: GeneratedExpressionSpec): ExpressionState {
 function assertOwnedItemsAreReplaceable(
   owned: readonly ItemState[],
   folder: GeneratedFolderSpec,
-  expressions: readonly GeneratedExpressionSpec[]
+  expressions: readonly GeneratedExpressionSpec[],
+  known: ReadonlySet<string>
 ) {
   const expected = new Map<string, "folder" | "expression">([
     [folder.id, "folder"],
@@ -262,11 +280,14 @@ function assertOwnedItemsAreReplaceable(
   ]);
   for (const item of owned) {
     const expectedType = expected.get(item.id);
-    // An item inside the namespace that this write does not account for is not
-    // this field's to replace. It used to be skipped here and then dropped by
-    // the rebuild below, which deleted it — the exact outcome the paragraph
-    // above promises does not happen. Refusing is what makes that true.
     if (expectedType === undefined) {
+      // Two different things look the same here, and only one of them is safe
+      // to delete. An ID this generator can produce but this plan left out is
+      // ours and no longer wanted — the curve after its checkbox is cleared,
+      // `f_function` after switching off gradient mode — and the rebuild below
+      // is how it goes. Anything else shares the prefix by coincidence and is
+      // somebody's own expression, which is what used to be deleted silently.
+      if (known.has(item.id)) continue;
       throw new Error(
         `${item.id} is not part of this field, but shares its namespace. Rename or remove it, or rename the field, and try again.`
       );
