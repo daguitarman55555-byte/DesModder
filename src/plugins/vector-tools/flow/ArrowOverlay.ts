@@ -45,6 +45,14 @@ export class ArrowOverlay {
   /** Kept so a remount after a lost context comes back with the same values. */
   private lastParameters: ReadonlyMap<string, number> = new Map();
   private lastTime = 0;
+  /**
+   * Whether to invert this canvas to cancel the graph's reverse contrast.
+   *
+   * Desmos inverts an ancestor of this canvas, so the field inverts with it
+   * unless it is inverted a second time here. Kept so a remount after a lost
+   * context comes back looking the same.
+   */
+  private counteractInvert = false;
   private lastOptions?: ArrowOptions;
   private contextLost = false;
   private readonly onContextLost = (event: Event) => {
@@ -122,6 +130,7 @@ export class ArrowOverlay {
       this.renderer!.setField(field);
       this.renderer!.setParameters(this.lastParameters);
       this.renderer!.setTime(this.lastTime);
+      this.applyContrast();
       this.requestFrame();
     } catch (error) {
       this.stop();
@@ -151,6 +160,19 @@ export class ArrowOverlay {
     if (this.renderer === undefined) return;
     this.renderer.setParameters(values);
     this.requestFrame();
+  }
+
+  /** Cancels, or stops cancelling, the graph's reverse contrast. */
+  setCounteractInvert(counteract: boolean) {
+    if (this.counteractInvert === counteract) return;
+    this.counteractInvert = counteract;
+    this.applyContrast();
+  }
+
+  private applyContrast() {
+    const canvas = document.getElementById(CANVAS_ID);
+    if (canvas === null) return;
+    canvas.style.filter = this.counteractInvert ? "invert(1)" : "";
   }
 
   /** Advances the clock and redraws. A still picture only while nothing reads it. */

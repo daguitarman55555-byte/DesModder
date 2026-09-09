@@ -349,6 +349,20 @@ export interface VectorColorConfig {
    * reconstruct it. A one-press copy could not be undone.
    */
   matchFlow: boolean;
+  /**
+   * Keep the field's own colours when the graph is in reverse contrast.
+   *
+   * Desmos's reverse contrast is `filter: invert(1)` on `.dcg-container`, which
+   * is an ancestor of both overlay canvases — so by default the arrows and the
+   * flow invert along with everything else, and a bright ramp on a dark graph
+   * comes out dark. Switching this on inverts the overlays a second time, which
+   * cancels the first, and leaves a dark graph with the field's real colours on
+   * it.
+   *
+   * Off by default, because that is what a graph saved before this existed
+   * already looks like.
+   */
+  keepColorsInReverseContrast: boolean;
 }
 
 export interface VectorFieldConfig {
@@ -473,6 +487,7 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
     maximum: 1,
     fixedColor: "#6042a6",
     matchFlow: false,
+    keepColorsInReverseContrast: false,
   },
   zeroVectorMode: "hide",
   arrowMode: "live",
@@ -815,6 +830,10 @@ export function normalizeVectorFieldConfig(value: unknown): VectorFieldConfig {
         typeof color?.matchFlow === "boolean"
           ? color.matchFlow
           : fallback.color.matchFlow,
+      keepColorsInReverseContrast:
+        typeof color?.keepColorsInReverseContrast === "boolean"
+          ? color.keepColorsInReverseContrast
+          : fallback.color.keepColorsInReverseContrast,
     },
     zeroVectorMode: value.zeroVectorMode === "point" ? "point" : "hide",
     arrowMode:

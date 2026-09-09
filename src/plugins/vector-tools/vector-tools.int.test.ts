@@ -1343,3 +1343,70 @@ testWithPage(
   },
   90000
 );
+
+testWithPage(
+  "Vector Tools can keep its colours through the graph's reverse contrast",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+
+    const state = async () =>
+      await driver.evaluate(() => {
+        const vt = DSM.enabledPlugins["vector-tools"] as any;
+        const canvas = document.getElementById("dsm-vector-tools-arrow-canvas");
+        return {
+          reversed: vt.graphReversesContrast as boolean,
+          keep: vt.keepColorsInReverseContrast as boolean,
+          filter: canvas === null ? null : canvas.style.filter,
+        };
+      });
+
+    // Reverse contrast is `filter: invert(1)` on `.dcg-container`, an ancestor
+    // of the overlay canvases, so the field inverts with the page by default.
+    expect(await state()).toMatchObject({ reversed: false, filter: "" });
+
+    // Ticking it while the graph is normal must do nothing visible: there is
+    // no inversion to cancel yet.
+    await driver.evaluate(() =>
+      (
+        DSM.enabledPlugins["vector-tools"] as any
+      ).setKeepColorsInReverseContrast(true)
+    );
+    await driver.waitForSync();
+    expect(await state()).toMatchObject({ keep: true, filter: "" });
+
+    // With both true, the canvas is inverted a second time, which cancels the
+    // ancestor's inversion and leaves a dark graph carrying the real colours.
+    await driver.evaluate(() =>
+      Calc.updateSettings({ invertedColors: true } as any)
+    );
+    await driver.waitForFunction(
+      () =>
+        document.getElementById("dsm-vector-tools-arrow-canvas")?.style
+          .filter === "invert(1)",
+      { timeout: 8000 }
+    );
+    expect(await state()).toMatchObject({ reversed: true, keep: true });
+
+    // Untick, and the field goes back to inverting along with everything else.
+    await driver.evaluate(() =>
+      (
+        DSM.enabledPlugins["vector-tools"] as any
+      ).setKeepColorsInReverseContrast(false)
+    );
+    await driver.waitForSync();
+    expect(await state()).toMatchObject({ reversed: true, filter: "" });
+
+    await driver.evaluate(() =>
+      Calc.updateSettings({ invertedColors: false } as any)
+    );
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).resetConfig()
+    );
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);

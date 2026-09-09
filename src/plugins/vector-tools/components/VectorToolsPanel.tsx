@@ -441,6 +441,26 @@ function colorTab(vectorTools: VectorTools, config: ConfigGetter) {
         (checked) => vectorTools.setMatchFlowColor(checked),
         "dsm-vector-tools-match-colors"
       )}
+      {checkboxControl(
+        "Keep these colors when the graph is in reverse contrast",
+        () => vectorTools.keepColorsInReverseContrast,
+        (checked) => vectorTools.setKeepColorsInReverseContrast(checked),
+        "dsm-vector-tools-keep-colors"
+      )}
+      {/* Reverse contrast is `filter: invert(1)` on an ancestor of both overlay
+          canvases, so the field inverts with the page unless it is inverted a
+          second time. Says which of the two situations it is in, because a
+          checkbox that does nothing right now is worth explaining rather than
+          hiding — the graph setting it depends on lives somewhere else. */}
+      <div class="dsm-vector-tools-hint">
+        {() =>
+          vectorTools.graphReversesContrast
+            ? vectorTools.keepColorsInReverseContrast
+              ? "The graph is reversed and the field is keeping its own colors."
+              : "The graph is reversed, so the field is reversed with it."
+            : "Only applies while Desmos's reverse contrast is on. Ticked, a dark graph keeps a bright field."
+        }
+      </div>
 
       <details class="dsm-vector-tools-more" open>
         <summary>Arrows</summary>

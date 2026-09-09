@@ -248,6 +248,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   private clockFrame?: number;
   private clockLastFrame?: number;
   private clockSeconds = 0;
+  private lastReverseContrast = false;
   /**
    * One `HelperExpression` per name the field has ever read, and the number it
    * most recently reported.
@@ -288,9 +289,18 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
         // change what the field means.
         this.scheduleEnvironmentRefresh();
       }
+      // Reverse contrast is a graph setting changed elsewhere entirely, and
+      // nothing tells this plugin about it. A boolean compare per event is
+      // cheaper than any arrangement that would.
+      if (this.graphReversesContrast !== this.lastReverseContrast) {
+        this.lastReverseContrast = this.graphReversesContrast;
+        this.syncContrast();
+        this.util.tick();
+      }
     });
     this.refreshEnvironment();
     this.syncClock();
+    this.syncContrast();
   }
 
   // ---- the animation clock -------------------------------------------------
@@ -666,6 +676,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     // might have made the field start or stop reading `t`.
     this.refreshArrows();
     this.syncClock();
+    this.syncContrast();
     this.util.tick();
   }
 
@@ -1078,6 +1089,37 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   /** What the flow is drawn with right now, match accounted for. */
   get flowColor() {
     return effectiveFlowColor(this.getConfig());
+  }
+
+  /** Whether Desmos is currently drawing the graph in reverse contrast. */
+  get graphReversesContrast(): boolean {
+    return this.cc.graphSettings?.config?.invertedColors ?? false;
+  }
+
+  get keepColorsInReverseContrast() {
+    return this.getConfig().color.keepColorsInReverseContrast;
+  }
+
+  setKeepColorsInReverseContrast(keep: boolean) {
+    this.updateConfig((config) => {
+      config.color.keepColorsInReverseContrast = keep;
+    });
+    this.syncContrast();
+  }
+
+  /**
+   * Tells both overlays whether to cancel the graph's inversion.
+   *
+   * Reverse contrast is `filter: invert(1)` on `.dcg-container`, which sits
+   * above both canvases, so the field inverts with the rest of the page whether
+   * or not that is wanted. Inverting the canvas a second time cancels it, which
+   * is what leaves a dark graph carrying the field's real colours.
+   */
+  private syncContrast() {
+    const counteract =
+      this.graphReversesContrast && this.keepColorsInReverseContrast;
+    this.arrowOverlay.setCounteractInvert(counteract);
+    this.flowOverlay.setCounteractInvert(counteract);
   }
 
   // ---- symbolic differentiation ------------------------------------------
