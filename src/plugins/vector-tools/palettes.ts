@@ -411,8 +411,27 @@ export function paletteLatex(
   )}\\right)`;
 }
 
+/**
+ * Built once per palette and kept.
+ *
+ * Both renderers call `paletteUniforms` from inside their frame paths, so this
+ * was allocating two typed arrays per frame per renderer for a result that only
+ * changes when somebody clicks a different swatch. The arrays are shared, so a
+ * caller must upload them rather than write into them — which is all either
+ * renderer does with them.
+ */
+const uniformCache = new Map<PaletteID, ReturnType<typeof buildUniforms>>();
+
 /** The stops as shader uniforms, padded to the fixed array the shader declares. */
 export function paletteUniforms(id: PaletteID) {
+  const cached = uniformCache.get(id);
+  if (cached !== undefined) return cached;
+  const built = buildUniforms(id);
+  uniformCache.set(id, built);
+  return built;
+}
+
+function buildUniforms(id: PaletteID) {
   const stops = paletteStops(id);
   const positions = new Float32Array(MAX_PALETTE_STOPS);
   const colors = new Float32Array(MAX_PALETTE_STOPS * 3);

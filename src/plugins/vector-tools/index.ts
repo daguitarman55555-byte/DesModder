@@ -217,7 +217,14 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   private arrowMessage = "";
   private flowMessage = "";
   private flowRefreshTimer?: ReturnType<typeof setTimeout>;
-  private flowCompilationCache?: { key: string; result: FlowCompilation };
+  private flowCompilationCache?: {
+    source: FieldSource;
+    xLatex: string;
+    yLatex: string;
+    fLatex: string;
+    revision: number;
+    result: FlowCompilation;
+  };
   /**
    * `getConfig` is read many times while the panel renders, and each read has
    * to parse the persisted JSON. Cache it against the raw string so a render
@@ -694,11 +701,12 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
 
   updateConfig(update: (config: VectorFieldConfig) => void) {
     // Copy first: `getConfig` hands back a cached object shared with the panel.
-    const next = normalizeVectorFieldConfig(
-      JSON.parse(JSON.stringify(this.getConfig()))
-    );
+    // `structuredClone` rather than a JSON round trip, because this runs on
+    // every pointermove of every slider and the round trip was serialising the
+    // whole configuration twice — once out, once back — to copy it.
+    const next = structuredClone(this.getConfig());
     update(next);
-    this.saveConfig(next);
+    this.saveConfig(normalizeVectorFieldConfig(next));
   }
 
   resetConfig() {
@@ -1179,22 +1187,33 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
 
   get flowCompilation(): FlowCompilation {
     const config = this.getConfig();
-    const key = JSON.stringify([
-      config.source,
-      config.components.xLatex,
-      config.components.yLatex,
-      config.scalar.fLatex,
+    // What identifies a compilation, compared field by field rather than
+    // serialised into one string. The panel reads this several times per render
+    // and a render happens per pointermove, so building a key here was itself
+    // most of the work this cache exists to avoid — measured at eight hundred
+    // serialisations across a hundred-frame drag.
+    const cached = this.flowCompilationCache;
+    if (
+      cached !== undefined &&
+      cached.source === config.source &&
+      cached.xLatex === config.components.xLatex &&
+      cached.yLatex === config.components.yLatex &&
+      cached.fLatex === config.scalar.fLatex &&
       // The same component compiles to different GLSL against a different set
       // of definitions, so the environment is part of what this identifies.
-      this.environmentRevision,
-    ]);
-    // The panel reads this several times per render pass, so compile once per
-    // distinct field rather than once per read.
-    if (this.flowCompilationCache?.key === key) {
-      return this.flowCompilationCache.result;
+      cached.revision === this.environmentRevision
+    ) {
+      return cached.result;
     }
     const result = compileFlowField(config, this.environment);
-    this.flowCompilationCache = { key, result };
+    this.flowCompilationCache = {
+      source: config.source,
+      xLatex: config.components.xLatex,
+      yLatex: config.components.yLatex,
+      fLatex: config.scalar.fLatex,
+      revision: this.environmentRevision,
+      result,
+    };
     return result;
   }
 
@@ -1505,10 +1524,17 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   }
 
   private saveConfig(config: VectorFieldConfig) {
+    const serialized = JSON.stringify(config);
+    // A drag delivers a pointermove per frame, and most of them land on the
+    // value the setting already has — a slider that has run out of travel, or a
+    // number that rounds to what it already was. Writing anyway meant a
+    // settings round trip, a panel render and an arrow refresh for a change
+    // that was not one.
+    if (serialized === this.settings.serializedFieldConfig) return;
     this.dsm.setPluginSetting(
       "vector-tools",
       "serializedFieldConfig",
-      JSON.stringify(config)
+      serialized
     );
   }
 

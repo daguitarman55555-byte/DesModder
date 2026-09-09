@@ -271,6 +271,10 @@ export class ArrowRenderer {
 
   setField(field: FlowField) {
     const { gl } = this;
+    // The compilation is cached upstream, so an unchanged field arrives as the
+    // same object. Checking that first avoids serialising the whole thing —
+    // including every helper's GLSL — once per settings change.
+    if (this.linkedField === field && this.program !== undefined) return;
     const key = JSON.stringify(field);
     if (this.fieldSource === key && this.program !== undefined) return;
     if (this.program !== undefined) gl.deleteProgram(this.program.program);

@@ -268,6 +268,9 @@ export class FlowRenderer {
    * compile, which is the last line of defence behind the LaTeX compiler.
    */
   setField(field: FlowField) {
+    // Same reasoning as ArrowRenderer: an unchanged field is the same object,
+    // and comparing that is free where serialising it is not.
+    if (this.linkedField === field) return;
     const key = JSON.stringify(field);
     if (this.fieldSource === key) return;
     const updateProgram = this.createProgram(
