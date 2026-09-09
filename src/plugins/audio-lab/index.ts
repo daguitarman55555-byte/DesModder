@@ -10,7 +10,7 @@ const POPOVER_CLASS = "dsm-audio-lab-popover";
 
 export default class AudioLab extends PluginController<AudioLabSettings> {
   static id = "audio-lab" as const;
-  static enabledByDefault = false;
+  static enabledByDefault = true;
   static config = [
     {
       type: "string",
