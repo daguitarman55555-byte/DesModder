@@ -7,6 +7,7 @@ import CodeGolf from "./code-golf";
 import CompactView from "./compact-view";
 import CustomMathQuillConfig from "./custom-mathquill-config";
 import DuplicateHotkey from "./duplicate-hotkey";
+import DoomFieldplay from "./doom-fieldplay";
 import ExprActionButtons, {
   ActionButton,
 } from "../core-plugins/expr-action-buttons";
@@ -152,6 +153,7 @@ export const keyToPlugin = {
   rightClickTray: RightClickTray,
   scrollBeyond: ScrollBeyond,
   duplicateHotkey: DuplicateHotkey,
+  doomFieldplay: DoomFieldplay,
   glesmos: GLesmos,
   hideErrors: HideErrors,
   folderTools: FolderTools,
@@ -210,6 +212,7 @@ export class TransparentPlugins implements KeyToPluginInstance {
   get rightClickTray () { return this.ep["right-click-tray"]; }
   get scrollBeyond () { return this.ep["scroll-beyond"]; }
   get duplicateHotkey () { return this.ep["duplicate-expression-hotkey"]; }
+  get doomFieldplay () { return this.ep["doom-fieldplay"]; }
   get glesmos () { return this.ep["GLesmos"]; }
   get hideErrors () { return this.ep["hide-errors"]; }
   get folderTools () { return this.ep["folder-tools"]; }
