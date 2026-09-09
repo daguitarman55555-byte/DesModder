@@ -3,19 +3,35 @@
   width: auto;
 }
 
+// Laid out to match the Vector Tools panel — the same chrome, metrics and
+// typography, under this plugin's own class names. The two plugins share no
+// code, and should not; but they sit in the same pillbox a click apart, and a
+// panel that follows different rules reads as a different product.
 .dsm-audio-lab-menu {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  height: min(760px, 84vh);
+  // `resize` needs a non-visible overflow. The body scrolls, not the panel, so
+  // the title and the footer stay put while its contents move.
   overflow: hidden;
+  resize: both;
+  height: min(760px, 84vh);
   width: min(430px, 88vw);
+  min-width: 320px;
+  max-width: min(720px, 92vw);
+  min-height: 260px;
+  max-height: min(900px, 86vh);
+
+  .dcg-popover-title {
+    flex: none;
+  }
 
   .dsm-audio-lab-body {
     flex: 1 1 auto;
     min-height: 0;
+    overflow-x: hidden;
     overflow-y: auto;
-    padding-right: 3px;
+    padding-right: 2px;
   }
 
   section {
@@ -24,13 +40,15 @@
 
   section + section {
     border-top: 1px solid #e6e6e6;
-    padding-top: 9px;
+    padding-top: 8px;
   }
 
   label,
   .dsm-audio-lab-plot-title {
+    display: block;
     font-size: 11px;
     font-weight: bold;
+    margin: 7px 0 3px;
   }
 
   input[type="url"] {
@@ -113,8 +131,8 @@
 .dsm-audio-lab-status {
   color: #666;
   font-size: 11px;
-  line-height: 1.35;
-  margin: 4px 0 0;
+  line-height: 1.4;
+  margin: 4px 0 6px;
 }
 
 .dsm-audio-lab-file {
@@ -156,9 +174,10 @@
 }
 
 .dsm-audio-lab-footer {
+  background: inherit;
   border-top: 1px solid #ddd;
   flex: none;
-  margin-top: 7px;
+  margin-top: 6px;
   padding-top: 7px;
 }
 

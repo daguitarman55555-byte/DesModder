@@ -180,12 +180,15 @@ export default class AudioLabRuntime {
         );
       }
     );
-    this.find<HTMLButtonElement>("previous").addEventListener("click", () =>
-      this.runPlaybackCommand("previous").catch(() => undefined)
-    );
-    this.find<HTMLButtonElement>("next").addEventListener("click", () =>
-      this.runPlaybackCommand("next").catch(() => undefined)
-    );
+    // A click handler returns nothing, so the promise is voided here rather
+    // than handed back to the listener — the same shape as the `analyze`
+    // handler below.
+    this.find<HTMLButtonElement>("previous").addEventListener("click", () => {
+      void this.runPlaybackCommand("previous").catch(() => undefined);
+    });
+    this.find<HTMLButtonElement>("next").addEventListener("click", () => {
+      void this.runPlaybackCommand("next").catch(() => undefined);
+    });
     this.find<HTMLButtonElement>("analyze").addEventListener("click", () => {
       if (this.capture === undefined) void this.analyzeTab();
       else this.stopTabAnalysis();
@@ -367,7 +370,7 @@ export default class AudioLabRuntime {
   }
 
   private stopTabAnalysis() {
-    const capture = this.capture;
+    const { capture } = this;
     this.capture = undefined;
     capture?.getTracks().forEach((track) => track.stop());
     if (this.sourceMode === "capture") {
