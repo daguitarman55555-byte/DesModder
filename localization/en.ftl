@@ -388,3 +388,6 @@ quake-pro-opt-scalarZoomed-desc = Combats perspective distortion by multiplying 
 ## Vector Tools
 vector-tools-name = Vector Tools
 vector-tools-desc = Build editable 2D vector fields, and animate them as flowing particles over the graph.
+
+vector-game-runtime-name = Vector Game Runtime
+vector-game-runtime-desc = Play safe vector-rendered WebAssembly game modules inside the graph.
