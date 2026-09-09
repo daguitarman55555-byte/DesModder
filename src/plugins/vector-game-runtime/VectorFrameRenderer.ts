@@ -46,10 +46,14 @@ export default class VectorFrameRenderer {
   constructor(private readonly canvas: HTMLCanvasElement) {
     const gl=canvas.getContext("webgl2",{alpha:false,antialias:false,depth:false});
     if(gl===null) throw new Error("WebGL2 is required."); this.gl=gl;
-    const program=gl.createProgram(), texture=gl.createTexture(), vao=gl.createVertexArray(), buffer=gl.createBuffer();
+    const program = gl.createProgram();
+    const texture = gl.createTexture();
+    const vao = gl.createVertexArray();
+    const buffer = gl.createBuffer();
     if(!program||!texture||!vao||!buffer) throw new Error("Could not allocate GPU resources.");
     this.program=program; this.texture=texture; this.vao=vao;
-    const vs=shader(gl,gl.VERTEX_SHADER,VERTEX), fs=shader(gl,gl.FRAGMENT_SHADER,FRAGMENT);
+    const vs = shader(gl, gl.VERTEX_SHADER, VERTEX);
+    const fs = shader(gl, gl.FRAGMENT_SHADER, FRAGMENT);
     gl.attachShader(program,vs);gl.attachShader(program,fs);gl.bindAttribLocation(program,0,"a");gl.linkProgram(program);
     gl.deleteShader(vs);gl.deleteShader(fs);
     if(!gl.getProgramParameter(program,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program)??"Shader link failed.");
