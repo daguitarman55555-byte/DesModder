@@ -20,7 +20,7 @@ export default class Runtime {
   private find<T extends Element>(name:string){const e=this.root.querySelector<T>(`[data-vgr="${name}"]`);if(!e)throw new Error(`Missing control: ${name}`);return e;}
   private bind(){
     this.find<HTMLButtonElement>("mode").addEventListener("click",()=>{this.mode=this.mode==="vectors"?"pixels":"vectors";this.painter.configure(this.mode,4);this.find<HTMLButtonElement>("mode").textContent=this.mode==="vectors"?"Vector field":"Source pixels";});
-    this.find<HTMLButtonElement>("fullscreen").addEventListener("click",()=>void this.find<HTMLElement>("stage").requestFullscreen());
+    this.find<HTMLButtonElement>("fullscreen").addEventListener("click",()=>{ this.find<HTMLElement>("stage").requestFullscreen().catch(() => undefined); });
     this.find<HTMLButtonElement>("save").addEventListener("click",()=>{ saveState("demo",this.engine.serialize()).then(()=>this.status("Saved."),e=>this.status(String(e),true)).catch(() => undefined); });
     this.find<HTMLButtonElement>("load").addEventListener("click",()=>{ loadState("demo").then(s=>{if(!s)throw new Error("No save exists yet.");this.engine.restore(s);this.status("Save loaded.");},e=>this.status(String(e),true)).catch(() => undefined); });
     new ResizeObserver(()=>this.resize()).observe(this.find<HTMLElement>("stage"));
