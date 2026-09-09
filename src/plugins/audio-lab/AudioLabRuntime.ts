@@ -9,11 +9,38 @@ const QUALITY = {
 } as const;
 
 type Quality = keyof typeof QUALITY;
+type SpotifyAction =
+  | "sign-in"
+  | "status"
+  | "sign-out"
+  | "play"
+  | "pause"
+  | "resume"
+  | "next"
+  | "previous"
+  | "playback-state"
+  | "open";
+
+interface SpotifyProfile {
+  name: string;
+}
+
+interface SpotifyPlayback {
+  active: boolean;
+  isPlaying?: boolean;
+  progressMs?: number;
+  durationMs?: number;
+  track?: string;
+  artist?: string;
+  device?: string;
+}
 
 export default class AudioLabRuntime {
   private context?: AudioContext;
   private analyser?: AnalyserNode;
   private source?: AudioNode;
+  private localSource?: MediaElementAudioSourceNode;
+  private sourceMode?: "local" | "capture";
   private capture?: MediaStream;
   private objectUrl?: string;
   private frame?: number;
@@ -21,14 +48,18 @@ export default class AudioLabRuntime {
   private timeData = new Float32Array();
   private frequencyData = new Float32Array();
   private quality: Quality = "balanced";
+  private spotifyPlaying = false;
+  private readonly playbackPoll: ReturnType<typeof setInterval>;
+  private readonly messageListener: (event: MessageEvent) => void;
   private readonly audio: HTMLAudioElement;
   private readonly wave: HTMLCanvasElement;
   private readonly spectrum: HTMLCanvasElement;
   private readonly spotifyResponses = new Map<
     string,
     {
-      resolve: (value?: { name: string }) => void;
+      resolve: (value?: unknown) => void;
       reject: (error: Error) => void;
+      timeout: ReturnType<typeof setTimeout>;
     }
   >();
 
@@ -41,11 +72,12 @@ export default class AudioLabRuntime {
     this.wave = this.find<HTMLCanvasElement>("wave");
     this.spectrum = this.find<HTMLCanvasElement>("spectrum");
     this.bind();
-    listenToMessageDown((message) => {
+    this.messageListener = listenToMessageDown((message) => {
       if (message.type !== "audio-lab-spotify-response") return false;
       const pending = this.spotifyResponses.get(message.requestId);
       if (pending === undefined) return false;
       this.spotifyResponses.delete(message.requestId);
+      clearTimeout(pending.timeout);
       if (message.ok) pending.resolve(message.value);
       else
         pending.reject(new Error(message.error ?? "Spotify request failed."));
@@ -53,6 +85,9 @@ export default class AudioLabRuntime {
     });
     this.frame = requestAnimationFrame(this.draw);
     void this.refreshSpotifyStatus();
+    this.playbackPoll = setInterval(() => {
+      void this.refreshPlayback();
+    }, 2500);
   }
 
   private hydrateMediaElements() {
@@ -74,6 +109,13 @@ export default class AudioLabRuntime {
 
   destroy() {
     if (this.frame !== undefined) cancelAnimationFrame(this.frame);
+    window.removeEventListener("message", this.messageListener, false);
+    if (this.playbackPoll !== undefined) clearInterval(this.playbackPoll);
+    for (const pending of this.spotifyResponses.values()) {
+      clearTimeout(pending.timeout);
+      pending.reject(new Error("Audio Lab closed."));
+    }
+    this.spotifyResponses.clear();
     this.capture?.getTracks().forEach((track) => track.stop());
     this.source?.disconnect();
     void this.context?.close();
@@ -95,6 +137,17 @@ export default class AudioLabRuntime {
     this.find<HTMLButtonElement>("sign-out").addEventListener("click", () => {
       void this.signOut();
     });
+    this.find<HTMLButtonElement>("open-spotify").addEventListener(
+      "click",
+      () => {
+        void this.spotifyRequest("open").catch((error: unknown) =>
+          this.status(
+            error instanceof Error ? error.message : "Could not open Spotify.",
+            true
+          )
+        );
+      }
+    );
     this.find<HTMLButtonElement>("spotify-load").addEventListener(
       "click",
       () => {
@@ -105,7 +158,10 @@ export default class AudioLabRuntime {
         }
         this.plugin.setSpotifyUrl(url.value.trim());
         void this.spotifyRequest("play", uri).then(
-          () => this.status("Spotify playback started."),
+          () => {
+            this.status("Spotify playback started.");
+            void this.refreshPlayback();
+          },
           (error: unknown) =>
             this.status(
               error instanceof Error
@@ -116,8 +172,23 @@ export default class AudioLabRuntime {
         );
       }
     );
+    this.find<HTMLButtonElement>("spotify-toggle").addEventListener(
+      "click",
+      () => {
+        this.runPlaybackCommand(this.spotifyPlaying ? "pause" : "resume").catch(
+          () => undefined
+        );
+      }
+    );
+    this.find<HTMLButtonElement>("previous").addEventListener("click", () =>
+      this.runPlaybackCommand("previous").catch(() => undefined)
+    );
+    this.find<HTMLButtonElement>("next").addEventListener("click", () =>
+      this.runPlaybackCommand("next").catch(() => undefined)
+    );
     this.find<HTMLButtonElement>("analyze").addEventListener("click", () => {
-      void this.analyzeTab();
+      if (this.capture === undefined) void this.analyzeTab();
+      else this.stopTabAnalysis();
     });
     const file = this.find<HTMLInputElement>("file");
     file.addEventListener("change", () => this.loadFile(file.files?.[0]));
@@ -141,36 +212,30 @@ export default class AudioLabRuntime {
     );
   }
 
-  private async spotifyRequest(
-    action: "sign-in" | "status" | "sign-out" | "play",
-    uri?: string
-  ) {
+  private async spotifyRequest(action: SpotifyAction, uri?: string) {
     const requestId = crypto.randomUUID();
-    return await new Promise<{ name: string } | undefined>(
-      (resolve, reject) => {
-        this.spotifyResponses.set(requestId, { resolve, reject });
-        postMessageUp({
-          type: "audio-lab-spotify",
-          requestId,
-          action,
-          ...(uri === undefined ? {} : { uri }),
-        });
-        setTimeout(() => {
-          if (!this.spotifyResponses.delete(requestId)) return;
-          reject(
-            new Error(
-              "Spotify did not respond. Reload the extension and retry."
-            )
-          );
-        }, 120_000);
-      }
-    );
+    return await new Promise<unknown>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        if (!this.spotifyResponses.delete(requestId)) return;
+        reject(
+          new Error("Spotify did not respond. Reload the extension and retry.")
+        );
+      }, 120_000);
+      this.spotifyResponses.set(requestId, { resolve, reject, timeout });
+      postMessageUp({
+        type: "audio-lab-spotify",
+        requestId,
+        action,
+        ...(uri === undefined ? {} : { uri }),
+      });
+    });
   }
 
   private async refreshSpotifyStatus() {
     try {
       const profile = await this.spotifyRequest("status");
-      this.setSignedIn(profile?.name);
+      this.setSignedIn((profile as SpotifyProfile | undefined)?.name);
+      await this.refreshPlayback();
     } catch {
       this.setSignedIn();
     }
@@ -180,8 +245,9 @@ export default class AudioLabRuntime {
     this.status("Opening Spotify sign-in…");
     try {
       const profile = await this.spotifyRequest("sign-in");
-      this.setSignedIn(profile?.name);
+      this.setSignedIn((profile as SpotifyProfile | undefined)?.name);
       this.status("Spotify connected successfully.");
+      await this.refreshPlayback();
     } catch (error) {
       this.setSignedIn();
       this.status(
@@ -212,6 +278,57 @@ export default class AudioLabRuntime {
     this.find<HTMLButtonElement>("sign-in").hidden = signedIn;
     this.find<HTMLButtonElement>("sign-out").hidden = !signedIn;
     this.find<HTMLButtonElement>("spotify-load").disabled = !signedIn;
+    if (!signedIn) this.showPlayback({ active: false });
+  }
+
+  private async runPlaybackCommand(
+    action: "pause" | "resume" | "next" | "previous"
+  ) {
+    try {
+      await this.spotifyRequest(action);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      await this.refreshPlayback();
+    } catch (error) {
+      this.status(
+        error instanceof Error ? error.message : "Playback command failed.",
+        true
+      );
+    }
+  }
+
+  private async refreshPlayback() {
+    if (!this.find<HTMLButtonElement>("sign-in").hidden) return;
+    try {
+      const playback = (await this.spotifyRequest(
+        "playback-state"
+      )) as SpotifyPlayback;
+      this.showPlayback(playback);
+    } catch {
+      // A transient status poll should not replace a useful user-facing message.
+    }
+  }
+
+  private showPlayback(playback: SpotifyPlayback) {
+    this.spotifyPlaying = playback.isPlaying ?? false;
+    this.find<HTMLElement>("track").textContent = playback.active
+      ? (playback.track ?? "Unknown track")
+      : "No active Spotify player";
+    this.find<HTMLElement>("artist").textContent = playback.active
+      ? [playback.artist, playback.device].filter(Boolean).join(" · ")
+      : "Open Spotify and play anything once.";
+    this.find<HTMLElement>("playback-time").textContent = `${this.formatTime(
+      (playback.progressMs ?? 0) / 1000
+    )} / ${this.formatTime((playback.durationMs ?? 0) / 1000)}`;
+    const toggle = this.find<HTMLButtonElement>("spotify-toggle");
+    toggle.textContent = this.spotifyPlaying ? "Pause" : "Play";
+    for (const name of ["spotify-toggle", "previous", "next"])
+      this.find<HTMLButtonElement>(name).disabled = !playback.active;
+  }
+
+  private formatTime(seconds: number) {
+    if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+    const whole = Math.floor(seconds);
+    return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
   }
 
   private async analyzeTab() {
@@ -231,9 +348,15 @@ export default class AudioLabRuntime {
       this.capture = new MediaStream(stream.getAudioTracks());
       this.setupContext();
       this.source?.disconnect();
+      this.analyser!.disconnect();
       this.source = this.context!.createMediaStreamSource(this.capture);
+      this.sourceMode = "capture";
       this.source.connect(this.analyser!);
+      this.capture
+        .getAudioTracks()[0]
+        ?.addEventListener("ended", () => this.stopTabAnalysis());
       this.find<HTMLButtonElement>("export").disabled = false;
+      this.find<HTMLButtonElement>("analyze").textContent = "Stop tab analysis";
       this.status("Live waveform and spectrum analysis is active.");
     } catch (error) {
       this.status(
@@ -243,12 +366,26 @@ export default class AudioLabRuntime {
     }
   }
 
+  private stopTabAnalysis() {
+    const capture = this.capture;
+    this.capture = undefined;
+    capture?.getTracks().forEach((track) => track.stop());
+    if (this.sourceMode === "capture") {
+      this.source?.disconnect();
+      this.source = undefined;
+      this.sourceMode = undefined;
+    }
+    this.find<HTMLButtonElement>("analyze").textContent = "Analyze tab audio";
+    this.status("Tab analysis stopped.");
+  }
+
   private loadFile(file?: File) {
     if (!file?.type.startsWith("audio/")) {
       this.status("Choose a supported audio file.", true);
       return;
     }
     if (this.objectUrl !== undefined) URL.revokeObjectURL(this.objectUrl);
+    this.stopTabAnalysis();
     this.objectUrl = URL.createObjectURL(file);
     this.audio.src = this.objectUrl;
     this.find<HTMLButtonElement>("play").disabled = false;
@@ -260,14 +397,20 @@ export default class AudioLabRuntime {
   private setupContext() {
     this.context ??= new AudioContext();
     if (this.context.state === "suspended") void this.context.resume();
-    this.analyser = this.context.createAnalyser();
-    this.configureAnalyser();
+    if (this.analyser === undefined) {
+      this.analyser = this.context.createAnalyser();
+      this.configureAnalyser();
+    }
   }
 
   private ensureAudioElementGraph() {
-    if (this.source !== undefined) return;
     this.setupContext();
-    this.source = this.context!.createMediaElementSource(this.audio);
+    if (this.sourceMode === "local") return;
+    this.source?.disconnect();
+    this.analyser!.disconnect();
+    this.localSource ??= this.context!.createMediaElementSource(this.audio);
+    this.source = this.localSource;
+    this.sourceMode = "local";
     this.source.connect(this.analyser!);
     this.analyser!.connect(this.context!.destination);
   }

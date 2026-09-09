@@ -78,6 +78,22 @@ async function accessToken() {
   return (await saveToken(refreshed, token.refreshToken)).accessToken;
 }
 
+async function spotifyFetch(path: string, init: RequestInit = {}) {
+  const token = await accessToken();
+  const response = await fetch(`https://api.spotify.com/v1${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...init.headers,
+    },
+  });
+  if (response.status === 401) {
+    await chrome.storage.local.remove(TOKEN_KEY);
+    throw new Error("Spotify sign-in expired. Sign in again.");
+  }
+  return response;
+}
+
 export async function spotifySignIn() {
   if (BROWSER !== "chrome")
     throw new Error("Spotify sign-in is currently available in Chrome only.");
@@ -124,10 +140,7 @@ export async function spotifySignIn() {
 }
 
 export async function spotifyProfile() {
-  const token = await accessToken();
-  const response = await fetch("https://api.spotify.com/v1/me", {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const response = await spotifyFetch("/me");
   if (!response.ok)
     throw new Error(`Spotify profile request failed (${response.status}).`);
   const profile = (await response.json()) as {
@@ -140,11 +153,9 @@ export async function spotifyProfile() {
 export async function spotifyPlay(uri: string) {
   if (!/^spotify:(track|album|playlist|episode|show):[A-Za-z0-9]+$/.test(uri))
     throw new Error("That Spotify link is not supported.");
-  const token = await accessToken();
-  const response = await fetch("https://api.spotify.com/v1/me/player/play", {
+  const response = await spotifyFetch("/me/player/play", {
     method: "PUT",
     headers: {
-      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(
@@ -159,6 +170,66 @@ export async function spotifyPlay(uri: string) {
     );
   if (!response.ok)
     throw new Error(`Spotify could not start playback (${response.status}).`);
+}
+
+async function playerCommand(path: string, method: "POST" | "PUT") {
+  const response = await spotifyFetch(`/me/player/${path}`, { method });
+  if (response.status === 404)
+    throw new Error(
+      "No active Spotify player. Open Spotify and play anything once, then retry."
+    );
+  if (!response.ok)
+    throw new Error(`Spotify playback command failed (${response.status}).`);
+}
+
+export async function spotifyPause() {
+  await playerCommand("pause", "PUT");
+}
+
+export async function spotifyResume() {
+  await playerCommand("play", "PUT");
+}
+
+export async function spotifyNext() {
+  await playerCommand("next", "POST");
+}
+
+export async function spotifyPrevious() {
+  await playerCommand("previous", "POST");
+}
+
+interface PlaybackResponse {
+  is_playing: boolean;
+  progress_ms?: number;
+  item?: {
+    name: string;
+    duration_ms: number;
+    uri: string;
+    artists?: Array<{ name: string }>;
+  };
+  device?: { name: string };
+}
+
+export async function spotifyPlaybackState() {
+  const response = await spotifyFetch("/me/player");
+  if (response.status === 204) return { active: false } as const;
+  if (!response.ok)
+    throw new Error(`Spotify playback state failed (${response.status}).`);
+  const state = (await response.json()) as PlaybackResponse;
+  return {
+    active: true,
+    isPlaying: state.is_playing,
+    progressMs: state.progress_ms ?? 0,
+    durationMs: state.item?.duration_ms ?? 0,
+    track: state.item?.name ?? "Unknown track",
+    artist: state.item?.artists?.map((artist) => artist.name).join(", ") ?? "",
+    uri: state.item?.uri ?? "",
+    device: state.device?.name ?? "Spotify",
+  } as const;
+}
+
+export async function spotifyOpen() {
+  await chrome.tabs.create({ url: "https://open.spotify.com/" });
 }
 
 export async function spotifySignOut() {

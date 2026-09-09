@@ -2,7 +2,13 @@ import { sendHeartbeat } from "./plugins/wakatime/heartbeat";
 import "./globals/env";
 import {
   spotifyIsSignedIn,
+  spotifyNext,
+  spotifyOpen,
+  spotifyPause,
   spotifyPlay,
+  spotifyPlaybackState,
+  spotifyPrevious,
+  spotifyResume,
   spotifySignIn,
   spotifySignOut,
 } from "./spotify";
@@ -20,6 +26,23 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           return await spotifyIsSignedIn();
         case "play":
           await spotifyPlay(msg.uri);
+          return undefined;
+        case "pause":
+          await spotifyPause();
+          return undefined;
+        case "resume":
+          await spotifyResume();
+          return undefined;
+        case "next":
+          await spotifyNext();
+          return undefined;
+        case "previous":
+          await spotifyPrevious();
+          return undefined;
+        case "playback-state":
+          return await spotifyPlaybackState();
+        case "open":
+          await spotifyOpen();
           return undefined;
         case "sign-out":
           await spotifySignOut();

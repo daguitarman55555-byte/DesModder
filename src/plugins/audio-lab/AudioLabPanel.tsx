@@ -35,6 +35,12 @@ export class AudioLabPanel extends Component<{ audioLab: () => AudioLab }> {
                 Sign out
               </button>
             </div>
+            <button
+              data-audio-lab="open-spotify"
+              class="dcg-btn-light-gray dsm-audio-lab-wide"
+            >
+              Open Spotify player
+            </button>
           </section>
           <section>
             <label>Spotify link</label>
@@ -46,6 +52,30 @@ export class AudioLabPanel extends Component<{ audioLab: () => AudioLab }> {
                 disabled
               >
                 Play
+              </button>
+            </div>
+            <div class="dsm-audio-lab-now-playing">
+              <strong data-audio-lab="track">Nothing playing</strong>
+              <span data-audio-lab="artist" />
+              <span data-audio-lab="playback-time">0:00 / 0:00</span>
+            </div>
+            <div class="dsm-audio-lab-transport">
+              <button
+                data-audio-lab="previous"
+                class="dcg-btn-light-gray"
+                disabled
+              >
+                Previous
+              </button>
+              <button
+                data-audio-lab="spotify-toggle"
+                class="dcg-btn-blue"
+                disabled
+              >
+                Play
+              </button>
+              <button data-audio-lab="next" class="dcg-btn-light-gray" disabled>
+                Next
               </button>
             </div>
             <button
