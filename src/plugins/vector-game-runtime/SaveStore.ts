@@ -1,7 +1,7 @@
 const DATABASE = "desmodder-vector-game-runtime";
 const STORE = "states";
 
-function openDatabase() {
+async function openDatabase() {
   return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DATABASE, 1);
     request.onupgradeneeded = () => request.result.createObjectStore(STORE);
