@@ -1,10 +1,65 @@
 import { sendHeartbeat } from "./plugins/wakatime/heartbeat";
 import "./globals/env";
+import {
+  spotifyIsSignedIn,
+  spotifyNext,
+  spotifyOpen,
+  spotifyPause,
+  spotifyPlay,
+  spotifyPlaybackState,
+  spotifyPrevious,
+  spotifyResume,
+  spotifySignIn,
+  spotifySignOut,
+} from "./spotify";
 
 // Send requests that would otherwise be blocked by CORS if sent from a content script
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === "send-background-heartbeat") {
     void sendHeartbeat(msg.options, sendResponse);
+  } else if (msg.type === "audio-lab-spotify") {
+    const operation = async () => {
+      switch (msg.action) {
+        case "sign-in":
+          return await spotifySignIn();
+        case "status":
+          return await spotifyIsSignedIn();
+        case "play":
+          await spotifyPlay(msg.uri);
+          return undefined;
+        case "pause":
+          await spotifyPause();
+          return undefined;
+        case "resume":
+          await spotifyResume();
+          return undefined;
+        case "next":
+          await spotifyNext();
+          return undefined;
+        case "previous":
+          await spotifyPrevious();
+          return undefined;
+        case "playback-state":
+          return await spotifyPlaybackState();
+        case "open":
+          await spotifyOpen();
+          return undefined;
+        case "sign-out":
+          await spotifySignOut();
+          return undefined;
+        default:
+          throw new Error("Unknown Spotify operation.");
+      }
+    };
+    void operation().then(
+      (value) => sendResponse({ ok: true, value }),
+      (error: unknown) =>
+        sendResponse({
+          ok: false,
+          error:
+            error instanceof Error ? error.message : "Spotify request failed.",
+        })
+    );
   }
   return true;
 });

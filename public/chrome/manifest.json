@@ -39,8 +39,13 @@
       }
     ]
   },
-  "permissions": ["storage", "declarativeNetRequest"],
-  "host_permissions": ["https://*.desmos.com/*", "https://wakatime.com/"],
+  "permissions": ["storage", "declarativeNetRequest", "identity"],
+  "host_permissions": [
+    "https://*.desmos.com/*",
+    "https://wakatime.com/",
+    "https://accounts.spotify.com/*",
+    "https://api.spotify.com/*"
+  ],
   "externally_connectable": {
     "matches": ["https://*.desmos.com/*"]
   }

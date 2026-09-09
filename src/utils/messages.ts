@@ -27,6 +27,22 @@ type MessageWindowToContent =
   | {
       type: "send-heartbeat";
       options: WindowHeartbeatOptions;
+    }
+  | {
+      type: "audio-lab-spotify";
+      requestId: string;
+      action:
+        | "sign-in"
+        | "status"
+        | "sign-out"
+        | "play"
+        | "pause"
+        | "resume"
+        | "next"
+        | "previous"
+        | "playback-state"
+        | "open";
+      uri?: string;
     };
 
 type MessageContentToWindow =
@@ -37,7 +53,16 @@ type MessageContentToWindow =
       pluginSettings: Record<PluginID, GenericSettings | undefined>;
       scriptURL: string;
     }
-  | HeartbeatError;
+  | HeartbeatError
+  | SpotifyResponse;
+
+export interface SpotifyResponse {
+  type: "audio-lab-spotify-response";
+  requestId: string;
+  ok: boolean;
+  value?: unknown;
+  error?: string;
+}
 
 export interface HeartbeatError {
   type: "heartbeat-error";
@@ -77,13 +102,13 @@ function listenToMessage<T>(callback: (message: T) => ShouldCancel) {
 export function listenToMessageUp(
   callback: (message: MessageWindowToContent) => ShouldCancel
 ) {
-  listenToMessage(callback);
+  return listenToMessage(callback);
 }
 
 export function listenToMessageDown(
   callback: (message: MessageContentToWindow) => ShouldCancel
 ) {
-  listenToMessage(callback);
+  return listenToMessage(callback);
 }
 
 /** Security issue on Firefox with posting a Map, so use this to convert a

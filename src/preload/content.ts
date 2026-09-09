@@ -151,6 +151,32 @@ function init() {
       case "send-heartbeat":
         _sendHeartbeat(message.options);
         break;
+      case "audio-lab-spotify":
+        if (BROWSER !== "chrome") {
+          postMessageDown({
+            type: "audio-lab-spotify-response",
+            requestId: message.requestId,
+            ok: false,
+            error: "Spotify sign-in is currently available in Chrome only.",
+          });
+          break;
+        }
+        chrome.runtime.sendMessage(
+          chrome.runtime.id,
+          {
+            type: "audio-lab-spotify",
+            action: message.action,
+            uri: message.uri,
+          },
+          (response) => {
+            postMessageDown({
+              type: "audio-lab-spotify-response",
+              requestId: message.requestId,
+              ...response,
+            });
+          }
+        );
+        break;
       default:
         message satisfies never;
     }
