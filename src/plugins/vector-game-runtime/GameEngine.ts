@@ -8,24 +8,24 @@ export interface GameInputState {
 export interface GameEngine {
   readonly width: number;
   readonly height: number;
-  start(): Promise<void>;
-  step(dt: number, input: GameInputState): void;
-  render(target: CanvasRenderingContext2D): void;
-  serialize(): Uint8Array;
-  restore(state: Uint8Array): void;
-  destroy(): void;
+  start: () => Promise<void>;
+  step: (dt: number, input: GameInputState) => void;
+  render: (target: CanvasRenderingContext2D) => void;
+  serialize: () => Uint8Array;
+  restore: (state: Uint8Array) => void;
+  destroy: () => void;
 }
 
 export interface WasmGameExports {
   memory: WebAssembly.Memory;
-  game_init(): void;
-  game_step(dt: number, forward: number, strafe: number, turn: number, action: number): void;
-  game_framebuffer(): number;
-  game_width(): number;
-  game_height(): number;
-  game_state_size(): number;
-  game_save(pointer: number): void;
-  game_load(pointer: number): void;
+  game_init: () => void;
+  game_step: (dt: number, forward: number, strafe: number, turn: number, action: number) => void;
+  game_framebuffer: () => number;
+  game_width: () => number;
+  game_height: () => number;
+  game_state_size: () => number;
+  game_save: (pointer: number) => void;
+  game_load: (pointer: number) => void;
 }
 
 export class WasmGameAdapter implements GameEngine {
