@@ -52,8 +52,8 @@ Two design commitments follow from that and constrain everything:
 
 ```
 npm run lint            # prettier --check, tsc --build, eslint
-npm run test:unit       # 1586 tests
-npm run test:integration  # 52 tests, real Desmos in headless Chrome
+npm run test:unit       # 1592 tests
+npm run test:integration  # 53 tests, real Desmos in headless Chrome
 ```
 
 The integration harness loads the built extension (`npm run build` → `dist/`)
@@ -337,12 +337,27 @@ starting assumptions to re-test.
   instrument for anything that should feel immediate.
 - **`cc.getAllItemModels()` gives id/type/latex without serialising the graph**,
   which `getState()` does. On a hot path, that difference is most of the cost.
-- **`t` is bound locally inside every parametric.** The generated arrow shafts
-  and arrowhead wings are restricted parametrics in `t` (`{0 ≤ t ≤ 1}`), so a
-  global `t` would be shadowed in exactly the expressions that draw the field.
-  A time variable spelled `t` cannot animate a generated field; it has to be
-  renamed on the way out. (Live rendering is unaffected — there `t` is a
+- **Defining a global `t` stops the generated arrows being parametrics.** The
+  shafts and wings are restricted parametrics in `t` (`{0 ≤ t ≤ 1}`). Defining
+  `t` does not error and does not shadow anything: Desmos evaluates those
+  expressions at the global value and draws **one point per arrow instead of a
+  segment**. `isGraphable` stays `true`, and the only assertable trace is
+  `expressionAnalysis[id].evaluationDisplayed` turning `true` — everything else
+  about it is visual. Established by drawing the same field twice, once with `t`
+  and once renamed: dots against arrows. So a time variable spelled `t` has to
+  be renamed on the way into the graph, which is what `timeSymbolFor` and
+  `renameIdentifier` are for. (Live rendering is unaffected — there `t` is a
   uniform, not an expression.)
+- **`\operatorname{dt}` works inside a ticker handler**, and is milliseconds
+  since the previous tick. Worth knowing because the tick rate is not what the
+  minimum step suggests: with `minStepLatex: "16"` the harness ticked about 27
+  times a second, not 62. A fixed step per tick therefore animates at an
+  unpredictable rate; `speed · dt/1000` does not.
+- **A ticker is graph-level**, one per graph, and lives in
+  `state.expressions.ticker` rather than the expression list. It round-trips
+  through `getState`/`setState`. Being outside the list means it cannot be
+  namespaced, so it is the one part of a generated field whose ownership has to
+  be recognised — by its handler mentioning the field's own clock symbol.
 - Values are best read through **`Calc.HelperExpression({ latex })`**, which is
   Desmos's own evaluator: `numericValue` plus `observe("numericValue", …)`. It
   has no documented teardown, so keep them rather than rebuilding them.
@@ -518,8 +533,8 @@ observed.)
 
 ## 8. The agreed roadmap
 
-Items 1–3 are done (palettes, live arrow rendering, the Streamlines/Texture
-flow preset). The rest, in the order agreed:
+Items 1–3 and 6 are done (palettes, live arrow rendering, the Streamlines/Texture
+flow preset, and time-varying fields). The rest, in the order agreed:
 
 ### 4. Nullclines and equilibria
 
@@ -543,25 +558,29 @@ Two halves:
   `∂P/∂x + ∂Q/∂y` and `∂Q/∂x - ∂P/∂y`, spelled with `\frac{d}{dx}` on
   two-argument functions per §5.1.
 
-### 6. Time-dependent fields — **next, and partly decided**
+### 6. Time-dependent fields — **done** (`d32754ab`, `0a288bb5`)
 
-`P(x,y,t)`, animated. Nothing else in the Desmos ecosystem does this.
+`P(x,y,t)`, animated, in both halves. Nothing else in the Desmos ecosystem does
+this.
 
-The live half is small: `t` resolves to a `u_time` uniform, the way a named
-value already resolves to `u_vp_<name>` (4.3), and the same argument applies —
-a uniform, not a recompile, or every frame relinks two programs.
+Live, `t` resolves to a `u_time` uniform, the way a named value resolves to
+`u_vp_<name>` (4.3) and for the same reason. One clock drives both overlays, so
+the arrows and the particles over them always show the same instant. Nothing
+animates unless the field asks to: a component with no `t` costs exactly what it
+did before, no loop and no uploads. The controls are play, speed and reset, and
+deliberately **not** a scrubber — `t` is unbounded, so there is no range for one
+to span.
 
-The generated half has a decided constraint. **`t` is shadowed inside every
-parametric** (5.1), and the generated arrows _are_ parametrics in `t`, so a
-global `t` cannot animate them. Agreed resolution: the user types `t`, live
-rendering binds it to the uniform, and **the generator rewrites `t` to a
-non-colliding symbol and emits a Desmos ticker driving it**, so a shared graph
-still animates for someone without the extension. The rename is invisible unless
-the folder is opened.
+Generated, the component is rewritten onto the field's own clock symbol and a
+ticker advances it, because a global `t` would turn the arrows into dots (5.1).
+The rewrite is undone on the way back, so the panel shows what the user wrote.
+The handler uses `speed · dt/1000`, so the generated animation runs at the same
+rate as the live one. Remove takes the ticker only when it is the field's own,
+and a ticker doing something else is refused rather than taken over.
 
-Note `environment.ts` deliberately does **not** reserve `t`: a graph is entitled
-to define it as a slider, and deciding otherwise would be guessing. Whatever
-resolves `t` has to settle that precedence explicitly.
+`t` is **not reserved**: a graph that defines `t` as a slider keeps that meaning,
+in both halves, and the field simply stops being time-varying. An explicit
+definition beats an implicit one.
 
 ### 7. Click-to-seed streamlines, and LIC
 
