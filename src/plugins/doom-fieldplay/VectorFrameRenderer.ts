@@ -173,6 +173,16 @@ export default class VectorFrameRenderer {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
   }
 
+  uploadCanvas(source: HTMLCanvasElement) {
+    if (this.destroyed) return;
+    this.sourceWidth = source.width;
+    this.sourceHeight = source.height;
+    const { gl } = this;
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+  }
+
   draw() {
     if (this.destroyed) return;
     const { gl } = this;
