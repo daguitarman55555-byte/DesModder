@@ -99,7 +99,7 @@ describe("the 3D flow", () => {
 });
 
 describe("the black hole's lens", () => {
-  test("draws the flow behind the hole twice, its two images, then what is in front", () => {
+  test("draws two passes: every main image, then the second images of what is behind; the shadow in the depth buffer hides the rest", () => {
     const gl = fakeGL();
     const renderer = new Flow3DRenderer(fakeCanvas(gl));
     renderer.setField(swirl);
@@ -117,7 +117,7 @@ describe("the black hole's lens", () => {
       view: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, -20, 1],
     };
     renderer.draw(facing, box);
-    expect(gl.counts.instancesDrawn - before).toBe(3 * 1000);
+    expect(gl.counts.instancesDrawn - before).toBe(2 * 1000);
   });
 
   test("with no lens, one pass", () => {

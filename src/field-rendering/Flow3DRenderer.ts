@@ -495,12 +495,26 @@ uniform float u_radiusPx;
 uniform int u_mode;
 uniform vec3 u_ringColor;
 uniform float u_ring;
+uniform float u_holeDistance;
+uniform float u_shadowView;
+uniform vec2 u_depthMap;
+uniform int u_ortho;
 out vec4 outColor;
 void main() {
   float r = length(gl_FragCoord.xy - u_centerPx) / max(u_radiusPx, 1.0e-3);
   if (u_mode == 0) {
+    // The shadow is a sphere's silhouette, so it is written into the depth
+    // buffer at the sphere's near face: the flow behind it then fails the
+    // depth test and is never drawn, at no cost, while what is in front of
+    // it passes and is drawn over the black.
+    if (r > 1.0) discard;
     float a = 1.0 - smoothstep(0.96, 1.0, r);
     outColor = vec4(0.0, 0.0, 0.0, a);
+    float z = -(u_holeDistance - u_shadowView * sqrt(max(1.0 - r * r, 0.0)));
+    float ndc = u_ortho == 1
+      ? u_depthMap.x * z + u_depthMap.y
+      : (u_depthMap.x * z + u_depthMap.y) / -z;
+    gl_FragDepth = clamp(0.5 * ndc + 0.5, 0.0, 1.0);
   } else {
     float w = 1.5 / max(u_radiusPx, 1.0);
     float g = u_ring * exp(-pow((r - 1.0 - w) / w, 2.0));
@@ -827,7 +841,7 @@ export class Flow3DRenderer implements Overlay3DRenderer {
         gl.depthFunc(gl.GREATER);
         draw(0.25);
       }
-      if (occluding) {
+      if (occluding || hole !== undefined) {
         gl.enable(gl.DEPTH_TEST);
         gl.depthFunc(gl.LEQUAL);
       } else {
@@ -867,12 +881,15 @@ export class Flow3DRenderer implements Overlay3DRenderer {
     };
     if (hole === undefined) trails(0, 1);
     else {
-      // Behind the hole, both images of it; then the shadow over them; then
-      // what is in front, over the shadow.
-      trails(1, 1);
+      // The shadow first, into the depth buffer as well as the colour, so
+      // every trail behind it is rejected by the depth test: one pass for
+      // the main image of everything, one for the faint second image of
+      // what is behind, rather than drawing the far side, the shadow and
+      // then the near side as three passes. Then the photon ring, over all.
+      this.drawShadowDisc(hole, camera, ba > 0);
+      trails(0, 1);
       trails(1, -1);
-      this.drawShadow(hole, palette, ba > 0);
-      trails(2, 1);
+      this.drawPhotonRing(hole, palette, ba > 0);
     }
     gl.depthMask(true);
     gl.bindVertexArray(null);
@@ -887,22 +904,20 @@ export class Flow3DRenderer implements Overlay3DRenderer {
     };
   }
 
-  /** The hole's shadow, then its photon ring in the palette's hottest colour. */
-  private drawShadow(
-    hole: LensFrame,
-    palette: ReturnType<typeof paletteUniforms>,
-    dark: boolean
-  ) {
+  /** The hole's shadow: black, opaque, and written into the depth buffer. */
+  private drawShadowDisc(hole: LensFrame, camera: Camera3D, dark: boolean) {
     const { gl } = this;
     const u = this.shadowUniforms;
     gl.useProgram(this.shadowProgram);
-    gl.disable(gl.DEPTH_TEST);
-    gl.uniform2fv(u.u_centerPx, [
-      hole.centerPx[0] * this.canvas.width,
-      hole.centerPx[1] * this.canvas.height,
-    ]);
-    gl.uniform1f(u.u_radiusPx, hole.shadowPx * this.canvas.height);
-    // Black over what is drawn, and opaque, so the graph does not show
+    this.shadowPlacement(hole);
+    gl.uniform1f(u.u_holeDistance, -hole.view[2]);
+    gl.uniform1f(u.u_shadowView, ((3 * Math.sqrt(3)) / 2) * hole.horizonView);
+    gl.uniform2f(u.u_depthMap, camera.projection[10], camera.projection[14]);
+    gl.uniform1i(u.u_ortho, camera.orthographic ? 1 : 0);
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LEQUAL);
+    gl.depthMask(true);
+    // Black over the backdrop, and opaque, so the graph does not show
     // through the hole.
     gl.blendFuncSeparate(
       gl.ZERO,
@@ -912,9 +927,31 @@ export class Flow3DRenderer implements Overlay3DRenderer {
     );
     gl.uniform1i(u.u_mode, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.depthMask(false);
+    // Back to the flow's own blending.
+    if (dark) {
+      gl.blendFuncSeparate(
+        gl.ONE,
+        gl.ONE_MINUS_SRC_COLOR,
+        gl.ONE,
+        gl.ONE_MINUS_SRC_ALPHA
+      );
+    } else gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  }
+
+  /** The photon ring at the shadow's edge, in the palette's hottest colour. */
+  private drawPhotonRing(
+    hole: LensFrame,
+    palette: ReturnType<typeof paletteUniforms>,
+    dark: boolean
+  ) {
+    const { gl } = this;
+    const u = this.shadowUniforms;
+    gl.useProgram(this.shadowProgram);
+    gl.disable(gl.DEPTH_TEST);
+    this.shadowPlacement(hole);
     const n = palette.count;
-    const hottest = palette.colors.slice((n - 1) * 3, n * 3);
-    gl.uniform3fv(u.u_ringColor, hottest);
+    gl.uniform3fv(u.u_ringColor, palette.colors.slice((n - 1) * 3, n * 3));
     gl.uniform1f(u.u_ring, 0.8);
     gl.uniform1i(u.u_mode, 1);
     if (dark) {
@@ -926,6 +963,16 @@ export class Flow3DRenderer implements Overlay3DRenderer {
       );
     } else gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  private shadowPlacement(hole: LensFrame) {
+    const { gl } = this;
+    const u = this.shadowUniforms;
+    gl.uniform2fv(u.u_centerPx, [
+      hole.centerPx[0] * this.canvas.width,
+      hole.centerPx[1] * this.canvas.height,
+    ]);
+    gl.uniform1f(u.u_radiusPx, hole.shadowPx * this.canvas.height);
   }
 
   destroy() {

@@ -204,11 +204,11 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
       seedLatex: String.raw`e^{-\frac{z^{2}}{0.006}}\cdot\frac{1.6}{${rho}}\cdot\frac{0.65+0.35\sin\left(11${rho}\right)}{\left(1+e^{-14\left(${rho}-1.4\right)}\right)\left(1+e^{5\left(${rho}-4.5\right)}\right)}+0.005e^{-0.6\left(x^{2}+y^{2}+z^{2}\right)}`,
       lensHorizon: 0.45,
       look: {
-        particles: 60_000,
+        particles: 36_000,
         speed: 0.3,
         trail: 64,
         lifetime: 6,
-        opacity: 0.38,
+        opacity: 0.5,
         glow: 0.12,
         normalizeSpeed: false,
         absorb: false,
