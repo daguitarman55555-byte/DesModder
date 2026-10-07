@@ -795,7 +795,7 @@ export class Flow3DRenderer implements Overlay3DRenderer {
 
     const cut = cutUniforms(mathToView, box, o.cut);
     const palette = paletteUniforms(o.palette);
-    const hole = lensFrame(camera, mathToView, o);
+    const hole = lensFrame(camera, mathToView, o, box);
     const common = (u: Uniforms) => {
       gl.uniformMatrix4fv(u.u_mathToView, false, mathToView);
       gl.uniformMatrix4fv(u.u_projection, false, camera.projection);
@@ -1012,9 +1012,14 @@ interface LensFrame {
 function lensFrame(
   camera: Camera3D,
   mathToView: readonly number[],
-  o: Flow3DOptions
+  o: Flow3DOptions,
+  box: Box3D
 ): LensFrame | undefined {
   if (!o.lens || !(o.horizon > 0)) return undefined;
+  // A hole the box has been moved off is not in the picture: nothing of it
+  // is drawn, as nothing of a surface outside the box is, rather than a
+  // shadow and a ring hanging beside the box and bending what is inside it.
+  if (box.min.some((lo, i) => lo > 0 || box.max[i] < 0)) return undefined;
   const m = mathToView;
   const det =
     m[0] * (m[5] * m[10] - m[9] * m[6]) -

@@ -101,17 +101,21 @@ export function thinVortexRing(R: number, a: number, k: number, pulse = "") {
 
 /**
  * A magnetic dipole of moment `m` (LaTeX for its components, which may read
- * t), B = (3(m·r)r − m r²)/r⁵, with the field zero inside the star or magnet
- * of radius `inside`, where field lines end. With `outflow`, particles move
- * along B away from the magnetic equator on both sides — B·tanh(3 m·r̂) — the
- * way a pulsar's wind leaves both poles along its open field lines and meets
- * at the current sheet, rather than in at one pole and out at the other.
+ * t), B = (3(m·r)r − m r²)/r⁵ outside radius `inside`. Within it, `interior`
+ * says what the body is: "empty" — a star the field lines end on, nothing
+ * drawn inside — or "magnet", a uniformly magnetised sphere, whose field
+ * inside is the uniform 2m/R³ that meets the outside one at its poles, so
+ * the lines run straight through it from south to north. With `outflow`,
+ * particles move along B away from the magnetic equator on both sides —
+ * B·tanh(3 m·r̂) — the way a pulsar's wind leaves both poles along its open
+ * field lines and meets at the current sheet.
  */
 export function dipole(
   m: readonly string[],
   axes: readonly ("x" | "y" | "z")[],
   inside: number,
-  outflow: boolean
+  outflow: boolean,
+  interior: "empty" | "magnet" = "empty"
 ) {
   const r2 = axes.map((a) => `${a}^{2}`).join("+");
   const dot = axes
@@ -124,10 +128,15 @@ export function dipole(
     ? String.raw`\tanh\left(\frac{3${s}}{\sqrt{${r2}}}\right)`
     : "";
   const out: Partial<Record<"x" | "y" | "z", string>> = {};
+  const R3 = Math.round(inside ** 3 * 1e4) / 1e4;
   axes.forEach((a, i) => {
     const mi = m[i] === "0" ? "" : String.raw`-${m[i]}\left(${r2}\right)`;
+    const within =
+      interior === "magnet" && m[i] !== "0"
+        ? String.raw`\frac{2${m[i]}}{${R3}}`
+        : "0";
     out[a] =
-      String.raw`\left\{${r2}>${inside * inside}:\frac{\left(3${a}${s}${mi}\right)${wind}}{\left(${r2}\right)^{2.5}},0\right\}`.replace(
+      String.raw`\left\{${r2}>${inside * inside}:\frac{\left(3${a}${s}${mi}\right)${wind}}{\left(${r2}\right)^{2.5}},${within}\right\}`.replace(
         /--/g,
         "+"
       );

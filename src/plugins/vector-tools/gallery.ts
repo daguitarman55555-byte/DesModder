@@ -70,10 +70,20 @@ export function colorsFromGallery(
       backdropEnabled: true,
       backdropColor: preset.backdrop ?? GALLERY_DEFAULT_BACKDROP,
       ...flowMatterFor(preset, base.flow),
+      ...GALLERY_VIVID,
     },
     space3d: dimensions === 3 ? matterFor(preset, base.space3d) : base.space3d,
   };
 }
+
+/**
+ * How saturated and how contrasted a preset's colours are drawn: more than a
+ * plain field's, because a preset is a picture on the dark, and the flow's
+ * trails are thin and blend into each other, which washes colour out. These
+ * are the flow's ordinary Saturation and Contrast settings, so they stay
+ * adjustable.
+ */
+const GALLERY_VIVID = { saturation: 1.45, contrast: 1.2 };
 
 /**
  * In 2D, what a preset's field carries besides its formula, as in 3D: where
@@ -171,6 +181,7 @@ export function configFromGallery(
       backdropColor: preset.backdrop ?? GALLERY_DEFAULT_BACKDROP,
       ...preset.flow,
       ...flowMatterFor(preset, base.flow),
+      ...GALLERY_VIVID,
       ...(preset.fixedColor !== undefined
         ? { colorMode: "fixed" as const }
         : {}),

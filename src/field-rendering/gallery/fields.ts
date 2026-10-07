@@ -4,8 +4,8 @@ import type { GalleryPreset } from "./types";
 
 /** The bar magnet on alternating current, along y in the plane and z in the box. */
 const AC = String.raw`\cos\left(0.4t\right)`;
-const MAGNET_2D = dipole(["0", AC], ["x", "y"], 0.8, false);
-const MAGNET_3D = dipole(["0", "0", AC], ["x", "y", "z"], 0.6, false);
+const MAGNET_2D = dipole(["0", AC], ["x", "y"], 0.8, false, "magnet");
+const MAGNET_3D = dipole(["0", "0", AC], ["x", "y", "z"], 0.6, false, "magnet");
 
 export const FIELDS: readonly GalleryPreset[] = [
   {
