@@ -282,21 +282,39 @@ type Field3DCompilation =
  */
 function compileField3D(
   config: VectorFieldConfig,
-  environment: FieldEnvironment
+  environment: FieldEnvironment,
+  gradient: (
+    latex: string
+  ) => { ok: true; latex: string[] } | { ok: false; error: string }
 ): Field3DCompilation {
   const seedLatex = config.space3d.seedLatex.trim();
+  // A gradient field's components are f's three partials, differentiated
+  // symbolically — exact, so no difference step has to follow the box as it
+  // zooms — and then compiled like any components.
+  let components: readonly [string, string][];
   if (config.source === "gradient") {
-    return {
-      ok: false,
-      error:
-        "Gradient fields are not drawn live in 3D yet. Switch the field to components, or generate it into Desmos.",
-    };
+    const partials = gradient(config.scalar.fLatex);
+    if (!partials.ok) {
+      return {
+        ok: false,
+        error: `f(x, y, z) could not be differentiated exactly: ${partials.error}`,
+      };
+    }
+    components = [
+      ["∂f/∂x", partials.latex[0]],
+      ["∂f/∂y", partials.latex[1]],
+      ["∂f/∂z", partials.latex[2]],
+    ];
+  } else {
+    components = [
+      ["P(x, y, z)", config.components.xLatex],
+      ["Q(x, y, z)", config.components.yLatex],
+      ["R(x, y, z)", config.components.zLatex],
+    ];
   }
   const space: FieldEnvironment = { ...environment, dimensions: 3 };
   const compiled = [
-    ["P(x, y, z)", config.components.xLatex],
-    ["Q(x, y, z)", config.components.yLatex],
-    ["R(x, y, z)", config.components.zLatex],
+    ...components,
     // Where particles are born rides along: the same names, the same clock.
     ...(seedLatex === "" ? [] : [["Where particles are born", seedLatex]]),
   ].map(([name, latex]) => ({
@@ -478,6 +496,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     xLatex: string;
     yLatex: string;
     zLatex: string;
+    fLatex: string;
     seedLatex: string;
     revision: number;
     result: Field3DCompilation;
@@ -1268,17 +1287,21 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       cached.xLatex === config.components.xLatex &&
       cached.yLatex === config.components.yLatex &&
       cached.zLatex === config.components.zLatex &&
+      cached.fLatex === config.scalar.fLatex &&
       cached.seedLatex === config.space3d.seedLatex &&
       cached.revision === this.environmentRevision
     ) {
       return cached.result;
     }
-    const result = compileField3D(config, this.environment);
+    const result = compileField3D(config, this.environment, (latex) =>
+      this.gradient(latex, ["x", "y", "z"])
+    );
     this.field3dCache = {
       source: config.source,
       xLatex: config.components.xLatex,
       yLatex: config.components.yLatex,
       zLatex: config.components.zLatex,
+      fLatex: config.scalar.fLatex,
       seedLatex: config.space3d.seedLatex,
       revision: this.environmentRevision,
       result,
@@ -2390,7 +2413,17 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
    */
   private parseField(cfg: Config, latex: string): Node {
     const { functions, scalars } = this.environment;
-    const values = new Set(["x", "y", "e", "pi", "tau", TIME_NAME, ...scalars]);
+    // z is a coordinate on Desmos 3D; on the calculator nothing calls it.
+    const values = new Set([
+      "x",
+      "y",
+      "z",
+      "e",
+      "pi",
+      "tau",
+      TIME_NAME,
+      ...scalars,
+    ]);
     // A definition beats an implicit meaning, as it does in the GLSL compiler:
     // `t(u) = ...` makes t a function, and the clock is no longer what t means.
     for (const name of functions.keys()) values.delete(name);

@@ -551,3 +551,47 @@ testWithPageAndOpts(
     await driver.setBlank();
   }
 );
+
+testWithPageAndOpts(
+  "Vector Tools draws a gradient field in 3D from f's exact partials",
+  { path: "/3d", timeout: 120000 },
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.page.waitForFunction(
+      () => DSM.enabledPlugins["vector-tools"] !== undefined
+    );
+    // f = xyz, whose gradient (yz, xz, xy) names every coordinate but the
+    // one it is the partial with respect to: differentiated, not sampled.
+    await configure(
+      driver,
+      `config.arrowMode = "live";
+       config.space3d.look = "arrows";
+       config.source = "gradient";
+       config.scalar.fLatex = "xyz";`
+    );
+    const compiled = await driver.page.evaluate(() => {
+      const c = (DSM.enabledPlugins["vector-tools"] as any).field3dCompilation;
+      return c.ok
+        ? { ok: true, p: c.field.p, q: c.field.q, r: c.field.r }
+        : { ok: false, error: c.error };
+    });
+    expect(compiled.ok).toBe(true);
+    expect(compiled.p).toContain("p.y");
+    expect(compiled.p).toContain("p.z");
+    expect(compiled.p).not.toContain("p.x");
+    expect(compiled.r).toContain("p.x");
+    expect(compiled.r).not.toContain("p.z");
+    const drawn = await frame(driver);
+    expect(drawn.frame?.instances).toBeGreaterThan(0);
+    expect(drawn.status).toContain("live in 3D");
+    mkdirSync(ASSETS, { recursive: true });
+    const shot = await capture(driver);
+    writeFileSync(
+      join(ASSETS, "plugin-gradient.png"),
+      Buffer.from(shot.png, "base64")
+    );
+    await configure(driver, `config.source = "components";`);
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+  }
+);

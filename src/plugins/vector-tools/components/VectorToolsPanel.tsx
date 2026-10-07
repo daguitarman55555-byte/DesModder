@@ -2405,6 +2405,13 @@ const SLOT_PLACEHOLDERS: Record<ComponentSlot, string> = {
   f: "x^2+y^2",
 };
 
+/** On Desmos 3D, where every slot is a function of z as well. */
+const SLOT_LABELS_3D: Record<ComponentSlot, string> = {
+  p: "P(x, y, z)",
+  q: "Q(x, y, z)",
+  f: "f(x, y, z)",
+};
+
 /** The name validation issues use for a slot, which has no spaces in it. */
 const SLOT_ISSUE_NAMES: Record<ComponentSlot, string> = {
   p: "P(x,y)",
@@ -2419,7 +2426,9 @@ function componentInput(
 ) {
   return (
     <div>
-      <label class="dsm-vector-tools-label">{SLOT_LABELS[which]}</label>
+      <label class="dsm-vector-tools-label">
+        {() => (vectorTools.is3d ? SLOT_LABELS_3D : SLOT_LABELS)[which]}
+      </label>
       <InlineMathInputViewGeneral
         containerClass={() => ({ "dsm-vector-tools-math-input": true })}
         placeholder={SLOT_PLACEHOLDERS[which]}
