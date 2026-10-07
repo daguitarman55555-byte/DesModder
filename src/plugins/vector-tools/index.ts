@@ -1246,6 +1246,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     return {
       shape: s.shape,
       placement: s.placement,
+      surfaceId: s.surfaceId,
       count: s.countAuto ? "auto" : s.count,
       sliceAxis: s.sliceAxis,
       slicePosition: s.slicePosition,
@@ -1700,6 +1701,18 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   get activePresetId() {
     const { name } = this.getConfig();
     return FIELD_GALLERY.find((preset) => preset.name === name)?.id;
+  }
+
+  /**
+   * The graphed surfaces arrows can be placed on, with their LaTeX for the
+   * panel to show them by: the ones the field is hidden behind, in the
+   * expression list's order.
+   */
+  get surfaceChoices(): { id: string; latex: string }[] {
+    return this.surfaces3d.surfaces.map((surface) => ({
+      id: surface.id,
+      latex: this.cc.getItemModel(surface.id)?.latex ?? "",
+    }));
   }
 
   get presetWindow() {

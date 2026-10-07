@@ -39,7 +39,12 @@ import {
 } from "./glsl3d";
 import type { Box3D, Overlay3DRenderer } from "./Overlay3D";
 import { linkProgram3D, uniformsOf, type Uniforms } from "./program3d";
-import { AUTO_SURFACE_RESOLUTION, SurfaceDepth } from "./SurfaceDepth";
+import {
+  AUTO_SURFACE_RESOLUTION,
+  SurfaceDepth,
+  surfaceDomain,
+  surfacePointSource,
+} from "./SurfaceDepth";
 import type { Surface3D } from "./surfaces3d";
 import { FieldScale3D, type ScaleRule3D } from "./FieldScale3D";
 import { PALETTE_GLSL, paletteUniforms, type PaletteID } from "./palettes";
@@ -51,6 +56,11 @@ export type ArrowLength3D = "normalized" | "saturating" | "clamped" | "actual";
 export interface Arrow3DOptions {
   shape: ArrowShape3D | "auto";
   placement: Placement3D;
+  /**
+   * With placement "surface": the id of the graphed surface the arrows stand
+   * on, or "" (or one no longer graphed) for the first.
+   */
+  surfaceId?: string;
   /** Arrows per axis, or Auto from the box's size on screen. */
   count: number | "auto";
   sliceAxis: 0 | 1 | 2;
@@ -192,7 +202,7 @@ const LENGTH_INDEX: Record<ArrowLength3D, number> = {
 /** However long Auto would make it, no arrow is longer than this, in box half-widths: an eighth of the diagonal. */
 const LENGTH_CAP = 0.125 * 2 * Math.sqrt(3);
 
-function arrowVertexSource(field: Field3D) {
+function arrowVertexSource(field: Field3D, onSurface?: Surface3D) {
   return `#version 300 es
 precision highp float;
 precision highp int;
@@ -221,7 +231,7 @@ ${HASH_GLSL}
 ${CLIP_GLSL}
 ${CUT_GLSL}
 ${PALETTE_GLSL}
-float vtSurface(vec2 p) { return vtUndefined(); }
+${onSurface === undefined ? "vec3 vtSurfacePoint(vec2 ab) { return vec3(vtUndefined()); }" : surfacePointSource(onSurface, field)}
 ${SAMPLE_GLSL}
 
 const ivec2 QUAD[6] = ivec2[6](
@@ -431,6 +441,7 @@ export class Arrow3DRenderer implements Overlay3DRenderer {
 
   /** The surfaces the field is hidden or faded behind. */
   setSurfaces(surfaces: readonly Surface3D[]) {
+    this.surfaces = surfaces;
     this.surfaceDepth.setSurfaces(surfaces);
   }
 
@@ -444,14 +455,42 @@ export class Arrow3DRenderer implements Overlay3DRenderer {
   /** Builds the shaders if the field changed; a no-op otherwise. */
   setField(field: Field3D) {
     if (sameField3D(this.field, field) && this.program !== undefined) return;
-    const { gl } = this;
-    const program = linkProgram3D(gl, arrowVertexSource(field), ARROW_FRAGMENT);
+    this.field = field;
+    this.scale.setField(field);
+    this.link();
+  }
+
+  /**
+   * The surface "On a surface" places arrows on, by id, from among the ones
+   * `setSurfaces` was given; undefined for none.
+   */
+  private onSurface?: Surface3D;
+
+  private link() {
+    const { gl, field } = this;
+    if (field === undefined) return;
+    const program = linkProgram3D(
+      gl,
+      arrowVertexSource(field, this.onSurface),
+      ARROW_FRAGMENT
+    );
     if (this.program !== undefined) gl.deleteProgram(this.program);
     this.program = program;
     this.uniforms = uniformsOf(gl, program);
-    this.field = field;
-    this.scale.setField(field);
   }
+
+  /** Relinks only when the surface the arrows stand on has changed. */
+  private chooseSurface(id: string | undefined) {
+    const chosen =
+      id === undefined
+        ? undefined
+        : (this.surfaces.find((s) => s.id === id) ?? this.surfaces[0]);
+    if (JSON.stringify(chosen) === JSON.stringify(this.onSurface)) return;
+    this.onSurface = chosen;
+    this.link();
+  }
+
+  private surfaces: readonly Surface3D[] = [];
 
   setOptions(options: Arrow3DOptions) {
     this.options = options;
@@ -480,6 +519,9 @@ export class Arrow3DRenderer implements Overlay3DRenderer {
     gl.clearDepth(1);
     gl.depthMask(true);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    this.chooseSurface(
+      o.placement === "surface" ? (o.surfaceId ?? "") : undefined
+    );
     const { field, program } = this;
     if (field === undefined || program === undefined) return;
 
@@ -506,7 +548,25 @@ export class Arrow3DRenderer implements Overlay3DRenderer {
     gl.uniform1f(u.u_viewportH, this.cssHeight);
     gl.uniform3fv(u.u_boxMin, box.min);
     gl.uniform3fv(u.u_boxMax, box.max);
-    gl.uniform1i(u.u_sampling, PLACEMENT_INDEX[o.placement]);
+    // On a surface with none to stand on, there are no arrows to draw.
+    gl.uniform1i(
+      u.u_sampling,
+      o.placement === "surface" && this.onSurface === undefined
+        ? PLACEMENT_INDEX.jitter
+        : PLACEMENT_INDEX[o.placement]
+    );
+    if (this.onSurface !== undefined) {
+      const d = surfaceDomain(this.onSurface, box);
+      gl.uniform2fv(u.u_surfFrom, d.from);
+      gl.uniform2fv(u.u_surfTo, d.to);
+      uploadField3DParameters(
+        gl,
+        u,
+        this.onSurface,
+        this.parameters,
+        this.time
+      );
+    }
     gl.uniform1i(u.u_count, count);
     gl.uniform1i(u.u_sliceAxis, o.sliceAxis);
     gl.uniform1f(u.u_slicePos, o.slicePosition);

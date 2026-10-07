@@ -195,11 +195,13 @@ real Desmos 3D for all of them.
 
 Left from this plan, and why:
 
-- **Gradient fields in 3D** say so instead of drawing: the GPU differentiates
-  by central differences, and the step has to follow the box, which the
-  field prelude does not see yet.
-- **Arrows on a surface** (the mock-up's fourth placement) need a chosen
-  surface compiled into the arrow shader's `vtSurface`.
+- **Gradient fields in 3D**: done (`40c21364`). f is differentiated
+  symbolically into its three partials, so no difference step has to follow
+  the box.
+- **Arrows on a surface**: done. "On a surface" stands arrows evenly over a
+  graphed surface's parameters — z = f(x, y), x = g(y, z), y = h(x, z) or
+  parametric — sharing the depth copies' own `vtSurfacePoint`
+  (`plugin-on-surface.png`).
 - **A real-GPU drag by eye** is still the last check of the alignment; every
-  measurement so far is headless.
+  measurement so far is headless. It needs a person at a real screen.
 - Open decisions (§5) keep their defaults until answered.

@@ -588,10 +588,11 @@ const SHAPES_3D: readonly Choice<Space3DConfig["shape"]>[] = [
   { value: "flat", label: "Flat" },
   { value: "solid", label: "Shaded 3D" },
 ];
-const PLACEMENTS_3D: readonly Choice<"jitter" | "grid" | "slice">[] = [
+const PLACEMENTS_3D: readonly Choice<Space3DConfig["placement"]>[] = [
   { value: "jitter", label: "Jittered" },
   { value: "grid", label: "Whole box" },
   { value: "slice", label: "Slice" },
+  { value: "surface", label: "On a surface" },
 ];
 const AXES_3D: readonly Choice<"0" | "1" | "2">[] = [
   { value: "0", label: "x =" },
@@ -673,10 +674,13 @@ function space3dSections(vectorTools: VectorTools, config: ConfigGetter) {
             </div>
             {chipGroup(
               "Where arrows go",
-              () => (s().placement === "surface" ? "jitter" : s().placement),
+              () => s().placement,
               PLACEMENTS_3D,
               (v) => set("placement", v)
             )}
+            <If predicate={() => s().placement === "surface"}>
+              {() => surfaceChooser(vectorTools, s)}
+            </If>
             <If predicate={() => s().placement === "slice"}>
               {() => (
                 <div>
@@ -2478,6 +2482,55 @@ function componentInputR(vectorTools: VectorTools) {
         controller={vectorTools.cc}
         readonly={false}
       />
+    </div>
+  );
+}
+
+/**
+ * Which graphed surface the arrows stand on, shown by its own equation.
+ * Arrows sit evenly over the surface's parameters, wherever it is inside the
+ * box, and show the field there.
+ */
+function surfaceChooser(vectorTools: VectorTools, s: () => Space3DConfig) {
+  const choices = () => vectorTools.surfaceChoices;
+  const chosen = () => {
+    const id = s().surfaceId;
+    const all = choices();
+    return all.some((c) => c.id === id) ? id : (all[0]?.id ?? "");
+  };
+  return (
+    <div class="dsm-vector-tools-surface-chooser">
+      <If predicate={() => choices().length === 0}>
+        {() => (
+          <div class="dsm-vector-tools-hint">
+            Graph a surface — z = f(x, y), x = g(y, z) or a parametric one — and
+            the arrows stand on it. Until then they fill the box.
+          </div>
+        )}
+      </If>
+      <If predicate={() => choices().length > 0}>
+        {() => (
+          <div class="dsm-vector-tools-chip-row">
+            <For each={() => choices()} key={(c: { id: string }) => c.id}>
+              {(c: () => { id: string; latex: string }) => (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  class={() => ({
+                    "dsm-vector-tools-chip": true,
+                    "dsm-vector-tools-surface-choice": true,
+                    "dsm-vector-tools-chip-selected": chosen() === c().id,
+                  })}
+                  data-surface={() => c().id}
+                  onTap={() => vectorTools.setSpace3D("surfaceId", c().id)}
+                >
+                  <StaticMathQuillView latex={() => c().latex} />
+                </span>
+              )}
+            </For>
+          </div>
+        )}
+      </If>
     </div>
   );
 }

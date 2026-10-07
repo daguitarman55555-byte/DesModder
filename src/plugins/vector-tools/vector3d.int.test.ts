@@ -191,7 +191,7 @@ testWithPageAndOpts(
       vt.applyGalleryPreset("dipole", false);
       return vt.getConfig().components.zLatex as string;
     });
-    expect(loaded).toContain("2z^{2}");
+    expect(loaded).toContain("x^{2}+y^{2}+z^{2}");
     // R is offered on 3D, beside P and Q.
     const fieldIndex = PANEL_TABS.findIndex((tab) => tab.id === "field");
     await driver.click(
@@ -591,6 +591,69 @@ testWithPageAndOpts(
       Buffer.from(shot.png, "base64")
     );
     await configure(driver, `config.source = "components";`);
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+  }
+);
+
+testWithPageAndOpts(
+  "Vector Tools stands arrows on a graphed surface",
+  { path: "/3d", timeout: 120000 },
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.page.waitForFunction(
+      () => DSM.enabledPlugins["vector-tools"] !== undefined
+    );
+    await driver.page.evaluate(() => {
+      Calc.setExpression({
+        id: "hill",
+        latex: String.raw`z=2\sin\left(\frac{x}{2}\right)\cos\left(\frac{y}{2}\right)`,
+      });
+    });
+    await driver.page.waitForFunction(
+      () =>
+        (DSM.enabledPlugins["vector-tools"] as any).surfaceChoices.length === 1,
+      { timeout: 10000 }
+    );
+    // A swirl round the z-axis, standing on the hill.
+    await configure(
+      driver,
+      `config.arrowMode = "live";
+       config.space3d.look = "arrows";
+       config.space3d.placement = "surface";
+       config.space3d.surfaceId = "";
+       config.space3d.occlusion = "fade";
+       config.source = "components";
+       config.components.xLatex = "-y";
+       config.components.yLatex = "x";
+       config.components.zLatex = "0.5";`
+    );
+    const onHill = await frame(driver);
+    expect(onHill.frame?.instances).toBeGreaterThan(0);
+    expect(onHill.status).toContain("live in 3D");
+    mkdirSync(ASSETS, { recursive: true });
+    writeFileSync(
+      join(ASSETS, "plugin-on-surface.png"),
+      Buffer.from((await capture(driver)).png, "base64")
+    );
+
+    // The panel offers it by its own equation.
+    await driver.click(".dsm-action-menu .dsm-icon-compass2");
+    const index = PANEL_TABS.findIndex((tab) => tab.id === "arrows");
+    await driver.click(
+      `.dsm-vector-tools-tabs .dcg-segmented-control-btn:nth-child(${index + 1})`
+    );
+    await driver.assertSelectorEventually(
+      '.dsm-vector-tools-surface-choice[data-surface="hill"]'
+    );
+    await driver.click(".dsm-action-menu .dsm-icon-compass2");
+
+    await configure(
+      driver,
+      `config.space3d.placement = "jitter";
+       config.space3d.occlusion = "hide";`
+    );
+    await driver.page.evaluate(() => Calc.removeExpression({ id: "hill" }));
     await driver.disablePlugin("vector-tools");
     await driver.setBlank();
   }

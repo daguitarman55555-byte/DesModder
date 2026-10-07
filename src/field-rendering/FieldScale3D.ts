@@ -65,7 +65,7 @@ out float v_m;
 ${field3dFunctions(field)}
 ${HASH_GLSL}
 ${CLIP_GLSL}
-float vtSurface(vec2 p) { return vtUndefined(); }
+vec3 vtSurfacePoint(vec2 ab) { return vec3(vtUndefined()); }
 ${SAMPLE_GLSL}
 void main() {
   int i = gl_VertexID;

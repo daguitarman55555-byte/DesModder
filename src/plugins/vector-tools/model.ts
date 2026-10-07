@@ -384,6 +384,11 @@ export interface Space3DConfig {
   lensHorizon: number;
   /** With the lens: Doppler beaming and gravitational redshift. */
   beaming: boolean;
+  /**
+   * The graphed surface "On a surface" places arrows on, by its expression
+   * id; "" for the first one graphed.
+   */
+  surfaceId: string;
 }
 
 /** What the Arrows tab draws on Desmos 3D. */
@@ -460,6 +465,7 @@ export const DEFAULT_SPACE_3D: Space3DConfig = {
   lens: false,
   lensHorizon: 0.45,
   beaming: true,
+  surfaceId: "",
 };
 
 export const TIME_SPEED_MINIMUM = 0.05;
@@ -1525,6 +1531,8 @@ export function normalizeSpace3D(
     lens: flag("lens"),
     lensHorizon: num("lensHorizon", 0.01, 100),
     beaming: flag("beaming"),
+    surfaceId:
+      typeof v?.surfaceId === "string" ? v.surfaceId : fallback.surfaceId,
   };
 }
 

@@ -21,11 +21,33 @@ import { linkProgram3D, uniformsOf, type Uniforms } from "./program3d";
 /** Auto's resolution: see the comment at the top of the file. */
 export const AUTO_SURFACE_RESOLUTION = 128;
 
-function vertexSource(surface: Surface3D) {
+/**
+ * `vec3 vtSurfacePoint(vec2 ab)`: the point of `surface` at parameters `ab` —
+ * (x, y) for z = f(x, y), the other two coordinates for x = g(y, z) and
+ * y = h(x, z), (u, v) for a parametric surface — with the uniforms and
+ * helpers it needs. Names and helpers `already` declared (by a field compiled
+ * into the same shader) are not declared again; GLSL_PRELUDE is the caller's.
+ */
+export function surfacePointSource(
+  surface: Surface3D,
+  already: {
+    params?: readonly string[];
+    usesTime?: boolean;
+    helpers?: readonly { name: string }[];
+  } = {}
+) {
   const uniforms = [
-    ...surface.params.map((name) => `uniform float ${glslParamName(name)};`),
-    ...(surface.usesTime ? ["uniform float u_time;"] : []),
+    ...surface.params
+      .filter((name) => !(already.params ?? []).includes(name))
+      .map((name) => `uniform float ${glslParamName(name)};`),
+    ...(surface.usesTime && already.usesTime !== true
+      ? ["uniform float u_time;"]
+      : []),
   ].join("\n");
+  const helpers = surface.helpers
+    .filter((h) => !(already.helpers ?? []).some((a) => a.name === h.name))
+    .map((h) => h.glsl)
+    .join("\n");
   const point =
     surface.kind === "uv"
       ? `
@@ -44,6 +66,36 @@ function vertexSource(surface: Surface3D) {
           : `
   vec3 p = vec3(ab.x, 0.0, ab.y);
   return vec3(ab.x, ${surface.body}, ab.y);`;
+  return `
+${uniforms}
+${surface.kind === "uv" ? "float u_vp_u;\nfloat u_vp_v;" : ""}
+${helpers}
+vec3 vtSurfacePoint(vec2 ab) {${point}
+}
+`;
+}
+
+/**
+ * The range of a surface's parameters that covers the box: the box's own
+ * extent in the two coordinates a graph surface is a function of, or the u, v
+ * ranges Desmos reports for a parametric one.
+ */
+export function surfaceDomain(
+  surface: Surface3D,
+  box: Box3D
+): { from: [number, number]; to: [number, number] } {
+  if (surface.kind === "uv") {
+    return {
+      from: [surface.u[0], surface.v[0]],
+      to: [surface.u[1], surface.v[1]],
+    };
+  }
+  const [a, b] =
+    surface.axis === 2 ? [0, 1] : surface.axis === 0 ? [1, 2] : [0, 2];
+  return { from: [box.min[a], box.min[b]], to: [box.max[a], box.max[b]] };
+}
+
+function vertexSource(surface: Surface3D) {
   return `#version 300 es
 precision highp float;
 precision highp int;
@@ -54,11 +106,7 @@ uniform vec2 u_from;
 uniform vec2 u_to;
 out vec3 v_math;
 ${GLSL_PRELUDE}
-${uniforms}
-${surface.kind === "uv" ? "float u_vp_u;\nfloat u_vp_v;" : ""}
-${surface.helpers.map((h) => h.glsl).join("\n")}
-vec3 vtPoint(vec2 ab) {${point}
-}
+${surfacePointSource(surface)}
 const ivec2 CORNER[6] = ivec2[6](
   ivec2(0, 0), ivec2(1, 0), ivec2(1, 1), ivec2(0, 0), ivec2(1, 1), ivec2(0, 1)
 );
@@ -66,7 +114,7 @@ void main() {
   int quad = gl_VertexID / 6;
   ivec2 cell = ivec2(quad % u_res, quad / u_res) + CORNER[gl_VertexID % 6];
   vec2 ab = mix(u_from, u_to, vec2(cell) / float(u_res));
-  vec3 m = vtPoint(ab);
+  vec3 m = vtSurfacePoint(ab);
   v_math = m;
   gl_Position = u_projection * (u_mathToView * vec4(m, 1.0));
 }

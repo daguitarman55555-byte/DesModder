@@ -59,9 +59,12 @@ bool vtCutAway(vec3 math, vec3 view) {
 
 /**
  * Where sample `id` is, for every placement. Needs `CLIP_GLSL`'s box uniforms,
- * `HASH_GLSL`, and a `float vtSurface(vec2)` (which may return NaN).
+ * `HASH_GLSL`, and a `vec3 vtSurfacePoint(vec2)` (which may return NaN) with
+ * its parameter range in `u_surfFrom`..`u_surfTo`.
  */
 export const SAMPLE_GLSL = `
+uniform vec2 u_surfFrom;
+uniform vec2 u_surfTo;
 uniform int u_sampling;
 uniform int u_count;
 uniform int u_sliceAxis;
@@ -89,10 +92,11 @@ bool vtSample(int id, out vec3 pos) {
     else pos = mix(lo, hi, vec3(t.x, t.y, s));
     return true;
   }
-  vec2 q = mix(lo.xy, hi.xy, t);
-  float z = vtSurface(q);
-  pos = vec3(q, z);
-  return !isnan(z) && z >= lo.z && z <= hi.z;
+  // On a surface: evenly over its parameters, and only where the point is a
+  // real one inside the box, which Desmos clips the surface to as well.
+  pos = vtSurfacePoint(mix(u_surfFrom, u_surfTo, t));
+  return !any(isnan(pos)) && !any(isinf(pos))
+    && all(greaterThanEqual(pos, lo)) && all(lessThanEqual(pos, hi));
 }
 `;
 
