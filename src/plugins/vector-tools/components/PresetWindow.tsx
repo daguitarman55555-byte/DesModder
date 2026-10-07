@@ -3,6 +3,7 @@ import { Component, jsx } from "#DCGView";
 import { For, If } from "#components";
 import { paletteStops } from "../../../field-rendering/palettes";
 import type { GalleryPreset } from "../gallery";
+import { PRESET_THUMBNAILS } from "./presetThumbnails";
 import "./PresetWindow.less";
 
 /**
@@ -108,7 +109,10 @@ export class PresetWindow extends Component<{
                           <span
                             class="dsm-preset-window-swatch"
                             onUpdate={(element: HTMLElement) => {
-                              element.style.background = swatchFor(preset());
+                              element.style.background = swatchFor(
+                                preset(),
+                                vectorTools.is3d
+                              );
                             }}
                           />
                           <span class="dsm-preset-window-name">
@@ -143,11 +147,19 @@ export class PresetWindow extends Component<{
 }
 
 /**
- * A preset's swatch: a glow in its palette on its own dark, hottest at the
- * centre, the way its pictures are drawn, so the list reads as the pictures
- * rather than as names. Ramps without stops (the hue wheel) fall back to grey.
+ * A preset's swatch: its thumbnail, photographed as the flow draws it on this
+ * product (see `presetThumbnails.ts`), so the list reads as the pictures
+ * rather than as names. Under it, and in its place for a preset without one
+ * yet, a glow in its palette on its own dark, hottest at the centre.
  */
-function swatchFor(preset: GalleryPreset) {
+function swatchFor(preset: GalleryPreset, is3d: boolean) {
+  const thumb = PRESET_THUMBNAILS[preset.id];
+  const glow = glowFor(preset);
+  if (thumb === undefined) return glow;
+  return `url("${is3d ? thumb.space : thumb.plane}") center / cover no-repeat, ${glow}`;
+}
+
+function glowFor(preset: GalleryPreset) {
   const stops = paletteStops(preset.palette);
   const dark = preset.backdrop ?? "#0d1020";
   if (stops.length === 0) return dark;
