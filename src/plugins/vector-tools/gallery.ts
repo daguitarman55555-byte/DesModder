@@ -57,7 +57,13 @@ export function colorsFromGallery(
     source: "components",
     components: componentsFor(preset, dimensions),
     color: { ...base.color, palette: preset.palette },
-    time: { ...base.time, speed: preset.timeSpeed ?? base.time.speed },
+    // Every preset moves with the clock, and a still one is only half of it,
+    // so even the light load starts the clock.
+    time: {
+      ...base.time,
+      playing: true,
+      speed: preset.timeSpeed ?? base.time.speed,
+    },
     flow: {
       ...base.flow,
       palette: preset.palette,

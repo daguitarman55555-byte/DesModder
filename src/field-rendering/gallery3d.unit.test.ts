@@ -57,3 +57,37 @@ describe("every gallery preset says where its matter is, in a form that compiles
     expect(hole.space.seedLatex).toBeDefined();
   });
 });
+
+describe("every gallery preset moves with the clock", () => {
+  const plane = EMPTY_ENVIRONMENT;
+  const space = { ...EMPTY_ENVIRONMENT, dimensions: 3 as const };
+  const readsTime = (
+    latex: readonly (string | undefined)[],
+    env: typeof plane
+  ) =>
+    latex.some((l) => {
+      if (l === undefined) return false;
+      const result = compileFieldComponentToGLSL(l, env);
+      return result.ok && result.usesTime;
+    });
+
+  test.each(FIELD_GALLERY.map((preset) => [preset.id, preset] as const))(
+    "%s reads t in 2D and in 3D",
+    (_id, preset) => {
+      expect(
+        readsTime([preset.xLatex, preset.yLatex, preset.seedLatex], plane)
+      ).toBe(true);
+      expect(
+        readsTime(
+          [
+            preset.space.xLatex,
+            preset.space.yLatex,
+            preset.space.zLatex,
+            preset.space.seedLatex,
+          ],
+          space
+        )
+      ).toBe(true);
+    }
+  );
+});
