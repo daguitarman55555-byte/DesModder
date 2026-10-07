@@ -541,6 +541,20 @@ export interface PanelConfig {
   height: number;
   /** Section the panel opens on. */
   tab: PanelTab;
+  /** The presets window: whether it is open, folded, and where. */
+  presets: PresetWindowConfig;
+}
+
+/**
+ * The presets window floats over the graph, outside the panel, so a preset
+ * can be changed while looking at the whole picture. x and y are its top-left
+ * corner in pixels from the graph's; −1 puts it at its default place.
+ */
+export interface PresetWindowConfig {
+  open: boolean;
+  collapsed: boolean;
+  x: number;
+  y: number;
 }
 
 export type PanelTab =
@@ -888,6 +902,7 @@ export const DEFAULT_PANEL_CONFIG: PanelConfig = {
   width: 460,
   height: 650,
   tab: "field",
+  presets: { open: false, collapsed: false, x: -1, y: -1 },
 };
 
 export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
@@ -1122,7 +1137,10 @@ export function cloneDefaultLibrary(): VectorFieldLibrary {
     schemaVersion: VECTOR_FIELD_SCHEMA_VERSION,
     fields: [field],
     activeId: field.id,
-    panel: { ...DEFAULT_PANEL_CONFIG },
+    panel: {
+      ...DEFAULT_PANEL_CONFIG,
+      presets: { ...DEFAULT_PANEL_CONFIG.presets },
+    },
     galleryWithLook: false,
   };
 }
@@ -1748,6 +1766,22 @@ function normalizePanel(value: unknown, fallback: PanelConfig): PanelConfig {
     tab: PANEL_TABS.some((tab) => tab.id === panel?.tab)
       ? (panel?.tab as PanelTab)
       : fallback.tab,
+    presets: normalizePresetWindow(panel?.presets, fallback.presets),
+  };
+}
+
+function normalizePresetWindow(
+  value: unknown,
+  fallback: PresetWindowConfig
+): PresetWindowConfig {
+  const w = asRecord(value);
+  const flag = (key: "open" | "collapsed") =>
+    typeof w?.[key] === "boolean" ? w[key] : fallback[key];
+  return {
+    open: flag("open"),
+    collapsed: flag("collapsed"),
+    x: Math.round(clampNumber(w?.x, fallback.x, -1, 10_000)),
+    y: Math.round(clampNumber(w?.y, fallback.y, -1, 10_000)),
   };
 }
 

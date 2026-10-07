@@ -2089,3 +2089,89 @@ testWithPage(
   },
   90000
 );
+
+testWithPage(
+  "the presets window floats over the graph, loads a preset, folds and moves",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await resetLibrary(driver);
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+    await driver.assertSelector(PANEL);
+    await driver.click(".dsm-vector-tools-presets-toggle");
+    await driver.assertSelectorEventually(".dsm-preset-window");
+
+    // Every preset, once, grouped by kind.
+    const shelves = await driver.evaluate(() =>
+      [...document.querySelectorAll(".dsm-preset-window-group")].map(
+        (group) => ({
+          label: group.querySelector(".dsm-preset-window-group-label")!
+            .textContent,
+          count: group.querySelectorAll(".dsm-preset-window-item").length,
+        })
+      )
+    );
+    expect(shelves.map((shelf) => shelf.label)).toEqual([
+      "Space",
+      "Fluids",
+      "Chaos",
+      "Fields",
+    ]);
+    expect(shelves.reduce((sum, shelf) => sum + shelf.count, 0)).toBe(
+      await driver.evaluate(() => DSM.vectorTools!.gallery.length)
+    );
+
+    // It stays when the panel closes: choosing a picture is done looking at it.
+    await driver.click(BUTTON);
+    await driver.assertSelectorEventually(".dsm-preset-window");
+    await driver.click('.dsm-preset-window-item[data-preset="tornado"]');
+    await driver.waitForFunction(
+      () => DSM.vectorTools!.getConfig().name === "Tornado"
+    );
+    await driver.assertSelectorEventually(
+      '.dsm-preset-window-active[data-preset="tornado"]'
+    );
+    await driver.page.screenshot({
+      path: "docs/assets/vector-tools-preset-window.png",
+    });
+
+    // Dragged by its title bar, and kept where it was put.
+    const before = await driver.evaluate(() => {
+      const r = document
+        .querySelector(".dsm-preset-window-title")!
+        .getBoundingClientRect();
+      return { x: r.x + 10, y: r.y + 5 };
+    });
+    await driver.page.mouse.move(before.x, before.y);
+    await driver.page.mouse.down();
+    await driver.page.mouse.move(before.x - 200, before.y + 120, { steps: 8 });
+    await driver.page.mouse.up();
+    await driver.waitForFunction(() => DSM.vectorTools!.presetWindow.x >= 0);
+    const moved = await driver.evaluate(() => {
+      const r = document
+        .querySelector(".dsm-preset-window-title")!
+        .getBoundingClientRect();
+      return { x: r.x + 10, y: r.y + 5 };
+    });
+    expect(Math.abs(moved.x - (before.x - 200))).toBeLessThan(3);
+    expect(Math.abs(moved.y - (before.y + 120))).toBeLessThan(3);
+
+    // Folded to its title bar.
+    await driver.click('.dsm-preset-window-button[aria-label="Collapse"]');
+    await driver.assertSelectorEventually(".dsm-preset-window-collapsed");
+    expect(
+      await driver.evaluate(
+        () => document.querySelectorAll(".dsm-preset-window-item").length
+      )
+    ).toBe(0);
+
+    await driver.click('.dsm-preset-window-button[aria-label="Close"]');
+    await driver.waitForFunction(
+      () => document.querySelector(".dsm-preset-window") === null
+    );
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);

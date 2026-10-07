@@ -1,5 +1,8 @@
 import { PluginController } from "../PluginController";
 import { VectorToolsPanelFunc } from "./components/VectorToolsPanel";
+import { PresetWindow } from "./components/PresetWindow";
+import { mountToNode, unmountFromNode, type MountedComponent } from "#DCGView";
+import { GALLERY_CATEGORIES } from "../../field-rendering/gallery";
 import {
   CalculatorExpressionAdapter,
   type GeneratedItemSnapshot,
@@ -25,6 +28,7 @@ import {
   normalizeVectorFieldLibrary,
   uniqueFieldName,
   type VectorFieldLibrary,
+  type PresetWindowConfig,
   type ColorPalette,
   type ColorRangeMode,
   type DensityPreset,
@@ -197,6 +201,16 @@ const POPOVER_CLASS = "dsm-vector-tools-popover";
  * Graph bounds carry a pan's worth of noise digits, and the panel's number
  * fields show them all. Three decimals is finer than anyone samples on.
  */
+function clampTo(value: number, low: number, high: number) {
+  return Math.max(low, Math.min(Math.max(low, high), value));
+}
+
+/** The gallery grouped for the presets window, each shelf in its order. */
+const PRESET_GROUPS = GALLERY_CATEGORIES.map((category) => ({
+  ...category,
+  presets: FIELD_GALLERY.filter((preset) => preset.category === category.id),
+})).filter((group) => group.presets.length > 0);
+
 function round(value: number) {
   return Math.round(value * 1000) / 1000;
 }
@@ -504,6 +518,8 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   private panelElement?: HTMLElement;
   private panelResizeObserver?: ResizeObserver;
   private panelSizeTimer?: ReturnType<typeof setTimeout>;
+  private presetWindowMount?: HTMLElement;
+  private presetWindowView?: MountedComponent;
   private componentLinkNote = "";
   /** What the expression list defines, as of the last scan. */
   private environment: FieldEnvironment = EMPTY_ENVIRONMENT;
@@ -566,6 +582,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
 
   afterEnable() {
     this.ensureStoredConfigIsCurrent();
+    this.syncPresetWindow();
     this.refreshArrows();
     this.dsm.pillboxMenus?.addPillboxButton({
       id: "dsm-vector-tools-menu",
@@ -576,6 +593,9 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     // Components live in the expression list once the field is generated, so
     // an edit there has to flow back into the panel and the visualizer.
     this.dispatcherID = this.cc.dispatcher.register((event) => {
+      // The presets window is mounted outside Desmos's views, so it redraws
+      // on the same tick the panel does.
+      if (event.type === "tick") this.presetWindowView?.update();
       if (
         event.type === "set-item-latex" ||
         event.type === "undo" ||
@@ -1342,6 +1362,12 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       this.cc.dispatcher.unregister(this.dispatcherID);
     this.dispatcherID = undefined;
     this.detachPanelElement();
+    if (this.presetWindowMount !== undefined) {
+      unmountFromNode(this.presetWindowMount);
+      this.presetWindowMount.remove();
+      this.presetWindowMount = undefined;
+      this.presetWindowView = undefined;
+    }
     this.arrowOverlay.stop();
     this.flowOverlay.stop();
     this.stop3D();
@@ -1637,6 +1663,111 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
 
   get gallery() {
     return FIELD_GALLERY;
+  }
+
+  /** The gallery as the presets window shows it: grouped by kind. */
+  get galleryByCategory() {
+    return PRESET_GROUPS;
+  }
+
+  /**
+   * The preset the field was last loaded from, while it still has that
+   * preset's name: what the presets window marks as chosen.
+   */
+  get activePresetId() {
+    const { name } = this.getConfig();
+    return FIELD_GALLERY.find((preset) => preset.name === name)?.id;
+  }
+
+  get presetWindow() {
+    return this.getLibrary().panel.presets;
+  }
+
+  setPresetWindow(change: Partial<PresetWindowConfig>) {
+    this.updateLibrary((library) => {
+      Object.assign(library.panel.presets, change);
+    });
+    this.syncPresetWindow();
+  }
+
+  togglePresetWindow() {
+    this.setPresetWindow({ open: !this.presetWindow.open });
+  }
+
+  /**
+   * Mounts the presets window over the graph while it is open, and removes it
+   * when it is closed. Its own mount, not part of the panel's popover, so it
+   * stays when the panel closes.
+   */
+  private syncPresetWindow() {
+    const { open } = this.presetWindow;
+    if (open && this.presetWindowMount === undefined) {
+      const host =
+        document.querySelector<HTMLElement>(".dcg-container") ?? document.body;
+      const mount = document.createElement("div");
+      host.appendChild(mount);
+      this.presetWindowMount = mount;
+      this.presetWindowView = mountToNode(PresetWindow, mount, {
+        vectorTools: () => this,
+      });
+    } else if (!open && this.presetWindowMount !== undefined) {
+      unmountFromNode(this.presetWindowMount);
+      this.presetWindowMount.remove();
+      this.presetWindowMount = undefined;
+      this.presetWindowView = undefined;
+    } else {
+      this.presetWindowView?.update();
+    }
+  }
+
+  /**
+   * Puts the window where it was left, or at its default place: the graph's
+   * top right, clear of Desmos's own buttons. Kept inside the graph if the
+   * graph has shrunk since, so a window can never be lost off its edge.
+   */
+  placePresetWindow(element: HTMLElement) {
+    const host = element.offsetParent as HTMLElement | null;
+    const width = host?.clientWidth ?? window.innerWidth;
+    const height = host?.clientHeight ?? window.innerHeight;
+    const { x, y } = this.presetWindow;
+    const left = x < 0 ? width - element.offsetWidth - 64 : x;
+    const top = y < 0 ? 58 : y;
+    element.style.left = `${clampTo(left, 0, width - element.offsetWidth)}px`;
+    element.style.top = `${clampTo(top, 0, height - 32)}px`;
+  }
+
+  /**
+   * Dragging by the title bar. The position is drawn on every move but saved
+   * once, on release: every save rewrites the stored library, and a drag is
+   * a hundred moves.
+   */
+  makePresetWindowDraggable(handle: HTMLElement) {
+    handle.addEventListener("pointerdown", (down: PointerEvent) => {
+      if ((down.target as HTMLElement).closest('[role="button"]') !== null)
+        return;
+      const element = handle.parentElement;
+      if (element === null) return;
+      down.preventDefault();
+      handle.setPointerCapture(down.pointerId);
+      const startX = element.offsetLeft;
+      const startY = element.offsetTop;
+      const move = (event: PointerEvent) => {
+        const host = element.offsetParent as HTMLElement | null;
+        const width = host?.clientWidth ?? window.innerWidth;
+        const height = host?.clientHeight ?? window.innerHeight;
+        element.style.left = `${clampTo(startX + event.clientX - down.clientX, 0, width - element.offsetWidth)}px`;
+        element.style.top = `${clampTo(startY + event.clientY - down.clientY, 0, height - 32)}px`;
+      };
+      const up = () => {
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", up);
+        handle.removeEventListener("pointercancel", up);
+        this.setPresetWindow({ x: element.offsetLeft, y: element.offsetTop });
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", up);
+      handle.addEventListener("pointercancel", up);
+    });
   }
 
   get galleryWithLook() {

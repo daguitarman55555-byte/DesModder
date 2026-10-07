@@ -58,9 +58,26 @@ export interface GalleryLook {
   normalizeSpeed: boolean;
 }
 
+/**
+ * The shelves the presets window groups them on: what kind of picture each
+ * is, which is how someone browsing for one thinks of it.
+ */
+export type GalleryCategory = "space" | "fluids" | "chaos" | "fields";
+
+export const GALLERY_CATEGORIES: readonly {
+  id: GalleryCategory;
+  label: string;
+}[] = [
+  { id: "space", label: "Space" },
+  { id: "fluids", label: "Fluids" },
+  { id: "chaos", label: "Chaos" },
+  { id: "fields", label: "Fields" },
+];
+
 export interface GalleryPreset {
   id: string;
   name: string;
+  category: GalleryCategory;
   /** What it is, in one line, under the name. */
   blurb: string;
   xLatex: string;
@@ -143,6 +160,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   {
     id: "black-hole",
     name: "Black hole",
+    category: "space",
     blurb:
       "An accretion disk seen from above: gas on Keplerian orbits, faster and hotter inward, plunging into the horizon once inside the innermost stable orbit. The black disc is the hole's shadow, ringed by the light that went round it.",
     // Rotation plus a drift toward the centre. The 3/4 power makes the speed
@@ -203,6 +221,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   {
     id: "spiral-galaxy",
     name: "Spiral galaxy",
+    category: "space",
     blurb:
       "Differential rotation: inner orbits come round faster than outer ones, which winds a spiral out of a disc.",
     xLatex: String.raw`\frac{-2y}{1.5+\sqrt{x^{2}+y^{2}}}`,
@@ -253,6 +272,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   {
     id: "binary",
     name: "Binary orbit",
+    category: "fluids",
     blurb:
       "Two vortices circling their common centre. The clock moves them, so the whole pattern turns.",
     // The softening term keeps the centres finite. Without it the two points
@@ -302,6 +322,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   {
     id: "aurora",
     name: "Aurora",
+    category: "space",
     blurb:
       "Curtains that drift and fold, because both components read the clock.",
     // Seen from the side: rays falling down the field lines to a sharp,
@@ -355,6 +376,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   {
     id: "pulsar",
     name: "Pulsar",
+    category: "space",
     blurb:
       "A radial field whose sign follows sin t, so the whole thing breathes in and out.",
     // A dipole spinning in the plane, m = (cos t, sin t):
@@ -405,6 +427,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   {
     id: "star-cluster",
     name: "Star cluster",
+    category: "space",
     blurb:
       "Three attractors. Particles fall into them and pile up, so the knots draw themselves.",
     xLatex: String.raw`\frac{-\left(x+4\right)}{\left(\left(x+4\right)^{2}+\left(y-2\right)^{2}+0.4\right)^{1.1}}+\frac{-\left(x-3\right)}{\left(\left(x-3\right)^{2}+\left(y-3\right)^{2}+0.4\right)^{1.1}}+\frac{-\left(x-1\right)}{\left(\left(x-1\right)^{2}+\left(y+4\right)^{2}+0.4\right)^{1.1}}`,
@@ -447,6 +470,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   {
     id: "cellular",
     name: "Vortex lattice",
+    category: "fluids",
     blurb:
       "Taylor–Green flow: an array of counter-rotating cells, each one shearing against its neighbours.",
     // Bracketed: Desmos refuses `\sin x\cos y` ("Use parentheses around the
@@ -491,6 +515,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   {
     id: "dipole",
     name: "Magnetic dipole",
+    category: "fields",
     blurb:
       "The field of a bar magnet, and the one picture every physics textbook opens with.",
     xLatex: String.raw`\frac{3xy}{${r2}^{2.5}}`,
@@ -539,6 +564,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   {
     id: "lorenz",
     name: "Lorenz butterfly",
+    category: "chaos",
     blurb:
       "Rayleigh–Bénard convection: a fluid heated from below rolls over in cells, warm rising, cool sinking. Lorenz cut these rolls down to three equations in 1963, and found chaos in them.",
     // Stream function ψ = 3 sin(0.4833x) cos(πy/8) in the layer |y| < 4, so
@@ -590,6 +616,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   {
     id: "thomas",
     name: "Thomas attractor",
+    category: "chaos",
     blurb:
       "Thomas's cyclically symmetric system in two variables: ẋ = sin y − bx, ẏ = sin x − by. A plane flow cannot be chaotic (the Poincaré–Bendixson theorem), so here it settles into a lattice of spirals.",
     xLatex: String.raw`\sin\left(y\right)-0.208186x`,
@@ -632,6 +659,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   {
     id: "tornado",
     name: "Tornado",
+    category: "fluids",
     blurb:
       "A tornado seen from above: air drawn inward from every side, spinning faster as it closes on the core, the Burgers–Rott vortex, an exact solution of the Navier–Stokes equations.",
     // The Burgers–Rott vortex's horizontal flow: inflow −αr/2 and swirl
@@ -679,6 +707,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   {
     id: "smoke-ring",
     name: "Smoke ring",
+    category: "fluids",
     blurb:
       "A smoke ring cut through its middle: Hill's spherical vortex, seen riding along with it. The smoke turns over and over inside the sphere while the air outside parts round it.",
     // Hill's spherical vortex (1894), radius 5, in the frame moving with it:
@@ -727,6 +756,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   {
     id: "karman",
     name: "Vortex street",
+    category: "fluids",
     blurb:
       "The wake behind a cylinder: vortices shed alternately from each side, spinning opposite ways, drifting downstream slower than the stream. Von Kármán showed only rows 0.281 of a spacing apart are stable.",
     // Two infinite rows of point vortices, spacing a = 6, rows h = 0.281a apart,
@@ -776,6 +806,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   {
     id: "solar-wind",
     name: "Solar wind",
+    category: "space",
     blurb:
       "The Sun's magnetic field carried out by the solar wind while the Sun turns, wound into Parker's spiral. Slow wind, about 400 km/s, marks the sector boundaries, where the spiral winds tighter; fast wind, about 750 km/s, is bright.",
     // Along B ∝ r̂ − (Ωr/v)φ̂, at the wind's speed v: 0.53 (slow) to 1 (fast),

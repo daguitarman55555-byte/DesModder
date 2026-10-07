@@ -79,7 +79,6 @@ import {
   type ObstacleRow,
 } from "../fluid/FluidSession";
 import type { ComponentSlot } from "../generator";
-import type { GalleryPreset } from "../gallery";
 import "./VectorToolsPanel.less";
 
 interface Choice<T extends string> {
@@ -2624,56 +2623,27 @@ function fieldChooser(vectorTools: VectorTools, config: ConfigGetter) {
 }
 
 /**
- * Fields worth looking at, and the one toggle that decides how much of one
- * gets loaded.
- *
- * A gallery entry is a picture rather than a formula: its palette, its particle
- * settings and the frame it is meant to be seen in are most of what makes it
- * what it is, and loading only P and Q gives a black hole drawn as a grid of
- * short blue arrows. That is still worth being able to ask for, though — a
- * formula is a fine starting point inside a look somebody has already set up —
- * so which of the two happens is a checkbox rather than a decision made here.
+ * The presets: fourteen pictures from physics, kept in a window of their own
+ * that floats over the graph (see `PresetWindow`). This is its switch.
  */
 function gallerySection(vectorTools: VectorTools) {
-  const withLook = () => vectorTools.galleryWithLook;
   return (
     <section class="dsm-vector-tools-section dsm-vector-tools-gallery">
       <div class="dsm-vector-tools-section-head">
-        <h3>Gallery</h3>
-      </div>
-      <div class="dsm-vector-tools-gallery-row">
-        <For
-          each={() => [...vectorTools.gallery]}
-          key={(preset: GalleryPreset) => preset.id}
+        <h3>Presets</h3>
+        <Button
+          color={() => (vectorTools.presetWindow.open ? "light-gray" : "blue")}
+          class="dsm-vector-tools-presets-toggle"
+          onTap={() => vectorTools.togglePresetWindow()}
         >
-          {(getPreset: () => GalleryPreset) => (
-            <span
-              role="button"
-              tabIndex={0}
-              data-preset={() => getPreset().id}
-              title={() =>
-                vectorTools.is3d ? getPreset().space.blurb : getPreset().blurb
-              }
-              class="dsm-vector-tools-chip dsm-vector-tools-gallery-chip"
-              onTap={() =>
-                vectorTools.applyGalleryPreset(getPreset().id, withLook())
-              }
-            >
-              {() => getPreset().name}
-            </span>
-          )}
-        </For>
+          {() =>
+            vectorTools.presetWindow.open ? "Hide presets" : "Show presets"
+          }
+        </Button>
       </div>
-      {checkboxControl(
-        "Also take its framing, particle settings and arrow mode",
-        withLook,
-        (checked) => vectorTools.setGalleryWithLook(checked)
-      )}
       <div class="dsm-vector-tools-hint">
         {() =>
-          withLook()
-            ? "Loading one replaces the field you are editing, including your sampling domain and flow settings. Save first to keep them."
-            : "The formula and the colours are loaded. Your sampling domain, arrows and flow settings stay as they are."
+          `${vectorTools.gallery.length} fields from physics, grouped by kind, in a window you can drag and fold away while you watch.`
         }
       </div>
     </section>

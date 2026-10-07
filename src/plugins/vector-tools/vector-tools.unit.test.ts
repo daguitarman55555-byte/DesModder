@@ -423,10 +423,20 @@ describe("Vector Tools field configuration", () => {
       width: PANEL_MAX_WIDTH,
       height: PANEL_MIN_HEIGHT,
       tab: "field",
+      // A setting saved before the presets window: closed, at its default place.
+      presets: { open: false, collapsed: false, x: -1, y: -1 },
     });
     expect(
       normalizeVectorFieldLibrary({ panel: { width: 460, tab: "flow" } }).panel
     ).toMatchObject({ width: 460, tab: "flow" });
+  });
+
+  test("keeps the presets window where it was left, within reason", () => {
+    expect(
+      normalizeVectorFieldLibrary({
+        panel: { presets: { open: true, collapsed: true, x: 12.4, y: -50 } },
+      }).panel.presets
+    ).toEqual({ open: true, collapsed: true, x: 12, y: -1 });
   });
 
   test("rejects incomplete fields and unsafe sampling while requiring a warning confirmation", () => {
