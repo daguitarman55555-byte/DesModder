@@ -15,9 +15,11 @@ describe("every gallery preset has a 3D form", () => {
         const result = compileFieldComponentToGLSL(latex, space);
         expect([latex, result.ok]).toEqual([latex, true]);
       }
-      // The Taylor–Green vortex is the one whose standard 3D form has w = 0;
+      // The Taylor–Green vortex and the vortex street are the two whose
+      // honest 3D forms have w = 0;
       // anything else lying flat is a preset that was never given its depth.
-      if (preset.id !== "cellular") expect(preset.space.zLatex).not.toBe("0");
+      if (!["cellular", "karman"].includes(preset.id))
+        expect(preset.space.zLatex).not.toBe("0");
       expect(preset.space.blurb.length).toBeGreaterThan(20);
     }
   );

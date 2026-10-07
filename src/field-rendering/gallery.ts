@@ -536,6 +536,291 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
       },
     },
   },
+  {
+    id: "lorenz",
+    name: "Lorenz butterfly",
+    blurb:
+      "Rayleigh–Bénard convection: a fluid heated from below rolls over in cells, warm rising, cool sinking. Lorenz cut these rolls down to three equations in 1963, and found chaos in them.",
+    // Stream function ψ = 3 sin(0.4833x) cos(πy/8) in the layer |y| < 4, so
+    // u = ∂ψ/∂y and v = −∂ψ/∂x: closed rolls between the plates.
+    xLatex: String.raw`-1.178\sin\left(0.4833x\right)\sin\left(0.3927y\right)`,
+    yLatex: String.raw`-1.45\cos\left(0.4833x\right)\cos\left(0.3927y\right)`,
+    seedLatex: String.raw`\frac{1}{1+e^{20\left(\left|y\right|-3.8\right)}}`,
+    colorScale: 1,
+    backdrop: "#05030a",
+    extent: 10,
+    palette: "plasma",
+    flow: {
+      particleCount: 40_000,
+      speed: 4,
+      trailPersistence: 0.97,
+      dropRate: 0.004,
+      opacity: 0.4,
+      pointSize: 1.3,
+      glow: 0.35,
+      normalizeSpeed: false,
+    },
+    space: {
+      blurb:
+        "Lorenz's equations themselves, σ = 10, ρ = 28, β = 8/3: every particle falls onto the butterfly and circles one wing, then the other, never repeating — the strange attractor that named the butterfly effect.",
+      // Lorenz's x, y, z scaled into the box: X = x/5.5, Y = y/5.5,
+      // Z = (z − 25)/5.5, so ẋ = σ(y − x), ẏ = x(ρ − z) − y and
+      // ż = xy − βz become these.
+      xLatex: String.raw`10\left(y-x\right)`,
+      yLatex: String.raw`x\left(3-5.5z\right)-y`,
+      zLatex: String.raw`5.5xy-\frac{8}{3}z-12.12`,
+      // Born round the two fixed points at the wings' centres, (±√72, ±√72,
+      // 27) in Lorenz's units, from which every orbit spirals out onto them.
+      seedLatex: String.raw`e^{-\frac{\left(x-1.543\right)^{2}+\left(y-1.543\right)^{2}+\left(z-0.364\right)^{2}}{2.5}}+e^{-\frac{\left(x+1.543\right)^{2}+\left(y+1.543\right)^{2}+\left(z-0.364\right)^{2}}{2.5}}`,
+      look: {
+        particles: 15_000,
+        speed: 0.5,
+        trail: 64,
+        lifetime: 15,
+        opacity: 0.4,
+        glow: 0.2,
+        normalizeSpeed: true,
+        absorb: false,
+        colorMode: "speed",
+        backdrop: "#05030a",
+        backdropOpacity: 1,
+      },
+    },
+  },
+  {
+    id: "thomas",
+    name: "Thomas attractor",
+    blurb:
+      "Thomas's cyclically symmetric system in two variables: ẋ = sin y − bx, ẏ = sin x − by. A plane flow cannot be chaotic (the Poincaré–Bendixson theorem), so here it settles into a lattice of spirals.",
+    xLatex: String.raw`\sin\left(y\right)-0.208186x`,
+    yLatex: String.raw`\sin\left(x\right)-0.208186y`,
+    colorScale: 0.8,
+    backdrop: "#05020c",
+    extent: 10,
+    palette: "neon",
+    flow: {
+      particleCount: 40_000,
+      speed: 5,
+      trailPersistence: 0.97,
+      dropRate: 0.004,
+      opacity: 0.4,
+      pointSize: 1.3,
+      glow: 0.35,
+      normalizeSpeed: false,
+    },
+    space: {
+      blurb:
+        "René Thomas's attractor, ẋ = sin y − bx and its two rotations, with b = 0.208186: the same rule in three variables is chaotic, and the particles thread a looping labyrinth that looks the same from all three axes.",
+      xLatex: String.raw`\sin\left(y\right)-0.208186x`,
+      yLatex: String.raw`\sin\left(z\right)-0.208186y`,
+      zLatex: String.raw`\sin\left(x\right)-0.208186z`,
+      look: {
+        particles: 30_000,
+        speed: 0.35,
+        trail: 64,
+        lifetime: 12,
+        opacity: 0.4,
+        glow: 0.2,
+        normalizeSpeed: false,
+        absorb: false,
+        colorMode: "speed",
+        backdrop: "#05020c",
+        backdropOpacity: 1,
+      },
+    },
+  },
+  {
+    id: "tornado",
+    name: "Tornado",
+    blurb:
+      "A tornado seen from above: air drawn inward from every side, spinning faster as it closes on the core, the Burgers–Rott vortex, an exact solution of the Navier–Stokes equations.",
+    // The Burgers–Rott vortex's horizontal flow: inflow −αr/2 and swirl
+    // Γ/(2πr)·(1 − e^(−r²/r₀²)), here with r₀ = 2.
+    xLatex: String.raw`-0.08x-y\frac{6\left(1-e^{-\frac{x^{2}+y^{2}}{4}}\right)}{x^{2}+y^{2}+0.001}`,
+    yLatex: String.raw`-0.08y+x\frac{6\left(1-e^{-\frac{x^{2}+y^{2}}{4}}\right)}{x^{2}+y^{2}+0.001}`,
+    colorScale: 1.2,
+    backdrop: "#0a0605",
+    extent: 10,
+    palette: "sunset",
+    flow: {
+      particleCount: 35_000,
+      speed: 3,
+      trailPersistence: 0.97,
+      dropRate: 0.006,
+      opacity: 0.35,
+      pointSize: 1.3,
+      glow: 0.3,
+      normalizeSpeed: false,
+    },
+    space: {
+      blurb:
+        "The Burgers–Rott vortex standing on the ground: dust swept in along the floor spirals into the core and is stretched up the funnel, swirling fastest just outside it.",
+      // u_r = −αr/2, u_θ = Γ/(2πr)(1 − e^(−r²/r₀²)), w = α(z + 5) up from
+      // the box's floor, with α = 0.3, Γ/2π = 3, r₀ = 1.
+      xLatex: String.raw`-0.15x-y\frac{3\left(1-e^{-x^{2}-y^{2}}\right)}{x^{2}+y^{2}+0.001}`,
+      yLatex: String.raw`-0.15y+x\frac{3\left(1-e^{-x^{2}-y^{2}}\right)}{x^{2}+y^{2}+0.001}`,
+      zLatex: String.raw`0.3\left(z+5\right)`,
+      seedLatex: String.raw`\frac{e^{-3\left(z+5\right)^{2}}}{1+e^{3\left(\sqrt{x^{2}+y^{2}}-4.3\right)}}+0.25e^{-2\left(x^{2}+y^{2}\right)}`,
+      look: {
+        particles: 40_000,
+        speed: 0.3,
+        trail: 64,
+        lifetime: 8,
+        opacity: 0.35,
+        glow: 0.15,
+        normalizeSpeed: false,
+        absorb: true,
+        colorMode: "speed",
+        backdrop: "#0a0605",
+        backdropOpacity: 1,
+      },
+    },
+  },
+  {
+    id: "smoke-ring",
+    name: "Smoke ring",
+    blurb:
+      "A smoke ring cut through its middle: Hill's spherical vortex, seen riding along with it. The smoke turns over and over inside the sphere while the air outside parts round it.",
+    // Hill's spherical vortex (1894), radius 5, in the frame moving with it:
+    // inside, uniform vorticity; outside, potential flow round a sphere.
+    xLatex: String.raw`\left\{x^{2}+y^{2}<25:0.06xy,\frac{187.5xy}{\left(x^{2}+y^{2}\right)^{2.5}}\right\}`,
+    yLatex: String.raw`\left\{x^{2}+y^{2}<25:1.5\left(1-\frac{2x^{2}+y^{2}}{25}\right),-\left(1-\frac{125}{\left(x^{2}+y^{2}\right)^{1.5}}\right)-\frac{187.5x^{2}}{\left(x^{2}+y^{2}\right)^{2.5}}\right\}`,
+    seedLatex: String.raw`e^{-\frac{\left(\left|x\right|-3.536\right)^{2}+y^{2}}{2}}+0.03`,
+    colorScale: 1,
+    backdrop: "#040506",
+    extent: 10,
+    palette: "grayscale",
+    flow: {
+      particleCount: 35_000,
+      speed: 4,
+      trailPersistence: 0.97,
+      dropRate: 0.004,
+      opacity: 0.35,
+      pointSize: 1.3,
+      glow: 0.35,
+      normalizeSpeed: false,
+    },
+    space: {
+      blurb:
+        "Hill's spherical vortex in 3D, an exact solution of Euler's equations and the classic model of a smoke ring: smoke circles the ring's core inside a sphere, and the air outside streams past it.",
+      // Radius a = 3.5, speed U = 1: inside u = (3U/2a²)·(xz, yz) and
+      // w = (3U/2)(1 − (2ρ² + z²)/a²); outside the flow past a sphere.
+      xLatex: String.raw`\left\{x^{2}+y^{2}+z^{2}<12.25:0.1224xz,\frac{64.31xz}{\left(x^{2}+y^{2}+z^{2}\right)^{2.5}}\right\}`,
+      yLatex: String.raw`\left\{x^{2}+y^{2}+z^{2}<12.25:0.1224yz,\frac{64.31yz}{\left(x^{2}+y^{2}+z^{2}\right)^{2.5}}\right\}`,
+      zLatex: String.raw`\left\{x^{2}+y^{2}+z^{2}<12.25:1.5\left(1-\frac{2x^{2}+2y^{2}+z^{2}}{12.25}\right),-\left(1-\frac{42.875}{\left(x^{2}+y^{2}+z^{2}\right)^{1.5}}\right)-\frac{64.31\left(x^{2}+y^{2}\right)}{\left(x^{2}+y^{2}+z^{2}\right)^{2.5}}\right\}`,
+      seedLatex: String.raw`e^{-\frac{\left(\sqrt{x^{2}+y^{2}}-2.475\right)^{2}+z^{2}}{0.2}}+0.002`,
+      look: {
+        particles: 40_000,
+        speed: 0.3,
+        trail: 64,
+        lifetime: 8,
+        opacity: 0.35,
+        glow: 0.2,
+        normalizeSpeed: false,
+        absorb: true,
+        colorMode: "speed",
+        backdrop: "#040506",
+        backdropOpacity: 1,
+      },
+    },
+  },
+  {
+    id: "karman",
+    name: "Vortex street",
+    blurb:
+      "The wake behind a cylinder: vortices shed alternately from each side, spinning opposite ways, drifting downstream slower than the stream. Von Kármán showed only rows 0.281 of a spacing apart are stable.",
+    // Two infinite rows of point vortices, spacing a = 6, rows h = 0.281a apart,
+    // in a stream U = 1; each row's velocity is the sum over its vortices,
+    // (Γ/2a)·(sinh, sin)/(cosh − cos). The street drifts at 0.646U.
+    xLatex: String.raw`1+\frac{0.5\sinh\left(1.0472\left(y-0.843\right)\right)}{\cosh\left(1.0472\left(y-0.843\right)\right)-\cos\left(1.0472\left(x-0.646t\right)\right)+0.02}-\frac{0.5\sinh\left(1.0472\left(y+0.843\right)\right)}{\cosh\left(1.0472\left(y+0.843\right)\right)-\cos\left(1.0472\left(x-0.646t\right)-3.1416\right)+0.02}`,
+    yLatex: String.raw`-\frac{0.5\sin\left(1.0472\left(x-0.646t\right)\right)}{\cosh\left(1.0472\left(y-0.843\right)\right)-\cos\left(1.0472\left(x-0.646t\right)\right)+0.02}+\frac{0.5\sin\left(1.0472\left(x-0.646t\right)-3.1416\right)}{\cosh\left(1.0472\left(y+0.843\right)\right)-\cos\left(1.0472\left(x-0.646t\right)-3.1416\right)+0.02}`,
+    seedLatex: String.raw`e^{-\frac{y^{2}}{1.2}}`,
+    colorScale: 1,
+    backdrop: "#02060a",
+    extent: 10,
+    palette: "ocean",
+    flow: {
+      particleCount: 40_000,
+      speed: 5,
+      trailPersistence: 0.96,
+      dropRate: 0.006,
+      opacity: 0.4,
+      pointSize: 1.3,
+      glow: 0.35,
+      normalizeSpeed: false,
+    },
+    space: {
+      blurb:
+        "The vortex street in 3D: the vortices are tubes along the cylinder's span, and they wave — the instability that makes real wakes three-dimensional.",
+      // The same street, spacing 4, its tubes displaced 0.25 sin(1.5z)
+      // along the stream.
+      xLatex: String.raw`1+\frac{0.5\sinh\left(1.5708\left(y-0.562\right)\right)}{\cosh\left(1.5708\left(y-0.562\right)\right)-\cos\left(1.5708\left(x-0.646t+0.25\sin\left(1.5z\right)\right)\right)+0.02}-\frac{0.5\sinh\left(1.5708\left(y+0.562\right)\right)}{\cosh\left(1.5708\left(y+0.562\right)\right)-\cos\left(1.5708\left(x-0.646t+0.25\sin\left(1.5z\right)\right)-3.1416\right)+0.02}`,
+      yLatex: String.raw`-\frac{0.5\sin\left(1.5708\left(x-0.646t+0.25\sin\left(1.5z\right)\right)\right)}{\cosh\left(1.5708\left(y-0.562\right)\right)-\cos\left(1.5708\left(x-0.646t+0.25\sin\left(1.5z\right)\right)\right)+0.02}+\frac{0.5\sin\left(1.5708\left(x-0.646t+0.25\sin\left(1.5z\right)\right)-3.1416\right)}{\cosh\left(1.5708\left(y+0.562\right)\right)-\cos\left(1.5708\left(x-0.646t+0.25\sin\left(1.5z\right)\right)-3.1416\right)+0.02}`,
+      zLatex: String.raw`0`,
+      seedLatex: String.raw`e^{-\frac{y^{2}}{0.6}}`,
+      look: {
+        particles: 40_000,
+        speed: 0.3,
+        trail: 48,
+        lifetime: 5,
+        opacity: 0.35,
+        glow: 0.15,
+        normalizeSpeed: false,
+        absorb: true,
+        colorMode: "speed",
+        backdrop: "#02060a",
+        backdropOpacity: 1,
+      },
+    },
+  },
+  {
+    id: "solar-wind",
+    name: "Solar wind",
+    blurb:
+      "The Sun's magnetic field carried out by the solar wind while the Sun turns, wound into Parker's spiral. Slow wind, about 400 km/s, marks the sector boundaries, where the spiral winds tighter; fast wind, about 750 km/s, is bright.",
+    // Along B ∝ r̂ − (Ωr/v)φ̂, at the wind's speed v: 0.53 (slow) to 1 (fast),
+    // slow at four sector boundaries that spiral out with the field and turn.
+    xLatex: String.raw`\frac{\left(1-0.467e^{-\frac{\sin\left(2\arctan\left(y,x\right)+0.6\sqrt{x^{2}+y^{2}}-0.3t\right)^{2}}{0.08}}\right)\left(x+\frac{0.15\sqrt{x^{2}+y^{2}}}{\left(1-0.467e^{-\frac{\sin\left(2\arctan\left(y,x\right)+0.6\sqrt{x^{2}+y^{2}}-0.3t\right)^{2}}{0.08}}\right)}y\right)}{\sqrt{x^{2}+y^{2}}\sqrt{1+\left(\frac{0.15\sqrt{x^{2}+y^{2}}}{\left(1-0.467e^{-\frac{\sin\left(2\arctan\left(y,x\right)+0.6\sqrt{x^{2}+y^{2}}-0.3t\right)^{2}}{0.08}}\right)}\right)^{2}}}`,
+    yLatex: String.raw`\frac{\left(1-0.467e^{-\frac{\sin\left(2\arctan\left(y,x\right)+0.6\sqrt{x^{2}+y^{2}}-0.3t\right)^{2}}{0.08}}\right)\left(y-\frac{0.15\sqrt{x^{2}+y^{2}}}{\left(1-0.467e^{-\frac{\sin\left(2\arctan\left(y,x\right)+0.6\sqrt{x^{2}+y^{2}}-0.3t\right)^{2}}{0.08}}\right)}x\right)}{\sqrt{x^{2}+y^{2}}\sqrt{1+\left(\frac{0.15\sqrt{x^{2}+y^{2}}}{\left(1-0.467e^{-\frac{\sin\left(2\arctan\left(y,x\right)+0.6\sqrt{x^{2}+y^{2}}-0.3t\right)^{2}}{0.08}}\right)}\right)^{2}}}`,
+    seedLatex: String.raw`e^{-3\left(\sqrt{x^{2}+y^{2}}-1.2\right)^{2}}`,
+    colorScale: 0.6,
+    backdrop: "#070305",
+    extent: 10,
+    palette: "sunset",
+    flow: {
+      particleCount: 40_000,
+      speed: 6,
+      trailPersistence: 0.97,
+      dropRate: 0.004,
+      opacity: 0.4,
+      pointSize: 1.3,
+      glow: 0.35,
+      normalizeSpeed: false,
+    },
+    space: {
+      blurb:
+        "Parker's spiral in 3D, with the heliospheric current sheet: the Sun's tilted magnetic equator, flung out and wound up into the wavy 'ballerina skirt'. Particles are born on the skirt; the slow wind rides it.",
+      // B ∝ r̂ − (Ωρ/v)φ̂, which winds faster near the equator; the current
+      // sheet at z = 0.35ρ sin(φ + Ωr/v − Ωt), slow wind within it.
+      xLatex: String.raw`\frac{\frac{x}{\sqrt{x^{2}+y^{2}+z^{2}}}+\frac{0.3}{\left(1-0.467e^{-\frac{\left(z-0.35\sqrt{x^{2}+y^{2}}\sin\left(\arctan\left(y,x\right)+0.45\sqrt{x^{2}+y^{2}+z^{2}}-0.3t\right)\right)^{2}}{0.25}}\right)}y}{\sqrt{1+\left(\frac{0.3}{\left(1-0.467e^{-\frac{\left(z-0.35\sqrt{x^{2}+y^{2}}\sin\left(\arctan\left(y,x\right)+0.45\sqrt{x^{2}+y^{2}+z^{2}}-0.3t\right)\right)^{2}}{0.25}}\right)}\right)^{2}\left(x^{2}+y^{2}\right)}}\left(1-0.467e^{-\frac{\left(z-0.35\sqrt{x^{2}+y^{2}}\sin\left(\arctan\left(y,x\right)+0.45\sqrt{x^{2}+y^{2}+z^{2}}-0.3t\right)\right)^{2}}{0.25}}\right)`,
+      yLatex: String.raw`\frac{\frac{y}{\sqrt{x^{2}+y^{2}+z^{2}}}-\frac{0.3}{\left(1-0.467e^{-\frac{\left(z-0.35\sqrt{x^{2}+y^{2}}\sin\left(\arctan\left(y,x\right)+0.45\sqrt{x^{2}+y^{2}+z^{2}}-0.3t\right)\right)^{2}}{0.25}}\right)}x}{\sqrt{1+\left(\frac{0.3}{\left(1-0.467e^{-\frac{\left(z-0.35\sqrt{x^{2}+y^{2}}\sin\left(\arctan\left(y,x\right)+0.45\sqrt{x^{2}+y^{2}+z^{2}}-0.3t\right)\right)^{2}}{0.25}}\right)}\right)^{2}\left(x^{2}+y^{2}\right)}}\left(1-0.467e^{-\frac{\left(z-0.35\sqrt{x^{2}+y^{2}}\sin\left(\arctan\left(y,x\right)+0.45\sqrt{x^{2}+y^{2}+z^{2}}-0.3t\right)\right)^{2}}{0.25}}\right)`,
+      zLatex: String.raw`\frac{\frac{z}{\sqrt{x^{2}+y^{2}+z^{2}}}}{\sqrt{1+\left(\frac{0.3}{\left(1-0.467e^{-\frac{\left(z-0.35\sqrt{x^{2}+y^{2}}\sin\left(\arctan\left(y,x\right)+0.45\sqrt{x^{2}+y^{2}+z^{2}}-0.3t\right)\right)^{2}}{0.25}}\right)}\right)^{2}\left(x^{2}+y^{2}\right)}}\left(1-0.467e^{-\frac{\left(z-0.35\sqrt{x^{2}+y^{2}}\sin\left(\arctan\left(y,x\right)+0.45\sqrt{x^{2}+y^{2}+z^{2}}-0.3t\right)\right)^{2}}{0.25}}\right)`,
+      seedLatex: String.raw`\frac{e^{-\frac{\left(z-0.35\sqrt{x^{2}+y^{2}}\sin\left(\arctan\left(y,x\right)+0.45\sqrt{x^{2}+y^{2}+z^{2}}-0.3t\right)\right)^{2}}{0.05}}}{1+e^{-4\left(\sqrt{x^{2}+y^{2}+z^{2}}-1.2\right)}}+0.5e^{-6\left(\sqrt{x^{2}+y^{2}+z^{2}}-1\right)^{2}}`,
+      look: {
+        particles: 40_000,
+        speed: 0.3,
+        trail: 64,
+        lifetime: 6,
+        opacity: 0.4,
+        glow: 0.2,
+        normalizeSpeed: false,
+        absorb: false,
+        colorMode: "speed",
+        backdrop: "#070305",
+        backdropOpacity: 1,
+      },
+    },
+  },
 ];
 
 export function galleryPreset(id: string): GalleryPreset | undefined {

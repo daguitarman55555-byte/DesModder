@@ -18,6 +18,12 @@ const PRESETS = [
   "star-cluster",
   "cellular",
   "dipole",
+  "lorenz",
+  "thomas",
+  "tornado",
+  "smoke-ring",
+  "karman",
+  "solar-wind",
 ];
 // Tilt for the black hole's own picture, radians from looking straight down:
 // nearly edge-on, as the classic renderings are.

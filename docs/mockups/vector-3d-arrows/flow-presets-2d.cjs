@@ -17,6 +17,12 @@ const PRESETS = [
   "star-cluster",
   "cellular",
   "dipole",
+  "lorenz",
+  "thomas",
+  "tornado",
+  "smoke-ring",
+  "karman",
+  "solar-wind",
 ];
 
 (async () => {
