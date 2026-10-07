@@ -70,3 +70,67 @@ export function vortexStreet(k: number, y0: number, half: number, shift = "") {
     y: String.raw`-\frac{${half}\sin\left(${b1}\right)}{${d1}}+\frac{${half}\sin\left(${b2}\right)}{${d2}}`,
   };
 }
+
+/**
+ * A thin-cored vortex ring of radius `R` round the z-axis, in the frame
+ * moving with it. Each meridional cross-section is a pair of Lamb–Oseen
+ * vortices of core radius `a` at ρ = ±R — the thin-core approximation, whose
+ * error is of order a/R — so the smoke swirls round a crisp core, and the
+ * ambient air streams past at the ring's own speed, Kelvin's
+ * U = Γ/(4πR)·(ln(8R/a) − 1/4), with k = Γ/2π. `pulse` multiplies the whole
+ * flow. Returns the Cartesian components.
+ */
+export function thinVortexRing(R: number, a: number, k: number, pulse = "") {
+  const rho = String.raw`\sqrt{x^{2}+y^{2}+0.0001}`;
+  const d1 = String.raw`\left(\left(${rho}-${R}\right)^{2}+z^{2}\right)`;
+  const d2 = String.raw`\left(\left(${rho}+${R}\right)^{2}+z^{2}\right)`;
+  const core = (d: string) =>
+    String.raw`\frac{1-e^{-\frac{${d}}{${a * a}}}}{${d}}`;
+  const f1 = core(d1);
+  const f2 = core(d2);
+  const U =
+    Math.round((k / (2 * R)) * (Math.log((8 * R) / a) - 0.25) * 1000) / 1000;
+  const radial = (c: "x" | "y") =>
+    String.raw`${pulse}\frac{${k}${c}z\left(${f1}-${f2}\right)}{${rho}}`;
+  return {
+    x: radial("x"),
+    y: radial("y"),
+    z: String.raw`${pulse}\left(-${k}\left(${rho}-${R}\right)${f1}+${k}\left(${rho}+${R}\right)${f2}-${U}\right)`,
+  };
+}
+
+/**
+ * A magnetic dipole of moment `m` (LaTeX for its components, which may read
+ * t), B = (3(m·r)r − m r²)/r⁵, with the field zero inside the star or magnet
+ * of radius `inside`, where field lines end. With `outflow`, particles move
+ * along B away from the magnetic equator on both sides — B·tanh(3 m·r̂) — the
+ * way a pulsar's wind leaves both poles along its open field lines and meets
+ * at the current sheet, rather than in at one pole and out at the other.
+ */
+export function dipole(
+  m: readonly string[],
+  axes: readonly ("x" | "y" | "z")[],
+  inside: number,
+  outflow: boolean
+) {
+  const r2 = axes.map((a) => `${a}^{2}`).join("+");
+  const dot = axes
+    .map((a, i) => (m[i] === "0" ? "" : `${m[i]}${a}`))
+    .filter((t) => t !== "")
+    .join("+")
+    .replace(/\+-/g, "-");
+  const s = String.raw`\left(${dot}\right)`;
+  const wind = outflow
+    ? String.raw`\tanh\left(\frac{3${s}}{\sqrt{${r2}}}\right)`
+    : "";
+  const out: Partial<Record<"x" | "y" | "z", string>> = {};
+  axes.forEach((a, i) => {
+    const mi = m[i] === "0" ? "" : String.raw`-${m[i]}\left(${r2}\right)`;
+    out[a] =
+      String.raw`\left\{${r2}>${inside * inside}:\frac{\left(3${a}${s}${mi}\right)${wind}}{\left(${r2}\right)^{2.5}},0\right\}`.replace(
+        /--/g,
+        "+"
+      );
+  });
+  return out;
+}

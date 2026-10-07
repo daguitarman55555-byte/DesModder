@@ -1,5 +1,5 @@
 /** Space: black holes, galaxies, stars and the solar wind. */
-import { orbitingWells, r3, rho } from "./latex";
+import { dipole, orbitingWells, r3, rho } from "./latex";
 import type { GalleryPreset } from "./types";
 
 /** The star cluster's three stars, circling their common centre. */
@@ -22,6 +22,28 @@ const CLUSTER_3D = orbitingWells(
   0.2,
   ["x", "y", "z"],
   0.25
+);
+
+/**
+ * The pulsar's spinning, tilted dipole: in the plane, m = (cos t, sin t); in
+ * the box, tilted 0.5 rad from its spin axis, m = (0.48 cos t, 0.48 sin t,
+ * 0.88). The wind leaves both poles.
+ */
+const PULSAR_2D = dipole(
+  [String.raw`\cos\left(t\right)`, String.raw`\sin\left(t\right)`],
+  ["x", "y"],
+  0.8,
+  true
+);
+const PULSAR_3D = dipole(
+  [
+    String.raw`0.48\cos\left(t\right)`,
+    String.raw`0.48\sin\left(t\right)`,
+    "0.88",
+  ],
+  ["x", "y", "z"],
+  0.7,
+  true
 );
 
 export const SPACE: readonly GalleryPreset[] = [
@@ -195,11 +217,11 @@ export const SPACE: readonly GalleryPreset[] = [
     name: "Pulsar",
     category: "space",
     blurb:
-      "A radial field whose sign follows sin t, so the whole thing breathes in and out.",
+      "A pulsar: a neutron star whose magnetic field turns with it. Charged particles stream out of both magnetic poles along the field lines and meet at the magnetic equator, where the field reverses — the current sheet.",
     // A dipole spinning in the plane, m = (cos t, sin t):
     // B = (3(m·r)r − m r²) / r⁵, with particles streaming off its poles.
-    xLatex: String.raw`\frac{3x\left(x\cos t+y\sin t\right)-\cos t\cdot\left(x^{2}+y^{2}\right)}{\left(x^{2}+y^{2}+0.05\right)^{2.5}}`,
-    yLatex: String.raw`\frac{3y\left(x\cos t+y\sin t\right)-\sin t\cdot\left(x^{2}+y^{2}\right)}{\left(x^{2}+y^{2}+0.05\right)^{2.5}}`,
+    xLatex: PULSAR_2D.x!,
+    yLatex: PULSAR_2D.y!,
     seedLatex: String.raw`e^{-3\left(\sqrt{x^{2}+y^{2}}-1.3\right)^{2}}\left(\frac{\left(x\cos t+y\sin t\right)^{2}}{x^{2}+y^{2}+0.01}\right)^{3}`,
     colorScale: 0.08,
     palette: "starfield",
@@ -218,12 +240,12 @@ export const SPACE: readonly GalleryPreset[] = [
     timeSpeed: 0.1,
     space: {
       blurb:
-        "A pulsar's magnetosphere: a neutron star whose magnetic axis is tilted from its spin axis, so the whole field turns with it. Charged particles stream off the magnetic poles along the field lines.",
+        "A pulsar's magnetosphere: a neutron star whose magnetic axis is tilted from its spin axis, so the whole field turns with it. The wind streams out of both magnetic poles along the field lines and meets at the magnetic equator, where the field reverses.",
       // A dipole whose moment m = (sin α cos t, sin α sin t, cos α), α = 0.5,
       // spins about z: B = (3(m·r)r − m r²) / r⁵.
-      xLatex: String.raw`\frac{3x\left(0.48x\cos t+0.48y\sin t+0.88z\right)-0.48\cos t\cdot${r3}}{\left(x^{2}+y^{2}+z^{2}+0.05\right)^{2.5}}`,
-      yLatex: String.raw`\frac{3y\left(0.48x\cos t+0.48y\sin t+0.88z\right)-0.48\sin t\cdot${r3}}{\left(x^{2}+y^{2}+z^{2}+0.05\right)^{2.5}}`,
-      zLatex: String.raw`\frac{3z\left(0.48x\cos t+0.48y\sin t+0.88z\right)-0.88${r3}}{\left(x^{2}+y^{2}+z^{2}+0.05\right)^{2.5}}`,
+      xLatex: PULSAR_3D.x!,
+      yLatex: PULSAR_3D.y!,
+      zLatex: PULSAR_3D.z!,
       // From the polar caps of a star of radius 0.8.
       seedLatex: String.raw`e^{-12\left(\sqrt{${r3}}-0.9\right)^{2}}\left(\frac{\left(0.48x\cos t+0.48y\sin t+0.88z\right)^{2}}{${r3}}\right)^{3}`,
       look: {

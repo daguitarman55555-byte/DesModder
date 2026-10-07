@@ -1,4 +1,4 @@
-import { vortexStreet } from "./latex";
+import { thinVortexRing, vortexStreet } from "./latex";
 /** Fluids: vortices, wakes and storms. */
 import type { GalleryPreset } from "./types";
 
@@ -9,6 +9,17 @@ const STREET_3D = vortexStreet(
   0.562,
   0.5,
   String.raw`+0.25\sin\left(1.5z\right)`
+);
+
+/**
+ * The smoke ring in the box: radius 2.5, core 0.4, k = Γ/2π = 2, its puff
+ * pulsing.
+ */
+const RING = thinVortexRing(
+  2.5,
+  0.4,
+  2,
+  String.raw`\left(1+0.35\sin\left(0.6t\right)\right)`
 );
 
 export const FLUIDS: readonly GalleryPreset[] = [
@@ -185,13 +196,11 @@ export const FLUIDS: readonly GalleryPreset[] = [
     },
     space: {
       blurb:
-        "Hill's spherical vortex in 3D, an exact solution of Euler's equations and the classic model of a smoke ring: smoke circles the ring's core inside a sphere, and the air outside streams past it. The puff driving it pulses, so the smoke turns faster and slower.",
-      // Radius a = 3.5, speed U = 1: inside u = (3U/2a²)·(xz, yz) and
-      // w = (3U/2)(1 − (2ρ² + z²)/a²); outside the flow past a sphere.
-      xLatex: String.raw`\left(1+0.35\sin\left(0.6t\right)\right)\left\{x^{2}+y^{2}+z^{2}<12.25:0.1224xz,\frac{64.31xz}{\left(x^{2}+y^{2}+z^{2}\right)^{2.5}}\right\}`,
-      yLatex: String.raw`\left(1+0.35\sin\left(0.6t\right)\right)\left\{x^{2}+y^{2}+z^{2}<12.25:0.1224yz,\frac{64.31yz}{\left(x^{2}+y^{2}+z^{2}\right)^{2.5}}\right\}`,
-      zLatex: String.raw`\left(1+0.35\sin\left(0.6t\right)\right)\left\{x^{2}+y^{2}+z^{2}<12.25:1.5\left(1-\frac{2x^{2}+2y^{2}+z^{2}}{12.25}\right),-\left(1-\frac{42.875}{\left(x^{2}+y^{2}+z^{2}\right)^{1.5}}\right)-\frac{64.31\left(x^{2}+y^{2}\right)}{\left(x^{2}+y^{2}+z^{2}\right)^{2.5}}\right\}`,
-      seedLatex: String.raw`e^{-\frac{\left(\sqrt{x^{2}+y^{2}}-2.475\right)^{2}+z^{2}}{0.2}}+0.002`,
+        "A smoke ring in 3D: smoke spinning round a thin core bent into a circle, as a real ring's is, in the frame moving with it, so the air streams past. Each cross-section is a pair of Lamb–Oseen vortices, the thin-core approximation. The puff driving it pulses.",
+      xLatex: RING.x,
+      yLatex: RING.y,
+      zLatex: RING.z,
+      seedLatex: String.raw`e^{-\frac{\left(\sqrt{x^{2}+y^{2}}-2.5\right)^{2}+z^{2}}{0.12}}+0.004`,
       look: {
         particles: 40_000,
         speed: 0.3,

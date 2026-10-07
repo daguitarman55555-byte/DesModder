@@ -1,6 +1,11 @@
 /** Fields: the textbook pictures. */
-import { r2, r3 } from "./latex";
+import { dipole, r2, r3 } from "./latex";
 import type { GalleryPreset } from "./types";
+
+/** The bar magnet on alternating current, along y in the plane and z in the box. */
+const AC = String.raw`\cos\left(0.4t\right)`;
+const MAGNET_2D = dipole(["0", AC], ["x", "y"], 0.8, false);
+const MAGNET_3D = dipole(["0", "0", AC], ["x", "y", "z"], 0.6, false);
 
 export const FIELDS: readonly GalleryPreset[] = [
   {
@@ -9,10 +14,10 @@ export const FIELDS: readonly GalleryPreset[] = [
     category: "fields",
     blurb:
       "The field of a bar magnet, and the one picture every physics textbook opens with. On alternating current: the lines keep their shape, and the field fades, reverses and returns.",
-    xLatex: String.raw`\frac{3xy\cos\left(0.4t\right)}{${r2}^{2.5}}`,
-    yLatex: String.raw`\frac{\left(2y^{2}-x^{2}\right)\cos\left(0.4t\right)}{${r2}^{2.5}}`,
+    xLatex: MAGNET_2D.x!,
+    yLatex: MAGNET_2D.y!,
     // Released round the magnet, as iron filings draw it.
-    seedLatex: String.raw`e^{-3\left(\sqrt{x^{2}+y^{2}}-1.5\right)^{2}}`,
+    seedLatex: String.raw`\frac{e^{-0.04\left(x^{2}+y^{2}\right)}}{1+e^{-4\left(\sqrt{x^{2}+y^{2}}-1.5\right)}}`,
     colorScale: 0.08,
     palette: "starfield",
     backdrop: "#02030a",
@@ -32,11 +37,11 @@ export const FIELDS: readonly GalleryPreset[] = [
     space: {
       blurb:
         "A bar magnet along the z-axis: field lines leave the north pole, loop round in every direction, and come back in at the south — drawn, as iron filings draw them, from around the magnet outward. On alternating current, so the field fades, reverses and returns.",
-      xLatex: String.raw`\frac{3xz\cos\left(0.4t\right)}{${r3}^{2.5}}`,
-      yLatex: String.raw`\frac{3yz\cos\left(0.4t\right)}{${r3}^{2.5}}`,
-      zLatex: String.raw`\frac{\left(2z^{2}-x^{2}-y^{2}\right)\cos\left(0.4t\right)}{${r3}^{2.5}}`,
+      xLatex: MAGNET_3D.x!,
+      yLatex: MAGNET_3D.y!,
+      zLatex: MAGNET_3D.z!,
       // Released round the magnet, a sphere of radius 1.
-      seedLatex: String.raw`e^{-10\left(\sqrt{${r3}}-1.2\right)^{2}}`,
+      seedLatex: String.raw`\frac{e^{-0.1\left(x^{2}+y^{2}+z^{2}\right)}}{1+e^{-4\left(\sqrt{x^{2}+y^{2}+z^{2}}-1.3\right)}}`,
       look: {
         particles: 18_000,
         speed: 0.3,
