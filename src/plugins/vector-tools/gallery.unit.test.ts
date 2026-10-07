@@ -60,8 +60,8 @@ describe("loading one", () => {
     // These are flow pictures: an arrow grid is how you read a field, not how
     // you watch one.
     expect(config.arrowMode).toBe("off");
-    expect(config.flow.palette).toBe("starfield");
-    expect(config.color.palette).toBe("starfield");
+    expect(config.flow.palette).toBe("galaxy");
+    expect(config.color.palette).toBe("galaxy");
     // The backdrop is what keeps a near-black palette from disappearing into
     // white graph paper.
     expect(config.flow.backdropEnabled).toBe(true);

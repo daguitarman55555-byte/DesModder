@@ -40,6 +40,8 @@ export type PaletteID =
   | "ocean"
   | "ember"
   | "blackbody"
+  | "galaxy"
+  | "auroral"
   | "neon"
   | "nebula"
   | "aurora"
@@ -276,6 +278,34 @@ export const PALETTES: Record<PaletteID, Palette> = {
       { at: 0.7, rgb: [255, 158, 45] },
       { at: 0.86, rgb: [255, 214, 140] },
       { at: 1, rgb: [250, 244, 255] },
+    ],
+  },
+  // A spiral galaxy's colours, slow to fast: the warm yellow of the old stars
+  // in the bulge, where the rotation curve starts low, to the blue of the
+  // young ones in the arms, where it has levelled off.
+  galaxy: {
+    name: "Galaxy",
+    group: "expressive",
+    stops: [
+      { at: 0, rgb: [30, 18, 8] },
+      { at: 0.3, rgb: [255, 196, 120] },
+      { at: 0.55, rgb: [255, 240, 225] },
+      { at: 0.8, rgb: [170, 200, 255] },
+      { at: 1, rgb: [110, 150, 255] },
+    ],
+  },
+  // An aurora's colours, by height: oxygen's green line at 557.7 nm low down,
+  // where the curtain's edge is, giving way to its red line at 630 nm and the
+  // pink and purple of nitrogen higher up.
+  auroral: {
+    name: "Auroral",
+    group: "expressive",
+    stops: [
+      { at: 0, rgb: [70, 255, 150] },
+      { at: 0.45, rgb: [60, 220, 140] },
+      { at: 0.7, rgb: [120, 170, 160] },
+      { at: 0.85, rgb: [200, 80, 150] },
+      { at: 1, rgb: [255, 60, 90] },
     ],
   },
   neon: {

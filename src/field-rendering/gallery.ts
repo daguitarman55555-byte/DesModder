@@ -171,7 +171,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
     yLatex: String.raw`\frac{3\left(x-y\left(0.05+0.9e^{-0.25\left(x^{2}+y^{2}\right)}\right)\right)}{\left(x^{2}+y^{2}+0.1\right)^{0.75}}`,
     // The disk from the innermost stable orbit outward, ringed, denser
     // inward; and a faint haze close in, gas being drawn down into the hole.
-    seedLatex: String.raw`\frac{\left(0.65+0.35\sin\left(5.5\sqrt{x^{2}+y^{2}}\right)\right)\cdot\frac{3}{\sqrt{x^{2}+y^{2}}}}{\left(1+e^{-7\left(\sqrt{x^{2}+y^{2}}-2.8\right)}\right)\left(1+e^{2.5\left(\sqrt{x^{2}+y^{2}}-8\right)}\right)}+0.05e^{-0.3\left(x^{2}+y^{2}\right)}`,
+    seedLatex: String.raw`\frac{\left(0.3+0.7\sin\left(2.75\sqrt{x^{2}+y^{2}}\right)^{2}\right)\cdot\frac{3}{\sqrt{x^{2}+y^{2}}}}{\left(1+e^{-7\left(\sqrt{x^{2}+y^{2}}-2.8\right)}\right)\left(1+e^{2.5\left(\sqrt{x^{2}+y^{2}}-8\right)}\right)}+0.05e^{-0.3\left(x^{2}+y^{2}\right)}`,
     lensHorizon: 0.6,
     colorScale: 1,
     palette: "blackbody",
@@ -228,9 +228,9 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
     yLatex: String.raw`\frac{2x}{1.5+\sqrt{x^{2}+y^{2}}}`,
     // Two logarithmic arms, a density wave the stars pass through, on an
     // exponential disk with an edge; a round bulge.
-    seedLatex: String.raw`\left(0.02+\left(\frac{1+\frac{\left(x^{2}-y^{2}\right)\cos\left(1.6\ln\left(x^{2}+y^{2}+0.01\right)-0.15t\right)+2xy\sin\left(1.6\ln\left(x^{2}+y^{2}+0.01\right)-0.15t\right)}{x^{2}+y^{2}+0.01}}{2}\right)^{12}\right)\frac{e^{-0.12\sqrt{x^{2}+y^{2}}}}{1+e^{2\left(\sqrt{x^{2}+y^{2}}-9\right)}}+e^{-0.5\left(x^{2}+y^{2}\right)}`,
+    seedLatex: String.raw`\left(0.01+\left(\frac{1+\frac{\left(x^{2}-y^{2}\right)\cos\left(1.6\ln\left(x^{2}+y^{2}+0.01\right)-0.15t\right)+2xy\sin\left(1.6\ln\left(x^{2}+y^{2}+0.01\right)-0.15t\right)}{x^{2}+y^{2}+0.01}}{2}\right)^{16}\right)\frac{e^{-0.12\sqrt{x^{2}+y^{2}}}}{1+e^{2\left(\sqrt{x^{2}+y^{2}}-9\right)}}+e^{-0.5\left(x^{2}+y^{2}\right)}`,
     colorScale: 1.5,
-    palette: "starfield",
+    palette: "galaxy",
     backdrop: "#020206",
     flow: {
       particleCount: 45_000,
@@ -303,7 +303,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
       yLatex: String.raw`\frac{x-2.4\cos t}{\left(x-2.4\cos t\right)^{2}+\left(y-2.4\sin t\right)^{2}+0.4}+\frac{x+2.4\cos t}{\left(x+2.4\cos t\right)^{2}+\left(y+2.4\sin t\right)^{2}+0.4}`,
       zLatex: String.raw`0.12\cos t`,
       // Smoke released round each core, as in a wind tunnel.
-      seedLatex: String.raw`\left(e^{-\frac{\left(x-2.4\cos t\right)^{2}+\left(y-2.4\sin t\right)^{2}}{2}}+e^{-\frac{\left(x+2.4\cos t\right)^{2}+\left(y+2.4\sin t\right)^{2}}{2}}\right)e^{-\frac{z^{2}}{6}}`,
+      seedLatex: String.raw`e^{-\frac{\left(\sqrt{\left(x-2.4\cos t\right)^{2}+\left(y-2.4\sin t\right)^{2}}-0.8\right)^{2}}{0.08}}+e^{-\frac{\left(\sqrt{\left(x+2.4\cos t\right)^{2}+\left(y+2.4\sin t\right)^{2}}-0.8\right)^{2}}{0.08}}`,
       look: {
         particles: 30_000,
         speed: 0.3,
@@ -330,8 +330,8 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
     xLatex: String.raw`0.05`,
     yLatex: String.raw`-0.4\left(y-\left(-4+1.2\sin\left(0.35x+0.3t\right)\right)+0.3\right)`,
     seedLatex: String.raw`\frac{e^{-0.45\left(y-\left(-4+1.2\sin\left(0.35x+0.3t\right)\right)\right)}}{1+e^{-6\left(y-\left(-4+1.2\sin\left(0.35x+0.3t\right)\right)\right)}}\cdot\frac{0.6+0.4\sin\left(3x+0.5t\right)^{2}}{1+e^{1.5\left(\left|x\right|-8\right)}}`,
-    fixedColor: "#5cffa8",
-    palette: "aurora",
+    colorScale: 2,
+    palette: "auroral",
     backdrop: "#02060a",
     flow: {
       particleCount: 35_000,
@@ -366,8 +366,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
         glow: 0.2,
         normalizeSpeed: false,
         absorb: true,
-        colorMode: "fixed",
-        fixedColor: "#5cffa8",
+        colorMode: "speed",
         backdrop: "#02060a",
         backdropOpacity: 1,
       },
@@ -398,7 +397,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
       dropRate: 0.006,
     },
     extent: 10,
-    timeSpeed: 0.15,
+    timeSpeed: 0.1,
     space: {
       blurb:
         "A pulsar's magnetosphere: a neutron star whose magnetic axis is tilted from its spin axis, so the whole field turns with it. Charged particles stream off the magnetic poles along the field lines.",
@@ -497,6 +496,9 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
       xLatex: String.raw`\sin\left(x\right)\cos\left(y\right)\cos\left(z\right)`,
       yLatex: String.raw`-\cos\left(x\right)\sin\left(y\right)\cos\left(z\right)`,
       zLatex: String.raw`0`,
+      // Three thin layers, at z = 0 and ±π, where the flow is strongest
+      // and turns opposite ways; w = 0 keeps each particle in its layer.
+      seedLatex: String.raw`e^{-\frac{z^{2}}{0.08}}+e^{-\frac{\left(z-3.1416\right)^{2}}{0.08}}+e^{-\frac{\left(z+3.1416\right)^{2}}{0.08}}`,
       look: {
         particles: 40_000,
         speed: 0.3,
@@ -547,11 +549,11 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
       // Released round the magnet, a sphere of radius 1.
       seedLatex: String.raw`e^{-10\left(\sqrt{${r3}}-1.2\right)^{2}}`,
       look: {
-        particles: 25_000,
+        particles: 18_000,
         speed: 0.3,
         trail: 64,
         lifetime: 5,
-        opacity: 0.2,
+        opacity: 0.14,
         glow: 0.08,
         normalizeSpeed: true,
         absorb: true,
@@ -669,7 +671,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
     colorScale: 1.2,
     backdrop: "#0a0605",
     extent: 10,
-    palette: "sunset",
+    palette: "grayscale",
     flow: {
       particleCount: 35_000,
       speed: 3,
