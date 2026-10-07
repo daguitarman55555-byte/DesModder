@@ -136,6 +136,8 @@ function spaceLookFor(
     particleGlow: look.glow ?? s.particleGlow,
     particleNormalize: look.normalizeSpeed ?? s.particleNormalize,
     particleAbsorb: look.absorb ?? s.particleAbsorb,
+    scaleAuto: look.scale === undefined,
+    scale: look.scale ?? s.scale,
     backdrop: true,
     backdropColor: look.backdrop ?? s.backdropColor,
     backdropOpacity: look.backdropOpacity ?? s.backdropOpacity,

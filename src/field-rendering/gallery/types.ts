@@ -108,6 +108,14 @@ export interface SpaceLook {
   fixedColor: string;
   backdrop: string;
   backdropOpacity: number;
+  /**
+   * The field strength the flow's speed and colours are measured against,
+   * where Auto's would not suit. A particle moves at speed × |F| / scale
+   * box half-widths a second, so a scale of (the box's half-width × speed)
+   * runs the particles on the same clock as `t`: what a picture needs whose
+   * matter rides along with something the clock moves.
+   */
+  scale: number;
 }
 
 /** The dark these are drawn on where a preset does not name its own. */

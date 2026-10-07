@@ -22,57 +22,53 @@ const RING = thinVortexRing(
   String.raw`\left(1+0.35\sin\left(0.6t\right)\right)`
 );
 
+/**
+ * A tornado standing on the ground, z = −5, under its cloud base at z = 4.
+ *
+ * Its core radius grows with height, r_c = 0.3 + 0.0015h³ for h = z + 5:
+ * a rope at the ground flaring into the cloud, the condensation funnel's
+ * shape. Round it, the Burgers–Rott swirl Γ(1 − e^(−r²/r_c²))/r, fastest
+ * just outside the core and near the ground, where it is narrowest. The air
+ * comes in along the ground, where friction has slowed its spin and the
+ * pressure drop draws it inward (the boundary layer that feeds a real
+ * tornado), rises fast in the core, and spreads out under the cloud. The
+ * funnel leans and sways, rooted where it touches down.
+ */
+const TORNADO = (() => {
+  const h = String.raw`\left(z+5\right)`;
+  const dx = String.raw`\left(x-0.06${h}\cos\left(0.35t\right)\right)`;
+  const dy = String.raw`\left(y-0.06${h}\sin\left(0.35t\right)\right)`;
+  const r2 = String.raw`${dx}^{2}+${dy}^{2}`;
+  const rc = String.raw`\left(0.3+0.0015${h}^{3}\right)`;
+  const swirl = String.raw`\frac{2.2\left(1-e^{-\frac{${r2}}{${rc}^{2}}}\right)}{${r2}+0.0001}`;
+  const radial = String.raw`\left(\frac{0.3}{1+e^{-3\left(z-3.5\right)}}-0.6e^{-${h}}\right)`;
+  return {
+    x: String.raw`${radial}${dx}-${dy}${swirl}`,
+    y: String.raw`${radial}${dy}+${dx}${swirl}`,
+    z: String.raw`0.12+2.2e^{-\frac{${r2}}{1.5${rc}^{2}}}`,
+    // Debris swept along the ground; the funnel, a thin shell at the core's
+    // edge, where the pressure drop condenses the air; and the wall cloud.
+    seed: String.raw`\frac{e^{-2${h}}}{1+e^{2\left(\sqrt{${r2}}-3.5\right)}}+\frac{0.8e^{-\frac{\left(\sqrt{${r2}}-${rc}\right)^{2}}{0.06${rc}^{2}}}}{1+e^{-4\left(z+4.5\right)}}+\frac{0.5e^{-4\left(z-4.4\right)^{2}}}{1+e^{2\left(\sqrt{x^{2}+y^{2}}-4.5\right)}}`,
+  };
+})();
+
+/**
+ * The tornado from above: the core wandering, air spiralling into it, and
+ * the debris and rain it draws in falling into spiral bands.
+ */
+const TORNADO_TOP = (() => {
+  const X = String.raw`\left(x-1.5\sin\left(0.21t\right)\right)`;
+  const Y = String.raw`\left(y-1.5\sin\left(0.33t\right)\right)`;
+  const r2 = String.raw`${X}^{2}+${Y}^{2}`;
+  const swirl = String.raw`\frac{6\left(1-e^{-\frac{${r2}}{4}}\right)}{${r2}+0.001}`;
+  return {
+    x: String.raw`-0.08${X}-${Y}${swirl}`,
+    y: String.raw`-0.08${Y}+${X}${swirl}`,
+    seed: String.raw`0.15+0.85\left(\frac{1+\sin\left(2\arctan\left(${Y},${X}\right)+2\ln\left(${r2}+1\right)-0.6t\right)}{2}\right)^{4}+e^{-\frac{\left(\sqrt{${r2}}-2\right)^{2}}{0.5}}`,
+  };
+})();
+
 export const FLUIDS: readonly GalleryPreset[] = [
-  {
-    id: "binary",
-    name: "Binary orbit",
-    category: "fluids",
-    blurb:
-      "Two vortices circling their common centre. The clock moves them, so the whole pattern turns.",
-    // The softening term keeps the centres finite. Without it the two points
-    // are poles, and a pole swallows the colour range and the integrator both.
-    xLatex: String.raw`\frac{-\left(y-3\sin t\right)}{\left(x-3\cos t\right)^{2}+\left(y-3\sin t\right)^{2}+0.6}+\frac{-\left(y+3\sin t\right)}{\left(x+3\cos t\right)^{2}+\left(y+3\sin t\right)^{2}+0.6}`,
-    yLatex: String.raw`\frac{x-3\cos t}{\left(x-3\cos t\right)^{2}+\left(y-3\sin t\right)^{2}+0.6}+\frac{x+3\cos t}{\left(x+3\cos t\right)^{2}+\left(y+3\sin t\right)^{2}+0.6}`,
-    // Smoke released round each core.
-    seedLatex: String.raw`e^{-\frac{\left(x-3\cos t\right)^{2}+\left(y-3\sin t\right)^{2}}{3}}+e^{-\frac{\left(x+3\cos t\right)^{2}+\left(y+3\sin t\right)^{2}}{3}}`,
-    colorScale: 0.4,
-    palette: "starfield",
-    backdrop: "#03050a",
-    flow: {
-      particleCount: 40_000,
-      glow: 0.35,
-      opacity: 0.45,
-      pointSize: 1.4,
-      normalizeSpeed: false,
-      speed: 6,
-      trailPersistence: 0.97,
-      dropRate: 0.004,
-    },
-    extent: 10,
-    timeSpeed: 0.45,
-    space: {
-      blurb:
-        "Two vortex tubes circling their common axis, like the pair trailing an aircraft's wings: smoke drawn into each core spirals along it, rising and falling with the clock.",
-      xLatex: String.raw`\frac{-\left(y-2.4\sin t\right)}{\left(x-2.4\cos t\right)^{2}+\left(y-2.4\sin t\right)^{2}+0.4}+\frac{-\left(y+2.4\sin t\right)}{\left(x+2.4\cos t\right)^{2}+\left(y+2.4\sin t\right)^{2}+0.4}`,
-      yLatex: String.raw`\frac{x-2.4\cos t}{\left(x-2.4\cos t\right)^{2}+\left(y-2.4\sin t\right)^{2}+0.4}+\frac{x+2.4\cos t}{\left(x+2.4\cos t\right)^{2}+\left(y+2.4\sin t\right)^{2}+0.4}`,
-      zLatex: String.raw`0.12\cos t`,
-      // Smoke released round each core, as in a wind tunnel.
-      seedLatex: String.raw`e^{-\frac{\left(\sqrt{\left(x-2.4\cos t\right)^{2}+\left(y-2.4\sin t\right)^{2}}-0.8\right)^{2}}{0.08}}+e^{-\frac{\left(\sqrt{\left(x+2.4\cos t\right)^{2}+\left(y+2.4\sin t\right)^{2}}-0.8\right)^{2}}{0.08}}`,
-      look: {
-        particles: 30_000,
-        speed: 0.3,
-        trail: 64,
-        lifetime: 4,
-        opacity: 0.22,
-        glow: 0.2,
-        normalizeSpeed: false,
-        absorb: true,
-        colorMode: "speed",
-        backdrop: "#03050a",
-        backdropOpacity: 1,
-      },
-    },
-  },
   {
     id: "cellular",
     name: "Vortex lattice",
@@ -126,45 +122,45 @@ export const FLUIDS: readonly GalleryPreset[] = [
     name: "Tornado",
     category: "fluids",
     blurb:
-      "A tornado seen from above: air drawn inward from every side, spinning faster as it closes on the core, the Burgers–Rott vortex, an exact solution of the Navier–Stokes equations. Its core wanders, as a real one does.",
-    // The Burgers–Rott vortex's horizontal flow: inflow −αr/2 and swirl
-    // Γ/(2πr)·(1 − e^(−r²/r₀²)), here with r₀ = 2.
-    xLatex: String.raw`-0.08\left(x-1.5\sin\left(0.21t\right)\right)-\left(y-1.5\sin\left(0.33t\right)\right)\frac{6\left(1-e^{-\frac{\left(x-1.5\sin\left(0.21t\right)\right)^{2}+\left(y-1.5\sin\left(0.33t\right)\right)^{2}}{4}}\right)}{\left(x-1.5\sin\left(0.21t\right)\right)^{2}+\left(y-1.5\sin\left(0.33t\right)\right)^{2}+0.001}`,
-    yLatex: String.raw`-0.08\left(y-1.5\sin\left(0.33t\right)\right)+\left(x-1.5\sin\left(0.21t\right)\right)\frac{6\left(1-e^{-\frac{\left(x-1.5\sin\left(0.21t\right)\right)^{2}+\left(y-1.5\sin\left(0.33t\right)\right)^{2}}{4}}\right)}{\left(x-1.5\sin\left(0.21t\right)\right)^{2}+\left(y-1.5\sin\left(0.33t\right)\right)^{2}+0.001}`,
+      "A tornado seen from above: air drawn inward from every side, spinning faster as it closes on the core — the Burgers–Rott vortex, an exact solution of the Navier–Stokes equations — with the debris and rain it draws in falling into spiral bands. Its core wanders, as a real one does.",
+    xLatex: TORNADO_TOP.x,
+    yLatex: TORNADO_TOP.y,
+    seedLatex: TORNADO_TOP.seed,
     colorScale: 1.2,
-    backdrop: "#0a0605",
+    backdrop: "#0a0907",
     extent: 10,
-    palette: "grayscale",
+    palette: "storm",
     flow: {
-      particleCount: 35_000,
+      particleCount: 40_000,
       speed: 3,
       trailPersistence: 0.97,
-      dropRate: 0.006,
-      opacity: 0.35,
+      dropRate: 0.008,
+      opacity: 0.4,
       pointSize: 1.3,
-      glow: 0.3,
+      glow: 0.35,
       normalizeSpeed: false,
     },
     space: {
       blurb:
-        "The Burgers–Rott vortex standing on the ground: dust swept in along the floor spirals into the core and is stretched up the funnel, swirling fastest just outside it. The funnel leans and swings round, rooted where it touches the ground.",
-      // u_r = −αr/2, u_θ = Γ/(2πr)(1 − e^(−r²/r₀²)), w = α(z + 5) up from
-      // the box's floor, with α = 0.3, Γ/2π = 3, r₀ = 1.
-      xLatex: String.raw`-0.15\left(x-0.1\left(z+5\right)\cos\left(0.4t\right)\right)-\left(y-0.1\left(z+5\right)\sin\left(0.4t\right)\right)\frac{3\left(1-e^{-\left(x-0.1\left(z+5\right)\cos\left(0.4t\right)\right)^{2}-\left(y-0.1\left(z+5\right)\sin\left(0.4t\right)\right)^{2}}\right)}{\left(x-0.1\left(z+5\right)\cos\left(0.4t\right)\right)^{2}+\left(y-0.1\left(z+5\right)\sin\left(0.4t\right)\right)^{2}+0.001}`,
-      yLatex: String.raw`-0.15\left(y-0.1\left(z+5\right)\sin\left(0.4t\right)\right)+\left(x-0.1\left(z+5\right)\cos\left(0.4t\right)\right)\frac{3\left(1-e^{-\left(x-0.1\left(z+5\right)\cos\left(0.4t\right)\right)^{2}-\left(y-0.1\left(z+5\right)\sin\left(0.4t\right)\right)^{2}}\right)}{\left(x-0.1\left(z+5\right)\cos\left(0.4t\right)\right)^{2}+\left(y-0.1\left(z+5\right)\sin\left(0.4t\right)\right)^{2}+0.001}`,
-      zLatex: String.raw`0.3\left(z+5\right)`,
-      seedLatex: String.raw`\frac{e^{-3\left(z+5\right)^{2}}}{1+e^{3\left(\sqrt{x^{2}+y^{2}}-4.3\right)}}+0.25e^{-2\left(\left(x-0.1\left(z+5\right)\cos\left(0.4t\right)\right)^{2}+\left(y-0.1\left(z+5\right)\sin\left(0.4t\right)\right)^{2}\right)}`,
+        "A tornado standing on the ground: a narrow rope at the ground flaring into the cloud base, the condensation funnel's shape, swirling fastest just outside its core and near the ground. Air and debris sweep in along the ground, rise fast up the core, and spread out under the wall cloud. The funnel leans and sways, rooted where it touches down.",
+      xLatex: TORNADO.x,
+      yLatex: TORNADO.y,
+      zLatex: TORNADO.z,
+      seedLatex: TORNADO.seed,
       look: {
-        particles: 40_000,
+        palette: "storm",
+        particles: 45_000,
         speed: 0.3,
-        trail: 64,
-        lifetime: 8,
-        opacity: 0.35,
-        glow: 0.15,
+        trail: 48,
+        lifetime: 4,
+        // Everything rises through the core, so it piles up there: at more
+        // than this the funnel was a white bar.
+        opacity: 0.22,
+        glow: 0.2,
         normalizeSpeed: false,
         absorb: true,
         colorMode: "speed",
-        backdrop: "#0a0605",
+        backdrop: "#0a0907",
         backdropOpacity: 1,
       },
     },
@@ -183,7 +179,7 @@ export const FLUIDS: readonly GalleryPreset[] = [
     colorScale: 1,
     backdrop: "#040506",
     extent: 10,
-    palette: "grayscale",
+    palette: "ocean",
     flow: {
       particleCount: 35_000,
       speed: 4,

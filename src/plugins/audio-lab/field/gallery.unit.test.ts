@@ -90,13 +90,13 @@ describe("every gallery field arrives usable", () => {
 
 describe("the clock speed, baked in", () => {
   test("a preset that slows its clock says so in the expression", () => {
-    const binary = FIELD_GALLERY.find((preset) => preset.id === "binary")!;
-    expect(binary.timeSpeed).toBeLessThan(1);
-    const config = configFromGalleryPreset(binary);
-    // Bracketed, because `3\sin 0.45t` is ambiguous where `3\sin(0.45t)` is
+    const pulsar = FIELD_GALLERY.find((preset) => preset.id === "pulsar")!;
+    expect(pulsar.timeSpeed).toBeLessThan(1);
+    const config = configFromGalleryPreset(pulsar);
+    // Bracketed, because `\cos 0.35t` is ambiguous where `\cos(0.35t)` is
     // not, and a preset should not depend on which reading a parser takes.
-    expect(config.p).toContain(`\\left(${binary.timeSpeed}t\\right)`);
-    expect(config.p).not.toMatch(/\\sin\s*0\.45t/);
+    expect(config.p).toContain(`\\left(${pulsar.timeSpeed}t\\right)`);
+    expect(config.p).not.toMatch(/\\(sin|cos)\s*0\.35t/);
   });
 
   test("a preset at normal speed is left exactly alone", () => {

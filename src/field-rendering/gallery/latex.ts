@@ -143,3 +143,261 @@ export function dipole(
   });
   return out;
 }
+
+/** A number as the presets write it: at most four decimals. */
+export function num(v: number) {
+  const r = Math.round(v * 1e4) / 1e4;
+  return Object.is(r, -0) ? "0" : String(r);
+}
+
+/**
+ * A sum of terms, each a coefficient and a LaTeX factor, written with its
+ * signs: `[[2, "x"], [-1, "y"]]` is `2x-y`. Terms that round to nothing are
+ * left out; nothing at all is `0`.
+ */
+export function sum(terms: readonly (readonly [number, string])[]) {
+  let out = "";
+  for (const [c, factor] of terms) {
+    const r = Math.round(c * 1e4) / 1e4;
+    if (r === 0) continue;
+    const size = Math.abs(r) === 1 && factor !== "" ? "" : num(Math.abs(r));
+    out += (r < 0 ? "-" : out === "" ? "" : "+") + size + factor;
+  }
+  return out === "" ? "0" : out;
+}
+
+const TAU = 2 * Math.PI;
+
+/** sin(k(wt + φ)), with its phase brought into [0, 2π). */
+function sinTurn(k: number, w: number, phase: number) {
+  const p = (((k * phase) % TAU) + TAU) % TAU;
+  return String.raw`\sin\left(${sum([
+    [k * w, "t"],
+    [p, ""],
+  ])}\right)`;
+}
+
+/**
+ * Where body `i` of three is on the figure-eight orbit, at `w` radians of the
+ * orbit per unit of t, scaled by `size`: Chenciner and Montgomery's stable
+ * three-body orbit (2000), three equal masses chasing each other round one
+ * figure eight, a third of a period apart.
+ *
+ * Its Fourier series, fitted to the orbit integrated from Simó's initial
+ * conditions (it closes to 4×10⁻⁸ after one period): x is odd harmonics, y
+ * even, and four terms put every body within 1% of the orbit's width of
+ * where it really is.
+ */
+export function figureEightBody(i: number, w: number, size: number) {
+  const phase = (TAU * i) / 3;
+  return {
+    x: sum([
+      [-1.1008 * size, sinTurn(1, w, phase)],
+      [0.0254 * size, sinTurn(5, w, phase)],
+    ]),
+    y: sum([
+      [-0.3388 * size, sinTurn(2, w, phase)],
+      [-0.056 * size, sinTurn(4, w, phase)],
+    ]),
+  };
+}
+
+type Vec3 = readonly [number, number, number];
+
+/** a − (c), bracketed; just a where c is nothing. */
+function offset(a: Axis, c: string | undefined) {
+  return c === undefined || c === "0"
+    ? a
+    : String.raw`\left(${a}-\left(${c}\right)\right)`;
+}
+
+/**
+ * The offset from a point that may move, per axis, and its squared length
+ * over `axes`: what a seed round a moving body is written in.
+ */
+export function separation(
+  c: Partial<Record<Axis, string>>,
+  axes: readonly Axis[]
+) {
+  const d = { x: offset("x", c.x), y: offset("y", c.y), z: offset("z", c.z) };
+  return { d, r2: axes.map((a) => `${d[a]}^{2}`).join("+") };
+}
+
+/** n × d, by components, for d given as LaTeX per axis. */
+function cross(n: Vec3, d: Record<Axis, string>): Record<Axis, string> {
+  return {
+    x: sum([
+      [n[1], d.z],
+      [-n[2], d.y],
+    ]),
+    y: sum([
+      [n[2], d.x],
+      [-n[0], d.z],
+    ]),
+    z: sum([
+      [n[0], d.y],
+      [-n[1], d.x],
+    ]),
+  };
+}
+
+/**
+ * Bodies pulling the gas round them, wherever their positions put them (the
+ * positions may read t): each pulls as `−pull·d/(|d|² + soft)^1.1`, a
+ * softened gravity a little steeper than 1/r so streams converge, and turns
+ * it round `normal` (in the plane, anticlockwise) as `swirl·n×d/(|d|² +
+ * soft)`, so it falls in on a spiral, as gas does onto a star.
+ */
+export function wells(
+  centres: readonly Partial<Record<Axis, string>>[],
+  axes: readonly Axis[],
+  o: { soft: number; pull: number; swirl: number; normal?: Vec3 }
+): Partial<Record<Axis, string>> {
+  const normal = o.normal ?? [0, 0, 1];
+  const out: Partial<Record<Axis, string>> = {};
+  for (const axis of axes) {
+    out[axis] = centres
+      .map((c) => {
+        const d = {
+          x: offset("x", c.x),
+          y: offset("y", c.y),
+          z: offset("z", c.z),
+        };
+        const r2 = axes.map((a) => `${d[a]}^{2}`).join("+");
+        const turn = cross(normal, d)[axis];
+        const fall = String.raw`\frac{${sum([[-o.pull, d[axis]]])}}{\left(${r2}+${o.soft}\right)^{1.1}}`;
+        return turn === "0" || o.swirl === 0
+          ? fall
+          : String.raw`${fall}+\frac{${num(o.swirl)}\left(${turn}\right)}{${r2}+${o.soft}}`;
+      })
+      .join("+")
+      .replace(/\+-/g, "-");
+  }
+  return out;
+}
+
+/**
+ * Two bodies on Kepler orbits round their common centre of mass: semi-major
+ * axis `a` of their separation, eccentricity `e`, mean motion `n` radians
+ * per unit of t, the second body `ratio` times the first's mass. The orbit
+ * lies in the plane tilted `tilt` radians about the x-axis.
+ *
+ * Where a body is on an ellipse at a given time is Kepler's equation, which
+ * has no closed form; the true anomaly's series in e to e⁴ (the equation of
+ * the centre) is within 0.02 rad at e = 0.35. Velocities are the exact
+ * ones at that anomaly, v = na/√(1 − e²)·(−sin θ, e + cos θ).
+ */
+export function keplerPair(o: {
+  a: number;
+  e: number;
+  n: number;
+  ratio: number;
+  tilt: number;
+}) {
+  const { a, e, n } = o;
+  const M = (k: number) => String.raw`\sin\left(${sum([[k * n, "t"]])}\right)`;
+  const theta = sum([
+    [n, "t"],
+    [2 * e - e ** 3 / 4, M(1)],
+    [(5 / 4) * e ** 2 - (11 / 24) * e ** 4, M(2)],
+    [(13 / 12) * e ** 3, M(3)],
+    [(103 / 96) * e ** 4, M(4)],
+  ]);
+  const cos = String.raw`\cos\left(${theta}\right)`;
+  const sin = String.raw`\sin\left(${theta}\right)`;
+  const p = a * (1 - e * e);
+  const K = (n * a) / Math.sqrt(1 - e * e);
+  const ci = Math.cos(o.tilt);
+  const si = Math.sin(o.tilt);
+  // Each body's share of the separation: the lighter one moves further.
+  const shares = [-o.ratio / (1 + o.ratio), 1 / (1 + o.ratio)];
+  return shares.map((f) => {
+    const radial = (c: number, trig: string) =>
+      String.raw`\frac{${sum([[c * f * p, trig]])}}{1+${num(e)}${cos}}`;
+    return {
+      position: {
+        x: radial(1, cos),
+        y: radial(ci, sin),
+        z: radial(si, sin),
+      },
+      velocity: {
+        x: sum([[-f * K, sin]]),
+        y: sum([
+          [f * K * ci * e, ""],
+          [f * K * ci, cos],
+        ]),
+        z: sum([
+          [f * K * si * e, ""],
+          [f * K * si, cos],
+        ]),
+      },
+    };
+  });
+}
+
+/**
+ * Worlds carried along by their orbits: round each, within a plateau of
+ * radius `reach`, the flow is the body's own velocity, plus material
+ * circling it at Kepler's speed, ∝ 1/√d, about the orbit's normal, and a
+ * slight pull that keeps it bound. Outside every plateau, still air.
+ */
+export function carriedWorlds(
+  bodies: readonly {
+    position: Record<Axis, string>;
+    velocity: Record<Axis, string>;
+    reach: number;
+    swirl: number;
+  }[],
+  axes: readonly Axis[],
+  normal: Vec3
+): Partial<Record<Axis, string>> {
+  const out: Partial<Record<Axis, string>> = {};
+  for (const axis of axes) {
+    out[axis] = bodies
+      .map((b) => {
+        const d = {
+          x: offset("x", b.position.x),
+          y: offset("y", b.position.y),
+          z: offset("z", b.position.z),
+        };
+        const r2 = axes.map((ax) => `${d[ax]}^{2}`).join("+");
+        const turn =
+          axes.length === 2
+            ? { x: sum([[-1, d.y]]), y: d.x, z: "0" }[axis]
+            : cross(normal, d)[axis];
+        const plateau = num(1 / b.reach ** 6);
+        return String.raw`\frac{${b.velocity[axis]}+\frac{${num(b.swirl)}\left(${turn}\right)}{\left(${r2}+0.05\right)^{0.75}}-0.15${d[axis]}}{1+${plateau}\left(${r2}\right)^{3}}`;
+      })
+      .join("+")
+      .replace(/\+-/g, "-");
+  }
+  return out;
+}
+
+/**
+ * A magnet in the plane: the field of a uniformly magnetised disc of radius
+ * `R` with moment along `m`, B = (2(m·r)r − m r²)/r⁴ outside, and the
+ * uniform m/R² inside, which meets it at the poles.
+ *
+ * The plane's own dipole, the field of a long bar magnet seen end-on, not a
+ * slice through a 3D one. A slice of the 3D field has divergence in the
+ * plane — field lines leave it — so particles drained out of two crescents
+ * beside the magnet, which drew as black holes in the picture. This one is
+ * divergence-free in the plane, so particles stay spread as they are born,
+ * and its field lines are circles through the magnet.
+ */
+export function planeDipole(m: readonly [string, string], R: number) {
+  const r2 = String.raw`x^{2}+y^{2}`;
+  const dot = [m[0] === "0" ? "" : `${m[0]}x`, m[1] === "0" ? "" : `${m[1]}y`]
+    .filter((t) => t !== "")
+    .join("+");
+  const component = (a: "x" | "y", mi: string) => {
+    const outside =
+      mi === "0"
+        ? String.raw`\frac{2${a}\left(${dot}\right)}{\left(${r2}\right)^{2}}`
+        : String.raw`\frac{2${a}\left(${dot}\right)-${mi}\left(${r2}\right)}{\left(${r2}\right)^{2}}`;
+    const inside = mi === "0" ? "0" : String.raw`\frac{${mi}}{${num(R * R)}}`;
+    return String.raw`\left\{${r2}>${num(R * R)}:${outside},${inside}\right\}`;
+  };
+  return { x: component("x", m[0]), y: component("y", m[1]) };
+}

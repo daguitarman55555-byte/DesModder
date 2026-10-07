@@ -41,6 +41,9 @@ export type PaletteID =
   | "ember"
   | "blackbody"
   | "galaxy"
+  | "magnetar"
+  | "worlds"
+  | "storm"
   | "auroral"
   | "neon"
   | "nebula"
@@ -283,15 +286,56 @@ export const PALETTES: Record<PaletteID, Palette> = {
   // A spiral galaxy's colours, slow to fast: the warm yellow of the old stars
   // in the bulge, where the rotation curve starts low, to the blue of the
   // young ones in the arms, where it has levelled off.
+  // The blue begins below the middle, where Auto's colour scale puts a flat
+  // rotation curve's speed: so the disk is blue and only the slow bulge gold.
   galaxy: {
     name: "Galaxy",
     group: "expressive",
     stops: [
       { at: 0, rgb: [30, 18, 8] },
-      { at: 0.3, rgb: [255, 196, 120] },
-      { at: 0.55, rgb: [255, 240, 225] },
-      { at: 0.8, rgb: [170, 200, 255] },
-      { at: 1, rgb: [110, 150, 255] },
+      { at: 0.24, rgb: [255, 186, 100] },
+      { at: 0.4, rgb: [255, 236, 210] },
+      { at: 0.52, rgb: [185, 205, 255] },
+      { at: 0.72, rgb: [110, 150, 255] },
+      { at: 1, rgb: [80, 120, 255] },
+    ],
+  },
+  // A neutron star's magnetosphere: violet where the plasma is slow, through
+  // electric blue to a white-hot cyan in the beams.
+  magnetar: {
+    name: "Magnetar",
+    group: "expressive",
+    stops: [
+      { at: 0, rgb: [16, 8, 48] },
+      { at: 0.28, rgb: [96, 40, 200] },
+      { at: 0.52, rgb: [50, 120, 255] },
+      { at: 0.78, rgb: [110, 230, 255] },
+      { at: 1, rgb: [245, 252, 255] },
+    ],
+  },
+  // Worlds: deep ocean blue, teal, desert gold, cloud white.
+  worlds: {
+    name: "Worlds",
+    group: "expressive",
+    stops: [
+      { at: 0, rgb: [10, 14, 50] },
+      { at: 0.3, rgb: [30, 100, 200] },
+      { at: 0.55, rgb: [40, 200, 190] },
+      { at: 0.8, rgb: [250, 200, 110] },
+      { at: 1, rgb: [255, 246, 228] },
+    ],
+  },
+  // A storm: slate cloud where the air is slow, dust and debris where the
+  // wind is fast, and the white of the condensation funnel at its fastest.
+  storm: {
+    name: "Storm",
+    group: "expressive",
+    stops: [
+      { at: 0, rgb: [14, 16, 24] },
+      { at: 0.3, rgb: [70, 86, 120] },
+      { at: 0.55, rgb: [150, 128, 100] },
+      { at: 0.8, rgb: [222, 196, 156] },
+      { at: 1, rgb: [250, 246, 238] },
     ],
   },
   // An aurora's colours, by height: oxygen's green line at 557.7 nm low down,

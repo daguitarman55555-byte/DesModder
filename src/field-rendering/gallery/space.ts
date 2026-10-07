@@ -1,50 +1,217 @@
 /** Space: black holes, galaxies, stars and the solar wind. */
-import { dipole, orbitingWells, r3, rho } from "./latex";
+import {
+  carriedWorlds,
+  figureEightBody,
+  keplerPair,
+  num,
+  rho,
+  separation,
+  wells,
+} from "./latex";
 import type { GalleryPreset } from "./types";
 
-/** The star cluster's three stars, circling their common centre. */
-const CLUSTER_2D = orbitingWells(
-  [
-    [-4, 2, 0],
-    [3, 3, 0],
-    [1, -4, 0],
-  ],
-  0.15,
-  ["x", "y"],
-  0.4
-);
-const CLUSTER_3D = orbitingWells(
-  [
-    [-2.4, 1.2, 0.6],
-    [1.8, 1.8, -1.2],
-    [0.6, -2.4, 0],
-  ],
-  0.2,
-  ["x", "y", "z"],
-  0.25
-);
+/**
+ * Three stars on the figure-eight orbit, the gas round them falling in on
+ * spirals. In the box the orbit's plane is tilted half a radian, so the eight
+ * reads as an eight from Desmos's default view.
+ */
+const EIGHT_TILT = 0.5;
+const EIGHT_2D = [0, 1, 2].map((i) => figureEightBody(i, 0.35, 6));
+const EIGHT_3D = [0, 1, 2].map((i) => {
+  const b = figureEightBody(i, 0.35, 3.6);
+  return {
+    x: b.x,
+    y: String.raw`${num(Math.cos(EIGHT_TILT))}\left(${b.y}\right)`,
+    z: String.raw`${num(Math.sin(EIGHT_TILT))}\left(${b.y}\right)`,
+  };
+});
+/** The gas each star is gathering, thinning into a faint haze between. */
+function eightSeed(
+  stars: readonly Partial<Record<"x" | "y" | "z", string>>[],
+  axes: readonly ("x" | "y" | "z")[],
+  reach: number
+) {
+  return [
+    "0.05",
+    ...stars.map(
+      (c) => String.raw`e^{-\frac{${separation(c, axes).r2}}{${num(reach)}}}`
+    ),
+  ].join("+");
+}
+const CLUSTER_2D = wells(EIGHT_2D, ["x", "y"], {
+  soft: 0.3,
+  pull: 1,
+  swirl: 0.6,
+});
+const CLUSTER_3D = wells(EIGHT_3D, ["x", "y", "z"], {
+  soft: 0.2,
+  pull: 1,
+  swirl: 0.5,
+  normal: [0, -Math.sin(EIGHT_TILT), Math.cos(EIGHT_TILT)],
+});
 
 /**
- * The pulsar's spinning, tilted dipole: in the plane, m = (cos t, sin t); in
- * the box, tilted 0.5 rad from its spin axis, m = (0.48 cos t, 0.48 sin t,
- * 0.88). The wind leaves both poles.
+ * A double planet: a world and a moon of nearly half its mass, like Pluto
+ * and Charon, on Kepler ellipses round their common centre of mass, each
+ * carrying its own circling material; the larger one has a ring.
  */
-const PULSAR_2D = dipole(
-  [String.raw`\cos\left(t\right)`, String.raw`\sin\left(t\right)`],
-  ["x", "y"],
-  0.8,
-  true
-);
-const PULSAR_3D = dipole(
-  [
-    String.raw`0.48\cos\left(t\right)`,
-    String.raw`0.48\sin\left(t\right)`,
-    "0.88",
-  ],
-  ["x", "y", "z"],
-  0.7,
-  true
-);
+function doublePlanet(
+  axes: readonly ("x" | "y" | "z")[],
+  o: {
+    a: number;
+    e: number;
+    tilt: number;
+    reach: readonly [number, number];
+    ball: readonly [number, number];
+    ring: number;
+    swirl: readonly [number, number];
+  }
+) {
+  const pair = keplerPair({
+    a: o.a,
+    e: o.e,
+    n: 0.4,
+    ratio: 0.45,
+    tilt: o.tilt,
+  });
+  const normal = [0, -Math.sin(o.tilt), Math.cos(o.tilt)] as const;
+  const field = carriedWorlds(
+    pair.map((p, i) => ({
+      ...p,
+      reach: o.reach[i],
+      // Faster round each world than the world moves, so no side of its
+      // material stands still in the frame it is drawn in, which drew dark.
+      swirl: o.swirl[i],
+    })),
+    axes,
+    normal
+  );
+  // Each world a ball of its material; round the larger, a thin ring in the
+  // orbit's plane, as Saturn's lies in its equator.
+  const seeds = pair.map((p, i) => {
+    const { d, r2 } = separation(p.position, axes);
+    const ball = String.raw`e^{-\frac{${r2}}{${num(o.ball[i] ** 2)}}}`;
+    if (i !== 0) return ball;
+    const height =
+      axes.length === 2
+        ? "0"
+        : String.raw`\left(${num(normal[1])}${d.y}+${num(normal[2])}${d.z}\right)`.replace(
+            /\+-/g,
+            "-"
+          );
+    const across = axes.length === 2 ? r2 : String.raw`${r2}-${height}^{2}`;
+    const flat =
+      axes.length === 2 ? "" : String.raw`e^{-\frac{${height}^{2}}{0.004}}`;
+    return String.raw`${ball}+0.6${flat}e^{-\frac{\left(\sqrt{${across}}-${num(o.ring)}\right)^{2}}{${num((0.12 * o.ring) ** 2)}}}`;
+  });
+  return { ...field, seed: seeds.join("+") };
+}
+
+const PLANETS_2D = doublePlanet(["x", "y"], {
+  a: 7.5,
+  e: 0.35,
+  tilt: 0,
+  reach: [2.6, 1.3],
+  ball: [0.7, 0.55],
+  ring: 2,
+  swirl: [2.5, 2],
+});
+const PLANETS_3D = doublePlanet(["x", "y", "z"], {
+  a: 4.2,
+  e: 0.3,
+  tilt: 0.35,
+  reach: [1.5, 0.8],
+  ball: [0.35, 0.28],
+  ring: 1.05,
+  swirl: [1.4, 1],
+});
+
+/**
+ * A pulsar: a magnetised neutron star spinning about z, its magnetic axis m
+ * tilted α from the spin, m = (sin α cos t, sin α sin t, cos α). Within a
+ * couple of radii, the closed loops of its dipole field, (3(m·r)r − m r²)/r²
+ * (the dipole's direction, at a strength that does not blow up at the
+ * star); further out, the wind streaming radially away, fastest along the
+ * magnetic axis, wound slightly by the spin. Where the plasma is born is what
+ * draws it as a lighthouse: two narrow beams along ±m, sweeping round with
+ * the star, a torus of wind in the spin equator, and the loops.
+ */
+function pulsar(axes: readonly ("x" | "y" | "z")[]) {
+  const three = axes.length === 3;
+  const a = three ? 0.6 : Math.PI / 2;
+  const m = [
+    String.raw`${num(Math.sin(a))}\cos\left(t\right)`.replace(/^1\\/, "\\"),
+    String.raw`${num(Math.sin(a))}\sin\left(t\right)`.replace(/^1\\/, "\\"),
+    num(Math.cos(a)),
+  ];
+  const r2 = axes.map((ax) => `${ax}^{2}`).join("+");
+  const mr = axes.map((ax, i) => `${m[i]}${ax}`).join("+");
+  // In the plane the dipole is the plane's own, 2(m·r)r − m r², which keeps
+  // particles spread (see planeDipole).
+  const k = three ? 3 : 2;
+  const loops = three ? "0.2" : "0.03";
+  const g = String.raw`e^{-${loops}\left(${r2}\right)^{2}}`;
+  const beam = String.raw`\left(\frac{\left(${mr}\right)^{2}}{${r2}}\right)^{20}`;
+  const spin = { x: "-0.3y", y: "+0.3x", z: "" };
+  const out: Partial<Record<"x" | "y" | "z", string>> = {};
+  axes.forEach((ax, i) => {
+    const dip = String.raw`\frac{${k}${ax}\left(${mr}\right)-${m[i]}\left(${r2}\right)}{${r2}}`;
+    const wind = String.raw`\frac{\left(0.35+2.2${beam}\right)${ax}${spin[ax]}}{\sqrt{${r2}}}`;
+    out[ax] = String.raw`0.9${g}${dip}+\left(1-${g}\right)${wind}`;
+  });
+  const star = three ? 0.8 : 1.6;
+  const beams = String.raw`\frac{\left(\frac{\left(${mr}\right)^{2}}{${r2}}\right)^{40}}{1+e^{-8\left(\sqrt{${r2}}-${num(star + 0.1)}\right)}}`;
+  const shell = String.raw`\frac{0.15}{\left(1+e^{8\left(\sqrt{${r2}}-${num(star * 2)}\right)}\right)\left(1+e^{-12\left(\sqrt{${r2}}-${num(star)}\right)}\right)}`;
+  const torus = three
+    ? String.raw`+0.3e^{-12z^{2}}e^{-\left(${rho}-2.4\right)^{2}}`
+    : "";
+  // The star itself, glowing: its own field inside it keeps its matter
+  // turning over within.
+  const body = String.raw`2e^{-\frac{${r2}}{${num(0.5 * star * star)}}}`;
+  return { ...out, seed: `${beams}+${shell}+${body}${torus}` };
+}
+
+/**
+ * A galaxy's matter: two logarithmic arms, cos(2θ − 4.5 ln r) — a pitch of
+ * about 24°, a typical Sb spiral's — turning slowly as a density wave does,
+ * raised to a high power so the arms are narrow; beaded with star-forming
+ * clumps; on an exponential disk with an edge; and a round bulge.
+ */
+function galaxySeed(o: {
+  power: number;
+  scale: number;
+  disk: number;
+  edge: number;
+  bulge: string;
+  thin: string;
+}) {
+  const r2 = String.raw`x^{2}+y^{2}`;
+  const phase = String.raw`2.25\ln\left(${r2}+0.01\right)-0.15t`;
+  const arm = String.raw`\left(\frac{1+\frac{\left(x^{2}-y^{2}\right)\cos\left(${phase}\right)+2xy\sin\left(${phase}\right)}{${r2}+0.01}}{2}\right)^{${o.power}}`;
+  const knots = String.raw`\left(0.45+0.55\sin\left(${num(9 / o.scale)}\sqrt{${r2}}+3\arctan\left(y,x\right)\right)^{2}\right)`;
+  const disk = String.raw`\frac{e^{-${num(o.disk)}\sqrt{${r2}}}}{1+e^{${num(4 / o.scale)}\left(\sqrt{${r2}}-${num(o.edge)}\right)}}`;
+  return String.raw`${o.thin}\left(0.03+${arm}${knots}\right)${disk}+${o.bulge}`;
+}
+
+const GALAXY_2D_SEED = galaxySeed({
+  power: 20,
+  scale: 2,
+  disk: 0.12,
+  edge: 9,
+  bulge: String.raw`e^{-0.6\left(x^{2}+y^{2}\right)}`,
+  thin: "",
+});
+const GALAXY_3D_SEED = galaxySeed({
+  power: 24,
+  scale: 1,
+  disk: 0.3,
+  edge: 4.6,
+  bulge: String.raw`0.5e^{-2.5\left(x^{2}+y^{2}+4z^{2}\right)}`,
+  thin: String.raw`e^{-\frac{z^{2}}{0.02}}`,
+});
+
+const PULSAR_2D = pulsar(["x", "y"]);
+const PULSAR_3D = pulsar(["x", "y", "z"]);
 
 export const SPACE: readonly GalleryPreset[] = [
   {
@@ -113,44 +280,47 @@ export const SPACE: readonly GalleryPreset[] = [
     name: "Spiral galaxy",
     category: "space",
     blurb:
-      "Differential rotation: inner orbits come round faster than outer ones, which winds a spiral out of a disc.",
+      "A spiral galaxy face-on: stars on a flat rotation curve round a golden bulge of old stars, and two arms where the young blue ones are. The arms are a density wave the stars pass through, lit by stars too short-lived to leave it.",
     xLatex: String.raw`\frac{-2y}{1.5+\sqrt{x^{2}+y^{2}}}`,
     yLatex: String.raw`\frac{2x}{1.5+\sqrt{x^{2}+y^{2}}}`,
-    // Two logarithmic arms, a density wave the stars pass through, on an
-    // exponential disk with an edge; a round bulge.
-    seedLatex: String.raw`\left(0.01+\left(\frac{1+\frac{\left(x^{2}-y^{2}\right)\cos\left(1.6\ln\left(x^{2}+y^{2}+0.01\right)-0.15t\right)+2xy\sin\left(1.6\ln\left(x^{2}+y^{2}+0.01\right)-0.15t\right)}{x^{2}+y^{2}+0.01}}{2}\right)^{16}\right)\frac{e^{-0.12\sqrt{x^{2}+y^{2}}}}{1+e^{2\left(\sqrt{x^{2}+y^{2}}-9\right)}}+e^{-0.5\left(x^{2}+y^{2}\right)}`,
-    colorScale: 1.5,
+    seedLatex: GALAXY_2D_SEED,
+    colorScale: 1.4,
     palette: "galaxy",
     backdrop: "#020206",
     flow: {
-      particleCount: 45_000,
-      glow: 0.4,
-      opacity: 0.45,
-      pointSize: 1.3,
+      particleCount: 50_000,
+      glow: 0.5,
+      opacity: 0.5,
+      pointSize: 1.4,
       normalizeSpeed: false,
       speed: 3,
-      trailPersistence: 0.95,
-      dropRate: 0.02,
+      trailPersistence: 0.93,
+      dropRate: 0.04,
     },
     extent: 10,
     space: {
       blurb:
-        "A spiral galaxy: stars on a flat rotation curve in a thin disk, the arms a density wave they pass through — which is what real arms are — and a round bulge at the centre.",
-      // Rotation rising from the centre and leveling off, the flat rotation
-      // curve that first told astronomers about dark matter.
+        "A spiral galaxy: a thin disk of stars on a flat rotation curve — the curve that first told astronomers about dark matter — round a golden bulge of old stars. Its two arms are a density wave the stars pass through, beaded with clusters and lit by young blue stars too short-lived to leave it.",
       xLatex: String.raw`\frac{-y}{0.6+${rho}}`,
       yLatex: String.raw`\frac{x}{0.6+${rho}}`,
-      zLatex: String.raw`-0.5z`,
-      // Two logarithmic arms, cos(2θ − 3.2 ln r), turning slowly; an
-      // exponential disk; a bulge.
-      seedLatex: String.raw`e^{-\frac{z^{2}}{0.03}}\left(0.06+\left(\frac{1+\frac{\left(x^{2}-y^{2}\right)\cos\left(1.6\ln\left(x^{2}+y^{2}\right)-0.15t\right)+2xy\sin\left(1.6\ln\left(x^{2}+y^{2}\right)-0.15t\right)}{x^{2}+y^{2}}}{2}\right)^{8}\right)\frac{e^{-0.25${rho}}}{1+e^{4\left(${rho}-4.4\right)}}+e^{-2\left(x^{2}+y^{2}+3z^{2}\right)}`,
+      // A gentle pull to the plane: a stronger one put speeds off the disk
+      // into Auto's colour scale, and the disk came out cream, not blue.
+      zLatex: String.raw`-0.15z`,
+      seedLatex: GALAXY_3D_SEED,
       look: {
-        particles: 70_000,
-        speed: 0.3,
-        trail: 48,
-        lifetime: 1.5,
-        opacity: 0.35,
-        glow: 0.2,
+        particles: 90_000,
+        speed: 0.12,
+        trail: 16,
+        // About the time a star takes to cross an arm: any longer and it carries
+        // the arm's light round into a ring.
+        lifetime: 0.35,
+        // The flat part of the rotation curve, |F| ≈ 0.85, well into the
+        // blue; the bulge's slow centre in the gold.
+        scale: 0.6,
+        // Ninety thousand stars in a disk this thin add up to white at any
+        // more: their colour is in the faint ones.
+        opacity: 0.3,
+        glow: 0.25,
         normalizeSpeed: false,
         absorb: true,
         colorMode: "speed",
@@ -217,91 +387,140 @@ export const SPACE: readonly GalleryPreset[] = [
     name: "Pulsar",
     category: "space",
     blurb:
-      "A pulsar: a neutron star whose magnetic field turns with it. Charged particles stream out of both magnetic poles along the field lines and meet at the magnetic equator, where the field reverses — the current sheet.",
-    // A dipole spinning in the plane, m = (cos t, sin t):
-    // B = (3(m·r)r − m r²) / r⁵, with particles streaming off its poles.
+      "A pulsar seen down its spin axis: a neutron star whose magnetic field is locked to it, closed loops near the star, and two beams of radiation from its magnetic poles sweeping round like a lighthouse's. Each sweep across the Earth is one pulse.",
     xLatex: PULSAR_2D.x!,
     yLatex: PULSAR_2D.y!,
-    seedLatex: String.raw`e^{-3\left(\sqrt{x^{2}+y^{2}}-1.3\right)^{2}}\left(\frac{\left(x\cos t+y\sin t\right)^{2}}{x^{2}+y^{2}+0.01}\right)^{3}`,
-    colorScale: 0.08,
-    palette: "starfield",
-    backdrop: "#02030a",
+    seedLatex: PULSAR_2D.seed,
+    colorScale: 2.5,
+    palette: "magnetar",
+    backdrop: "#03020c",
     flow: {
-      particleCount: 30_000,
-      glow: 0.3,
-      opacity: 0.3,
-      pointSize: 1.3,
-      normalizeSpeed: true,
-      speed: 0.35,
-      trailPersistence: 0.97,
-      dropRate: 0.006,
+      particleCount: 35_000,
+      glow: 0.45,
+      opacity: 0.45,
+      pointSize: 1.4,
+      normalizeSpeed: false,
+      speed: 4,
+      trailPersistence: 0.9,
+      dropRate: 0.04,
     },
     extent: 10,
-    timeSpeed: 0.1,
+    timeSpeed: 0.35,
     space: {
       blurb:
-        "A pulsar's magnetosphere: a neutron star whose magnetic axis is tilted from its spin axis, so the whole field turns with it. The wind streams out of both magnetic poles along the field lines and meets at the magnetic equator, where the field reverses.",
-      // A dipole whose moment m = (sin α cos t, sin α sin t, cos α), α = 0.5,
-      // spins about z: B = (3(m·r)r − m r²) / r⁵.
+        "A pulsar: a spinning neutron star whose magnetic axis is tilted from its spin axis. Near the star, the closed loops of its field; from its magnetic poles, two narrow beams sweeping round with every turn, like a lighthouse's; and round its equator, a torus of wind, as the Crab pulsar's is.",
       xLatex: PULSAR_3D.x!,
       yLatex: PULSAR_3D.y!,
       zLatex: PULSAR_3D.z!,
-      // From the polar caps of a star of radius 0.8.
-      seedLatex: String.raw`e^{-12\left(\sqrt{${r3}}-0.9\right)^{2}}\left(\frac{\left(0.48x\cos t+0.48y\sin t+0.88z\right)^{2}}{${r3}}\right)^{3}`,
+      seedLatex: PULSAR_3D.seed,
       look: {
-        particles: 25_000,
+        palette: "magnetar",
+        particles: 32_000,
         speed: 0.35,
-        trail: 64,
-        lifetime: 4,
-        opacity: 0.22,
-        glow: 0.1,
-        normalizeSpeed: true,
+        trail: 24,
+        lifetime: 1.2,
+        opacity: 0.5,
+        glow: 0.3,
+        normalizeSpeed: false,
         absorb: false,
         colorMode: "speed",
-        backdrop: "#02030a",
+        backdrop: "#03020c",
         backdropOpacity: 1,
       },
     },
   },
   {
     id: "star-cluster",
-    name: "Star cluster",
+    name: "Three-body eight",
     category: "space",
     blurb:
-      "Three attractors. Particles fall into them and pile up, so the knots draw themselves. The stars circle their common centre, dragging their streams round.",
+      "Three equal stars on the figure-eight orbit, the one stable way found for three bodies to share a single path (Chenciner and Montgomery, 2000), each a third of an orbit behind the next. Gas falls into them on spirals, and the knots trace the eight as they go.",
     xLatex: CLUSTER_2D.x!,
     yLatex: CLUSTER_2D.y!,
-    colorScale: 0.3,
-    palette: "nebula",
-    backdrop: "#04030a",
+    seedLatex: eightSeed(EIGHT_2D, ["x", "y"], 4),
+    colorScale: 1.2,
+    palette: "plasma",
+    backdrop: "#05030c",
     flow: {
       particleCount: 40_000,
       glow: 0.5,
-      opacity: 0.35,
+      opacity: 0.4,
       pointSize: 1.3,
       normalizeSpeed: false,
-      speed: 6,
-      trailPersistence: 0.96,
-      dropRate: 0.01,
+      speed: 4,
+      trailPersistence: 0.97,
+      dropRate: 0.008,
     },
     extent: 10,
     space: {
       blurb:
-        "Three stars at different heights, each pulling in the gas around it: streams fall in from every side and gather into glowing knots. The stars circle their common centre, dragging their streams round.",
+        "Three equal stars on the figure-eight orbit, the stable three-body orbit Chenciner and Montgomery proved exists, in a plane tilted to the view. Each pulls the gas round it in on a spiral, so three glowing knots chase each other round the eight.",
       xLatex: CLUSTER_3D.x!,
       yLatex: CLUSTER_3D.y!,
       zLatex: CLUSTER_3D.z!,
+      seedLatex: eightSeed(EIGHT_3D, ["x", "y", "z"], 1.5),
       look: {
+        palette: "plasma",
         particles: 50_000,
         speed: 0.25,
         trail: 48,
         lifetime: 3,
-        opacity: 0.35,
+        opacity: 0.4,
+        glow: 0.35,
+        normalizeSpeed: false,
+        absorb: false,
+        colorMode: "speed",
+        backdrop: "#05030c",
+        backdropOpacity: 1,
+      },
+    },
+  },
+  {
+    id: "binary",
+    name: "Double planet",
+    category: "space",
+    blurb:
+      "Two worlds orbiting each other, like Pluto and Charon: the smaller has nearly half the larger's mass, so both swing round their common centre on Kepler ellipses, fastest when closest. Each carries its circling material with it, and the larger a ring.",
+    xLatex: PLANETS_2D.x!,
+    yLatex: PLANETS_2D.y!,
+    seedLatex: PLANETS_2D.seed,
+    colorScale: 1.6,
+    palette: "worlds",
+    backdrop: "#02040c",
+    flow: {
+      particleCount: 30_000,
+      glow: 0.45,
+      opacity: 0.45,
+      pointSize: 1.4,
+      normalizeSpeed: false,
+      // A step is 0.01 × speed units of t, and there are about sixty a
+      // second: at 1.67 the material keeps time with the worlds carrying it.
+      speed: 1.67,
+      trailPersistence: 0.97,
+      dropRate: 0.006,
+    },
+    extent: 10,
+    space: {
+      blurb:
+        "Two worlds orbiting each other on Kepler ellipses round their common centre of mass, in a plane tilted to the view, like Pluto and Charon. Each carries the material circling it; the larger has a ring in its orbit's plane. Their trails draw the ellipses.",
+      xLatex: PLANETS_3D.x!,
+      yLatex: PLANETS_3D.y!,
+      zLatex: PLANETS_3D.z!,
+      seedLatex: PLANETS_3D.seed,
+      look: {
+        palette: "worlds",
+        particles: 30_000,
+        speed: 0.3,
+        // Half-width 5 × speed 0.3: the material on the clock's time.
+        scale: 1.5,
+        trail: 64,
+        lifetime: 5,
+        opacity: 0.3,
         glow: 0.3,
         normalizeSpeed: false,
         absorb: false,
         colorMode: "speed",
-        backdrop: "#04030a",
+        backdrop: "#02040c",
         backdropOpacity: 1,
       },
     },

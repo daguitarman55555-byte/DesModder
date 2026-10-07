@@ -1,10 +1,10 @@
 /** Fields: the textbook pictures. */
-import { dipole } from "./latex";
+import { dipole, planeDipole } from "./latex";
 import type { GalleryPreset } from "./types";
 
 /** The bar magnet on alternating current, along y in the plane and z in the box. */
 const AC = String.raw`\cos\left(0.4t\right)`;
-const MAGNET_2D = dipole(["0", AC], ["x", "y"], 0.8, false, "magnet");
+const MAGNET_2D = planeDipole(["0", AC], 0.8);
 const MAGNET_3D = dipole(["0", "0", AC], ["x", "y", "z"], 0.6, false, "magnet");
 
 export const FIELDS: readonly GalleryPreset[] = [
@@ -14,12 +14,13 @@ export const FIELDS: readonly GalleryPreset[] = [
     category: "fields",
     blurb:
       "The field of a bar magnet, and the one picture every physics textbook opens with. On alternating current: the lines keep their shape, and the field fades, reverses and returns.",
-    xLatex: MAGNET_2D.x!,
-    yLatex: MAGNET_2D.y!,
-    // Released round the magnet, as iron filings draw it.
-    seedLatex: String.raw`\frac{e^{-0.04\left(x^{2}+y^{2}\right)}}{1+e^{-4\left(\sqrt{x^{2}+y^{2}}-1.5\right)}}`,
-    colorScale: 0.08,
-    palette: "starfield",
+    xLatex: MAGNET_2D.x,
+    yLatex: MAGNET_2D.y,
+    // Released everywhere, thinning outward: the small loops hugging the
+    // magnet too, which a seed starting at 1.5 left as two black crescents.
+    seedLatex: String.raw`e^{-0.03\left(x^{2}+y^{2}\right)}`,
+    colorScale: 0.25,
+    palette: "neon",
     backdrop: "#02030a",
     flow: {
       particleCount: 30_000,
@@ -40,8 +41,9 @@ export const FIELDS: readonly GalleryPreset[] = [
       xLatex: MAGNET_3D.x!,
       yLatex: MAGNET_3D.y!,
       zLatex: MAGNET_3D.z!,
-      // Released round the magnet, a sphere of radius 1.
-      seedLatex: String.raw`\frac{e^{-0.1\left(x^{2}+y^{2}+z^{2}\right)}}{1+e^{-4\left(\sqrt{x^{2}+y^{2}+z^{2}}-1.3\right)}}`,
+      // Released everywhere, thinning outward, the loops hugging the magnet
+      // included.
+      seedLatex: String.raw`e^{-0.06\left(x^{2}+y^{2}+z^{2}\right)}`,
       look: {
         particles: 18_000,
         speed: 0.3,
