@@ -38,7 +38,13 @@ import {
   type CutSettings,
 } from "./glsl3d";
 import type { Box3D, Overlay3DRenderer } from "./Overlay3D";
-import { PALETTE_GLSL, paletteUniforms, type PaletteID } from "./palettes";
+import {
+  PALETTE_GLSL,
+  PALETTE_LUT_SIZE,
+  paletteLUT,
+  paletteUniforms,
+  type PaletteID,
+} from "./palettes";
 import { linkProgram3D, uniformsOf, type Uniforms } from "./program3d";
 import { AUTO_SURFACE_RESOLUTION, SurfaceDepth } from "./SurfaceDepth";
 import type { Surface3D } from "./surfaces3d";
@@ -97,6 +103,19 @@ export interface Flow3DOptions {
    * and everything dimmed close to the horizon by gravitational redshift.
    */
   beaming: boolean;
+  /**
+   * Draw every this-many-th point of each trail: 1 is every point, 2 half of
+   * them. Trails move a pixel or two a step, so 2 looks the same at half the
+   * vertices.
+   */
+  trailStride: number;
+  /**
+   * While the view is still, keep the trails as a picture that fades a
+   * little each step and add only each particle's newest segment, instead of
+   * drawing every trail whole each frame; any change of view redraws them
+   * whole. False redraws every frame.
+   */
+  incremental: boolean;
 }
 
 export const MAX_FLOW_PARTICLES_3D = 200_000;
@@ -128,6 +147,8 @@ export const DEFAULT_FLOW_3D_OPTIONS: Flow3DOptions = {
   lens: false,
   horizon: 0.45,
   beaming: true,
+  trailStride: 2,
+  incremental: true,
 };
 
 /**
@@ -178,6 +199,8 @@ uniform int u_absorb;
 uniform int u_lens;
 uniform float u_horizon;
 uniform uint u_seed;
+uniform highp sampler2D u_pool;
+uniform int u_pooled;
 layout(location = 0) out vec4 o_state;
 layout(location = 1) out vec4 o_trail;
 ${field3dFunctions(field)}
@@ -201,19 +224,20 @@ vec3 vtVelocity(vec3 p) {
 }
 
 /**
- * Where a particle is born: a point through the box kept with the chance the
- * seed gives there, tried up to 64 times. Rejection sampling, so the births
- * follow the seed's density exactly, whatever shape it has. A seed so thin no
- * try lands returns a point outside the box, which is no particle this step;
- * the next step tries again.
+ * Where a particle is born. Without a seed, anywhere in the box. With one, a
+ * point drawn from the birth pool (see BIRTH_POOL_FRAGMENT), nudged by a
+ * thousandth of the box so particles that drew the same point part at once.
+ * A pool entry no try landed in is no particle this step; the next step
+ * draws again.
  */
 vec3 vtBirth(uint key) {
-  for (uint i = 0u; i < 64u; i++) {
-    vec3 h = vtHash3(key + i * 2246822519u);
-    vec3 p = mix(u_boxMin, u_boxMax, h);
-    if (vtHash3(key ^ (i * 3266489917u + 374761393u)).x < vtSeed(p)) return p;
-  }
-  return u_boxMax + (u_boxMax - u_boxMin);
+  vec3 h = vtHash3(key);
+  if (u_pooled == 0) return mix(u_boxMin, u_boxMax, h);
+  ivec2 size = textureSize(u_pool, 0);
+  vec4 b = texelFetch(u_pool, ivec2(h.xy * vec2(size)) % size, 0);
+  if (b.w < 0.5) return u_boxMax + (u_boxMax - u_boxMin);
+  vec3 jitter = (vtHash3(key ^ 0x68bc21ebu) - 0.5) * 1.0e-3 * (u_boxMax - u_boxMin);
+  return clamp(b.xyz + jitter, u_boxMin, u_boxMax);
 }
 
 void main() {
@@ -227,6 +251,9 @@ void main() {
   // — and their mean is the lifetime in seconds at any frame rate. r is new
   // every step, because the seed is.
   bool respawn = u_init == 1 || r.x < u_dt / max(u_lifetime, 1.0e-3);
+  // The field's strength where the particle ends this step, for its trail's
+  // colour: measured once, and used by the sink test too.
+  float here = 0.0;
   if (!respawn) {
     vec3 p = s.xyz;
     float h = u_dt;
@@ -239,7 +266,8 @@ void main() {
     // too in a pole's core, where the field is thirty times the scale: there
     // a sink would otherwise collect every particle in the box into one
     // white knot, where a simulation's outflow absorbs them.
-    bool core = u_absorb == 1 && length(vtField(next)) > 30.0 * u_speedScale;
+    here = length(vtField(next));
+    bool core = u_absorb == 1 && here > 30.0 * u_speedScale;
     // Nothing comes back out of a horizon.
     bool fell = u_lens == 1 && length(next) < u_horizon;
     if (vtOutsideBox(next) || length(k1) == 0.0 || core || fell) respawn = true;
@@ -249,10 +277,53 @@ void main() {
     vec3 born = vtBirth(uint(id) ^ (u_seed * 747796405u));
     // Not born this step: hidden, and tried again next step.
     s = vec4(born, vtOutsideBox(born) ? -1.0e9 : u_frame);
+    here = length(vtField(born));
   }
   if (id >= u_count) s.w = -1.0e9;
   o_state = s;
-  o_trail = vec4(s.xyz, length(vtField(s.xyz)));
+  o_trail = vec4(s.xyz, here);
+}
+`;
+}
+
+/**
+ * The birth pool: points sampled from the seed's density, by rejection, a
+ * slice of rows at a time.
+ *
+ * Births used to be sampled where they happened, in the step, up to 64 tries
+ * each. A GPU runs neighbouring particles in lockstep, so one respawn in a
+ * group held the whole group through every try: with tens of thousands of
+ * particles, nearly every group had one each frame, and a heavy seed (the
+ * galaxy's arms, the black hole's disk) was evaluated millions of times a
+ * frame. Sampling into a pool of 4,096 points instead, a sixteenth refreshed
+ * each step — the whole pool every quarter of a second, quick enough for a
+ * seed that moves with the clock — costs 64 tries for 256 points, and a
+ * respawn is one lookup.
+ */
+const POOL_SIDE = 64;
+const POOL_ROWS_PER_STEP = 4;
+
+function birthPoolFragment(field: Field3D) {
+  return `#version 300 es
+precision highp float;
+precision highp int;
+uniform uint u_seed;
+out vec4 o_birth;
+${field3dFunctions(field)}
+${HASH_GLSL}
+${CLIP_GLSL}
+void main() {
+  ivec2 q = ivec2(gl_FragCoord.xy);
+  uint key = uint(q.y * ${POOL_SIDE} + q.x) * 2654435761u ^ u_seed;
+  for (uint i = 0u; i < 64u; i++) {
+    vec3 h = vtHash3(key + i * 2246822519u);
+    vec3 p = mix(u_boxMin, u_boxMax, h);
+    if (vtHash3(key ^ (i * 3266489917u + 374761393u)).x < vtSeed(p)) {
+      o_birth = vec4(p, 1.0);
+      return;
+    }
+  }
+  o_birth = vec4(0.0);
 }
 `;
 }
@@ -284,6 +355,8 @@ uniform float u_horizon;
 uniform float u_image;
 uniform int u_side;
 uniform int u_beaming;
+uniform int u_stride;
+uniform int u_needsAlong;
 `;
 
 /**
@@ -360,11 +433,18 @@ float vtShift(vec3 math, vec3 along, vec3 view) {
 `;
 
 const DRAW_COLOR = `
-/** The colour, shifted hotter or cooler by g, the beaming's frequency ratio. */
+uniform highp sampler2D u_paletteLUT;
+/**
+ * The colour, shifted hotter or cooler by g, the beaming's frequency ratio.
+ * The ramp is read from its lookup texture (see paletteLUT): every trail
+ * point of every particle asks for a colour each frame, and walking the stops
+ * for each was a measurable part of drawing them.
+ */
 vec3 vtFlowColor(float m, vec3 along, float g) {
   if (u_colorMode == 1) return vtAdjust(u_fixedColor);
   if (u_colorMode == 2) return abs(along);
-  return vtPalette(clamp(1.0 - exp(-m / u_speedScale) + 0.3 * log2(g), 0.0, 1.0));
+  float t = clamp(1.0 - exp(-m / u_speedScale) + 0.3 * log2(g), 0.0, 1.0);
+  return texture(u_paletteLUT, vec2((t * 255.0 + 0.5) / 256.0, 0.5)).rgb;
 }
 /** Colour and opacity, brightened by g³ without passing white. */
 vec4 vtLit(vec3 c, float a, float g) {
@@ -396,13 +476,17 @@ void main() {
   ivec2 q = ivec2(gl_InstanceID % u_width, gl_InstanceID / u_width);
   vec4 s = texelFetch(u_state, q, 0);
   int age = int(u_frame - s.w);
-  int back = gl_VertexID;
+  // Every u_stride-th point of the ring, and always its oldest.
+  int back = min(gl_VertexID * u_stride, u_layers - 1);
   // Points from before this particle's current life are not its trail:
   // collapse them onto its oldest real point, invisibly, so the strip has no
-  // segment jumping from where it died to where it was reborn.
+  // segment jumping from where it died to where it was reborn — and, being
+  // zero length, no fragments either.
   bool real = back <= age && s.w > -1.0e8;
   vec4 t = vtTrailAt(q, real ? back : max(min(age, u_layers - 1), 0));
-  vec4 ahead = vtTrailAt(q, max(back - 1, 0));
+  // The direction along the trail is only read by the direction colours and
+  // by beaming; a uniform branch, so the fetch is skipped when neither is on.
+  vec4 ahead = u_needsAlong == 1 ? vtTrailAt(q, max(back - u_stride, 0)) : t;
   vec3 view = (u_mathToView * vec4(t.xyz, 1.0)).xyz;
   v_view = view;
   v_math = t.xyz;
@@ -436,7 +520,9 @@ void main() {
   ivec2 q = ivec2(gl_VertexID % u_width, gl_VertexID / u_width);
   vec4 s = texelFetch(u_state, q, 0);
   vec4 t = texelFetch(u_trail, ivec3(q, u_newest), 0);
-  vec4 before = texelFetch(u_trail, ivec3(q, (u_newest + u_layers - 1) % u_layers), 0);
+  vec4 before = u_needsAlong == 1
+    ? texelFetch(u_trail, ivec3(q, (u_newest + u_layers - 1) % u_layers), 0)
+    : t;
   vec3 view = (u_mathToView * vec4(t.xyz, 1.0)).xyz;
   v_view = view;
   v_math = t.xyz;
@@ -523,6 +609,21 @@ void main() {
 }
 `;
 
+/** A flat colour over the target: with constant-alpha blending, the fade. */
+const FLAT_FRAGMENT = `#version 300 es
+precision highp float;
+out vec4 outColor;
+void main() { outColor = vec4(1.0); }
+`;
+
+/** The accumulated trails, onto the canvas. */
+const COMPOSITE_FRAGMENT = `#version 300 es
+precision highp float;
+uniform highp sampler2D u_accum;
+out vec4 outColor;
+void main() { outColor = texelFetch(u_accum, ivec2(gl_FragCoord.xy), 0); }
+`;
+
 export class Flow3DRenderer implements Overlay3DRenderer {
   private readonly gl: WebGL2RenderingContext;
   private readonly vao: WebGLVertexArrayObject;
@@ -535,6 +636,33 @@ export class Flow3DRenderer implements Overlay3DRenderer {
   private readonly shadowUniforms: Uniforms;
   private stepProgram?: WebGLProgram;
   private stepUniforms: Uniforms = {};
+  private poolProgram?: WebGLProgram;
+  private poolUniforms: Uniforms = {};
+  private pool?: WebGLTexture;
+  private poolRow = 0;
+  private lut?: WebGLTexture;
+  private lutKey = "";
+  private readonly flatProgram: WebGLProgram;
+  private readonly compositeProgram: WebGLProgram;
+  private readonly compositeUniforms: Uniforms;
+  /**
+   * The trails as a picture, for a still view: a float colour target with a
+   * depth buffer of its own, the view it was drawn for, and the step it has
+   * the trails up to.
+   */
+  private accum?: {
+    texture: WebGLTexture;
+    depth: WebGLRenderbuffer;
+    framebuffer: WebGLFramebuffer;
+    width: number;
+    height: number;
+  };
+  private accumKey = "";
+  private accumFrame = -1;
+  /** Steps whose fade is still owed to the kept picture. */
+  private fadeDebt = 0;
+  /** For the tests: whether the last frame redrew the trails whole. */
+  lastRedrewTrails = true;
   private readonly surfaceDepth: SurfaceDepth;
   private readonly scale: FieldScale3D;
   private state: WebGLTexture[] = [];
@@ -546,6 +674,8 @@ export class Flow3DRenderer implements Overlay3DRenderer {
   private frame = 0;
   private newest = 0;
   private needsInit = true;
+  /** Set when the particles start again, so a kept picture of trails goes. */
+  private needsTrailRedraw = true;
   private lastStep?: number;
   private field?: Field3D;
   private options: Flow3DOptions = DEFAULT_FLOW_3D_OPTIONS;
@@ -554,9 +684,17 @@ export class Flow3DRenderer implements Overlay3DRenderer {
   private pixelRatio = 1;
   last?: Flow3DFrame;
 
-  constructor(private readonly canvas: HTMLCanvasElement) {
+  /**
+   * `smoothLines` multisamples the canvas: smoother trails at two to three and
+   * a half times the cost of drawing them (measured on this machine's GPU);
+   * fixed for the canvas's life, since WebGL decides it at creation.
+   */
+  constructor(
+    private readonly canvas: HTMLCanvasElement,
+    readonly smoothLines = false
+  ) {
     const gl = canvas.getContext("webgl2", {
-      antialias: true,
+      antialias: smoothLines,
       premultipliedAlpha: true,
       alpha: true,
       depth: true,
@@ -579,6 +717,13 @@ export class Flow3DRenderer implements Overlay3DRenderer {
     this.headProgram = linkProgram3D(gl, HEAD_VERTEX, FLOW_FRAGMENT);
     this.headUniforms = uniformsOf(gl, this.headProgram);
     this.shadowProgram = linkProgram3D(gl, FULLSCREEN_VERTEX, SHADOW_FRAGMENT);
+    this.flatProgram = linkProgram3D(gl, FULLSCREEN_VERTEX, FLAT_FRAGMENT);
+    this.compositeProgram = linkProgram3D(
+      gl,
+      FULLSCREEN_VERTEX,
+      COMPOSITE_FRAGMENT
+    );
+    this.compositeUniforms = uniformsOf(gl, this.compositeProgram);
     this.shadowUniforms = uniformsOf(gl, this.shadowProgram);
     this.surfaceDepth = new SurfaceDepth(gl);
     this.scale = new FieldScale3D(gl, this.vao);
@@ -599,6 +744,13 @@ export class Flow3DRenderer implements Overlay3DRenderer {
     if (this.stepProgram !== undefined) gl.deleteProgram(this.stepProgram);
     this.stepProgram = step;
     this.stepUniforms = uniformsOf(gl, step);
+    if (this.poolProgram !== undefined) gl.deleteProgram(this.poolProgram);
+    this.poolProgram =
+      field.seed === undefined
+        ? undefined
+        : linkProgram3D(gl, FULLSCREEN_VERTEX, birthPoolFragment(field));
+    this.poolUniforms =
+      this.poolProgram === undefined ? {} : uniformsOf(gl, this.poolProgram);
     this.field = field;
     this.scale.setField(field);
     // A new field is a new flow: every particle starts again.
@@ -680,6 +832,8 @@ export class Flow3DRenderer implements Overlay3DRenderer {
     const dt = Math.min(elapsed, 0.05);
     const o = this.options;
     this.frame++;
+    // A whole pool before the first births, a quarter of it each step after.
+    const pooled = this.refreshPool(box, this.needsInit);
     this.newest = this.frame % this.layers;
     const write = 1 - this.read;
     const u = this.stepUniforms;
@@ -722,11 +876,207 @@ export class Flow3DRenderer implements Overlay3DRenderer {
     gl.uniform1i(u.u_lens, o.lens ? 1 : 0);
     gl.uniform1f(u.u_horizon, o.horizon);
     gl.uniform1ui(u.u_seed, (this.frame * 2246822519) >>> 0);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, pooled ? this.pool! : null);
+    gl.uniform1i(u.u_pool, 2);
+    gl.uniform1i(u.u_pooled, pooled ? 1 : 0);
+    gl.activeTexture(gl.TEXTURE0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.drawBuffers([gl.BACK]);
     this.read = write;
+    if (this.needsInit) this.needsTrailRedraw = true;
     this.needsInit = false;
+  }
+
+  /**
+   * Draws `paint` into the kept picture of trails, clearing it first when
+   * `clear`. The picture has the canvas's size, float colour so a long fade
+   * never bands, and a depth buffer of its own for what hides the trails.
+   */
+  private accumulate(clear: boolean, paint: () => void) {
+    const { gl } = this;
+    const { width } = this.canvas;
+    const { height } = this.canvas;
+    if (
+      this.accum === undefined ||
+      this.accum.width !== width ||
+      this.accum.height !== height
+    ) {
+      if (this.accum !== undefined) {
+        gl.deleteTexture(this.accum.texture);
+        gl.deleteRenderbuffer(this.accum.depth);
+        gl.deleteFramebuffer(this.accum.framebuffer);
+      }
+      const texture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA16F, width, height);
+      const depth = gl.createRenderbuffer();
+      gl.bindRenderbuffer(gl.RENDERBUFFER, depth);
+      gl.renderbufferStorage(
+        gl.RENDERBUFFER,
+        gl.DEPTH_COMPONENT24,
+        width,
+        height
+      );
+      const framebuffer = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+      gl.framebufferTexture2D(
+        gl.FRAMEBUFFER,
+        gl.COLOR_ATTACHMENT0,
+        gl.TEXTURE_2D,
+        texture,
+        0
+      );
+      gl.framebufferRenderbuffer(
+        gl.FRAMEBUFFER,
+        gl.DEPTH_ATTACHMENT,
+        gl.RENDERBUFFER,
+        depth
+      );
+      this.accum = { texture, depth, framebuffer, width, height };
+      clear = true;
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.accum.framebuffer);
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+    gl.viewport(0, 0, width, height);
+    if (clear) {
+      gl.clearColor(0, 0, 0, 0);
+      gl.clearDepth(1);
+      gl.depthMask(true);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.depthMask(false);
+    }
+    paint();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, width, height);
+  }
+
+  /**
+   * One step's fade of the kept trails: by 1 − 2/layers, so a trail kept as
+   * a picture is about as long and as bright as one drawn whole — measured,
+   * since a trail's points overlap and screen blending is not a sum: within
+   * five percent of mean brightness on the galaxy and the Lorenz butterfly,
+   * a little brighter on the black hole's longer trails
+   * (kept-trails-compare.png).
+   */
+  private fadeAccum(layers: number, dark: boolean, steps: number) {
+    const { gl } = this;
+    const keep = Math.max(0, 1 - 2 / Math.max(layers, 4)) ** steps;
+    gl.useProgram(this.flatProgram);
+    gl.disable(gl.DEPTH_TEST);
+    gl.enable(gl.BLEND);
+    gl.blendColor(0, 0, 0, keep);
+    gl.blendFunc(gl.ZERO, gl.CONSTANT_ALPHA);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    this.restoreTrailBlend(dark);
+  }
+
+  /** The kept trails onto the canvas, blended as trails drawn there are. */
+  private compositeAccum(dark: boolean) {
+    const { gl } = this;
+    gl.useProgram(this.compositeProgram);
+    gl.disable(gl.DEPTH_TEST);
+    gl.activeTexture(gl.TEXTURE4);
+    gl.bindTexture(gl.TEXTURE_2D, this.accum!.texture);
+    gl.uniform1i(this.compositeUniforms.u_accum, 4);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.enable(gl.BLEND);
+    this.restoreTrailBlend(dark);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  private restoreTrailBlend(dark: boolean) {
+    const { gl } = this;
+    if (dark) {
+      gl.blendFuncSeparate(
+        gl.ONE,
+        gl.ONE_MINUS_SRC_COLOR,
+        gl.ONE,
+        gl.ONE_MINUS_SRC_ALPHA
+      );
+    } else gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  }
+
+  /** The palette's lookup texture, rebuilt only when the ramp changes. */
+  private updateLUT(o: Flow3DOptions) {
+    const key = `${o.palette}|${o.saturation}|${o.contrast}`;
+    if (key === this.lutKey && this.lut !== undefined) return;
+    const { gl } = this;
+    if (this.lut === undefined) {
+      this.lut = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, this.lut);
+      gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, PALETTE_LUT_SIZE, 1);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
+    gl.bindTexture(gl.TEXTURE_2D, this.lut);
+    gl.texSubImage2D(
+      gl.TEXTURE_2D,
+      0,
+      0,
+      0,
+      PALETTE_LUT_SIZE,
+      1,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      paletteLUT(o.palette, {
+        saturation: o.saturation,
+        contrast: o.contrast,
+      })
+    );
+    this.lutKey = key;
+  }
+
+  /**
+   * Resamples a slice of the birth pool (all of it if `whole`), for a field
+   * with a seed; false for one without, whose births need no pool.
+   */
+  private refreshPool(box: Box3D, whole: boolean) {
+    const { gl, field } = this;
+    if (this.poolProgram === undefined || field === undefined) return false;
+    if (this.pool === undefined) {
+      this.pool = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, this.pool);
+      gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32F, POOL_SIDE, POOL_SIDE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      whole = true;
+    }
+    const u = this.poolUniforms;
+    gl.useProgram(this.poolProgram);
+    gl.bindVertexArray(this.vao);
+    gl.disable(gl.BLEND);
+    gl.disable(gl.DEPTH_TEST);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+    gl.framebufferTexture2D(
+      gl.FRAMEBUFFER,
+      gl.COLOR_ATTACHMENT0,
+      gl.TEXTURE_2D,
+      this.pool,
+      0
+    );
+    gl.framebufferTexture2D(
+      gl.FRAMEBUFFER,
+      gl.COLOR_ATTACHMENT1,
+      gl.TEXTURE_2D,
+      null,
+      0
+    );
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+    uploadField3DParameters(gl, u, field, this.parameters, this.time);
+    gl.uniform3fv(u.u_boxMin, box.min);
+    gl.uniform3fv(u.u_boxMax, box.max);
+    gl.uniform1ui(u.u_seed, (this.frame * 2654435761 + 12345) >>> 0);
+    const rows = whole ? POOL_SIDE : POOL_ROWS_PER_STEP;
+    const from = whole ? 0 : this.poolRow;
+    gl.viewport(0, from, POOL_SIDE, rows);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    this.poolRow = (from + rows) % POOL_SIDE;
+    gl.useProgram(this.stepProgram!);
+    return true;
   }
 
   draw(camera: Camera3D, box: Box3D) {
@@ -795,7 +1145,11 @@ export class Flow3DRenderer implements Overlay3DRenderer {
 
     const cut = cutUniforms(mathToView, box, o.cut);
     const palette = paletteUniforms(o.palette);
+    this.updateLUT(o);
     const hole = lensFrame(camera, mathToView, o, box);
+    const stride = Math.max(1, Math.min(8, Math.round(o.trailStride)));
+    // Points drawn per trail: every stride-th, and the oldest.
+    const strip = Math.ceil((this.layers - 1) / stride) + 1;
     const common = (u: Uniforms) => {
       gl.uniformMatrix4fv(u.u_mathToView, false, mathToView);
       gl.uniformMatrix4fv(u.u_projection, false, camera.projection);
@@ -825,6 +1179,10 @@ export class Flow3DRenderer implements Overlay3DRenderer {
       gl.uniform1fv(u.u_paletteAt, palette.positions);
       gl.uniform3fv(u.u_paletteRGB, palette.colors);
       gl.uniform1i(u.u_paletteCount, palette.count);
+      gl.activeTexture(gl.TEXTURE3);
+      gl.bindTexture(gl.TEXTURE_2D, this.lut ?? null);
+      gl.uniform1i(u.u_paletteLUT, 3);
+      gl.activeTexture(gl.TEXTURE0);
       gl.uniform1i(u.u_paletteIsHue, o.palette === "direction-hue" ? 1 : 0);
       gl.uniform1f(u.u_saturation, o.saturation);
       gl.uniform1f(u.u_contrast, o.contrast);
@@ -834,6 +1192,11 @@ export class Flow3DRenderer implements Overlay3DRenderer {
       gl.uniform1f(u.u_horizonView, hole?.horizonView ?? 0);
       gl.uniform1f(u.u_horizon, o.horizon);
       gl.uniform1i(u.u_beaming, o.beaming ? 1 : 0);
+      gl.uniform1i(u.u_stride, stride);
+      gl.uniform1i(
+        u.u_needsAlong,
+        o.colorMode === "direction" || (hole !== undefined && o.beaming) ? 1 : 0
+      );
     };
     const passes = (draw: (alpha: number) => void) => {
       if (occluding && o.occlusion === "fade") {
@@ -850,18 +1213,31 @@ export class Flow3DRenderer implements Overlay3DRenderer {
       draw(1);
     };
 
-    const trails = (side: number, image: number) => {
+    /**
+     * Trail strips for one side of the hole and one of its images: `vertices`
+     * points of each, every `step`-th of its ring.
+     */
+    const strips = (
+      side: number,
+      image: number,
+      vertices: number,
+      step: number,
+      dim = 1
+    ) => {
       gl.useProgram(this.trailProgram);
       const tu = this.trailUniforms;
       common(tu);
       gl.uniform1i(tu.u_side, side);
       gl.uniform1f(tu.u_image, image);
-      gl.uniform1f(tu.u_opacity, o.opacity);
+      gl.uniform1i(tu.u_stride, step);
+      gl.uniform1f(tu.u_opacity, o.opacity * dim);
       gl.uniform1i(tu.u_round, 0);
       passes((alpha) => {
         gl.uniform1f(tu.u_alpha, alpha);
-        gl.drawArraysInstanced(gl.LINE_STRIP, 0, this.layers, particles);
+        gl.drawArraysInstanced(gl.LINE_STRIP, 0, vertices, particles);
       });
+    };
+    const heads = (side: number, image: number) => {
       if (o.glow <= 0) return;
       gl.useProgram(this.headProgram);
       const hu = this.headUniforms;
@@ -879,18 +1255,108 @@ export class Flow3DRenderer implements Overlay3DRenderer {
         gl.drawArrays(gl.POINTS, 0, particles);
       });
     };
-    if (hole === undefined) trails(0, 1);
-    else {
-      // The shadow first, into the depth buffer as well as the colour, so
-      // every trail behind it is rejected by the depth test: one pass for
-      // the main image of everything, one for the faint second image of
-      // what is behind, rather than drawing the far side, the shadow and
-      // then the near side as three passes. Then the photon ring, over all.
-      this.drawShadowDisc(hole, camera, ba > 0);
-      trails(0, 1);
-      trails(1, -1);
-      this.drawPhotonRing(hole, palette, ba > 0);
+    // The shadow first, into the depth buffer as well as the colour, so
+    // every trail behind it is rejected by the depth test: one pass for the
+    // main image of everything, one for the faint second image of what is
+    // behind. The photon ring goes over everything, after.
+    if (hole !== undefined) this.drawShadowDisc(hole, camera, ba > 0);
+    const images: [number, number][] =
+      hole === undefined
+        ? [[0, 1]]
+        : [
+            [0, 1],
+            [1, -1],
+          ];
+
+    // The trails: whole, into the canvas, for a view that is moving or when
+    // asked to; otherwise into the kept picture, only the newest segments.
+    const viewKey = JSON.stringify([
+      mathToView,
+      camera.projection,
+      this.canvas.width,
+      this.canvas.height,
+      box,
+      o.opacity,
+      o.colorMode,
+      o.fixedColor,
+      o.cut,
+      o.clip,
+      o.fog,
+      o.occlusion,
+      o.lens,
+      o.horizon,
+      o.beaming,
+      stride,
+      this.lutKey,
+      this.layers,
+      this.side,
+      particles,
+      ba > 0,
+      this.surfaceDepth.count,
+      // A slider a surface reads moves the surface, and what it hides.
+      occluding ? [...this.parameters] : 0,
+    ]);
+    const surfacesMove = this.surfaceDepth.moving;
+    const keep = o.incremental && !surfacesMove;
+    if (!keep) {
+      for (const [side, image] of images) strips(side, image, strip, stride);
+      this.lastRedrewTrails = true;
+    } else {
+      const redraw =
+        this.accum === undefined ||
+        this.accumKey !== viewKey ||
+        this.needsTrailRedraw;
+      this.accumulate(redraw, () => {
+        if (redraw) {
+          if (occluding) {
+            gl.colorMask(false, false, false, false);
+            gl.depthMask(true);
+            this.surfaceDepth.draw(
+              mathToView,
+              camera.projection,
+              box,
+              o.surfaceResolution === "auto"
+                ? AUTO_SURFACE_RESOLUTION
+                : o.surfaceResolution,
+              this.parameters,
+              this.time
+            );
+            gl.depthMask(false);
+            gl.colorMask(true, true, true, true);
+          }
+          if (hole !== undefined) {
+            gl.colorMask(false, false, false, false);
+            this.drawShadowDisc(hole, camera, ba > 0);
+            gl.colorMask(true, true, true, true);
+          }
+          for (const [side, image] of images)
+            strips(side, image, strip, stride);
+        } else if (this.accumFrame !== this.frame) {
+          // A step has been taken since: fade the picture by one step's
+          // worth, and add each particle's newest segment.
+          // Faded every second step by two steps' worth, which looks the
+          // same at half the cost of a pass over the whole picture.
+          this.fadeDebt += this.frame - Math.max(this.accumFrame, 0);
+          if (this.fadeDebt >= 2) {
+            this.fadeAccum(this.layers, ba > 0, this.fadeDebt);
+            this.fadeDebt = 0;
+          }
+          // A particle moves about a pixel a step, and a line a pixel long
+          // often lights no pixel at all; so each step's segment reaches back
+          // three steps, covering every pixel of the trail about three times,
+          // at 0.4 of the opacity, a third and a little more since screen
+          // blending sums less than linearly.
+          for (const [side, image] of images) strips(side, image, 2, 3, 1 / 3);
+        }
+      });
+      this.accumKey = viewKey;
+      this.accumFrame = this.frame;
+      this.needsTrailRedraw = false;
+      this.lastRedrewTrails = redraw;
+      this.compositeAccum(ba > 0);
     }
+    for (const [side, image] of images) heads(side, image);
+    if (hole !== undefined) this.drawPhotonRing(hole, palette, ba > 0);
     gl.depthMask(true);
     gl.bindVertexArray(null);
     this.last = {
@@ -980,9 +1446,19 @@ export class Flow3DRenderer implements Overlay3DRenderer {
     for (const t of this.state) gl.deleteTexture(t);
     if (this.trail !== undefined) gl.deleteTexture(this.trail);
     if (this.stepProgram !== undefined) gl.deleteProgram(this.stepProgram);
+    if (this.poolProgram !== undefined) gl.deleteProgram(this.poolProgram);
+    if (this.pool !== undefined) gl.deleteTexture(this.pool);
+    if (this.lut !== undefined) gl.deleteTexture(this.lut);
     gl.deleteProgram(this.trailProgram);
     gl.deleteProgram(this.headProgram);
     gl.deleteProgram(this.shadowProgram);
+    gl.deleteProgram(this.flatProgram);
+    gl.deleteProgram(this.compositeProgram);
+    if (this.accum !== undefined) {
+      gl.deleteTexture(this.accum.texture);
+      gl.deleteRenderbuffer(this.accum.depth);
+      gl.deleteFramebuffer(this.accum.framebuffer);
+    }
     gl.deleteFramebuffer(this.framebuffer);
     this.surfaceDepth.dispose();
     this.scale.dispose();

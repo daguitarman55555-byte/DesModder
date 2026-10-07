@@ -58,6 +58,9 @@ describe("the 3D flow", () => {
   });
 
   test("steps by real time: a second draw in the same instant does not step again", () => {
+    // The same instant, held: a loaded machine can take longer than the
+    // 4 ms the step waits for between two draws.
+    jest.spyOn(performance, "now").mockReturnValue(1000);
     const renderer = new Flow3DRenderer(fakeCanvas(fakeGL()));
     renderer.setField(swirl);
     renderer.resize(800, 600, 1);
@@ -128,5 +131,43 @@ describe("the black hole's lens", () => {
     renderer.setOptions({ ...DEFAULT_FLOW_3D_OPTIONS, particles: 1000 });
     renderer.draw(flat, box);
     expect(gl.counts.instancesDrawn).toBe(1000);
+  });
+});
+
+describe("trails kept as a picture while the view is still", () => {
+  test("a still view adds only the newest segments; a moved one redraws them whole", () => {
+    const gl = fakeGL();
+    const renderer = new Flow3DRenderer(fakeCanvas(gl));
+    renderer.setField(swirl);
+    renderer.resize(800, 600, 1);
+    renderer.setOptions({ ...DEFAULT_FLOW_3D_OPTIONS, particles: 1000 });
+    renderer.draw(flat, box);
+    expect(renderer.lastRedrewTrails).toBe(true);
+    advance(16);
+    renderer.draw(flat, box);
+    expect(renderer.lastRedrewTrails).toBe(false);
+    // The camera turned: the kept picture was of another view.
+    const turned: Camera3D = {
+      ...flat,
+      view: [0, 0, 1, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 0, 1],
+    };
+    advance(32);
+    renderer.draw(turned, box);
+    expect(renderer.lastRedrewTrails).toBe(true);
+  });
+
+  test("asked to, it redraws them whole every frame", () => {
+    const renderer = new Flow3DRenderer(fakeCanvas(fakeGL()));
+    renderer.setField(swirl);
+    renderer.resize(800, 600, 1);
+    renderer.setOptions({
+      ...DEFAULT_FLOW_3D_OPTIONS,
+      particles: 1000,
+      incremental: false,
+    });
+    renderer.draw(flat, box);
+    advance(16);
+    renderer.draw(flat, box);
+    expect(renderer.lastRedrewTrails).toBe(true);
   });
 });

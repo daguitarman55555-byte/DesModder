@@ -99,6 +99,17 @@ export class FieldScale3D {
   private field?: Field3D;
   /** The median |F| and what it was measured for. */
   private median?: { key: string; value: number };
+  /**
+   * A measurement on its way back from the GPU: read into a pixel buffer
+   * behind a fence, collected on a later frame once the fence has passed, so
+   * the frame that asks never waits for the GPU to finish.
+   */
+  private inFlight?: {
+    key: string;
+    buffer: WebGLBuffer;
+    fence: WebGLSync;
+    taken: number;
+  };
 
   constructor(
     private readonly gl: WebGL2RenderingContext,
@@ -168,6 +179,14 @@ export class FieldScale3D {
       field.usesTime ? Math.floor(time * 2) : 0,
     ].join("|");
     if (this.median?.key === key) return this.median.value;
+    // A re-measurement while an earlier value stands (a field moving with
+    // time, a slider moved, the box zoomed) goes back asynchronously: this
+    // frame keeps the last value, a frame or two later has the new one. Only
+    // the very first measurement, with nothing to show meanwhile, waits.
+    const landed = this.collect();
+    if (landed !== undefined && landed.key === key) return landed.value;
+    const asynchronous = this.median !== undefined;
+    if (asynchronous && this.inFlight !== undefined) return this.median!.value;
 
     const taken = Math.min(instances, SCALE_SAMPLES);
     const height = SCALE_SAMPLES / SCALE_WIDTH;
@@ -205,23 +224,50 @@ export class FieldScale3D {
     gl.uniform1i(u.u_total, instances);
     gl.uniform1i(u.u_taken, taken);
     gl.drawArrays(gl.POINTS, 0, taken);
+    if (asynchronous) {
+      const buffer = gl.createBuffer();
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, buffer);
+      gl.bufferData(
+        gl.PIXEL_PACK_BUFFER,
+        SCALE_WIDTH * height * 4 * 4,
+        gl.STREAM_READ
+      );
+      gl.readPixels(0, 0, SCALE_WIDTH, height, gl.RGBA, gl.FLOAT, 0);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+      const fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0)!;
+      gl.flush();
+      this.inFlight = { key, buffer, fence, taken };
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.enable(gl.BLEND);
+      return this.median!.value;
+    }
     const pixels = new Float32Array(SCALE_WIDTH * height * 4);
     gl.readPixels(0, 0, SCALE_WIDTH, height, gl.RGBA, gl.FLOAT, pixels);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.enable(gl.BLEND);
-
-    const magnitudes: number[] = [];
-    for (let i = 0; i < taken; i++) {
-      const m = pixels[i * 4];
-      if (m > 1e-9 && Number.isFinite(m)) magnitudes.push(m);
-    }
-    magnitudes.sort((a, b) => a - b);
-    const value =
-      magnitudes.length > 0
-        ? magnitudes[Math.floor(magnitudes.length / 2)]
-        : undefined;
+    const value = medianOf(pixels, taken);
     if (value !== undefined) this.median = { key, value };
     return value;
+  }
+
+  /** The measurement in flight, if the GPU has finished it; else nothing. */
+  private collect() {
+    const { gl, inFlight } = this;
+    if (inFlight === undefined) return undefined;
+    const status = gl.clientWaitSync(inFlight.fence, 0, 0);
+    if (status === gl.TIMEOUT_EXPIRED) return undefined;
+    const height = SCALE_SAMPLES / SCALE_WIDTH;
+    const pixels = new Float32Array(SCALE_WIDTH * height * 4);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, inFlight.buffer);
+    gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, pixels);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    gl.deleteSync(inFlight.fence);
+    gl.deleteBuffer(inFlight.buffer);
+    this.inFlight = undefined;
+    const value = medianOf(pixels, inFlight.taken);
+    if (value === undefined) return undefined;
+    this.median = { key: inFlight.key, value };
+    return this.median;
   }
 
   dispose() {
@@ -232,7 +278,25 @@ export class FieldScale3D {
       gl.deleteFramebuffer(this.magnitudeTarget.framebuffer);
       gl.deleteTexture(this.magnitudeTarget.texture);
     }
+    if (this.inFlight !== undefined) {
+      gl.deleteSync(this.inFlight.fence);
+      gl.deleteBuffer(this.inFlight.buffer);
+    }
     this.magnitudeProgram = undefined;
     this.magnitudeTarget = undefined;
+    this.inFlight = undefined;
   }
+}
+
+/** The median of the first `taken` magnitudes read back, ignoring the empty. */
+function medianOf(pixels: Float32Array, taken: number) {
+  const magnitudes: number[] = [];
+  for (let i = 0; i < taken; i++) {
+    const m = pixels[i * 4];
+    if (m > 1e-9 && Number.isFinite(m)) magnitudes.push(m);
+  }
+  magnitudes.sort((a, b) => a - b);
+  return magnitudes.length > 0
+    ? magnitudes[Math.floor(magnitudes.length / 2)]
+    : undefined;
 }

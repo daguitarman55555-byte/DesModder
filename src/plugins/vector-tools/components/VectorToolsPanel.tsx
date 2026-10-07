@@ -1601,6 +1601,39 @@ function flow3dTab(vectorTools: VectorTools, config: ConfigGetter) {
               { minimum: 0, maximum: 1, step: 0.05, decimals: 2 },
               (v) => set("particleGlow", v)
             )}
+            {chipGroup(
+              "Smooth lines (multisampling: 2–3½× the drawing cost)",
+              () => s().particleSmooth,
+              [
+                { value: "auto", label: "Auto" },
+                { value: "on", label: "On" },
+                { value: "off", label: "Off" },
+              ],
+              (v) => set("particleSmooth", v),
+              "dsm-vector-tools-3d-particle-smooth"
+            )}
+            {chipGroup(
+              "Trails (Auto redraws them whole only while the view moves)",
+              () => s().particleRedraw,
+              [
+                { value: "auto", label: "Auto" },
+                { value: "always", label: "Redraw every frame" },
+              ],
+              (v) => set("particleRedraw", v),
+              "dsm-vector-tools-3d-particle-redraw"
+            )}
+            {chipGroup(
+              "Trail detail (points drawn per trail)",
+              () => s().particleDetail,
+              [
+                { value: "auto", label: "Auto (half)" },
+                { value: "full", label: "Every point" },
+                { value: "half", label: "Half" },
+                { value: "quarter", label: "Quarter" },
+              ],
+              (v) => set("particleDetail", v),
+              "dsm-vector-tools-3d-particle-detail"
+            )}
             {sliderControl(
               "dsm-vector-tools-3d-particle-size",
               "Dot size (px)",

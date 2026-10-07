@@ -149,6 +149,11 @@ export class SurfaceDepth {
     return this.programs.length;
   }
 
+  /** Whether any surface moves with the clock, and so with every frame. */
+  get moving() {
+    return this.programs.some(({ surface }) => surface.usesTime);
+  }
+
   /** Builds a program per surface; a no-op if the surfaces are the same. */
   setSurfaces(surfaces: readonly Surface3D[]) {
     const key = JSON.stringify(surfaces);

@@ -389,7 +389,27 @@ export interface Space3DConfig {
    * id; "" for the first one graphed.
    */
   surfaceId: string;
+  /**
+   * Multisampled trails: smoother, at two to three and a half times the cost
+   * of drawing them. Auto smooths only a light flow, where it is cheap.
+   */
+  particleSmooth: "auto" | "on" | "off";
+  /** How many of each trail's points are drawn; Auto draws half. */
+  particleDetail: "auto" | "full" | "half" | "quarter";
+  /**
+   * Auto keeps the trails as a fading picture while the view is still and
+   * adds only each step's newest segments, redrawing them whole only when
+   * the view moves; Always redraws them whole every frame.
+   */
+  particleRedraw: "auto" | "always";
 }
+
+/**
+ * Auto smooths trails only when there are at most this many trail points to
+ * draw: below it multisampling costs under a millisecond on an integrated
+ * GPU; above it, two to three and a half times the whole drawing.
+ */
+export const AUTO_SMOOTH_TRAIL_POINTS = 300_000;
 
 /** What the Arrows tab draws on Desmos 3D. */
 export type Look3D = "arrows" | "cloud";
@@ -466,6 +486,9 @@ export const DEFAULT_SPACE_3D: Space3DConfig = {
   lensHorizon: 0.45,
   beaming: true,
   surfaceId: "",
+  particleSmooth: "auto",
+  particleDetail: "auto",
+  particleRedraw: "auto",
 };
 
 export const TIME_SPEED_MINIMUM = 0.05;
@@ -1533,6 +1556,14 @@ export function normalizeSpace3D(
     beaming: flag("beaming"),
     surfaceId:
       typeof v?.surfaceId === "string" ? v.surfaceId : fallback.surfaceId,
+    particleSmooth: oneOf("particleSmooth", ["auto", "on", "off"]),
+    particleDetail: oneOf("particleDetail", [
+      "auto",
+      "full",
+      "half",
+      "quarter",
+    ]),
+    particleRedraw: oneOf("particleRedraw", ["auto", "always"]),
   };
 }
 

@@ -489,6 +489,50 @@ export function adjustRGB(
   return [push(rgb[0]), push(rgb[1]), push(rgb[2])];
 }
 
+/** Entries in a palette lookup texture: finer than 8-bit colour can show. */
+export const PALETTE_LUT_SIZE = 256;
+
+/**
+ * The ramp as a lookup table, RGBA bytes, `PALETTE_LUT_SIZE` entries from 0
+ * to 1, adjusted the way `vtPalette` adjusts it — each stop pushed, then the
+ * stops interpolated — so a shader that reads it draws the same colours with
+ * one texture read instead of walking every stop.
+ */
+export function paletteLUT(id: PaletteID, adjust: ColorAdjust): Uint8Array {
+  const out = new Uint8Array(PALETTE_LUT_SIZE * 4);
+  const hue = PALETTES[id].stops === undefined;
+  const stops = hue
+    ? []
+    : paletteStops(id).map((s) => ({
+        at: s.at,
+        rgb: adjustRGB(s.rgb, adjust),
+      }));
+  for (let i = 0; i < PALETTE_LUT_SIZE; i++) {
+    const t = i / (PALETTE_LUT_SIZE - 1);
+    let rgb: readonly number[];
+    if (hue) rgb = adjustRGB(hueRamp(t), adjust);
+    else {
+      const c = [...stops[0].rgb];
+      for (let k = 1; k < stops.length; k++) {
+        const from = stops[k - 1].at;
+        const to = stops[k].at;
+        const f = Math.min(
+          1,
+          Math.max(0, (t - from) / Math.max(to - from, 1e-6))
+        );
+        for (let j = 0; j < 3; j++)
+          c[j] += (stops[k].rgb[j] - stops[k - 1].rgb[j]) * f;
+      }
+      rgb = c;
+    }
+    out.set(
+      [Math.round(rgb[0]), Math.round(rgb[1]), Math.round(rgb[2]), 255],
+      i * 4
+    );
+  }
+  return out;
+}
+
 /** Whether an adjustment would leave every colour exactly where it was. */
 export function isNeutralAdjust(adjust: ColorAdjust) {
   return adjust.saturation === 1 && adjust.contrast === 1;

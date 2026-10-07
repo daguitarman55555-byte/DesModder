@@ -52,6 +52,7 @@ import {
   cloneDefaultConfig,
   validateVectorFieldConfig,
   AUTO_LENGTH_MULTIPLE_3D,
+  AUTO_SMOOTH_TRAIL_POINTS,
   type Space3DConfig,
 } from "./model";
 import {
@@ -117,6 +118,7 @@ import {
   type Volume3DOptions,
 } from "../../field-rendering/Volume3DRenderer";
 import {
+  autoFlowParticles3D,
   Flow3DRenderer,
   type Flow3DOptions,
 } from "../../field-rendering/Flow3DRenderer";
@@ -210,6 +212,11 @@ const PRESET_GROUPS = GALLERY_CATEGORIES.map((category) => ({
   ...category,
   presets: FIELD_GALLERY.filter((preset) => preset.category === category.id),
 })).filter((group) => group.presets.length > 0);
+
+/** Every n-th trail point drawn, for a detail setting; Auto draws half. */
+function trailStrideFor(detail: Space3DConfig["particleDetail"]) {
+  return detail === "full" ? 1 : detail === "quarter" ? 4 : 2;
+}
 
 function round(value: number) {
   return Math.round(value * 1000) / 1000;
@@ -479,7 +486,10 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     (canvas) => {
       let renderer: Flow3DRenderer | Volume3DRenderer;
       if (this.getConfig().space3d.flowLook === "particles") {
-        renderer = this.flow3d = new Flow3DRenderer(canvas);
+        renderer = this.flow3d = new Flow3DRenderer(
+          canvas,
+          this.flow3dSmoothLines
+        );
         this.traced3d = undefined;
       } else {
         renderer = this.traced3d = new Volume3DRenderer(canvas);
@@ -1109,7 +1119,12 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       return;
     }
     const wantsParticles = this.getConfig().space3d.flowLook === "particles";
-    if (wantsParticles !== (this.flow3d !== undefined)) {
+    // Multisampling is fixed when a canvas's context is made, so a change of
+    // it is a new canvas.
+    const smoothChanged =
+      this.flow3d !== undefined &&
+      this.flow3d.smoothLines !== this.flow3dSmoothLines;
+    if (wantsParticles !== (this.flow3d !== undefined) || smoothChanged) {
       this.stopFlow3D();
       this.flowOverlay3d.start();
       return;
@@ -1142,6 +1157,20 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     else this.traced3d?.setOptions(this.tracedOptions);
     renderer.setParameters(this.parameterValues);
     renderer.setTime(this.clockSeconds);
+  }
+
+  /**
+   * Whether the 3D flow's trails are multisampled: the setting, or for Auto,
+   * only when there are few enough trail points that it is cheap.
+   */
+  get flow3dSmoothLines() {
+    const s = this.getConfig().space3d;
+    if (s.particleSmooth !== "auto") return s.particleSmooth === "on";
+    const particles = s.particlesAuto
+      ? (this.flow3d?.last?.particles ?? autoFlowParticles3D(570))
+      : s.particles;
+    const stride = trailStrideFor(s.particleDetail);
+    return (particles * s.particleTrail) / stride <= AUTO_SMOOTH_TRAIL_POINTS;
   }
 
   /** What the 3D particle flow is told, from the field's settings. */
@@ -1177,6 +1206,8 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       lens: s.lens,
       horizon: s.lensHorizon,
       beaming: s.beaming,
+      trailStride: trailStrideFor(s.particleDetail),
+      incremental: s.particleRedraw === "auto",
     };
   }
 
