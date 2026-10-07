@@ -4,3 +4,6 @@
 # added for safety.
 *.png binary
 *.woff binary
+
+# Windows runs .bat files line by line and mis-jumps on LF endings.
+*.bat text eol=crlf

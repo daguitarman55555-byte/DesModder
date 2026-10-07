@@ -1,0 +1,43 @@
+# Builds the Chrome extension on every push to the working branch and puts it,
+# with the installer, on one release whose links never change:
+#
+#   https://github.com/daguitarman55555-byte/DesModder/releases/tag/latest-build
+#
+# So another computer needs no Node and no Git: Install-DesModder.bat
+# downloads the zip from there and unpacks it into a fixed folder.
+name: Latest build
+
+on:
+  push:
+    branches: [feature/vector-tools-foundation]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Two quick pushes: only the newer one's build should end up on the release.
+concurrency:
+  group: latest-build
+  cancel-in-progress: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build for Chrome
+        run: |
+          npm ci
+          node ./esbuild.mjs --browser=chrome --outdir=dist-chrome
+          cd dist-chrome && zip -qr ../DesModder-Chrome.zip .
+      - name: Replace the latest-build release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest-build --yes --cleanup-tag || true
+          gh release create latest-build \
+            DesModder-Chrome.zip install/Install-DesModder.bat \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Latest build" \
+            --notes "Built from ${GITHUB_SHA::8} on ${GITHUB_REF_NAME}. Download Install-DesModder.bat and double-click it to install or update."
