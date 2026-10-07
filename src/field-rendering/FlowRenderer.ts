@@ -127,6 +127,13 @@ export interface FlowOptions {
   lens?: boolean;
   /** Its horizon radius, in math units. */
   lensHorizon?: number;
+  /**
+   * How far past each edge of the view particles live and are born, as a
+   * fraction of its size, with the count raised to keep the view as dense.
+   * Born only in the view, the edge the flow comes in through looked faded:
+   * nothing there had had time to grow a trail.
+   */
+  margin?: number;
 }
 
 export const DEFAULT_FLOW_OPTIONS: FlowOptions = {
@@ -421,7 +428,9 @@ export class FlowRenderer {
 
   setOptions(options: FlowOptions) {
     this.options = { ...options };
-    this.setParticleCount(options.particleCount);
+    this.setParticleCount(
+      options.particleCount * (1 + 2 * (options.margin ?? 0)) ** 2
+    );
   }
 
   /** Matches the drawing buffer to the CSS box. Returns true if it changed. */
@@ -560,6 +569,7 @@ export class FlowRenderer {
       this.options.lens === true ? (this.options.lensHorizon ?? 0) : 0
     );
     gl.uniform1f(program.uniforms.u_seed, this.frameSeed / 2147483647);
+    gl.uniform1f(program.uniforms.u_margin, this.options.margin ?? 0);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
     gl.framebufferTexture2D(
@@ -1097,6 +1107,7 @@ float vtRand(vec2 co) {
 }
 
 uniform float u_horizon;
+uniform float u_margin;
 
 /**
  * Where a particle is born: a point in the view kept with the chance the seed
@@ -1105,9 +1116,11 @@ uniform float u_horizon;
  * the next step finds escaped and tries again.
  */
 vec2 vtBirth(vec2 seed, vec2 span) {
+  vec2 from = u_min - u_margin * span;
+  vec2 across = span * (1.0 + 2.0 * u_margin);
   for (int i = 0; i < 48; i++) {
     vec2 k = seed + vec2(float(i) * 3.17, float(i) * 1.37);
-    vec2 p = vec2(vtRand(k + 1.9), vtRand(k + 8.4)) * span + u_min;
+    vec2 p = vec2(vtRand(k + 1.9), vtRand(k + 8.4)) * across + from;
     if (vtRand(k + 5.3) < vtSeed(p)) return p;
   }
   return u_max + 10.0 * span;
@@ -1140,8 +1153,8 @@ void main() {
   vec2 delta = vtStep(pos);
   vec2 next = pos + delta;
 
-  bool escaped = any(lessThan(next, u_min - 0.05 * span)) ||
-                 any(greaterThan(next, u_max + 0.05 * span));
+  bool escaped = any(lessThan(next, u_min - (u_margin + 0.05) * span)) ||
+                 any(greaterThan(next, u_max + (u_margin + 0.05) * span));
   bool stalled = length(delta) < 1e-9 * max(span.x, span.y);
   bool expired = age > ${MAX_PARTICLE_AGE}.0 || vtRand(seed) < u_dropRate;
   bool broken = isnan(next.x) || isnan(next.y) || isinf(next.x) || isinf(next.y);

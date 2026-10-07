@@ -18,7 +18,12 @@
  * 144 Hz display advects no faster than a 60 Hz one (briefing §11.1, which
  * records the 2D flow's version of that defect).
  */
-import { multiplyMat4, type Camera3D } from "./camera3d";
+import {
+  mathToClip,
+  multiplyMat4,
+  projectToScreen,
+  type Camera3D,
+} from "./camera3d";
 import {
   field3dFunctions,
   sameField3D,
@@ -116,6 +121,13 @@ export interface Flow3DOptions {
    * whole. False redraws every frame.
    */
   incremental: boolean;
+  /**
+   * How far past each face of the box particles live and are born, as a
+   * fraction of its size, with the count raised to keep the box as dense
+   * (see SPAWN_GLSL). Only while the box clips: unclipped, particles out
+   * there would be drawn.
+   */
+  margin: number;
 }
 
 export const MAX_FLOW_PARTICLES_3D = 200_000;
@@ -149,7 +161,25 @@ export const DEFAULT_FLOW_3D_OPTIONS: Flow3DOptions = {
   beaming: true,
   trailStride: 2,
   incremental: true,
+  margin: 0.08,
 };
+
+/**
+ * Where particles live: the box and a margin past each face. A particle is
+ * born anywhere in it and lives until it leaves it, and what is outside the
+ * box is clipped from the picture as everything is. Particles born only in
+ * the box left the face the flow comes in through faded — nothing there had
+ * had time to grow a trail; with the margin they arrive already moving.
+ */
+const SPAWN_GLSL = `
+uniform float u_margin;
+vec3 vtSpawnMin() { return u_boxMin - u_margin * (u_boxMax - u_boxMin); }
+vec3 vtSpawnMax() { return u_boxMax + u_margin * (u_boxMax - u_boxMin); }
+bool vtOutsideSpawn(vec3 m) {
+  return any(lessThan(m, vtSpawnMin())) || any(greaterThan(m, vtSpawnMax()))
+    || any(isnan(m));
+}
+`;
 
 /**
  * Auto's particle count, from the box's size on screen: about one particle
@@ -158,6 +188,36 @@ export const DEFAULT_FLOW_3D_OPTIONS: Flow3DOptions = {
  * filled with an even fuzz in which no structure showed, where a simulation
  * picture reads through fewer, longer lines.
  */
+/**
+ * How big the box is on screen, in a way turning the view does not change:
+ * the length its diagonal would have seen square-on. Auto's particle count
+ * follows it.
+ *
+ * It used to follow the diagonal of the box's outline, which turning the
+ * view changes by up to one and a half times with nothing having got bigger
+ * (14,000 to 31,000 particles, rotate-restart.cjs); a count crossing a power
+ * of two reallocates the particles, and every particle starts again, so the
+ * flow restarted now and then while being dragged round. Each half-edge
+ * from the centre, projected: the sum of their squared lengths on screen is
+ * twice the square of the box's displayed half-side, whichever way it faces.
+ */
+export function boxDiagonalPx(camera: Camera3D, box: Box3D) {
+  const clip = mathToClip(camera);
+  const c = [0, 1, 2].map((i) => (box.min[i] + box.max[i]) / 2);
+  const centre = projectToScreen(camera, c[0], c[1], c[2], clip);
+  if (centre === undefined) return boxScreenSize(camera, box);
+  let sum = 0;
+  for (let i = 0; i < 3; i++) {
+    const p = [...c];
+    p[i] = box.max[i];
+    const edge = projectToScreen(camera, p[0], p[1], p[2], clip);
+    if (edge === undefined) return boxScreenSize(camera, box);
+    sum += (edge.x - centre.x) ** 2 + (edge.y - centre.y) ** 2;
+  }
+  // sum = 2h² for a displayed half-side h; the diagonal is 2h√3.
+  return Math.sqrt(6 * sum);
+}
+
 export function autoFlowParticles3D(boxPx: number) {
   return clamp(Math.round(boxPx ** 2 / 30), 4_000, 40_000);
 }
@@ -206,6 +266,7 @@ layout(location = 1) out vec4 o_trail;
 ${field3dFunctions(field)}
 ${HASH_GLSL}
 ${CLIP_GLSL}
+${SPAWN_GLSL}
 
 /**
  * Velocity in math units per second. Along the field's direction in box
@@ -232,12 +293,12 @@ vec3 vtVelocity(vec3 p) {
  */
 vec3 vtBirth(uint key) {
   vec3 h = vtHash3(key);
-  if (u_pooled == 0) return mix(u_boxMin, u_boxMax, h);
+  if (u_pooled == 0) return mix(vtSpawnMin(), vtSpawnMax(), h);
   ivec2 size = textureSize(u_pool, 0);
   vec4 b = texelFetch(u_pool, ivec2(h.xy * vec2(size)) % size, 0);
-  if (b.w < 0.5) return u_boxMax + (u_boxMax - u_boxMin);
+  if (b.w < 0.5) return vtSpawnMax() + (u_boxMax - u_boxMin);
   vec3 jitter = (vtHash3(key ^ 0x68bc21ebu) - 0.5) * 1.0e-3 * (u_boxMax - u_boxMin);
-  return clamp(b.xyz + jitter, u_boxMin, u_boxMax);
+  return clamp(b.xyz + jitter, vtSpawnMin(), vtSpawnMax());
 }
 
 void main() {
@@ -270,13 +331,13 @@ void main() {
     bool core = u_absorb == 1 && here > 30.0 * u_speedScale;
     // Nothing comes back out of a horizon.
     bool fell = u_lens == 1 && length(next) < u_horizon;
-    if (vtOutsideBox(next) || length(k1) == 0.0 || core || fell) respawn = true;
+    if (vtOutsideSpawn(next) || length(k1) == 0.0 || core || fell) respawn = true;
     else s.xyz = next;
   }
   if (respawn) {
     vec3 born = vtBirth(uint(id) ^ (u_seed * 747796405u));
     // Not born this step: hidden, and tried again next step.
-    s = vec4(born, vtOutsideBox(born) ? -1.0e9 : u_frame);
+    s = vec4(born, vtOutsideSpawn(born) ? -1.0e9 : u_frame);
     here = length(vtField(born));
   }
   if (id >= u_count) s.w = -1.0e9;
@@ -312,12 +373,13 @@ out vec4 o_birth;
 ${field3dFunctions(field)}
 ${HASH_GLSL}
 ${CLIP_GLSL}
+${SPAWN_GLSL}
 void main() {
   ivec2 q = ivec2(gl_FragCoord.xy);
   uint key = uint(q.y * ${POOL_SIDE} + q.x) * 2654435761u ^ u_seed;
   for (uint i = 0u; i < 64u; i++) {
     vec3 h = vtHash3(key + i * 2246822519u);
-    vec3 p = mix(u_boxMin, u_boxMax, h);
+    vec3 p = mix(vtSpawnMin(), vtSpawnMax(), h);
     if (vtHash3(key ^ (i * 3266489917u + 374761393u)).x < vtSeed(p)) {
       o_birth = vec4(p, 1.0);
       return;
@@ -542,6 +604,7 @@ precision highp float;
 precision highp int;
 uniform int u_clip;
 uniform int u_round;
+uniform int u_density;
 uniform float u_fog;
 uniform float u_alpha;
 in vec4 v_color;
@@ -564,6 +627,10 @@ void main() {
   }
   a *= u_alpha * mix(1.0, 0.2, v_fog * u_fog);
   outColor = v_color * a;
+  // Into the kept trails on the dark, as optical depth, −ln(1 − c): summed
+  // and then put back through 1 − e^(−sum), that is screen blending exactly
+  // (see compositeAccum), but a sum can be faded without changing its hue.
+  if (u_density == 1) outColor = -log(1.0 - min(outColor, vec4(0.999)));
 }
 `;
 
@@ -616,12 +683,19 @@ out vec4 outColor;
 void main() { outColor = vec4(1.0); }
 `;
 
-/** The accumulated trails, onto the canvas. */
+/**
+ * The accumulated trails, onto the canvas. On the dark they were kept as
+ * optical depth, which 1 − e^(−d) turns back into light.
+ */
 const COMPOSITE_FRAGMENT = `#version 300 es
 precision highp float;
 uniform highp sampler2D u_accum;
+uniform int u_density;
 out vec4 outColor;
-void main() { outColor = texelFetch(u_accum, ivec2(gl_FragCoord.xy), 0); }
+void main() {
+  vec4 c = texelFetch(u_accum, ivec2(gl_FragCoord.xy), 0);
+  outColor = u_density == 1 ? 1.0 - exp(-c) : c;
+}
 `;
 
 export class Flow3DRenderer implements Overlay3DRenderer {
@@ -674,6 +748,8 @@ export class Flow3DRenderer implements Overlay3DRenderer {
   private frame = 0;
   private newest = 0;
   private needsInit = true;
+  private heldBoxPx?: number;
+  private margin = 0;
   /** Set when the particles start again, so a kept picture of trails goes. */
   private needsTrailRedraw = true;
   private lastStep?: number;
@@ -817,6 +893,18 @@ export class Flow3DRenderer implements Overlay3DRenderer {
     this.needsInit = true;
   }
 
+  /**
+   * The box's size on screen (see boxDiagonalPx), held while it changes by
+   * less than 15%, so the small wobble perspective gives it as the view
+   * turns does not count either.
+   */
+  private steadyBoxPx(measured: number) {
+    const held = this.heldBoxPx;
+    if (held === undefined || measured > held * 1.15 || measured < held / 1.15)
+      this.heldBoxPx = measured;
+    return this.heldBoxPx!;
+  }
+
   /** Advances every particle by the real time since the last step. */
   private step(box: Box3D, particles: number, speedScale: number) {
     const { gl, field } = this;
@@ -864,6 +952,7 @@ export class Flow3DRenderer implements Overlay3DRenderer {
     uploadField3DParameters(gl, u, field, this.parameters, this.time);
     gl.uniform3fv(u.u_boxMin, box.min);
     gl.uniform3fv(u.u_boxMax, box.max);
+    gl.uniform1f(u.u_margin, this.margin);
     gl.uniform1i(u.u_init, this.needsInit ? 1 : 0);
     gl.uniform1i(u.u_count, particles);
     gl.uniform1f(u.u_frame, this.frame);
@@ -953,23 +1042,38 @@ export class Flow3DRenderer implements Overlay3DRenderer {
   }
 
   /**
-   * One step's fade of the kept trails: by 1 − 2/layers, so a trail kept as
-   * a picture is about as long and as bright as one drawn whole — measured,
-   * since a trail's points overlap and screen blending is not a sum: within
-   * five percent of mean brightness on the galaxy and the Lorenz butterfly,
-   * a little brighter on the black hole's longer trails
-   * (kept-trails-compare.png).
+   * One step's fade of the kept trails: by 1 − 3/layers, so a trail kept as
+   * a picture is about as long and as bright as one drawn whole, whose
+   * opacity falls as (1 − age/layers)², averaging a third; e^(−3·age/layers)
+   * averages a little under a third too. Measured with look-compare.cjs:
+   * brightness and colourfulness within about ten percent of trails redrawn
+   * each frame, on every preset tried.
+   *
+   * On the dark, what is faded is optical depth (see FLOW_FRAGMENT), not
+   * screen-blended light. Fading light that screen blending has squeezed
+   * towards white squeezes it further each step, which turned every preset
+   * grey: a sum fades without changing hue.
    */
   private fadeAccum(layers: number, dark: boolean, steps: number) {
     const { gl } = this;
-    const keep = Math.max(0, 1 - 2 / Math.max(layers, 4)) ** steps;
+    const keep = Math.max(0, 1 - 3 / Math.max(layers, 4)) ** steps;
     gl.useProgram(this.flatProgram);
     gl.disable(gl.DEPTH_TEST);
     gl.enable(gl.BLEND);
     gl.blendColor(0, 0, 0, keep);
     gl.blendFunc(gl.ZERO, gl.CONSTANT_ALPHA);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
-    this.restoreTrailBlend(dark);
+    this.accumBlend(dark);
+  }
+
+  /**
+   * How trails are blended into the kept picture: on the dark, summed as
+   * optical depth; on paper, painted over as they are on the canvas.
+   */
+  private accumBlend(dark: boolean) {
+    const { gl } = this;
+    if (dark) gl.blendFunc(gl.ONE, gl.ONE);
+    else gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   }
 
   /** The kept trails onto the canvas, blended as trails drawn there are. */
@@ -980,6 +1084,7 @@ export class Flow3DRenderer implements Overlay3DRenderer {
     gl.activeTexture(gl.TEXTURE4);
     gl.bindTexture(gl.TEXTURE_2D, this.accum!.texture);
     gl.uniform1i(this.compositeUniforms.u_accum, 4);
+    gl.uniform1i(this.compositeUniforms.u_density, dark ? 1 : 0);
     gl.activeTexture(gl.TEXTURE0);
     gl.enable(gl.BLEND);
     this.restoreTrailBlend(dark);
@@ -1069,6 +1174,7 @@ export class Flow3DRenderer implements Overlay3DRenderer {
     uploadField3DParameters(gl, u, field, this.parameters, this.time);
     gl.uniform3fv(u.u_boxMin, box.min);
     gl.uniform3fv(u.u_boxMax, box.max);
+    gl.uniform1f(u.u_margin, this.margin);
     gl.uniform1ui(u.u_seed, (this.frame * 2654435761 + 12345) >>> 0);
     const rows = whole ? POOL_SIDE : POOL_ROWS_PER_STEP;
     const from = whole ? 0 : this.poolRow;
@@ -1082,12 +1188,17 @@ export class Flow3DRenderer implements Overlay3DRenderer {
   draw(camera: Camera3D, box: Box3D) {
     const { gl, options: o, field } = this;
     if (field === undefined) return;
-    const boxPx = boxScreenSize(camera, box);
+    const boxPx = this.steadyBoxPx(boxDiagonalPx(camera, box));
+    this.margin = o.clip ? Math.max(0, o.margin) : 0;
+    // As many more as the margin's volume holds, so the box is as dense.
     const particles = Math.min(
       MAX_FLOW_PARTICLES_3D,
-      o.particles === "auto"
-        ? autoFlowParticles3D(boxPx)
-        : Math.max(1, Math.round(o.particles))
+      Math.round(
+        (o.particles === "auto"
+          ? autoFlowParticles3D(boxPx)
+          : Math.max(1, Math.round(o.particles))) *
+          (1 + 2 * this.margin) ** 3
+      )
     );
     const trail = Math.round(clamp(o.trail, 2, MAX_FLOW_TRAIL_3D));
     this.allocate(particles, trail);
@@ -1217,6 +1328,8 @@ export class Flow3DRenderer implements Overlay3DRenderer {
      * Trail strips for one side of the hole and one of its images: `vertices`
      * points of each, every `step`-th of its ring.
      */
+    // Whether trails are going into the kept picture as optical depth.
+    let density = 0;
     const strips = (
       side: number,
       image: number,
@@ -1230,6 +1343,7 @@ export class Flow3DRenderer implements Overlay3DRenderer {
       gl.uniform1i(tu.u_side, side);
       gl.uniform1f(tu.u_image, image);
       gl.uniform1i(tu.u_stride, step);
+      gl.uniform1i(tu.u_density, density);
       gl.uniform1f(tu.u_opacity, o.opacity * dim);
       gl.uniform1i(tu.u_round, 0);
       passes((alpha) => {
@@ -1307,6 +1421,8 @@ export class Flow3DRenderer implements Overlay3DRenderer {
         this.accumKey !== viewKey ||
         this.needsTrailRedraw;
       this.accumulate(redraw, () => {
+        this.accumBlend(ba > 0);
+        density = ba > 0 ? 1 : 0;
         if (redraw) {
           if (occluding) {
             gl.colorMask(false, false, false, false);
@@ -1344,10 +1460,10 @@ export class Flow3DRenderer implements Overlay3DRenderer {
           // A particle moves about a pixel a step, and a line a pixel long
           // often lights no pixel at all; so each step's segment reaches back
           // three steps, covering every pixel of the trail about three times,
-          // at 0.4 of the opacity, a third and a little more since screen
-          // blending sums less than linearly.
+          // at a third of the opacity.
           for (const [side, image] of images) strips(side, image, 2, 3, 1 / 3);
         }
+        density = 0;
       });
       this.accumKey = viewKey;
       this.accumFrame = this.frame;

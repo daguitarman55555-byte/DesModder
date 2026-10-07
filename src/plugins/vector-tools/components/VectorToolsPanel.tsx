@@ -2608,6 +2608,26 @@ function seedInput(vectorTools: VectorTools, dimensions: 2 | 3 = 3) {
         controller={vectorTools.cc}
         readonly={false}
       />
+      {chipGroup(
+        "Where particles start",
+        () => (vectorTools.getConfig().flow.seedOn ? "seed" : "everywhere"),
+        [
+          { value: "seed", label: "Where the seed says" },
+          { value: "everywhere", label: "Everywhere" },
+        ],
+        (v) => vectorTools.setFlow("seedOn", v === "seed"),
+        `dsm-vector-tools-seed-on-${dimensions}d`
+      )}
+      {chipGroup(
+        "Edges (Auto starts particles just past them, so the flow arrives already moving)",
+        () => vectorTools.getConfig().flow.edges,
+        [
+          { value: "auto", label: "Auto" },
+          { value: "view", label: "Only in view" },
+        ],
+        (v) => vectorTools.setFlow("edges", v),
+        `dsm-vector-tools-edges-${dimensions}d`
+      )}
     </div>
   );
 }

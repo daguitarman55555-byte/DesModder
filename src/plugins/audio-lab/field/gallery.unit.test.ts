@@ -113,6 +113,7 @@ describe("the clock speed, baked in", () => {
     const config = configFromGalleryPreset({
       id: "probe",
       name: "Probe",
+      category: "fields",
       blurb: "",
       xLatex: String.raw`\tan\left(t\right)+T_{audio}`,
       yLatex: String.raw`\cot\left(y\right)`,

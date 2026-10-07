@@ -124,6 +124,39 @@ export class PresetWindow extends Component<{
                   </div>
                 )}
               </For>
+              <div
+                class="dsm-preset-window-motion"
+                role="group"
+                aria-label="Moving or still"
+              >
+                {(["moving", "still"] as const).map((choice) => (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    data-value={choice}
+                    class={() => ({
+                      "dsm-preset-window-motion-choice": true,
+                      "dsm-preset-window-motion-selected":
+                        (choice === "still") === settings().still,
+                    })}
+                    aria-pressed={() =>
+                      (choice === "still") === settings().still
+                        ? "true"
+                        : "false"
+                    }
+                    title={
+                      choice === "still"
+                        ? "The clock stopped: each preset as one moment"
+                        : "The clock running: each preset changing over time"
+                    }
+                    onTap={() =>
+                      vectorTools.setPresetsStill(choice === "still")
+                    }
+                  >
+                    {choice === "still" ? "Still" : "Moving"}
+                  </span>
+                ))}
+              </div>
               <label class="dsm-preset-window-look">
                 <input
                   type="checkbox"

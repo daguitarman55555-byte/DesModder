@@ -235,6 +235,19 @@ export interface FlowConfig {
    * LaTeX; empty for evenly across the view.
    */
   seedLatex: string;
+  /**
+   * Whether particles are born where the seed says (both 2D's and 3D's), or
+   * evenly everywhere: a way to see the whole field under a preset's matter
+   * without losing the seed that was written.
+   */
+  seedOn: boolean;
+  /**
+   * Where particles may be born beyond what is shown. Auto: a little past
+   * every edge, with as many more particles as that takes to keep the view
+   * as dense, so the flow arrives already moving instead of the upstream edge
+   * looking faded. "view": only in what is shown, at the cost of that edge.
+   */
+  edges: "auto" | "view";
   /** The speed the colour ramp spans: Auto is a third of the view's width. */
   colorScaleAuto: boolean;
   colorScale: number;
@@ -584,6 +597,11 @@ export interface PresetWindowConfig {
   collapsed: boolean;
   x: number;
   y: number;
+  /**
+   * Presets load with the clock stopped: each one's still picture, rather
+   * than the one that changes over time.
+   */
+  still: boolean;
 }
 
 export type PanelTab =
@@ -931,7 +949,7 @@ export const DEFAULT_PANEL_CONFIG: PanelConfig = {
   width: 460,
   height: 650,
   tab: "field",
-  presets: { open: false, collapsed: false, x: -1, y: -1 },
+  presets: { open: false, collapsed: false, x: -1, y: -1, still: false },
 };
 
 export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
@@ -1003,6 +1021,8 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
     colorScale: 1,
     lens: false,
     lensHorizon: 0.6,
+    seedOn: true,
+    edges: "auto",
   },
   curve: {
     enabled: false,
@@ -1814,11 +1834,12 @@ function normalizePresetWindow(
   fallback: PresetWindowConfig
 ): PresetWindowConfig {
   const w = asRecord(value);
-  const flag = (key: "open" | "collapsed") =>
+  const flag = (key: "open" | "collapsed" | "still") =>
     typeof w?.[key] === "boolean" ? w[key] : fallback[key];
   return {
     open: flag("open"),
     collapsed: flag("collapsed"),
+    still: flag("still"),
     x: Math.round(clampNumber(w?.x, fallback.x, -1, 10_000)),
     y: Math.round(clampNumber(w?.y, fallback.y, -1, 10_000)),
   };
@@ -1904,6 +1925,11 @@ function normalizeFlow(value: unknown, fallback: FlowConfig): FlowConfig {
     ),
     seedLatex:
       typeof flow?.seedLatex === "string" ? flow.seedLatex : fallback.seedLatex,
+    seedOn: typeof flow?.seedOn === "boolean" ? flow.seedOn : fallback.seedOn,
+    edges:
+      flow?.edges === "auto" || flow?.edges === "view"
+        ? flow.edges
+        : fallback.edges,
     colorScaleAuto:
       typeof flow?.colorScaleAuto === "boolean"
         ? flow.colorScaleAuto

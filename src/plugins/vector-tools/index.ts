@@ -1,3 +1,4 @@
+import type { ItemModel } from "#globals";
 import { PluginController } from "../PluginController";
 import { VectorToolsPanelFunc } from "./components/VectorToolsPanel";
 import { PresetWindow } from "./components/PresetWindow";
@@ -222,6 +223,24 @@ function round(value: number) {
   return Math.round(value * 1000) / 1000;
 }
 
+/**
+ * Where the 2D flow's particles are born, as compiled: the seed, unless it is
+ * switched off, when they are born everywhere.
+ */
+/** An expression's LaTeX; empty for a table, a note or a folder. */
+function itemLatex(model: ItemModel | undefined) {
+  return model !== undefined && "latex" in model ? (model.latex ?? "") : "";
+}
+
+function flowSeedLatex(config: VectorFieldConfig) {
+  return config.flow.seedOn ? config.flow.seedLatex : "";
+}
+
+/** The same for the 3D flow, whose seed has a third coordinate. */
+function spaceSeedLatex(config: VectorFieldConfig) {
+  return config.flow.seedOn ? config.space3d.seedLatex : "";
+}
+
 function compileFlowField(
   config: VectorFieldConfig,
   environment: FieldEnvironment
@@ -246,7 +265,7 @@ function compileFlowField(
   if (!q.ok) return { ok: false, error: `Q(x, y): ${q.error}` };
   // Where the flow's particles are born rides along with the field: the same
   // names, the same clock.
-  const seedLatex = config.flow.seedLatex.trim();
+  const seedLatex = flowSeedLatex(config).trim();
   const seed =
     seedLatex === ""
       ? undefined
@@ -294,7 +313,7 @@ function compileField3D(
     latex: string
   ) => { ok: true; latex: string[] } | { ok: false; error: string }
 ): Field3DCompilation {
-  const seedLatex = config.space3d.seedLatex.trim();
+  const seedLatex = spaceSeedLatex(config).trim();
   // A gradient field's components are f's three partials, differentiated
   // symbolically — exact, so no difference step has to follow the box as it
   // zooms — and then compiled like any components.
@@ -500,6 +519,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     }
   );
   private flow3d?: Flow3DRenderer;
+  private lastFlow3DParticles?: number;
   private traced3d?: Volume3DRenderer;
   private field3dCache?: {
     source: FieldSource;
@@ -1141,6 +1161,8 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   }
 
   private stopFlow3D() {
+    this.lastFlow3DParticles =
+      this.flow3d?.last?.particles ?? this.lastFlow3DParticles;
     this.flowOverlay3d.stop();
     this.flow3d = undefined;
     this.traced3d = undefined;
@@ -1166,8 +1188,13 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   get flow3dSmoothLines() {
     const s = this.getConfig().space3d;
     if (s.particleSmooth !== "auto") return s.particleSmooth === "on";
+    // A flow just started has drawn nothing yet: the count its predecessor
+    // drew, so that the guess and the real count cannot disagree, which
+    // restarted the flow at the next change of any setting.
     const particles = s.particlesAuto
-      ? (this.flow3d?.last?.particles ?? autoFlowParticles3D(570))
+      ? (this.flow3d?.last?.particles ??
+        this.lastFlow3DParticles ??
+        autoFlowParticles3D(570))
       : s.particles;
     const stride = trailStrideFor(s.particleDetail);
     return (particles * s.particleTrail) / stride <= AUTO_SMOOTH_TRAIL_POINTS;
@@ -1208,6 +1235,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       beaming: s.beaming,
       trailStride: trailStrideFor(s.particleDetail),
       incremental: s.particleRedraw === "auto",
+      margin: config.flow.edges === "auto" ? 0.08 : 0,
     };
   }
 
@@ -1320,7 +1348,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       cached.yLatex === config.components.yLatex &&
       cached.zLatex === config.components.zLatex &&
       cached.fLatex === config.scalar.fLatex &&
-      cached.seedLatex === config.space3d.seedLatex &&
+      cached.seedLatex === spaceSeedLatex(config) &&
       cached.revision === this.environmentRevision
     ) {
       return cached.result;
@@ -1334,7 +1362,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       yLatex: config.components.yLatex,
       zLatex: config.components.zLatex,
       fLatex: config.scalar.fLatex,
-      seedLatex: config.space3d.seedLatex,
+      seedLatex: spaceSeedLatex(config),
       revision: this.environmentRevision,
       result,
     };
@@ -1742,7 +1770,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   get surfaceChoices(): { id: string; latex: string }[] {
     return this.surfaces3d.surfaces.map((surface) => ({
       id: surface.id,
-      latex: this.cc.getItemModel(surface.id)?.latex ?? "",
+      latex: itemLatex(this.cc.getItemModel(surface.id)),
     }));
   }
 
@@ -1859,6 +1887,15 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
    * It replaces the active field rather than adding one, which is what "load"
    * usually means — Duplicate is next to it for keeping what is there.
    */
+  /**
+   * Presets moving or still: the clock running or stopped, now and for every
+   * preset loaded after. Still keeps the moment the clock is at.
+   */
+  setPresetsStill(still: boolean) {
+    this.setPresetWindow({ still });
+    this.setTimePlaying(!still);
+  }
+
   applyGalleryPreset(id: string, withLook: boolean) {
     const preset = galleryPreset(id);
     if (preset === undefined) return;
@@ -1873,6 +1910,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       Object.assign(config, loaded, { id: keepID, symbolToken });
     });
     this.lastActionMessage = `Loaded ${preset.name}.`;
+    if (this.presetWindow.still) this.setTimePlaying(false);
     // These are flow pictures, so the flow is what has to be running for one
     // to be anything at all.
     if (withLook && !this.isFlowRunning) this.toggleFlow();
@@ -2613,7 +2651,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       cached.xLatex === config.components.xLatex &&
       cached.yLatex === config.components.yLatex &&
       cached.fLatex === config.scalar.fLatex &&
-      cached.seedLatex === config.flow.seedLatex &&
+      cached.seedLatex === flowSeedLatex(config) &&
       // The same component compiles to different GLSL against a different set
       // of definitions, so the environment is part of what this identifies.
       cached.revision === this.environmentRevision
@@ -2626,7 +2664,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       xLatex: config.components.xLatex,
       yLatex: config.components.yLatex,
       fLatex: config.scalar.fLatex,
-      seedLatex: config.flow.seedLatex,
+      seedLatex: flowSeedLatex(config),
       revision: this.environmentRevision,
       result,
     };
@@ -2716,7 +2754,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       config.components.xLatex,
       config.components.yLatex,
       config.scalar.fLatex,
-      config.flow.seedLatex,
+      flowSeedLatex(config),
       this.fluid.isSimulating,
     ]);
   }
@@ -2736,6 +2774,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
         : config.flow.colorScale,
       ...effectiveFlowColor(config),
       fixedColor: config.color.fixedColor,
+      margin: config.flow.edges === "auto" ? 0.1 : 0,
     };
   }
 

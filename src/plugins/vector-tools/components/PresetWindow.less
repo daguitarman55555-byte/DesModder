@@ -68,6 +68,36 @@
     padding: 4px 6px 8px;
   }
 
+  // Moving or still: two halves of one pill, the chosen one filled.
+  .dsm-preset-window-motion {
+    display: flex;
+    margin: 10px 4px 4px;
+    border: 1px solid #c8c8c8;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .dsm-preset-window-motion-choice {
+    flex: 1;
+    padding: 4px 0;
+    text-align: center;
+    cursor: pointer;
+    color: #555;
+
+    & + .dsm-preset-window-motion-choice {
+      border-left: 1px solid #c8c8c8;
+    }
+
+    &:hover {
+      background: #f0f0f0;
+    }
+
+    &.dsm-preset-window-motion-selected {
+      background: #2f72dc;
+      color: #fff;
+    }
+  }
+
   .dsm-preset-window-group-label {
     margin: 8px 4px 3px;
     font-size: 11px;

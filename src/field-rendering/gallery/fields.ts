@@ -1,5 +1,5 @@
 /** Fields: the textbook pictures. */
-import { dipole, r2, r3 } from "./latex";
+import { dipole } from "./latex";
 import type { GalleryPreset } from "./types";
 
 /** The bar magnet on alternating current, along y in the plane and z in the box. */

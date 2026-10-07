@@ -147,8 +147,9 @@ export function configFromGallery(
   base: VectorFieldConfig = cloneDefaultConfig(),
   dimensions: 2 | 3 = 2
 ): VectorFieldConfig {
-  const extent =
-    (dimensions === 3 ? preset.space.extent : undefined) ?? preset.extent ?? 8;
+  // The box's own size is Desmos 3D's; the arrows' domain follows the 2D
+  // picture's extent in both.
+  const extent = preset.extent ?? 8;
   const axis = (from: SamplingAxisConfig): SamplingAxisConfig => ({
     ...from,
     min: -extent,

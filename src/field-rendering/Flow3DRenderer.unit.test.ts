@@ -47,7 +47,11 @@ describe("the 3D flow", () => {
     const renderer = new Flow3DRenderer(fakeCanvas(gl));
     renderer.setField(swirl);
     renderer.resize(800, 600, 1);
-    renderer.setOptions({ ...DEFAULT_FLOW_3D_OPTIONS, particles: 5000 });
+    renderer.setOptions({
+      ...DEFAULT_FLOW_3D_OPTIONS,
+      particles: 5000,
+      margin: 0,
+    });
     renderer.draw(flat, box);
     expect(gl.counts.instancesDrawn).toBe(5000);
     // 5,000 heads, and the colour scale's 1,000-sample measurement.
@@ -55,6 +59,29 @@ describe("the 3D flow", () => {
     renderer.setOptions({ ...DEFAULT_FLOW_3D_OPTIONS, particles: 999_999 });
     renderer.draw(flat, box);
     expect(renderer.last?.particles).toBe(MAX_FLOW_PARTICLES_3D);
+  });
+
+  test("a margin past the box holds as many more particles as its volume, while the box clips", () => {
+    const gl = fakeGL();
+    const renderer = new Flow3DRenderer(fakeCanvas(gl));
+    renderer.setField(swirl);
+    renderer.resize(800, 600, 1);
+    renderer.setOptions({
+      ...DEFAULT_FLOW_3D_OPTIONS,
+      particles: 5000,
+      margin: 0.1,
+    });
+    renderer.draw(flat, box);
+    expect(renderer.last?.particles).toBe(Math.round(5000 * 1.2 ** 3));
+    // Unclipped, particles past the box would be seen: no margin.
+    renderer.setOptions({
+      ...DEFAULT_FLOW_3D_OPTIONS,
+      particles: 5000,
+      margin: 0.1,
+      clip: false,
+    });
+    renderer.draw(flat, box);
+    expect(renderer.last?.particles).toBe(5000);
   });
 
   test("steps by real time: a second draw in the same instant does not step again", () => {
@@ -84,16 +111,25 @@ describe("the 3D flow", () => {
     const renderer = new Flow3DRenderer(fakeCanvas(gl));
     renderer.setField(swirl);
     renderer.resize(800, 600, 1);
-    renderer.setOptions({ ...DEFAULT_FLOW_3D_OPTIONS, particles: 1000 });
+    renderer.setOptions({
+      ...DEFAULT_FLOW_3D_OPTIONS,
+      particles: 1000,
+      margin: 0,
+    });
     renderer.draw(flat, box);
     const textures = gl.counts.createTexture;
     // 1000 and 1010 share a power-of-two state texture.
-    renderer.setOptions({ ...DEFAULT_FLOW_3D_OPTIONS, particles: 1010 });
+    renderer.setOptions({
+      ...DEFAULT_FLOW_3D_OPTIONS,
+      particles: 1010,
+      margin: 0,
+    });
     renderer.draw(flat, box);
     expect(gl.counts.createTexture).toBe(textures);
     renderer.setOptions({
       ...DEFAULT_FLOW_3D_OPTIONS,
       particles: 1010,
+      margin: 0,
       trail: 40,
     });
     renderer.draw(flat, box);
@@ -110,6 +146,7 @@ describe("the black hole's lens", () => {
     renderer.setOptions({
       ...DEFAULT_FLOW_3D_OPTIONS,
       particles: 1000,
+      margin: 0,
       lens: true,
       horizon: 0.5,
     });
@@ -128,7 +165,11 @@ describe("the black hole's lens", () => {
     const renderer = new Flow3DRenderer(fakeCanvas(gl));
     renderer.setField(swirl);
     renderer.resize(800, 600, 1);
-    renderer.setOptions({ ...DEFAULT_FLOW_3D_OPTIONS, particles: 1000 });
+    renderer.setOptions({
+      ...DEFAULT_FLOW_3D_OPTIONS,
+      particles: 1000,
+      margin: 0,
+    });
     renderer.draw(flat, box);
     expect(gl.counts.instancesDrawn).toBe(1000);
   });
@@ -140,7 +181,11 @@ describe("trails kept as a picture while the view is still", () => {
     const renderer = new Flow3DRenderer(fakeCanvas(gl));
     renderer.setField(swirl);
     renderer.resize(800, 600, 1);
-    renderer.setOptions({ ...DEFAULT_FLOW_3D_OPTIONS, particles: 1000 });
+    renderer.setOptions({
+      ...DEFAULT_FLOW_3D_OPTIONS,
+      particles: 1000,
+      margin: 0,
+    });
     renderer.draw(flat, box);
     expect(renderer.lastRedrewTrails).toBe(true);
     advance(16);
@@ -163,6 +208,7 @@ describe("trails kept as a picture while the view is still", () => {
     renderer.setOptions({
       ...DEFAULT_FLOW_3D_OPTIONS,
       particles: 1000,
+      margin: 0,
       incremental: false,
     });
     renderer.draw(flat, box);
