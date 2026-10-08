@@ -1,0 +1,24 @@
+{
+  "status": "Proposed optional backend, not implemented by these files",
+  "backendOptions": ["native", "gpu"],
+  "toggles": {
+    "writing": false,
+    "mainVectors": true,
+    "vectorNames": false,
+    "contributions": false,
+    "force": false
+  },
+  "instanceContract": {
+    "tail": "P in math coordinates",
+    "displacement": "s times E1, E2, E or q0 E in declared normalized units",
+    "nameGlyphs": ["E", "E1", "E2", "F"],
+    "vectorAccent": true,
+    "visibility": "role toggle AND exterior probe AND length > 1e-8",
+    "labels": "independent name toggle; hide with parent arrow; stroke glyphs in screen space",
+    "length": "linear common gain, never per-instance normalize or clip",
+    "depth": "surface depth for shafts/heads; screen-space label with leader, hide or fade when anchor is occluded",
+    "sizing": "4 CSS px shaft, 20–24 CSS px names at 1080p; test projector",
+    "dataSource": "same scalar field evaluation and scale as native backend"
+  },
+  "fallback": "If GPU backend has not been built, explicitly expose native only; never label native rendering as GPU."
+}

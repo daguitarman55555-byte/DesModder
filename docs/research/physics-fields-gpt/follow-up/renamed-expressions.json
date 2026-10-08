@@ -1,0 +1,509 @@
+{
+  "allocation": "VT1 is an example allocated suffix, not a reserved namespace. Scan and allocate before use. Alternative-model expressions are not all loaded together.",
+  "sections": [
+    {
+      "section": 4,
+      "tag": "E",
+      "mapping": {
+        "P": "P_{EVT1}",
+        "S": "S_{EVT1}",
+        "V": "V_{EVT1}",
+        "a": "a_{EVT1}",
+        "d": "d_{EVT1}",
+        "f": "f_{EVT1}",
+        "g": "g_{EVT1}",
+        "h": "h_{EVT1}",
+        "k": "k_{EVT1}",
+        "p_{x}": "p_{ExVT1}",
+        "p_{y}": "p_{EyVT1}",
+        "p_{z}": "p_{EzVT1}",
+        "q_{0}": "q_{E0VT1}",
+        "q_{1}": "q_{E1VT1}",
+        "q_{2}": "q_{E2VT1}",
+        "r_{1}": "r_{E1VT1}",
+        "r_{2}": "r_{E2VT1}",
+        "s": "s_{EVT1}"
+      },
+      "expressions": [
+        {
+          "original": "r_{1}(x,y,z)=\\sqrt{\\left(x+\\frac{d}{2}\\right)^{2}+y^{2}+z^{2}}",
+          "latex": "r_{E1VT1}(x,y,z)=\\sqrt{\\left(x+\\frac{d_{EVT1}}{2}\\right)^{2}+y^{2}+z^{2}}"
+        },
+        {
+          "original": "r_{2}(x,y,z)=\\sqrt{\\left(x-\\frac{d}{2}\\right)^{2}+y^{2}+z^{2}}",
+          "latex": "r_{E2VT1}(x,y,z)=\\sqrt{\\left(x-\\frac{d_{EVT1}}{2}\\right)^{2}+y^{2}+z^{2}}"
+        },
+        {
+          "original": "f(x,y,z)=\\frac{kq_{1}\\left(x+\\frac{d}{2}\\right)}{r_{1}(x,y,z)^{3}}+\\frac{kq_{2}\\left(x-\\frac{d}{2}\\right)}{r_{2}(x,y,z)^{3}}",
+          "latex": "f_{EVT1}(x,y,z)=\\frac{k_{EVT1}q_{E1VT1}\\left(x+\\frac{d_{EVT1}}{2}\\right)}{r_{E1VT1}(x,y,z)^{3}}+\\frac{k_{EVT1}q_{E2VT1}\\left(x-\\frac{d_{EVT1}}{2}\\right)}{r_{E2VT1}(x,y,z)^{3}}"
+        },
+        {
+          "original": "g(x,y,z)=\\frac{kq_{1}y}{r_{1}(x,y,z)^{3}}+\\frac{kq_{2}y}{r_{2}(x,y,z)^{3}}",
+          "latex": "g_{EVT1}(x,y,z)=\\frac{k_{EVT1}q_{E1VT1}y}{r_{E1VT1}(x,y,z)^{3}}+\\frac{k_{EVT1}q_{E2VT1}y}{r_{E2VT1}(x,y,z)^{3}}"
+        },
+        {
+          "original": "h(x,y,z)=\\frac{kq_{1}z}{r_{1}(x,y,z)^{3}}+\\frac{kq_{2}z}{r_{2}(x,y,z)^{3}}",
+          "latex": "h_{EVT1}(x,y,z)=\\frac{k_{EVT1}q_{E1VT1}z}{r_{E1VT1}(x,y,z)^{3}}+\\frac{k_{EVT1}q_{E2VT1}z}{r_{E2VT1}(x,y,z)^{3}}"
+        },
+        {
+          "original": "V(x,y,z)=\\frac{kq_{1}}{r_{1}(x,y,z)}+\\frac{kq_{2}}{r_{2}(x,y,z)}",
+          "latex": "V_{EVT1}(x,y,z)=\\frac{k_{EVT1}q_{E1VT1}}{r_{E1VT1}(x,y,z)}+\\frac{k_{EVT1}q_{E2VT1}}{r_{E2VT1}(x,y,z)}"
+        },
+        {
+          "original": "\\left(x+\\frac{d}{2}\\right)^{2}+y^{2}\\le a^{2}",
+          "latex": "\\left(x+\\frac{d_{EVT1}}{2}\\right)^{2}+y^{2}\\le a_{EVT1}^{2}"
+        },
+        {
+          "original": "\\left(x-\\frac{d}{2}\\right)^{2}+y^{2}\\le a^{2}",
+          "latex": "\\left(x-\\frac{d_{EVT1}}{2}\\right)^{2}+y^{2}\\le a_{EVT1}^{2}"
+        },
+        {
+          "original": "V(x,y,0)=[-2,-1,-0.5,0,0.5,1,2]",
+          "latex": "V_{EVT1}(x,y,0)=[-2,-1,-0.5,0,0.5,1,2]"
+        },
+        {
+          "original": "P=(p_{x},p_{y})",
+          "latex": "P_{EVT1}=(p_{ExVT1},p_{EyVT1})"
+        },
+        {
+          "original": "S(x,y)=q_{1}\\frac{x+d/2}{\\sqrt{\\left(x+d/2\\right)^{2}+y^{2}}}+q_{2}\\frac{x-d/2}{\\sqrt{\\left(x-d/2\\right)^{2}+y^{2}}}",
+          "latex": "S_{EVT1}(x,y)=q_{E1VT1}\\frac{x+d_{EVT1}/2}{\\sqrt{\\left(x+d_{EVT1}/2\\right)^{2}+y^{2}}}+q_{E2VT1}\\frac{x-d_{EVT1}/2}{\\sqrt{\\left(x-d_{EVT1}/2\\right)^{2}+y^{2}}}"
+        },
+        {
+          "original": "S(x,y)=[-1.75,-1.5,-1.25,-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.25,1.5,1.75]",
+          "latex": "S_{EVT1}(x,y)=[-1.75,-1.5,-1.25,-1,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1,1.25,1.5,1.75]"
+        },
+        {
+          "original": "\\min\\left(1,\\max\\left(q_{1},0\\right)\\left\\{\\left|r_{1}(x,y,0)-1.3a\\right|<0.2a:1,0\\right\\}/3+\\max\\left(q_{2},0\\right)\\left\\{\\left|r_{2}(x,y,0)-1.3a\\right|<0.2a:1,0\\right\\}/3\\right)",
+          "latex": "\\min\\left(1,\\max\\left(q_{E1VT1},0\\right)\\left\\{\\left|r_{E1VT1}(x,y,0)-1.3a_{EVT1}\\right|<0.2a_{EVT1}:1,0\\right\\}/3+\\max\\left(q_{E2VT1},0\\right)\\left\\{\\left|r_{E2VT1}(x,y,0)-1.3a_{EVT1}\\right|<0.2a_{EVT1}:1,0\\right\\}/3\\right)"
+        },
+        {
+          "original": "S(x,y)=q_{1}(x+d/2)/r_{1}(x,y,0)+q_{2}(x-d/2)/r_{2}(x,y,0)",
+          "latex": "S_{EVT1}(x,y)=q_{E1VT1}(x+d_{EVT1}/2)/r_{E1VT1}(x,y,0)+q_{E2VT1}(x-d_{EVT1}/2)/r_{E2VT1}(x,y,0)"
+        }
+      ]
+    },
+    {
+      "section": 5,
+      "tag": "W",
+      "mapping": {
+        "D_{1}": "D_{W1VT1}",
+        "D_{2}": "D_{W2VT1}",
+        "I_{1}": "I_{W1VT1}",
+        "I_{2}": "I_{W2VT1}",
+        "S": "S_{WVT1}",
+        "a": "a_{WVT1}",
+        "d": "d_{WVT1}",
+        "f": "f_{WVT1}",
+        "g": "g_{WVT1}",
+        "k": "k_{WVT1}"
+      },
+      "expressions": [
+        {
+          "original": "D_{1}(x,y)=\\max\\left(\\left(x+d/2\\right)^{2}+y^{2},a^{2}\\right)",
+          "latex": "D_{W1VT1}(x,y)=\\max\\left(\\left(x+d_{WVT1}/2\\right)^{2}+y^{2},a_{WVT1}^{2}\\right)"
+        },
+        {
+          "original": "D_{2}(x,y)=\\max\\left(\\left(x-d/2\\right)^{2}+y^{2},a^{2}\\right)",
+          "latex": "D_{W2VT1}(x,y)=\\max\\left(\\left(x-d_{WVT1}/2\\right)^{2}+y^{2},a_{WVT1}^{2}\\right)"
+        },
+        {
+          "original": "f(x,y)=\\frac{-kI_{1}y}{D_{1}(x,y)}-\\frac{kI_{2}y}{D_{2}(x,y)}",
+          "latex": "f_{WVT1}(x,y)=\\frac{-k_{WVT1}I_{W1VT1}y}{D_{W1VT1}(x,y)}-\\frac{k_{WVT1}I_{W2VT1}y}{D_{W2VT1}(x,y)}"
+        },
+        {
+          "original": "g(x,y)=\\frac{kI_{1}\\left(x+d/2\\right)}{D_{1}(x,y)}+\\frac{kI_{2}\\left(x-d/2\\right)}{D_{2}(x,y)}",
+          "latex": "g_{WVT1}(x,y)=\\frac{k_{WVT1}I_{W1VT1}\\left(x+d_{WVT1}/2\\right)}{D_{W1VT1}(x,y)}+\\frac{k_{WVT1}I_{W2VT1}\\left(x-d_{WVT1}/2\\right)}{D_{W2VT1}(x,y)}"
+        },
+        {
+          "original": "\\left(x+d/2\\right)^{2}+y^{2}=a^{2}\\left\\{\\left|z\\right|<4\\right\\}",
+          "latex": "\\left(x+d_{WVT1}/2\\right)^{2}+y^{2}=a_{WVT1}^{2}\\left\\{\\left|z\\right|<4\\right\\}"
+        },
+        {
+          "original": "\\left(x-d/2\\right)^{2}+y^{2}=a^{2}\\left\\{\\left|z\\right|<4\\right\\}",
+          "latex": "\\left(x-d_{WVT1}/2\\right)^{2}+y^{2}=a_{WVT1}^{2}\\left\\{\\left|z\\right|<4\\right\\}"
+        },
+        {
+          "original": "S(x,y)=-\\frac{kI_{1}}{2}\\ln\\left(\\left(x+d/2\\right)^{2}+y^{2}\\right)-\\frac{kI_{2}}{2}\\ln\\left(\\left(x-d/2\\right)^{2}+y^{2}\\right)",
+          "latex": "S_{WVT1}(x,y)=-\\frac{k_{WVT1}I_{W1VT1}}{2}\\ln\\left(\\left(x+d_{WVT1}/2\\right)^{2}+y^{2}\\right)-\\frac{k_{WVT1}I_{W2VT1}}{2}\\ln\\left(\\left(x-d_{WVT1}/2\\right)^{2}+y^{2}\\right)"
+        },
+        {
+          "original": "S(x,y)=[-3,-2.5,-2,-1.5,-1,-0.5,0,0.5,1]",
+          "latex": "S_{WVT1}(x,y)=[-3,-2.5,-2,-1.5,-1,-0.5,0,0.5,1]"
+        }
+      ]
+    },
+    {
+      "section": 6,
+      "tag": "G",
+      "mapping": {
+        "D_{1}": "D_{G1VT1}",
+        "D_{2}": "D_{G2VT1}",
+        "G": "G_{GVT1}",
+        "M_{1}": "M_{G1VT1}",
+        "M_{2}": "M_{G2VT1}",
+        "N": "N_{GVT1}",
+        "R_{1}": "R_{G1VT1}",
+        "R_{2}": "R_{G2VT1}",
+        "V": "V_{GVT1}",
+        "c_{1}": "c_{G1VT1}",
+        "c_{2}": "c_{G2VT1}",
+        "d": "d_{GVT1}",
+        "f": "f_{GVT1}",
+        "g": "g_{GVT1}",
+        "h": "h_{GVT1}",
+        "m_{0}": "m_{G0VT1}",
+        "r_{1}": "r_{G1VT1}",
+        "r_{2}": "r_{G2VT1}"
+      },
+      "expressions": [
+        {
+          "original": "c_{1}=-\\frac{dM_{2}}{M_{1}+M_{2}}",
+          "latex": "c_{G1VT1}=-\\frac{d_{GVT1}M_{G2VT1}}{M_{G1VT1}+M_{G2VT1}}"
+        },
+        {
+          "original": "c_{2}=\\frac{dM_{1}}{M_{1}+M_{2}}",
+          "latex": "c_{G2VT1}=\\frac{d_{GVT1}M_{G1VT1}}{M_{G1VT1}+M_{G2VT1}}"
+        },
+        {
+          "original": "r_{1}(x,y,z)=\\sqrt{\\left(x-c_{1}\\right)^{2}+y^{2}+z^{2}}",
+          "latex": "r_{G1VT1}(x,y,z)=\\sqrt{\\left(x-c_{G1VT1}\\right)^{2}+y^{2}+z^{2}}"
+        },
+        {
+          "original": "r_{2}(x,y,z)=\\sqrt{\\left(x-c_{2}\\right)^{2}+y^{2}+z^{2}}",
+          "latex": "r_{G2VT1}(x,y,z)=\\sqrt{\\left(x-c_{G2VT1}\\right)^{2}+y^{2}+z^{2}}"
+        },
+        {
+          "original": "D_{1}(x,y,z)=\\max\\left(r_{1}(x,y,z),R_{1}\\right)^{3}",
+          "latex": "D_{G1VT1}(x,y,z)=\\max\\left(r_{G1VT1}(x,y,z),R_{G1VT1}\\right)^{3}"
+        },
+        {
+          "original": "D_{2}(x,y,z)=\\max\\left(r_{2}(x,y,z),R_{2}\\right)^{3}",
+          "latex": "D_{G2VT1}(x,y,z)=\\max\\left(r_{G2VT1}(x,y,z),R_{G2VT1}\\right)^{3}"
+        },
+        {
+          "original": "f(x,y,z)=-\\frac{GM_{1}\\left(x-c_{1}\\right)}{D_{1}(x,y,z)}-\\frac{GM_{2}\\left(x-c_{2}\\right)}{D_{2}(x,y,z)}",
+          "latex": "f_{GVT1}(x,y,z)=-\\frac{G_{GVT1}M_{G1VT1}\\left(x-c_{G1VT1}\\right)}{D_{G1VT1}(x,y,z)}-\\frac{G_{GVT1}M_{G2VT1}\\left(x-c_{G2VT1}\\right)}{D_{G2VT1}(x,y,z)}"
+        },
+        {
+          "original": "g(x,y,z)=-\\frac{GM_{1}y}{D_{1}(x,y,z)}-\\frac{GM_{2}y}{D_{2}(x,y,z)}",
+          "latex": "g_{GVT1}(x,y,z)=-\\frac{G_{GVT1}M_{G1VT1}y}{D_{G1VT1}(x,y,z)}-\\frac{G_{GVT1}M_{G2VT1}y}{D_{G2VT1}(x,y,z)}"
+        },
+        {
+          "original": "h(x,y,z)=-\\frac{GM_{1}z}{D_{1}(x,y,z)}-\\frac{GM_{2}z}{D_{2}(x,y,z)}",
+          "latex": "h_{GVT1}(x,y,z)=-\\frac{G_{GVT1}M_{G1VT1}z}{D_{G1VT1}(x,y,z)}-\\frac{G_{GVT1}M_{G2VT1}z}{D_{G2VT1}(x,y,z)}"
+        },
+        {
+          "original": "N=\\left(c_{1}+\\frac{d\\sqrt{M_{1}}}{\\sqrt{M_{1}}+\\sqrt{M_{2}}},0\\right)",
+          "latex": "N_{GVT1}=\\left(c_{G1VT1}+\\frac{d_{GVT1}\\sqrt{M_{G1VT1}}}{\\sqrt{M_{G1VT1}}+\\sqrt{M_{G2VT1}}},0\\right)"
+        },
+        {
+          "original": "V(x,y,z)=-GM_{1}/r_{1}(x,y,z)-GM_{2}/r_{2}(x,y,z)",
+          "latex": "V_{GVT1}(x,y,z)=-G_{GVT1}M_{G1VT1}/r_{G1VT1}(x,y,z)-G_{GVT1}M_{G2VT1}/r_{G2VT1}(x,y,z)"
+        }
+      ]
+    },
+    {
+      "section": 7,
+      "tag": "C",
+      "mapping": {
+        "D": "D_{CVT1}",
+        "P": "P_{CVT1}",
+        "P_{0}": "P_{C0VT1}",
+        "R": "R_{CVT1}",
+        "S": "S_{CVT1}",
+        "T": "T_{CVT1}",
+        "U": "U_{CVT1}",
+        "f": "f_{CVT1}",
+        "g": "g_{CVT1}",
+        "s": "s_{CVT1}",
+        "w": "w_{CVT1}"
+      },
+      "expressions": [
+        {
+          "original": "f(x,y)=\\left\\{x^{2}+y^{2}\\ge R^{2}:U\\left(1-\\frac{R^{2}\\left(x^{2}-y^{2}\\right)}{\\left(x^{2}+y^{2}\\right)^{2}}\\right)+\\frac{R^{2}wy}{x^{2}+y^{2}},0\\right\\}",
+          "latex": "f_{CVT1}(x,y)=\\left\\{x^{2}+y^{2}\\ge R_{CVT1}^{2}:U_{CVT1}\\left(1-\\frac{R_{CVT1}^{2}\\left(x^{2}-y^{2}\\right)}{\\left(x^{2}+y^{2}\\right)^{2}}\\right)+\\frac{R_{CVT1}^{2}w_{CVT1}y}{x^{2}+y^{2}},0\\right\\}"
+        },
+        {
+          "original": "g(x,y)=\\left\\{x^{2}+y^{2}\\ge R^{2}:-\\frac{2UR^{2}xy}{\\left(x^{2}+y^{2}\\right)^{2}}-\\frac{R^{2}wx}{x^{2}+y^{2}},0\\right\\}",
+          "latex": "g_{CVT1}(x,y)=\\left\\{x^{2}+y^{2}\\ge R_{CVT1}^{2}:-\\frac{2U_{CVT1}R_{CVT1}^{2}xy}{\\left(x^{2}+y^{2}\\right)^{2}}-\\frac{R_{CVT1}^{2}w_{CVT1}x}{x^{2}+y^{2}},0\\right\\}"
+        },
+        {
+          "original": "S(x,y)=Uy\\left(1-\\frac{R^{2}}{x^{2}+y^{2}}\\right)+\\frac{R^{2}w}{2}\\ln\\left(\\frac{x^{2}+y^{2}}{R^{2}}\\right)",
+          "latex": "S_{CVT1}(x,y)=U_{CVT1}y\\left(1-\\frac{R_{CVT1}^{2}}{x^{2}+y^{2}}\\right)+\\frac{R_{CVT1}^{2}w_{CVT1}}{2}\\ln\\left(\\frac{x^{2}+y^{2}}{R_{CVT1}^{2}}\\right)"
+        },
+        {
+          "original": "P(x,y)=P_{0}+\\frac{D}{2}\\left(U^{2}-f(x,y)^{2}-g(x,y)^{2}\\right)",
+          "latex": "P_{CVT1}(x,y)=P_{C0VT1}+\\frac{D_{CVT1}}{2}\\left(U_{CVT1}^{2}-f_{CVT1}(x,y)^{2}-g_{CVT1}(x,y)^{2}\\right)"
+        },
+        {
+          "original": "x^{2}+y^{2}\\le R^{2}",
+          "latex": "x^{2}+y^{2}\\le R_{CVT1}^{2}"
+        },
+        {
+          "original": "\\left(0.9R\\cos\\left(wT\\right),-0.9R\\sin\\left(wT\\right)\\right)",
+          "latex": "\\left(0.9R_{CVT1}\\cos\\left(w_{CVT1}T_{CVT1}\\right),-0.9R_{CVT1}\\sin\\left(w_{CVT1}T_{CVT1}\\right)\\right)"
+        },
+        {
+          "original": "S(x,y)=[-3,-2.5,-2,-1.5,-1,-0.5,0,0.5,1,1.5,2,2.5,3]\\left\\{x^{2}+y^{2}\\ge R^{2}\\right\\}",
+          "latex": "S_{CVT1}(x,y)=[-3,-2.5,-2,-1.5,-1,-0.5,0,0.5,1,1.5,2,2.5,3]\\left\\{x^{2}+y^{2}\\ge R_{CVT1}^{2}\\right\\}"
+        },
+        {
+          "original": "\\left(R\\sqrt{1-\\left(\\frac{wR}{2U}\\right)^{2}},-\\frac{wR^{2}}{2U}\\right)",
+          "latex": "\\left(R_{CVT1}\\sqrt{1-\\left(\\frac{w_{CVT1}R_{CVT1}}{2U_{CVT1}}\\right)^{2}},-\\frac{w_{CVT1}R_{CVT1}^{2}}{2U_{CVT1}}\\right)"
+        },
+        {
+          "original": "\\left(-R\\sqrt{1-\\left(\\frac{wR}{2U}\\right)^{2}},-\\frac{wR^{2}}{2U}\\right)",
+          "latex": "\\left(-R_{CVT1}\\sqrt{1-\\left(\\frac{w_{CVT1}R_{CVT1}}{2U_{CVT1}}\\right)^{2}},-\\frac{w_{CVT1}R_{CVT1}^{2}}{2U_{CVT1}}\\right)"
+        }
+      ]
+    },
+    {
+      "section": 8,
+      "tag": "P",
+      "mapping": {
+        "A": "A_{PVT1}",
+        "C": "C_{PVT1}",
+        "H": "H_{PVT1}",
+        "J": "J_{PVT1}",
+        "L": "L_{PVT1}",
+        "S": "S_{PVT1}",
+        "d": "d_{PVT1}",
+        "f": "f_{PVT1}",
+        "g": "g_{PVT1}",
+        "k": "k_{PVT1}",
+        "q_{0}": "q_{P0VT1}",
+        "s": "s_{PVT1}"
+      },
+      "expressions": [
+        {
+          "original": "A(x,b)=\\frac{1}{2}\\ln\\left(\\frac{\\left(x+L\\right)^{2}+b^{2}}{\\left(x-L\\right)^{2}+b^{2}}\\right)",
+          "latex": "A_{PVT1}(x,b)=\\frac{1}{2}\\ln\\left(\\frac{\\left(x+L_{PVT1}\\right)^{2}+b^{2}}{\\left(x-L_{PVT1}\\right)^{2}+b^{2}}\\right)"
+        },
+        {
+          "original": "C(x,b)=\\left\\{b=0:0,\\arctan\\left(\\frac{x+L}{b}\\right)-\\arctan\\left(\\frac{x-L}{b}\\right)\\right\\}",
+          "latex": "C_{PVT1}(x,b)=\\left\\{b=0:0,\\arctan\\left(\\frac{x+L_{PVT1}}{b}\\right)-\\arctan\\left(\\frac{x-L_{PVT1}}{b}\\right)\\right\\}"
+        },
+        {
+          "original": "f(x,y)=ks\\left(A(x,y-d/2)-A(x,y+d/2)\\right)",
+          "latex": "f_{PVT1}(x,y)=k_{PVT1}s_{PVT1}\\left(A_{PVT1}(x,y-d_{PVT1}/2)-A_{PVT1}(x,y+d_{PVT1}/2)\\right)"
+        },
+        {
+          "original": "g(x,y)=ks\\left(C(x,y-d/2)-C(x,y+d/2)\\right)",
+          "latex": "g_{PVT1}(x,y)=k_{PVT1}s_{PVT1}\\left(C_{PVT1}(x,y-d_{PVT1}/2)-C_{PVT1}(x,y+d_{PVT1}/2)\\right)"
+        },
+        {
+          "original": "H(u,b)=u\\arctan\\left(\\frac{u}{b}\\right)-\\frac{b}{2}\\ln\\left(u^{2}+b^{2}\\right)",
+          "latex": "H_{PVT1}(u,b)=u\\arctan\\left(\\frac{u}{b}\\right)-\\frac{b}{2}\\ln\\left(u^{2}+b^{2}\\right)"
+        },
+        {
+          "original": "J(x,b)=-H(x+L,b)+H(x-L,b)",
+          "latex": "J_{PVT1}(x,b)=-H_{PVT1}(x+L_{PVT1},b)+H_{PVT1}(x-L_{PVT1},b)"
+        },
+        {
+          "original": "S(x,y)=ks\\left(J(x,y-d/2)-J(x,y+d/2)\\right)",
+          "latex": "S_{PVT1}(x,y)=k_{PVT1}s_{PVT1}\\left(J_{PVT1}(x,y-d_{PVT1}/2)-J_{PVT1}(x,y+d_{PVT1}/2)\\right)"
+        }
+      ]
+    },
+    {
+      "section": 9,
+      "tag": "M",
+      "mapping": {
+        "A": "A_{MVT1}",
+        "C": "C_{MVT1}",
+        "D": "D_{MVT1}",
+        "J": "J_{MVT1}",
+        "a": "a_{MVT1}",
+        "b": "b_{MVT1}",
+        "c": "c_{MVT1}",
+        "f": "f_{MVT1}",
+        "f_{0}": "f_{M0VT1}",
+        "g": "g_{MVT1}",
+        "g_{0}": "g_{M0VT1}",
+        "h": "h_{MVT1}",
+        "h_{0}": "h_{M0VT1}",
+        "p": "p_{MVT1}",
+        "r": "r_{MVT1}"
+      },
+      "expressions": [
+        {
+          "original": "r(u,v,w)=\\sqrt{u^{2}+v^{2}+w^{2}}",
+          "latex": "r_{MVT1}(u,v,w)=\\sqrt{u^{2}+v^{2}+w^{2}}"
+        },
+        {
+          "original": "A(u,v,w)=\\arctan\\left(\\frac{vw}{u r(u,v,w)}\\right)",
+          "latex": "A_{MVT1}(u,v,w)=\\arctan\\left(\\frac{vw}{u r_{MVT1}(u,v,w)}\\right)"
+        },
+        {
+          "original": "C(u,v,w)=\\ln\\left(w+r(u,v,w)\\right)",
+          "latex": "C_{MVT1}(u,v,w)=\\ln\\left(w+r_{MVT1}(u,v,w)\\right)"
+        },
+        {
+          "original": "D(u,v,w)=\\ln\\left(v+r(u,v,w)\\right)",
+          "latex": "D_{MVT1}(u,v,w)=\\ln\\left(v+r_{MVT1}(u,v,w)\\right)"
+        },
+        {
+          "original": "f_{0}(u,v,w)=A(u,v+b,w+c)-A(u,v-b,w+c)-A(u,v+b,w-c)+A(u,v-b,w-c)",
+          "latex": "f_{M0VT1}(u,v,w)=A_{MVT1}(u,v+b_{MVT1},w+c_{MVT1})-A_{MVT1}(u,v-b_{MVT1},w+c_{MVT1})-A_{MVT1}(u,v+b_{MVT1},w-c_{MVT1})+A_{MVT1}(u,v-b_{MVT1},w-c_{MVT1})"
+        },
+        {
+          "original": "g_{0}(u,v,w)=-C(u,v+b,w+c)+C(u,v-b,w+c)+C(u,v+b,w-c)-C(u,v-b,w-c)",
+          "latex": "g_{M0VT1}(u,v,w)=-C_{MVT1}(u,v+b_{MVT1},w+c_{MVT1})+C_{MVT1}(u,v-b_{MVT1},w+c_{MVT1})+C_{MVT1}(u,v+b_{MVT1},w-c_{MVT1})-C_{MVT1}(u,v-b_{MVT1},w-c_{MVT1})"
+        },
+        {
+          "original": "h_{0}(u,v,w)=-D(u,v+b,w+c)+D(u,v-b,w+c)+D(u,v+b,w-c)-D(u,v-b,w-c)",
+          "latex": "h_{M0VT1}(u,v,w)=-D_{MVT1}(u,v+b_{MVT1},w+c_{MVT1})+D_{MVT1}(u,v-b_{MVT1},w+c_{MVT1})+D_{MVT1}(u,v+b_{MVT1},w-c_{MVT1})-D_{MVT1}(u,v-b_{MVT1},w-c_{MVT1})"
+        },
+        {
+          "original": "J(x,y,z)=\\left\\{\\left|x\\right|<a:\\left\\{\\left|y\\right|<b:\\left\\{\\left|z\\right|<c:1,0\\right\\},0\\right\\},0\\right\\}",
+          "latex": "J_{MVT1}(x,y,z)=\\left\\{\\left|x\\right|<a_{MVT1}:\\left\\{\\left|y\\right|<b_{MVT1}:\\left\\{\\left|z\\right|<c_{MVT1}:1,0\\right\\},0\\right\\},0\\right\\}"
+        },
+        {
+          "original": "f(x,y,z)=p\\left(f_{0}(x-a,y,z)-f_{0}(x+a,y,z)+12.566370614359172J(x,y,z)\\right)",
+          "latex": "f_{MVT1}(x,y,z)=p_{MVT1}\\left(f_{M0VT1}(x-a_{MVT1},y,z)-f_{M0VT1}(x+a_{MVT1},y,z)+12.566370614359172J_{MVT1}(x,y,z)\\right)"
+        },
+        {
+          "original": "g(x,y,z)=p\\left(g_{0}(x-a,y,z)-g_{0}(x+a,y,z)\\right)",
+          "latex": "g_{MVT1}(x,y,z)=p_{MVT1}\\left(g_{M0VT1}(x-a_{MVT1},y,z)-g_{M0VT1}(x+a_{MVT1},y,z)\\right)"
+        },
+        {
+          "original": "h(x,y,z)=p\\left(h_{0}(x-a,y,z)-h_{0}(x+a,y,z)\\right)",
+          "latex": "h_{MVT1}(x,y,z)=p_{MVT1}\\left(h_{M0VT1}(x-a_{MVT1},y,z)-h_{M0VT1}(x+a_{MVT1},y,z)\\right)"
+        }
+      ]
+    },
+    {
+      "section": 10,
+      "tag": "D",
+      "mapping": {
+        "A": "A_{DVT1}",
+        "L": "L_{DVT1}",
+        "T": "T_{DVT1}",
+        "a": "a_{DVT1}",
+        "f": "f_{DVT1}",
+        "g": "g_{DVT1}",
+        "h": "h_{DVT1}",
+        "m": "m_{DVT1}",
+        "m_{0}": "m_{D0VT1}",
+        "r": "r_{DVT1}",
+        "w": "w_{DVT1}"
+      },
+      "expressions": [
+        {
+          "original": "r(x,y,z)=\\sqrt{x^{2}+y^{2}+z^{2}}",
+          "latex": "r_{DVT1}(x,y,z)=\\sqrt{x^{2}+y^{2}+z^{2}}"
+        },
+        {
+          "original": "f(x,y,z)=\\left\\{r(x,y,z)>a:\\frac{3mxy}{r(x,y,z)^{5}},0\\right\\}",
+          "latex": "f_{DVT1}(x,y,z)=\\left\\{r_{DVT1}(x,y,z)>a_{DVT1}:\\frac{3m_{DVT1}xy}{r_{DVT1}(x,y,z)^{5}},0\\right\\}"
+        },
+        {
+          "original": "g(x,y,z)=\\left\\{r(x,y,z)>a:\\frac{m\\left(3y^{2}-r(x,y,z)^{2}\\right)}{r(x,y,z)^{5}},\\frac{2m}{a^{3}}\\right\\}",
+          "latex": "g_{DVT1}(x,y,z)=\\left\\{r_{DVT1}(x,y,z)>a_{DVT1}:\\frac{m_{DVT1}\\left(3y^{2}-r_{DVT1}(x,y,z)^{2}\\right)}{r_{DVT1}(x,y,z)^{5}},\\frac{2m_{DVT1}}{a_{DVT1}^{3}}\\right\\}"
+        },
+        {
+          "original": "h(x,y,z)=\\left\\{r(x,y,z)>a:\\frac{3myz}{r(x,y,z)^{5}},0\\right\\}",
+          "latex": "h_{DVT1}(x,y,z)=\\left\\{r_{DVT1}(x,y,z)>a_{DVT1}:\\frac{3m_{DVT1}yz}{r_{DVT1}(x,y,z)^{5}},0\\right\\}"
+        },
+        {
+          "original": "\\left(L\\sin(t)^{3},L\\sin(t)^{2}\\cos(t)\\right)",
+          "latex": "\\left(L_{DVT1}\\sin(t)^{3},L_{DVT1}\\sin(t)^{2}\\cos(t)\\right)"
+        },
+        {
+          "original": "\\left(-L\\sin(t)^{3},L\\sin(t)^{2}\\cos(t)\\right)",
+          "latex": "\\left(-L_{DVT1}\\sin(t)^{3},L_{DVT1}\\sin(t)^{2}\\cos(t)\\right)"
+        },
+        {
+          "original": "m=m_{0}\\cos(wT)",
+          "latex": "m_{DVT1}=m_{D0VT1}\\cos(w_{DVT1}T_{DVT1})"
+        },
+        {
+          "original": "L=[0.7,1,1.5,2.2,3.2,4.5]",
+          "latex": "L_{DVT1}=[0.7,1,1.5,2.2,3.2,4.5]"
+        },
+        {
+          "original": "A=0",
+          "latex": "A_{DVT1}=0"
+        }
+      ]
+    },
+    {
+      "section": 17,
+      "tag": "N",
+      "mapping": {
+        "A": "A_{NVT1}",
+        "G": "G_{NVT1}",
+        "M_{1}": "M_{N1VT1}",
+        "M_{2}": "M_{N2VT1}",
+        "M_{3}": "M_{N3VT1}",
+        "R_{1}": "R_{N1VT1}",
+        "R_{2}": "R_{N2VT1}",
+        "R_{3}": "R_{N3VT1}",
+        "R_{i}": "R_{NiVT1}",
+        "R_{j}": "R_{NjVT1}",
+        "T": "T_{NVT1}",
+        "T_{e}": "T_{NeVT1}",
+        "X": "X_{NVT1}",
+        "Y": "Y_{NVT1}",
+        "Z": "Z_{NVT1}",
+        "a_{1}": "a_{N1VT1}",
+        "a_{2}": "a_{N2VT1}",
+        "a_{3}": "a_{N3VT1}",
+        "b_{1}": "b_{N1VT1}",
+        "b_{2}": "b_{N2VT1}",
+        "b_{3}": "b_{N3VT1}",
+        "c_{1}": "c_{N1VT1}",
+        "c_{2}": "c_{N2VT1}",
+        "c_{3}": "c_{N3VT1}",
+        "c_{x}": "c_{NxVT1}",
+        "c_{y}": "c_{NyVT1}",
+        "c_{z}": "c_{NzVT1}",
+        "f": "f_{NVT1}",
+        "g": "g_{NVT1}",
+        "h": "h_{NVT1}",
+        "r_{1}": "r_{N1VT1}",
+        "r_{2}": "r_{N2VT1}",
+        "r_{3}": "r_{N3VT1}"
+      },
+      "expressions": [
+        {
+          "original": "r_{1}(x,y,z)=\\sqrt{\\left(x-a_{1}\\right)^{2}+\\left(y-b_{1}\\right)^{2}+\\left(z-c_{1}\\right)^{2}}",
+          "latex": "r_{N1VT1}(x,y,z)=\\sqrt{\\left(x-a_{N1VT1}\\right)^{2}+\\left(y-b_{N1VT1}\\right)^{2}+\\left(z-c_{N1VT1}\\right)^{2}}"
+        },
+        {
+          "original": "r_{2}(x,y,z)=\\sqrt{\\left(x-a_{2}\\right)^{2}+\\left(y-b_{2}\\right)^{2}+\\left(z-c_{2}\\right)^{2}}",
+          "latex": "r_{N2VT1}(x,y,z)=\\sqrt{\\left(x-a_{N2VT1}\\right)^{2}+\\left(y-b_{N2VT1}\\right)^{2}+\\left(z-c_{N2VT1}\\right)^{2}}"
+        },
+        {
+          "original": "r_{3}(x,y,z)=\\sqrt{\\left(x-a_{3}\\right)^{2}+\\left(y-b_{3}\\right)^{2}+\\left(z-c_{3}\\right)^{2}}",
+          "latex": "r_{N3VT1}(x,y,z)=\\sqrt{\\left(x-a_{N3VT1}\\right)^{2}+\\left(y-b_{N3VT1}\\right)^{2}+\\left(z-c_{N3VT1}\\right)^{2}}"
+        },
+        {
+          "original": "f(x,y,z)=-\\frac{GM_{1}\\left(x-a_{1}\\right)}{r_{1}(x,y,z)^{3}}-\\frac{GM_{2}\\left(x-a_{2}\\right)}{r_{2}(x,y,z)^{3}}-\\frac{GM_{3}\\left(x-a_{3}\\right)}{r_{3}(x,y,z)^{3}}",
+          "latex": "f_{NVT1}(x,y,z)=-\\frac{G_{NVT1}M_{N1VT1}\\left(x-a_{N1VT1}\\right)}{r_{N1VT1}(x,y,z)^{3}}-\\frac{G_{NVT1}M_{N2VT1}\\left(x-a_{N2VT1}\\right)}{r_{N2VT1}(x,y,z)^{3}}-\\frac{G_{NVT1}M_{N3VT1}\\left(x-a_{N3VT1}\\right)}{r_{N3VT1}(x,y,z)^{3}}"
+        },
+        {
+          "original": "g(x,y,z)=-\\frac{GM_{1}\\left(y-b_{1}\\right)}{r_{1}(x,y,z)^{3}}-\\frac{GM_{2}\\left(y-b_{2}\\right)}{r_{2}(x,y,z)^{3}}-\\frac{GM_{3}\\left(y-b_{3}\\right)}{r_{3}(x,y,z)^{3}}",
+          "latex": "g_{NVT1}(x,y,z)=-\\frac{G_{NVT1}M_{N1VT1}\\left(y-b_{N1VT1}\\right)}{r_{N1VT1}(x,y,z)^{3}}-\\frac{G_{NVT1}M_{N2VT1}\\left(y-b_{N2VT1}\\right)}{r_{N2VT1}(x,y,z)^{3}}-\\frac{G_{NVT1}M_{N3VT1}\\left(y-b_{N3VT1}\\right)}{r_{N3VT1}(x,y,z)^{3}}"
+        },
+        {
+          "original": "h(x,y,z)=-\\frac{GM_{1}\\left(z-c_{1}\\right)}{r_{1}(x,y,z)^{3}}-\\frac{GM_{2}\\left(z-c_{2}\\right)}{r_{2}(x,y,z)^{3}}-\\frac{GM_{3}\\left(z-c_{3}\\right)}{r_{3}(x,y,z)^{3}}",
+          "latex": "h_{NVT1}(x,y,z)=-\\frac{G_{NVT1}M_{N1VT1}\\left(z-c_{N1VT1}\\right)}{r_{N1VT1}(x,y,z)^{3}}-\\frac{G_{NVT1}M_{N2VT1}\\left(z-c_{N2VT1}\\right)}{r_{N2VT1}(x,y,z)^{3}}-\\frac{G_{NVT1}M_{N3VT1}\\left(z-c_{N3VT1}\\right)}{r_{N3VT1}(x,y,z)^{3}}"
+        },
+        {
+          "original": "A(T_{e})=R_{i}+R_{j}+0.8T_{e}",
+          "latex": "A_{NVT1}(T_{e})=R_{NiVT1}+R_{NjVT1}+0.8T_{e}"
+        },
+        {
+          "original": "\\left(x-c_{x}\\right)^{2}+\\left(y-c_{y}\\right)^{2}=A(T_{e})^{2}",
+          "latex": "\\left(x-c_{NxVT1}\\right)^{2}+\\left(y-c_{NyVT1}\\right)^{2}=A_{NVT1}(T_{NeVT1})^{2}"
+        },
+        {
+          "original": "\\left(x-c_{x}\\right)^{2}+\\left(y-c_{y}\\right)^{2}+\\left(z-c_{z}\\right)^{2}=A(T_{e})^{2}",
+          "latex": "\\left(x-c_{NxVT1}\\right)^{2}+\\left(y-c_{NyVT1}\\right)^{2}+\\left(z-c_{NzVT1}\\right)^{2}=A_{NVT1}(T_{NeVT1})^{2}"
+        }
+      ]
+    }
+  ]
+}

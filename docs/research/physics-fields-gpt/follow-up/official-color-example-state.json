@@ -1,0 +1,45 @@
+{
+  "version": 11,
+  "randomSeed": "9e20e385349828b6468db80423b8decf",
+  "graph": {
+    "viewport": {
+      "xmin": -1.5,
+      "ymin": -1.5,
+      "zmin": -1.5,
+      "xmax": 1.5,
+      "ymax": 1.5,
+      "zmax": 1.5
+    },
+    "threeDMode": true,
+    "product": "graphing-3d",
+    "__v12ViewportLatexStash": {
+      "xmin": "-1.5",
+      "xmax": "1.5",
+      "ymin": "-1.5",
+      "ymax": "1.5",
+      "zmin": "-1.5",
+      "zmax": "1.5"
+    }
+  },
+  "expressions": {
+    "list": [
+      {
+        "type": "expression",
+        "id": "2",
+        "color": "#c74440",
+        "latex": "x^{2}+y^{2}=1\\left\\{0\\le z\\le1\\right\\}",
+        "extendTo3D": true,
+        "colorLatex": "C_{1}"
+      },
+      {
+        "type": "expression",
+        "id": "4",
+        "color": "#2d70b3",
+        "latex": "C_{1}=\\operatorname{hsv}\\left(250z,1,1\\right)"
+      }
+    ]
+  },
+  "includeFunctionParametersInRandomSeed": true,
+  "doNotMigrate3dLineWidthZero": true,
+  "doNotMigrateMovablePointStyle": true
+}

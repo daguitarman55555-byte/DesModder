@@ -1,0 +1,66 @@
+{
+  "format": "Deep partial VectorFieldConfig. Merge into a freshly cloned branch default; not a standalone persistence object. Enable the flow through the controller.",
+  "patch": {
+    "source": "components",
+    "components": {
+      "xLatex": "\\left\\{\\min(r_{E1VT1}(x,y,z),r_{E2VT1}(x,y,z))>a_{EVT1}:f_{EVT1}(x,y,z)\\right\\}",
+      "yLatex": "\\left\\{\\min(r_{E1VT1}(x,y,z),r_{E2VT1}(x,y,z))>a_{EVT1}:g_{EVT1}(x,y,z)\\right\\}",
+      "zLatex": "\\left\\{\\min(r_{E1VT1}(x,y,z),r_{E2VT1}(x,y,z))>a_{EVT1}:h_{EVT1}(x,y,z)\\right\\}"
+    },
+    "arrowMode": "off",
+    "overlayLayer": "over",
+    "color": {
+      "fixedColor": "#29486b",
+      "saturation": 1,
+      "contrast": 1
+    },
+    "flow": {
+      "particleCount": 16000,
+      "speed": 0.35,
+      "trailPersistence": 0.85,
+      "dropRate": 0.03,
+      "opacity": 0.28,
+      "pointSize": 1.5,
+      "glow": 0,
+      "glowEnabled": false,
+      "backdropEnabled": false,
+      "backdropOpacity": 0,
+      "colorMode": "fixed",
+      "saturation": 1,
+      "contrast": 1,
+      "look": "streamlines",
+      "normalizeSpeed": true,
+      "renderScale": 1,
+      "seedLatex": "\\left\\{\\min(r_{E1VT1}(x,y,z),r_{E2VT1}(x,y,z))>a_{EVT1}:1,0\\right\\}",
+      "seedOn": true,
+      "lens": false
+    },
+    "space3d": {
+      "flowLook": "particles",
+      "particlesAuto": false,
+      "particles": 20000,
+      "particleSpeed": 0.18,
+      "particleNormalize": true,
+      "particleTrail": 16,
+      "particleLifetime": 3,
+      "particleOpacity": 0.22,
+      "particleGlow": 0,
+      "particlePx": 1.5,
+      "particleAbsorb": true,
+      "backdrop": false,
+      "backdropOpacity": 0,
+      "occlusion": "hide",
+      "seedLatex": "\\left\\{\\min(r_{E1VT1}(x,y,z),r_{E2VT1}(x,y,z))>a_{EVT1}:1,0\\right\\}",
+      "lens": false
+    }
+  },
+  "presentation": {
+    "writing": false,
+    "mainVectors": true,
+    "names": false,
+    "contributions": false,
+    "force": false,
+    "potentialContours": false,
+    "gpuMainVectorBackend": "Optional future renderer; native backend is specified in this state."
+  }
+}

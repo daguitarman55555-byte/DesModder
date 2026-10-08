@@ -1,0 +1,27 @@
+{
+  "expressions": {
+    "ticker": {
+      "handlerLatex": "T_{CVT1}\\to T_{CVT1}+s_{CVT1}\\frac{dt}{1000}",
+      "minStepLatex": "1000/30",
+      "open": true,
+      "playing": false
+    },
+    "list": [
+      {
+        "type": "expression",
+        "id": "clock_time",
+        "latex": "T_{CVT1}=0"
+      },
+      {
+        "type": "expression",
+        "id": "clock_speed",
+        "latex": "s_{CVT1}=1",
+        "slider": {
+          "min": "0.1",
+          "max": "2",
+          "step": "0.1"
+        }
+      }
+    ]
+  }
+}

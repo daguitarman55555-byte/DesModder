@@ -1,0 +1,302 @@
+{
+  "scope": "Renamed scalar-helper compiler checks (dependency scalars provisioned automatically); charges slots checked against defined numeric scalars. JSON parse, IDs and folder references checked. Not a Desmos state import, native geometry rendering, GPU shader link or performance test.",
+  "helperChecks": [
+    {
+      "section": 4,
+      "name": "r_E1VT1",
+      "ok": true
+    },
+    {
+      "section": 4,
+      "name": "r_E2VT1",
+      "ok": true
+    },
+    {
+      "section": 4,
+      "name": "f_EVT1",
+      "ok": true
+    },
+    {
+      "section": 4,
+      "name": "g_EVT1",
+      "ok": true
+    },
+    {
+      "section": 4,
+      "name": "h_EVT1",
+      "ok": true
+    },
+    {
+      "section": 4,
+      "name": "V_EVT1",
+      "ok": true
+    },
+    {
+      "section": 4,
+      "name": "S_EVT1",
+      "ok": true
+    },
+    {
+      "section": 5,
+      "name": "D_W1VT1",
+      "ok": true
+    },
+    {
+      "section": 5,
+      "name": "D_W2VT1",
+      "ok": true
+    },
+    {
+      "section": 5,
+      "name": "f_WVT1",
+      "ok": true
+    },
+    {
+      "section": 5,
+      "name": "g_WVT1",
+      "ok": true
+    },
+    {
+      "section": 5,
+      "name": "S_WVT1",
+      "ok": true
+    },
+    {
+      "section": 6,
+      "name": "r_G1VT1",
+      "ok": true
+    },
+    {
+      "section": 6,
+      "name": "r_G2VT1",
+      "ok": true
+    },
+    {
+      "section": 6,
+      "name": "D_G1VT1",
+      "ok": true
+    },
+    {
+      "section": 6,
+      "name": "D_G2VT1",
+      "ok": true
+    },
+    {
+      "section": 6,
+      "name": "f_GVT1",
+      "ok": true
+    },
+    {
+      "section": 6,
+      "name": "g_GVT1",
+      "ok": true
+    },
+    {
+      "section": 6,
+      "name": "h_GVT1",
+      "ok": true
+    },
+    {
+      "section": 6,
+      "name": "V_GVT1",
+      "ok": true
+    },
+    {
+      "section": 7,
+      "name": "f_CVT1",
+      "ok": true
+    },
+    {
+      "section": 7,
+      "name": "g_CVT1",
+      "ok": true
+    },
+    {
+      "section": 7,
+      "name": "S_CVT1",
+      "ok": true
+    },
+    {
+      "section": 7,
+      "name": "P_CVT1",
+      "ok": true
+    },
+    {
+      "section": 8,
+      "name": "A_PVT1",
+      "ok": true
+    },
+    {
+      "section": 8,
+      "name": "C_PVT1",
+      "ok": true
+    },
+    {
+      "section": 8,
+      "name": "f_PVT1",
+      "ok": true
+    },
+    {
+      "section": 8,
+      "name": "g_PVT1",
+      "ok": true
+    },
+    {
+      "section": 8,
+      "name": "H_PVT1",
+      "ok": true
+    },
+    {
+      "section": 8,
+      "name": "J_PVT1",
+      "ok": true
+    },
+    {
+      "section": 8,
+      "name": "S_PVT1",
+      "ok": true
+    },
+    {
+      "section": 9,
+      "name": "r_MVT1",
+      "ok": true
+    },
+    {
+      "section": 9,
+      "name": "A_MVT1",
+      "ok": true
+    },
+    {
+      "section": 9,
+      "name": "C_MVT1",
+      "ok": true
+    },
+    {
+      "section": 9,
+      "name": "D_MVT1",
+      "ok": true
+    },
+    {
+      "section": 9,
+      "name": "f_M0VT1",
+      "ok": true
+    },
+    {
+      "section": 9,
+      "name": "g_M0VT1",
+      "ok": true
+    },
+    {
+      "section": 9,
+      "name": "h_M0VT1",
+      "ok": true
+    },
+    {
+      "section": 9,
+      "name": "J_MVT1",
+      "ok": true
+    },
+    {
+      "section": 9,
+      "name": "f_MVT1",
+      "ok": true
+    },
+    {
+      "section": 9,
+      "name": "g_MVT1",
+      "ok": true
+    },
+    {
+      "section": 9,
+      "name": "h_MVT1",
+      "ok": true
+    },
+    {
+      "section": 10,
+      "name": "r_DVT1",
+      "ok": true
+    },
+    {
+      "section": 10,
+      "name": "f_DVT1",
+      "ok": true
+    },
+    {
+      "section": 10,
+      "name": "g_DVT1",
+      "ok": true
+    },
+    {
+      "section": 10,
+      "name": "h_DVT1",
+      "ok": true
+    },
+    {
+      "section": 17,
+      "name": "r_N1VT1",
+      "ok": true
+    },
+    {
+      "section": 17,
+      "name": "r_N2VT1",
+      "ok": true
+    },
+    {
+      "section": 17,
+      "name": "r_N3VT1",
+      "ok": true
+    },
+    {
+      "section": 17,
+      "name": "f_NVT1",
+      "ok": true
+    },
+    {
+      "section": 17,
+      "name": "g_NVT1",
+      "ok": true
+    },
+    {
+      "section": 17,
+      "name": "h_NVT1",
+      "ok": true
+    },
+    {
+      "section": 17,
+      "name": "A_NVT1",
+      "ok": true
+    }
+  ],
+  "componentChecks": [
+    {
+      "dimension": 2,
+      "slot": "xLatex",
+      "ok": true
+    },
+    {
+      "dimension": 2,
+      "slot": "yLatex",
+      "ok": true
+    },
+    {
+      "dimension": 2,
+      "slot": "zLatex",
+      "ok": true
+    },
+    {
+      "dimension": 3,
+      "slot": "xLatex",
+      "ok": true
+    },
+    {
+      "dimension": 3,
+      "slot": "yLatex",
+      "ok": true
+    },
+    {
+      "dimension": 3,
+      "slot": "zLatex",
+      "ok": true
+    }
+  ]
+}
