@@ -40,8 +40,10 @@
 import { CHAOS } from "./chaos";
 import { FIELDS } from "./fields";
 import { FLUIDS } from "./fluids";
+import { PHYSICS } from "./physics";
 import { SPACE } from "./space";
-import type { GalleryPreset } from "./types";
+import { renameIdentifier } from "../identifiers";
+import type { GalleryPreset, GalleryVariable } from "./types";
 
 export * from "./types";
 
@@ -51,7 +53,45 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   ...FLUIDS,
   ...CHAOS,
   ...FIELDS,
+  ...PHYSICS,
 ];
+
+/**
+ * The preset with its variables written in as their values, for a place
+ * that has no sliders to give them — Audio Lab, and the tests that compile
+ * every preset with nothing else in the graph.
+ */
+export function withVariablesInlined(preset: GalleryPreset): GalleryPreset {
+  const inline = (
+    latex: string | undefined,
+    variables: readonly GalleryVariable[]
+  ) =>
+    latex === undefined
+      ? undefined
+      : variables.reduce(
+          (out, v) =>
+            renameIdentifier(out, v.name, String.raw`\left(${v.value}\right)`),
+          latex
+        );
+  const flat = preset.variables ?? [];
+  const space = preset.space.variables ?? flat;
+  if (flat.length === 0 && space.length === 0) return preset;
+  return {
+    ...preset,
+    xLatex: inline(preset.xLatex, flat)!,
+    yLatex: inline(preset.yLatex, flat)!,
+    seedLatex: inline(preset.seedLatex, flat),
+    variables: undefined,
+    space: {
+      ...preset.space,
+      xLatex: inline(preset.space.xLatex, space)!,
+      yLatex: inline(preset.space.yLatex, space)!,
+      zLatex: inline(preset.space.zLatex, space)!,
+      seedLatex: inline(preset.space.seedLatex, space),
+      variables: undefined,
+    },
+  };
+}
 
 export function galleryPreset(id: string): GalleryPreset | undefined {
   return FIELD_GALLERY.find((preset) => preset.id === id);

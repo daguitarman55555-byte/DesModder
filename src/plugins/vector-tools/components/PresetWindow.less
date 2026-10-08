@@ -68,6 +68,63 @@
     padding: 4px 6px 8px;
   }
 
+  // A physics preset's variables: a slider each, its value beside it.
+  .dsm-preset-window-variables {
+    margin: 8px 4px 2px;
+  }
+
+  .dsm-preset-window-variables-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+
+    .dsm-preset-window-group-label {
+      margin: 0;
+    }
+  }
+
+  .dsm-preset-window-variables-reset {
+    font-size: 11px;
+    color: #2f72dc;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  .dsm-preset-window-variable {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+
+    input {
+      flex: 1;
+      min-width: 0;
+    }
+  }
+
+  .dsm-preset-window-variable-name {
+    width: 26px;
+    font-style: italic;
+    font-family: "Times New Roman", serif;
+    font-size: 15px;
+  }
+
+  .dsm-preset-window-variable-sub {
+    font-size: 10px;
+    vertical-align: sub;
+    font-style: normal;
+  }
+
+  .dsm-preset-window-variable-value {
+    width: 34px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: #555;
+  }
+
   // Moving or still: two halves of one pill, the chosen one filled.
   .dsm-preset-window-motion {
     display: flex;

@@ -101,12 +101,16 @@ import {
   EMPTY_ENVIRONMENT,
   TIME_NAME,
 } from "../../field-rendering/latexToGLSL";
-import { mentions } from "../../field-rendering/identifiers";
+import {
+  canonicalIdentifier,
+  mentions,
+} from "../../field-rendering/identifiers";
 import type { FieldEnvironment } from "../../field-rendering/latexToGLSL";
 import {
   environmentsDiffer,
   scanDefinitions,
 } from "../../field-rendering/environment";
+import type { GalleryVariable } from "../../field-rendering/gallery/types";
 import type { FlowField } from "../../field-rendering/FlowRenderer";
 import { Overlay3D } from "../../field-rendering/Overlay3D";
 import {
@@ -130,6 +134,18 @@ import {
   type SurfaceScan,
 } from "../../field-rendering/surfaces3d";
 import type { ConfigItem } from "..";
+
+/**
+ * Where a preset's variables live in the expression list: outside every
+ * field's own namespace, since they belong to the picture loaded, not to the
+ * field being edited.
+ */
+const PRESET_VARIABLES_NAMESPACE = "vector_tools_variables";
+
+/** A preset variable's expression: `q_{1}` is `vector_tools_variables_q1`. */
+function presetVariableID(name: string) {
+  return `${PRESET_VARIABLES_NAMESPACE}_${name.replace(/[^A-Za-z0-9]/g, "")}`;
+}
 
 /** The divergence and curl of a field, and whether it has a potential. */
 export type FieldAnalysis =
@@ -955,6 +971,9 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       values.set(name, helper.numericValue);
     }
     this.setParameterValues(values);
+    // A slider dragged in the expression list moves the presets window's
+    // copy of it too.
+    if (this.presetWindow.open) this.util.tick();
   }
 
   /**
@@ -1888,6 +1907,96 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
    * usually means — Duplicate is next to it for keeping what is there.
    */
   /**
+   * A preset's variables, as sliders in a folder of their own, replacing the
+   * last preset's. A name the graph already defines elsewhere is the user's
+   * — a problem's numbers, say — and is left as it is: the field then reads
+   * theirs. Removed, rather than left behind, for a preset without any.
+   */
+  private loadPresetVariables(
+    title: string,
+    variables: readonly GalleryVariable[]
+  ) {
+    const namespace = PRESET_VARIABLES_NAMESPACE;
+    const existing = this.expressions
+      .getGeneratedItems(namespace)
+      .map((item) => item.id);
+    const theirs = new Set(
+      scanDefinitions(this.cc.getAllItemModels(), namespace).scalars
+    );
+    const wanted = variables.filter(
+      (v) => !theirs.has(canonicalIdentifier(v.name))
+    );
+    try {
+      if (wanted.length === 0) {
+        if (existing.length > 0)
+          this.expressions.removeGeneratedSet(namespace, existing);
+      } else {
+        const folder = `${namespace}_folder`;
+        this.expressions.applyGeneratedSet(
+          namespace,
+          { id: folder, title: `${title}: the field's variables` },
+          wanted.map((v) => ({
+            id: presetVariableID(v.name),
+            latex: `${v.name}=${v.value}`,
+            folderId: folder,
+            slider: {
+              min: String(v.min),
+              max: String(v.max),
+              ...(v.step !== undefined ? { step: String(v.step) } : {}),
+            },
+          })),
+          { knownIDs: existing }
+        );
+      }
+    } catch (error) {
+      this.lastActionMessage = `Could not add the preset's variables: ${
+        error instanceof Error ? error.message : "unknown error"
+      }`;
+    }
+    // Now, not on the graph's next change event: the field about to be
+    // loaded is compiled against these.
+    this.refreshEnvironment();
+  }
+
+  /**
+   * The loaded preset's variables that are still its sliders in the graph,
+   * each with the value the graph has for it now: for the presets window to
+   * show and set. A variable the user defined for themselves is not here —
+   * it is theirs, in the expression list.
+   */
+  get presetVariables(): (GalleryVariable & { id: string; current: number })[] {
+    const preset = galleryPreset(this.activePresetId ?? "");
+    if (preset === undefined) return [];
+    const variables =
+      (this.is3d ? preset.space.variables : undefined) ??
+      preset.variables ??
+      [];
+    return variables.flatMap((v) => {
+      const id = presetVariableID(v.name);
+      const latex = itemLatex(this.cc.getItemModel(id));
+      const value = Number(latex.slice(latex.indexOf("=") + 1));
+      return latex === ""
+        ? []
+        : [{ ...v, id, current: Number.isFinite(value) ? value : v.value }];
+    });
+  }
+
+  /** Sets a preset variable's slider in the graph, which redraws the field. */
+  setPresetVariable(id: string, value: number) {
+    const variable = this.presetVariables.find((v) => v.id === id);
+    if (variable === undefined || !Number.isFinite(value)) return;
+    this.calc.setExpression({ id, latex: `${variable.name}=${value}` });
+    this.util.tick();
+  }
+
+  /** Every preset variable back to the value the preset loads it with. */
+  resetPresetVariables() {
+    for (const v of this.presetVariables)
+      this.calc.setExpression({ id: v.id, latex: `${v.name}=${v.value}` });
+    this.util.tick();
+  }
+
+  /**
    * Presets moving or still: the clock running or stopped, now and for every
    * preset loaded after. Still keeps the moment the clock is at.
    */
@@ -1899,6 +2008,12 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   applyGalleryPreset(id: string, withLook: boolean) {
     const preset = galleryPreset(id);
     if (preset === undefined) return;
+    // Before the field: it is written in these names, and compiling it
+    // before the graph defines them would fail.
+    this.loadPresetVariables(
+      preset.name,
+      (this.is3d ? preset.space.variables : undefined) ?? preset.variables ?? []
+    );
     this.updateConfig((config) => {
       const dimensions = this.is3d ? 3 : 2;
       const loaded = withLook

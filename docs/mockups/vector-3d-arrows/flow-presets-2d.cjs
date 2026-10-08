@@ -23,6 +23,12 @@ const PRESETS = [
   "smoke-ring",
   "karman",
   "solar-wind",
+  "charges",
+  "wires",
+  "earth-moon",
+  "cylinder",
+  "capacitor",
+  "bar-magnet",
 ];
 
 (async () => {

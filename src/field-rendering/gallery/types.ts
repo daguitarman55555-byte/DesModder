@@ -32,8 +32,23 @@ export const GALLERY_CATEGORIES: readonly {
   { id: "space", label: "Space" },
   { id: "fluids", label: "Fluids" },
   { id: "chaos", label: "Chaos" },
-  { id: "fields", label: "Fields" },
+  { id: "fields", label: "Physics" },
 ];
+
+/**
+ * A number a preset's field is written in terms of — a charge, a current, a
+ * distance — loaded into the graph as a slider, so the field can be set to a
+ * problem's numbers and redrawn as they change. A name the graph already
+ * defines is left as the graph has it.
+ */
+export interface GalleryVariable {
+  /** Desmos LaTeX: a letter, optionally subscripted, e.g. `q_{1}`. */
+  name: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+}
 
 export interface GalleryPreset {
   id: string;
@@ -60,16 +75,12 @@ export interface GalleryPreset {
   seedLatex?: string;
   /** A black hole at the origin, with this horizon radius. */
   lensHorizon?: number;
+  /** The numbers the field is written in, loaded as sliders. */
+  variables?: readonly GalleryVariable[];
   /** The speed the 2D colour ramp spans, where Auto's would not suit. */
   colorScale?: number;
   /** One colour rather than a ramp, for the 2D flow. */
   fixedColor?: string;
-  /**
-   * The 2D flow coloured by which way the field points rather than how
-   * strong it is: for a field whose strength falls so fast that colouring
-   * by it leaves all but the centre dark.
-   */
-  colorByDirection?: boolean;
   /**
    * The same picture on Desmos 3D: the field with a third component, and
    * what is different about it in a box. Every preset has one, so loading a
@@ -88,6 +99,8 @@ export interface GalleryPreset {
     seedLatex?: string;
     /** A black hole at the origin bending light, with this horizon radius. */
     lensHorizon?: number;
+    /** The numbers the 3D field is written in, where they differ. */
+    variables?: readonly GalleryVariable[];
     /** How the 3D flow is drawn, over the caller's defaults. */
     look?: Partial<SpaceLook>;
   };

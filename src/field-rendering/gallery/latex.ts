@@ -401,31 +401,3 @@ export function carriedWorlds(
   }
   return out;
 }
-
-/**
- * A magnet in the plane: the field of a uniformly magnetised disc of radius
- * `R` with moment along `m`, B = (2(m·r)r − m r²)/r⁴ outside, and the
- * uniform m/R² inside, which meets it at the poles.
- *
- * The plane's own dipole, the field of a long bar magnet seen end-on, not a
- * slice through a 3D one. A slice of the 3D field has divergence in the
- * plane — field lines leave it — so particles drained out of two crescents
- * beside the magnet, which drew as black holes in the picture. This one is
- * divergence-free in the plane, so particles stay spread as they are born,
- * and its field lines are circles through the magnet.
- */
-export function planeDipole(m: readonly [string, string], R: number) {
-  const r2 = String.raw`x^{2}+y^{2}`;
-  const dot = [m[0] === "0" ? "" : `${m[0]}x`, m[1] === "0" ? "" : `${m[1]}y`]
-    .filter((t) => t !== "")
-    .join("+");
-  const component = (a: "x" | "y", mi: string) => {
-    const outside =
-      mi === "0"
-        ? String.raw`\frac{2${a}\left(${dot}\right)}{\left(${r2}\right)^{2}}`
-        : String.raw`\frac{2${a}\left(${dot}\right)-${mi}\left(${r2}\right)}{\left(${r2}\right)^{2}}`;
-    const inside = mi === "0" ? "0" : String.raw`\frac{${mi}}{${num(R * R)}}`;
-    return String.raw`\left\{${r2}>${num(R * R)}:${outside},${inside}\right\}`;
-  };
-  return { x: component("x", m[0]), y: component("y", m[1]) };
-}

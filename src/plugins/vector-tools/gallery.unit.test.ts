@@ -9,6 +9,7 @@ import {
   colorsFromGallery,
   configFromGallery,
   FIELD_GALLERY,
+  withVariablesInlined,
   galleryPreset,
 } from "./gallery";
 import { compileFieldComponentToGLSL } from "../../field-rendering/latexToGLSL";
@@ -19,7 +20,10 @@ describe("every gallery field compiles", () => {
   test.each(FIELD_GALLERY.map((preset) => [preset.name, preset] as const))(
     "%s",
     (_name, preset) => {
-      for (const latex of [preset.xLatex, preset.yLatex]) {
+      // A physics preset's variables are sliders in the graph; alone, their
+      // default values.
+      const alone = withVariablesInlined(preset);
+      for (const latex of [alone.xLatex, alone.yLatex]) {
         const result = compileFieldComponentToGLSL(latex);
         // The message is worth surfacing: "unexpected end of input" names the
         // problem, and `ok: false` does not.

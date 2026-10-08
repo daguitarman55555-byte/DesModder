@@ -37,15 +37,41 @@ type UntrustedInitialData = Partial<InitialData> | undefined;
 
 function getInitialData() {
   chrome.storage.sync.get(initialDataDefaults, (_items) => {
-    const items = _items as UntrustedInitialData;
-    postMessageDown({
-      type: "apply-initial-data",
-      pluginsEnabled: getItem(items, StorageKeys.pluginsEnabled),
-      pluginsForceDisabled: pluginsForceDisabled(items),
-      pluginSettings: pluginSettings(items),
-      scriptURL: chrome.runtime.getURL("script.js"),
+    // Plugin settings from this browser's own copy where there is one (see
+    // savePluginSettings), else the synced one.
+    chrome.storage.local.get(StorageKeys.pluginSettings, (local) => {
+      const items: UntrustedInitialData = {
+        ...(_items as UntrustedInitialData),
+        ...(local?.[StorageKeys.pluginSettings] !== undefined
+          ? { [StorageKeys.pluginSettings]: local[StorageKeys.pluginSettings] }
+          : {}),
+      };
+      postMessageDown({
+        type: "apply-initial-data",
+        pluginsEnabled: getItem(items, StorageKeys.pluginsEnabled),
+        pluginsForceDisabled: pluginsForceDisabled(items),
+        pluginSettings: pluginSettings(items),
+        scriptURL: chrome.runtime.getURL("script.js"),
+      });
     });
   });
+}
+
+/**
+ * Saves plugin settings to this browser's own storage, which holds
+ * megabytes, and to the synced storage too while they fit there, so that
+ * small settings still follow the account to another computer.
+ *
+ * Synced storage allows 8 KB an item, and every plugin's settings are one
+ * item: a Vector Tools library holding a few preset fields is more than
+ * that, and every save was refused ("QUOTA_BYTES_PER_ITEM quota exceeded"),
+ * so the settings were silently never saved.
+ */
+function savePluginSettings(value: unknown) {
+  void chrome.storage.local.set({ [StorageKeys.pluginSettings]: value });
+  chrome.storage.sync
+    .set({ [StorageKeys.pluginSettings]: value })
+    .catch(() => {});
 }
 
 type KID = keyof InitialData;
@@ -144,9 +170,7 @@ function init() {
         });
         break;
       case "set-plugin-settings":
-        void chrome.storage.sync.set({
-          [StorageKeys.pluginSettings]: message.value,
-        });
+        savePluginSettings(message.value);
         break;
       case "send-heartbeat":
         _sendHeartbeat(message.options);

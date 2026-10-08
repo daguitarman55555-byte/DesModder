@@ -155,7 +155,8 @@ function pulsar(axes: readonly ("x" | "y" | "z")[]) {
   const r2 = axes.map((ax) => `${ax}^{2}`).join("+");
   const mr = axes.map((ax, i) => `${m[i]}${ax}`).join("+");
   // In the plane the dipole is the plane's own, 2(m·r)r − m r², which keeps
-  // particles spread (see planeDipole).
+  // particles spread: it is divergence-free in the plane, where a slice of
+  // the 3D one is not.
   const k = three ? 3 : 2;
   const loops = three ? "0.2" : "0.03";
   const g = String.raw`e^{-${loops}\left(${r2}\right)^{2}}`;

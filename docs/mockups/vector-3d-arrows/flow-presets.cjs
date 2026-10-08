@@ -24,6 +24,12 @@ const PRESETS = [
   "smoke-ring",
   "karman",
   "solar-wind",
+  "charges",
+  "wires",
+  "earth-moon",
+  "cylinder",
+  "capacitor",
+  "bar-magnet",
 ];
 // Tilt for the black hole's own picture, radians from looking straight down:
 // nearly edge-on, as the classic renderings are.

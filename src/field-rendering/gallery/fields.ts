@@ -1,10 +1,16 @@
 /** Fields: the textbook pictures. */
-import { dipole, planeDipole } from "./latex";
+import { dipole } from "./latex";
 import type { GalleryPreset } from "./types";
 
 /** The bar magnet on alternating current, along y in the plane and z in the box. */
 const AC = String.raw`\cos\left(0.4t\right)`;
-const MAGNET_2D = planeDipole(["0", AC], 0.8);
+/**
+ * In the plane, the slice through the 3D magnet's own field, its centre a
+ * point: Rafael's picture of it is the 3D one seen side-on, and a magnet
+ * drawn as a disc of uniform field in the middle read as a sphere sitting
+ * on the lines.
+ */
+const MAGNET_2D = dipole(["0", AC], ["x", "y"], 0.25, false, "magnet");
 const MAGNET_3D = dipole(["0", "0", AC], ["x", "y", "z"], 0.6, false, "magnet");
 
 export const FIELDS: readonly GalleryPreset[] = [
@@ -14,33 +20,24 @@ export const FIELDS: readonly GalleryPreset[] = [
     category: "fields",
     blurb:
       "The field of a bar magnet, and the one picture every physics textbook opens with. On alternating current: the lines keep their shape, and the field fades, reverses and returns.",
-    xLatex: MAGNET_2D.x,
-    yLatex: MAGNET_2D.y,
-    // Released everywhere, thinning outward: the small loops hugging the
-    // magnet too, which a seed starting at 1.5 left as two black crescents.
-    // Fewer close in, where particles moving along the lines at one pace
-    // crowd anyway (their density goes as |B|), which washed the lines there
-    // into a glow.
-    seedLatex: String.raw`\frac{\left(x^{2}+y^{2}\right)e^{-0.03\left(x^{2}+y^{2}\right)}}{x^{2}+y^{2}+2}`,
-    // By direction: the field falls as 1/r², so by strength every line but
-    // the nearest was dark; by direction each loop is a rainbow, evenly lit,
-    // and when the current reverses, every colour turns to its opposite.
-    colorByDirection: true,
-    colorScale: 0.25,
-    palette: "neon",
+    xLatex: MAGNET_2D.x!,
+    yLatex: MAGNET_2D.y!,
+    // Released everywhere, the loops hugging the magnet too: a seed that
+    // started at 1.5 left two black crescents beside it.
+    seedLatex: String.raw`e^{-0.04\left(x^{2}+y^{2}\right)}`,
+    colorScale: 0.08,
+    palette: "starfield",
     backdrop: "#02030a",
     flow: {
-      // Sparse, long-trailed and thin, so each particle draws a line, as
-      // iron filings do.
-      particleCount: 16_000,
-      glow: 0.15,
-      opacity: 0.5,
-      pointSize: 1.2,
+      particleCount: 30_000,
+      glow: 0.3,
+      opacity: 0.3,
+      pointSize: 1.3,
       // The field is enormous at the origin and tiny at the edge, so drawing
       // it at its own pace leaves everything but the centre standing still.
       normalizeSpeed: true,
       speed: 0.35,
-      trailPersistence: 0.985,
+      trailPersistence: 0.97,
       dropRate: 0.005,
     },
     extent: 6,
@@ -50,9 +47,8 @@ export const FIELDS: readonly GalleryPreset[] = [
       xLatex: MAGNET_3D.x!,
       yLatex: MAGNET_3D.y!,
       zLatex: MAGNET_3D.z!,
-      // Released everywhere, thinning outward, the loops hugging the magnet
-      // included.
-      seedLatex: String.raw`e^{-0.06\left(x^{2}+y^{2}+z^{2}\right)}`,
+      // Released round the magnet, as iron filings draw it.
+      seedLatex: String.raw`\frac{e^{-0.1\left(x^{2}+y^{2}+z^{2}\right)}}{1+e^{-4\left(\sqrt{x^{2}+y^{2}+z^{2}}-1.3\right)}}`,
       look: {
         particles: 18_000,
         speed: 0.3,

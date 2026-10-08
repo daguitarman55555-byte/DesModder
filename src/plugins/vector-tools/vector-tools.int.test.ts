@@ -2115,7 +2115,7 @@ testWithPage(
       "Space",
       "Fluids",
       "Chaos",
-      "Fields",
+      "Physics",
     ]);
     expect(shelves.reduce((sum, shelf) => sum + shelf.count, 0)).toBe(
       await driver.evaluate(() => DSM.vectorTools!.gallery.length)
@@ -2169,6 +2169,83 @@ testWithPage(
     await driver.waitForFunction(
       () => document.querySelector(".dsm-preset-window") === null
     );
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);
+
+testWithPage(
+  "a physics preset's variables are sliders, set from the presets window",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await resetLibrary(driver);
+    const variables = async () =>
+      await driver.evaluate(() =>
+        Calc.getState()
+          .expressions.list.filter((e) =>
+            e.id.startsWith("vector_tools_variables_")
+          )
+          .map((e) =>
+            e.type === "folder" ? "folder" : (e as { latex?: string }).latex
+          )
+      );
+    await driver.evaluate(() => {
+      const vt = (window as any).DSM.enabledPlugins["vector-tools"];
+      vt.applyGalleryPreset("charges", true);
+      if (!vt.presetWindow.open) vt.togglePresetWindow();
+    });
+    await driver.waitForSync();
+    // Defaults, in a folder of their own, and the field compiled against them.
+    expect(await variables()).toEqual(["folder", "q_{1}=1", "q_{2}=-1", "d=5"]);
+    expect(
+      await driver.evaluate(
+        () => (window as any).DSM.enabledPlugins["vector-tools"].flowMessage
+      )
+    ).toBeFalsy();
+    await driver.assertSelectorEventually(".dsm-preset-window-variable");
+    expect(
+      await driver.evaluate(
+        () => document.querySelectorAll(".dsm-preset-window-variable").length
+      )
+    ).toBe(3);
+
+    // Set from the window; reset to the preset's own.
+    await driver.evaluate(() =>
+      (window as any).DSM.enabledPlugins["vector-tools"].setPresetVariable(
+        "vector_tools_variables_q2",
+        2
+      )
+    );
+    expect(await variables()).toContain("q_{2}=2");
+    await driver.evaluate(() =>
+      (window as any).DSM.enabledPlugins["vector-tools"].resetPresetVariables()
+    );
+    expect(await variables()).toContain("q_{2}=-1");
+
+    // A name the graph already defines is the user's, and is left alone.
+    await driver.evaluate(() => {
+      Calc.setExpression({ id: "mine", latex: "I_{1}=3" });
+    });
+    await driver.waitForSync();
+    await driver.evaluate(() =>
+      (window as any).DSM.enabledPlugins["vector-tools"].applyGalleryPreset(
+        "wires",
+        true
+      )
+    );
+    expect(await variables()).toEqual(["folder", "I_{2}=1", "d=5"]);
+
+    // A preset with none takes the folder away.
+    await driver.evaluate(() =>
+      (window as any).DSM.enabledPlugins["vector-tools"].applyGalleryPreset(
+        "lorenz",
+        true
+      )
+    );
+    expect(await variables()).toEqual([]);
+
     await driver.disablePlugin("vector-tools");
     await driver.setBlank();
     await driver.waitForSync();

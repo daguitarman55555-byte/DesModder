@@ -22,8 +22,9 @@
  * preset's own and arrives unchanged.
  */
 import {
-  FIELD_GALLERY,
+  FIELD_GALLERY as SHARED_GALLERY,
   GALLERY_DEFAULT_BACKDROP,
+  withVariablesInlined,
   type GalleryPreset,
 } from "../../../field-rendering/gallery";
 import { renameIdentifier } from "../../../field-rendering/identifiers";
@@ -34,6 +35,12 @@ import {
   type AudioFieldConfig,
   type RippleConfig,
 } from "./model";
+
+/**
+ * The shared presets, a physics preset's variables written in as their
+ * values: Audio Lab has no sliders to give them, and its field is the music's.
+ */
+const FIELD_GALLERY = SHARED_GALLERY.map(withVariablesInlined);
 
 export { FIELD_GALLERY };
 export type { GalleryPreset };

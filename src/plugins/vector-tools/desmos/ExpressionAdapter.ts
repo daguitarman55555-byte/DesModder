@@ -22,6 +22,8 @@ export interface GeneratedExpressionSpec {
   pointSize?: string;
   lines?: boolean;
   points?: boolean;
+  /** A slider for a definition `name=value`, between these bounds. */
+  slider?: { min: string; max: string; step?: string };
 }
 
 export interface GeneratedFolderSpec {
@@ -260,6 +262,15 @@ function expressionState(spec: GeneratedExpressionSpec): ExpressionState {
   if (spec.pointSize !== undefined) expression.pointSize = spec.pointSize;
   if (spec.lines !== undefined) expression.lines = spec.lines;
   if (spec.points !== undefined) expression.points = spec.points;
+  if (spec.slider !== undefined) {
+    expression.slider = {
+      hardMin: true,
+      hardMax: true,
+      min: spec.slider.min,
+      max: spec.slider.max,
+      ...(spec.slider.step !== undefined ? { step: spec.slider.step } : {}),
+    };
+  }
   return expression;
 }
 

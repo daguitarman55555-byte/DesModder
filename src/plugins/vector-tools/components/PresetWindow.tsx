@@ -71,6 +71,65 @@ export class PresetWindow extends Component<{
         <If predicate={() => !collapsed()}>
           {() => (
             <div class="dsm-preset-window-body">
+              <If predicate={() => vectorTools.presetVariables.length > 0}>
+                {() => (
+                  <div
+                    class="dsm-preset-window-variables"
+                    role="group"
+                    aria-label="The field's variables"
+                  >
+                    <div class="dsm-preset-window-variables-head">
+                      <span class="dsm-preset-window-group-label">
+                        Variables
+                      </span>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        class="dsm-preset-window-variables-reset"
+                        onTap={() => vectorTools.resetPresetVariables()}
+                      >
+                        Reset
+                      </span>
+                    </div>
+                    <For
+                      each={() => vectorTools.presetVariables}
+                      key={(v: { id: string }) => v.id}
+                    >
+                      {(v: () => (typeof vectorTools.presetVariables)[0]) => (
+                        <label class="dsm-preset-window-variable">
+                          <span class="dsm-preset-window-variable-name">
+                            {() => nameParts(v().name).base}
+                            <span class="dsm-preset-window-variable-sub">
+                              {() => nameParts(v().name).sub}
+                            </span>
+                          </span>
+                          <input
+                            type="range"
+                            onUpdate={(element: HTMLInputElement) => {
+                              element.min = String(v().min);
+                              element.max = String(v().max);
+                              element.step = String(
+                                v().step ?? (v().max - v().min) / 200
+                              );
+                              if (document.activeElement !== element)
+                                element.value = String(v().current);
+                            }}
+                            onInput={(event: Event) =>
+                              vectorTools.setPresetVariable(
+                                v().id,
+                                Number((event.target as HTMLInputElement).value)
+                              )
+                            }
+                          />
+                          <span class="dsm-preset-window-variable-value">
+                            {() => formatValue(v().current)}
+                          </span>
+                        </label>
+                      )}
+                    </For>
+                  </div>
+                )}
+              </If>
               <For
                 each={() => [...vectorTools.galleryByCategory]}
                 key={(group: { id: string }) => group.id}
@@ -108,6 +167,15 @@ export class PresetWindow extends Component<{
                         >
                           <span
                             class="dsm-preset-window-swatch"
+                            // On mount as well: a window opened and left
+                            // alone is never updated, and its swatches were
+                            // blank.
+                            didMount={(element: HTMLElement) => {
+                              element.style.background = swatchFor(
+                                preset(),
+                                vectorTools.is3d
+                              );
+                            }}
                             onUpdate={(element: HTMLElement) => {
                               element.style.background = swatchFor(
                                 preset(),
@@ -177,6 +245,17 @@ export class PresetWindow extends Component<{
       </div>
     );
   }
+}
+
+/** A variable's name split for display: `q_{1}` is q with a subscript 1. */
+function nameParts(name: string) {
+  const match = /^([A-Za-z])(?:_\{?([A-Za-z0-9]+)\}?)?$/.exec(name);
+  return { base: match?.[1] ?? name, sub: match?.[2] ?? "" };
+}
+
+/** A slider's value, to three significant figures. */
+function formatValue(value: number) {
+  return Number(value.toPrecision(3)).toString();
 }
 
 /**
