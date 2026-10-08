@@ -28,6 +28,7 @@ export class PresetWindow extends Component<{
         class={() => ({
           "dsm-preset-window": true,
           "dsm-preset-window-collapsed": collapsed(),
+          "dsm-preset-window-split": vectorTools.presetVariables.length > 0,
         })}
         role="dialog"
         aria-label="Vector field presets"
@@ -71,201 +72,209 @@ export class PresetWindow extends Component<{
         <If predicate={() => !collapsed()}>
           {() => (
             <div class="dsm-preset-window-body">
-              <If predicate={() => vectorTools.presetVariables.length > 0}>
-                {() => (
-                  <div
-                    class="dsm-preset-window-variables"
-                    role="group"
-                    aria-label="The field's variables"
-                  >
-                    <div class="dsm-preset-window-variables-head">
-                      <span class="dsm-preset-window-group-label">
-                        Variables
-                      </span>
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        class="dsm-preset-window-variables-reset"
-                        onTap={() => vectorTools.resetPresetVariables()}
-                      >
-                        Reset
-                      </span>
-                    </div>
-                    <For
-                      each={() => vectorTools.presetVariables}
-                      key={(v: { id: string }) => v.id}
+              {/* What is loaded, beside what can be: the controls in a pane of
+                  their own, so a variable can be set with the presets in view. */}
+              <div class="dsm-preset-window-controls">
+                <div
+                  class="dsm-preset-window-motion"
+                  role="group"
+                  aria-label="Moving or still"
+                >
+                  {(["moving", "still"] as const).map((choice) => (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      data-value={choice}
+                      class={() => ({
+                        "dsm-preset-window-motion-choice": true,
+                        "dsm-preset-window-motion-selected":
+                          (choice === "still") === settings().still,
+                      })}
+                      aria-pressed={() =>
+                        (choice === "still") === settings().still
+                          ? "true"
+                          : "false"
+                      }
+                      title={
+                        choice === "still"
+                          ? "The clock stopped: each preset as one moment"
+                          : "The clock running: each preset changing over time"
+                      }
+                      onTap={() =>
+                        vectorTools.setPresetsStill(choice === "still")
+                      }
                     >
-                      {(v: () => (typeof vectorTools.presetVariables)[0]) => (
-                        <div>
-                          {IfElse(() => v().toggle !== undefined, {
-                            true: () => (
-                              <label class="dsm-preset-window-variable dsm-preset-window-switch">
-                                <input
-                                  type="checkbox"
-                                  onUpdate={(element: HTMLInputElement) => {
-                                    element.checked = v().current === 1;
-                                  }}
-                                  onChange={(event: Event) =>
-                                    vectorTools.setPresetVariable(
-                                      v().id,
-                                      (event.target as HTMLInputElement).checked
-                                        ? 1
-                                        : 0
-                                    )
-                                  }
-                                />
-                                <span>{() => v().toggle}</span>
-                              </label>
-                            ),
-                            false: () => (
-                              <label class="dsm-preset-window-variable">
-                                <span class="dsm-preset-window-variable-name">
-                                  {() => nameParts(v().name).base}
-                                  <span class="dsm-preset-window-variable-sub">
-                                    {() => nameParts(v().name).sub}
-                                  </span>
-                                </span>
-                                <input
-                                  type="range"
-                                  onUpdate={(element: HTMLInputElement) => {
-                                    element.min = String(v().min);
-                                    element.max = String(v().max);
-                                    element.step = String(
-                                      v().step ?? (v().max - v().min) / 200
-                                    );
-                                    if (document.activeElement !== element)
-                                      element.value = String(v().current);
-                                  }}
-                                  onInput={(event: Event) =>
-                                    vectorTools.setPresetVariable(
-                                      v().id,
-                                      Number(
-                                        (event.target as HTMLInputElement).value
-                                      )
-                                    )
-                                  }
-                                />
-                                <span class="dsm-preset-window-variable-value">
-                                  {() => formatValue(v().current)}
-                                </span>
-                              </label>
-                            ),
-                          })}
-                        </div>
-                      )}
-                    </For>
-                  </div>
-                )}
-              </If>
-              <For
-                each={() => [...vectorTools.galleryByCategory]}
-                key={(group: { id: string }) => group.id}
-              >
-                {(group: () => (typeof vectorTools.galleryByCategory)[0]) => (
-                  <div class="dsm-preset-window-group">
-                    <div class="dsm-preset-window-group-label">
-                      {() => group().label}
-                    </div>
-                    <For
-                      each={() => [...group().presets]}
-                      key={(preset: GalleryPreset) => preset.id}
+                      {choice === "still" ? "Still" : "Moving"}
+                    </span>
+                  ))}
+                </div>
+                <If predicate={() => vectorTools.presetVariables.length > 0}>
+                  {() => (
+                    <div
+                      class="dsm-preset-window-variables"
+                      role="group"
+                      aria-label="The field's variables"
                     >
-                      {(preset: () => GalleryPreset) => (
-                        <div
+                      <div class="dsm-preset-window-variables-head">
+                        <span class="dsm-preset-window-group-label">
+                          Variables
+                        </span>
+                        <span
                           role="button"
                           tabIndex={0}
-                          data-preset={() => preset().id}
-                          title={() =>
-                            vectorTools.is3d
-                              ? preset().space.blurb
-                              : preset().blurb
-                          }
-                          class={() => ({
-                            "dsm-preset-window-item": true,
-                            "dsm-preset-window-active":
-                              vectorTools.activePresetId === preset().id,
-                          })}
-                          onTap={() =>
-                            vectorTools.applyGalleryPreset(
-                              preset().id,
-                              vectorTools.galleryWithLook
-                            )
-                          }
+                          class="dsm-preset-window-variables-reset"
+                          onTap={() => vectorTools.resetPresetVariables()}
                         >
-                          <span
-                            class="dsm-preset-window-swatch"
-                            // On mount as well: a window opened and left
-                            // alone is never updated, and its swatches were
-                            // blank.
-                            didMount={(element: HTMLElement) => {
-                              element.style.background = swatchFor(
-                                preset(),
-                                vectorTools.is3d
-                              );
-                            }}
-                            onUpdate={(element: HTMLElement) => {
-                              element.style.background = swatchFor(
-                                preset(),
-                                vectorTools.is3d
-                              );
-                            }}
-                          />
-                          <span class="dsm-preset-window-name">
-                            {() => preset().name}
-                          </span>
-                        </div>
-                      )}
-                    </For>
-                  </div>
-                )}
-              </For>
-              <div
-                class="dsm-preset-window-motion"
-                role="group"
-                aria-label="Moving or still"
-              >
-                {(["moving", "still"] as const).map((choice) => (
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    data-value={choice}
-                    class={() => ({
-                      "dsm-preset-window-motion-choice": true,
-                      "dsm-preset-window-motion-selected":
-                        (choice === "still") === settings().still,
-                    })}
-                    aria-pressed={() =>
-                      (choice === "still") === settings().still
-                        ? "true"
-                        : "false"
-                    }
-                    title={
-                      choice === "still"
-                        ? "The clock stopped: each preset as one moment"
-                        : "The clock running: each preset changing over time"
-                    }
-                    onTap={() =>
-                      vectorTools.setPresetsStill(choice === "still")
-                    }
-                  >
-                    {choice === "still" ? "Still" : "Moving"}
-                  </span>
-                ))}
+                          Reset
+                        </span>
+                      </div>
+                      <For
+                        each={() => vectorTools.presetVariables}
+                        key={(v: { id: string }) => v.id}
+                      >
+                        {(v: () => (typeof vectorTools.presetVariables)[0]) => (
+                          <div>
+                            {IfElse(() => v().toggle !== undefined, {
+                              true: () => (
+                                <label class="dsm-preset-window-variable dsm-preset-window-switch">
+                                  <input
+                                    type="checkbox"
+                                    onUpdate={(element: HTMLInputElement) => {
+                                      element.checked = v().current === 1;
+                                    }}
+                                    onChange={(event: Event) =>
+                                      vectorTools.setPresetVariable(
+                                        v().id,
+                                        (event.target as HTMLInputElement)
+                                          .checked
+                                          ? 1
+                                          : 0
+                                      )
+                                    }
+                                  />
+                                  <span>{() => v().toggle}</span>
+                                </label>
+                              ),
+                              false: () => (
+                                <label class="dsm-preset-window-variable">
+                                  <span class="dsm-preset-window-variable-name">
+                                    {() => nameParts(v().name).base}
+                                    <span class="dsm-preset-window-variable-sub">
+                                      {() => nameParts(v().name).sub}
+                                    </span>
+                                  </span>
+                                  <input
+                                    type="range"
+                                    onUpdate={(element: HTMLInputElement) => {
+                                      element.min = String(v().min);
+                                      element.max = String(v().max);
+                                      element.step = String(
+                                        v().step ?? (v().max - v().min) / 200
+                                      );
+                                      if (document.activeElement !== element)
+                                        element.value = String(v().current);
+                                    }}
+                                    onInput={(event: Event) =>
+                                      vectorTools.setPresetVariable(
+                                        v().id,
+                                        Number(
+                                          (event.target as HTMLInputElement)
+                                            .value
+                                        )
+                                      )
+                                    }
+                                  />
+                                  <span class="dsm-preset-window-variable-value">
+                                    {() => formatValue(v().current)}
+                                  </span>
+                                </label>
+                              ),
+                            })}
+                          </div>
+                        )}
+                      </For>
+                    </div>
+                  )}
+                </If>
               </div>
-              <label class="dsm-preset-window-look">
-                <input
-                  type="checkbox"
-                  onUpdate={(element: HTMLInputElement) => {
-                    element.checked = vectorTools.galleryWithLook;
-                  }}
-                  onChange={(event: Event) =>
-                    vectorTools.setGalleryWithLook(
-                      (event.target as HTMLInputElement).checked
-                    )
-                  }
-                />
-                Whole look: particles, speed and framing too
-              </label>
+              <div class="dsm-preset-window-list">
+                <For
+                  each={() => [...vectorTools.galleryByCategory]}
+                  key={(group: { id: string }) => group.id}
+                >
+                  {(group: () => (typeof vectorTools.galleryByCategory)[0]) => (
+                    <div class="dsm-preset-window-group">
+                      <div class="dsm-preset-window-group-label">
+                        {() => group().label}
+                      </div>
+                      <For
+                        each={() => [...group().presets]}
+                        key={(preset: GalleryPreset) => preset.id}
+                      >
+                        {(preset: () => GalleryPreset) => (
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            data-preset={() => preset().id}
+                            title={() =>
+                              vectorTools.is3d
+                                ? preset().space.blurb
+                                : preset().blurb
+                            }
+                            class={() => ({
+                              "dsm-preset-window-item": true,
+                              "dsm-preset-window-active":
+                                vectorTools.activePresetId === preset().id,
+                            })}
+                            onTap={() =>
+                              vectorTools.applyGalleryPreset(
+                                preset().id,
+                                vectorTools.galleryWithLook
+                              )
+                            }
+                          >
+                            <span
+                              class="dsm-preset-window-swatch"
+                              // On mount as well: a window opened and left
+                              // alone is never updated, and its swatches were
+                              // blank.
+                              didMount={(element: HTMLElement) => {
+                                element.style.background = swatchFor(
+                                  preset(),
+                                  vectorTools.is3d
+                                );
+                              }}
+                              onUpdate={(element: HTMLElement) => {
+                                element.style.background = swatchFor(
+                                  preset(),
+                                  vectorTools.is3d
+                                );
+                              }}
+                            />
+                            <span class="dsm-preset-window-name">
+                              {() => preset().name}
+                            </span>
+                          </div>
+                        )}
+                      </For>
+                    </div>
+                  )}
+                </For>
+                <label class="dsm-preset-window-look">
+                  <input
+                    type="checkbox"
+                    onUpdate={(element: HTMLInputElement) => {
+                      element.checked = vectorTools.galleryWithLook;
+                    }}
+                    onChange={(event: Event) =>
+                      vectorTools.setGalleryWithLook(
+                        (event.target as HTMLInputElement).checked
+                      )
+                    }
+                  />
+                  Whole look: particles, speed and framing too
+                </label>
+              </div>
             </div>
           )}
         </If>

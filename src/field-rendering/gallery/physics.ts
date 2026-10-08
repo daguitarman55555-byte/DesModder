@@ -7,7 +7,7 @@
  * Constants are folded into the variables (k, μ₀/2π, G are 1): the shape of
  * a field does not depend on its units, and its strength is one slider.
  */
-import { probeArrows2D, probeArrows3D } from "./probe";
+import { probeArrows2D, probeArrows3D, type ProbeSetup } from "./probe";
 import type { GalleryPreset, GalleryVariable, SceneItem } from "./types";
 
 type Axis = "x" | "y" | "z";
@@ -225,7 +225,12 @@ const signColor = (q: string) =>
   String.raw`\left\{${q}>0:\operatorname{rgb}\left(189,75,50\right),${q}<0:\operatorname{rgb}\left(36,106,163\right),\operatorname{rgb}\left(119,119,119\right)\right\}`;
 
 /** The two charges' colours and the probe's arrows, the same in 2D and 3D. */
-function chargeProbe(at: string, outside: string) {
+function chargeProbe(
+  at: string,
+  outside: string,
+  dimensions: 2 | 3,
+  reach: number
+): { colors: SceneItem[]; setup: ProbeSetup } {
   const r = (by: string) =>
     String.raw`\left(\left(p_{x}${by}\frac{d}{2}\right)^{2}+p_{y}^{2}${at.includes("p_{z}") ? "+p_{z}^{2}" : ""}\right)^{1.5}`;
   const rest = at.includes("p_{z}") ? ",p_{y},p_{z}" : ",p_{y}";
@@ -245,11 +250,14 @@ function chargeProbe(at: string, outside: string) {
       },
       { key: "E1", latex: String.raw`E_{1vt}=${part(1, "+")}`, hidden: true },
       { key: "E2", latex: String.raw`E_{2vt}=${part(2, "-")}`, hidden: true },
-    ] satisfies SceneItem[],
+    ],
     setup: {
       at,
       gain: "s_{arrow}",
       names: "s_{names}",
+      damp: "s_{damp}",
+      reach,
+      dimensions,
       valid: outside,
       arrows: [
         {
@@ -257,6 +265,7 @@ function chargeProbe(at: string, outside: string) {
           vector: String.raw`\left(E_{1vt}+E_{2vt}\right)`,
           toggle: "s_{net}",
           color: "#243b7a",
+          nameColor: "#243b7a",
           name: String.raw`\vec{E}`,
         },
         {
@@ -264,6 +273,7 @@ function chargeProbe(at: string, outside: string) {
           vector: "E_{1vt}",
           toggle: "s_{parts}",
           colorLatex: "C_{1vt}",
+          nameColor: "#9a3a24",
           name: String.raw`\vec{E}_{1}`,
         },
         {
@@ -271,6 +281,7 @@ function chargeProbe(at: string, outside: string) {
           vector: "E_{2vt}",
           toggle: "s_{parts}",
           colorLatex: "C_{2vt}",
+          nameColor: "#1d5687",
           name: String.raw`\vec{E}_{2}`,
         },
         {
@@ -278,6 +289,7 @@ function chargeProbe(at: string, outside: string) {
           vector: String.raw`q_{0}\left(E_{1vt}+E_{2vt}\right)`,
           toggle: "s_{force}",
           color: "#7547a8",
+          nameColor: "#7547a8",
           name: String.raw`\vec{F}`,
         },
       ],
@@ -293,6 +305,7 @@ const probeSwitches = (gain: number, max: number): GalleryVariable[] => [
   t("s_{parts}", 0, "Each charge's arrow"),
   t("s_{force}", 0, "Force on a test charge"),
   t("s_{names}", 0, "Names"),
+  t("s_{damp}", 1, "Damped lengths"),
 ];
 
 /**
@@ -310,7 +323,10 @@ const CHARGES_SCENE_2D: SceneItem[] = (() => {
   const outsideProbe = String.raw`\min\left(\left(p_{x}+\frac{d}{2}\right)^{2}+p_{y}^{2},\left(p_{x}-\frac{d}{2}\right)^{2}+p_{y}^{2}\right)>${CHARGE_RADIUS_2D}^{2}`;
   const { colors, setup } = chargeProbe(
     String.raw`\left(p_{x},p_{y}\right)`,
-    outsideProbe
+    outsideProbe,
+    2,
+    // At home view, ±10: a long arrow reaches a quarter of the way across.
+    5
   );
   const R = CHARGE_RADIUS_2D;
   const r = (by: string) =>
@@ -346,8 +362,16 @@ const CHARGES_SCENE_2D: SceneItem[] = (() => {
     ...charge(1, "+", String.raw`-\frac{d}{2}`),
     ...charge(2, "-", String.raw`\frac{d}{2}`),
     {
+      // S runs between ±(|q₁| + |q₂|), so only the levels in that range are
+      // lines at all: asking Desmos for a fixed 81 made it trace 64 empty
+      // contours on every change of a charge or the distance.
+      key: "levels",
+      latex: String.raw`n_{vt}=\operatorname{ceil}\left(4\left(\left|q_{1}\right|+\left|q_{2}\right|\right)\right)`,
+      hidden: true,
+    },
+    {
       key: "lines",
-      latex: String.raw`\frac{q_{1}\left(x+\frac{d}{2}\right)}{${r("+")}}+\frac{q_{2}\left(x-\frac{d}{2}\right)}{${r("-")}}=0.25\cdot\left[-40...40\right]\left\{s_{lines}=1\right\}\left\{${outside}\right\}\left\{\left|y\right|>0.02\right\}`,
+      latex: String.raw`\frac{q_{1}\left(x+\frac{d}{2}\right)}{${r("+")}}+\frac{q_{2}\left(x-\frac{d}{2}\right)}{${r("-")}}=0.25\cdot\left[-n_{vt}...n_{vt}\right]\left\{s_{lines}=1\right\}\left\{${outside}\right\}\left\{\left|y\right|>0.02\right\}`,
       color: "#718296",
       lineWidth: 1.5,
       lineOpacity: 0.7,
@@ -388,7 +412,9 @@ const CHARGES_SCENE_3D: SceneItem[] = (() => {
   const outsideProbe = String.raw`\min\left(\left(p_{x}+\frac{d}{2}\right)^{2}+p_{y}^{2}+p_{z}^{2},\left(p_{x}-\frac{d}{2}\right)^{2}+p_{y}^{2}+p_{z}^{2}\right)>${CHARGE_RADIUS_3D}^{2}`;
   const { colors, setup } = chargeProbe(
     String.raw`\left(p_{x},p_{y},p_{z}\right)`,
-    outsideProbe
+    outsideProbe,
+    3,
+    2.5
   );
   const R = CHARGE_RADIUS_3D;
   const ball = (i: 1 | 2, cx: string): SceneItem => ({
@@ -408,7 +434,8 @@ const CHARGES_SCENE_3D: SceneItem[] = (() => {
       color: "#222222",
       points: true,
       // In 3D a point is a ball, and 12 hid the arrows' tails inside it.
-      pointSize: 5,
+      pointSize: 7,
+      drag3d: ["p_{x}", "p_{y}", "p_{z}"],
     },
     ...probeArrows3D(setup),
   ];
@@ -428,11 +455,13 @@ const BAR_3D = barMagnet(["x", "y", "z"]);
  */
 const CHARGE_FLOW_COLOR = "#29486b";
 const CHARGE_FLOW = {
-  particleCount: 16_000,
+  // Dense and dark enough to read as the field's grain on white: half this
+  // many at 0.28 was a faint wash Rafael found too light.
+  particleCount: 32_000,
   speed: 0.35,
-  trailPersistence: 0.85,
+  trailPersistence: 0.88,
   dropRate: 0.03,
-  opacity: 0.28,
+  opacity: 0.5,
   pointSize: 1.5,
   glow: 0,
   normalizeSpeed: true,
@@ -544,11 +573,11 @@ export const PHYSICS: readonly GalleryPreset[] = [
       ],
       scene: CHARGES_SCENE_3D,
       look: {
-        particles: 20_000,
+        particles: 36_000,
         speed: 0.18,
         trail: 16,
         lifetime: 3,
-        opacity: 0.22,
+        opacity: 0.45,
         glow: 0,
         normalizeSpeed: true,
         absorb: true,

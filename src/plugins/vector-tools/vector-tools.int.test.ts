@@ -2227,7 +2227,7 @@ testWithPage(
       await driver.evaluate(
         () => document.querySelectorAll(".dsm-preset-window-switch").length
       )
-    ).toBe(6);
+    ).toBe(7);
 
     // Set from the window; reset to the preset's own.
     await driver.evaluate(() =>

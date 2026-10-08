@@ -86,6 +86,16 @@ export interface SceneItem {
   /** The ranges of u and v, for a surface in u and v on Desmos 3D. */
   domainU?: readonly [string, string];
   domainV?: readonly [string, string];
+  /**
+   * On Desmos 3D, which draws no labels: a name the plugin draws itself at
+   * this item's point, a definition `N=(…)`, undefined while hidden.
+   */
+  name3d?: { label: string; color: string };
+  /**
+   * On Desmos 3D, where points cannot be dragged: the three sliders this
+   * point is made of, which dragging it moves.
+   */
+  drag3d?: readonly [string, string, string];
 }
 
 /**

@@ -1159,6 +1159,20 @@ function colorTab(vectorTools: VectorTools, config: ConfigGetter) {
               }
             />
             <div class="dsm-vector-tools-hint">{fixedUsers}</div>
+            <label class="dsm-vector-tools-checkbox">
+              <input
+                type="checkbox"
+                onUpdate={(element: HTMLInputElement) => {
+                  element.checked = vectorTools.inkAuto;
+                }}
+                onChange={(event: Event) =>
+                  vectorTools.setInkAuto(
+                    (event.target as HTMLInputElement).checked
+                  )
+                }
+              />
+              Auto ink: dark on the graph paper, light on a dark background
+            </label>
           </section>
         )}
       </If>

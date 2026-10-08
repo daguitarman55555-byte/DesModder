@@ -61,11 +61,44 @@
     }
   }
 
+  // Two panes, each scrolling on its own: what is loaded (moving or still,
+  // and its variables) and the presets. Stacked, the controls pinned above
+  // the list; side by side once a preset has variables, which are too many
+  // to stack without hiding the list.
   .dsm-preset-window-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dsm-preset-window-controls {
+    flex: none;
+    padding: 4px 6px 4px;
+    border-bottom: 1px solid #e6e6e6;
+  }
+
+  .dsm-preset-window-list {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     padding: 4px 6px 8px;
+  }
+
+  &.dsm-preset-window-split {
+    width: 480px;
+
+    .dsm-preset-window-body {
+      flex-direction: row;
+    }
+
+    .dsm-preset-window-controls {
+      flex: 0 0 236px;
+      min-height: 0;
+      overflow-y: auto;
+      border-bottom: none;
+      border-right: 1px solid #e6e6e6;
+    }
   }
 
   // A physics preset's variables: a slider each, its value beside it.
@@ -133,7 +166,7 @@
   // Moving or still: two halves of one pill, the chosen one filled.
   .dsm-preset-window-motion {
     display: flex;
-    margin: 10px 4px 4px;
+    margin: 4px 4px 4px;
     border: 1px solid #c8c8c8;
     border-radius: 6px;
     overflow: hidden;

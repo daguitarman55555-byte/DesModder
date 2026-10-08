@@ -52,7 +52,7 @@ export function colorsFromGallery(
   base: VectorFieldConfig,
   dimensions: 2 | 3 = 2
 ): VectorFieldConfig {
-  return {
+  return inked(preset, {
     ...base,
     name: preset.name,
     source: "components",
@@ -79,6 +79,20 @@ export function colorsFromGallery(
       dimensions === 3
         ? paperSpace(preset, matterFor(preset, base.space3d))
         : base.space3d,
+  });
+}
+
+/**
+ * Auto ink on for a picture on paper, and off for any other, so a dark
+ * picture loaded after one keeps the colour it names.
+ */
+function inked(
+  preset: GalleryPreset,
+  config: VectorFieldConfig
+): VectorFieldConfig {
+  return {
+    ...config,
+    color: { ...config.color, inkAuto: preset.onPaper === true },
   };
 }
 
@@ -188,7 +202,7 @@ export function configFromGallery(
     mode: "count",
     count: 25,
   });
-  return {
+  return inked(preset, {
     ...base,
     name: preset.name,
     source: "components",
@@ -244,7 +258,7 @@ export function configFromGallery(
       dimensions === 3
         ? paperSpace(preset, spaceLookFor(preset, base.space3d))
         : base.space3d,
-  };
+  });
 }
 
 /**

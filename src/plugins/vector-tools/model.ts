@@ -787,7 +787,19 @@ export interface VectorColorConfig {
    * already looks like.
    */
   keepColorsInReverseContrast: boolean;
+  /**
+   * The fixed colour as ink, chosen for what is behind it: dark on the graph
+   * paper, light on a dark backdrop or a dark graph. Off, the colour picked
+   * is used as it is. A picture drawn on paper (a physics preset) turns it
+   * on, because one colour can't read on both: a navy that shows on white
+   * vanishes into the dark.
+   */
+  inkAuto: boolean;
 }
+
+/** The ink `inkAuto` uses on light, and on dark. */
+export const INK_ON_LIGHT = "#1d3b63";
+export const INK_ON_DARK = "#bcd3f5";
 
 export interface VectorFieldConfig {
   schemaVersion: number;
@@ -949,7 +961,8 @@ export const DEFAULT_PANEL_CONFIG: PanelConfig = {
   width: 460,
   height: 650,
   tab: "field",
-  presets: { open: false, collapsed: false, x: -1, y: -1, still: false },
+  // In the order the loader writes them: see the note on its flow keys.
+  presets: { open: false, collapsed: false, still: false, x: -1, y: -1 },
 };
 
 export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
@@ -987,6 +1000,7 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
     contrast: 1,
     matchFlow: false,
     keepColorsInReverseContrast: false,
+    inkAuto: false,
   },
   zeroVectorMode: "hide",
   arrowMode: "live",
@@ -1017,12 +1031,12 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
     normalizeSpeed: true,
     renderScale: 1,
     seedLatex: "",
+    seedOn: true,
+    edges: "auto",
     colorScaleAuto: true,
     colorScale: 1,
     lens: false,
     lensHorizon: 0.6,
-    seedOn: true,
-    edges: "auto",
   },
   curve: {
     enabled: false,
@@ -1459,6 +1473,10 @@ export function normalizeVectorFieldConfig(value: unknown): VectorFieldConfig {
         typeof color?.keepColorsInReverseContrast === "boolean"
           ? color.keepColorsInReverseContrast
           : fallback.color.keepColorsInReverseContrast,
+      inkAuto:
+        typeof color?.inkAuto === "boolean"
+          ? color.inkAuto
+          : fallback.color.inkAuto,
     },
     zeroVectorMode: value.zeroVectorMode === "point" ? "point" : "hide",
     arrowMode:

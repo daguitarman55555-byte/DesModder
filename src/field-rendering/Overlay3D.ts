@@ -304,7 +304,7 @@ export class Overlay3D {
   }
 }
 
-function webglCanvasOf(grapher: Grapher3d | undefined) {
+export function webglCanvasOf(grapher: Grapher3d | undefined) {
   return (
     grapher?.webglCanvas ??
     document.querySelector<HTMLCanvasElement>(WEBGL_CANVAS_SELECTOR) ??

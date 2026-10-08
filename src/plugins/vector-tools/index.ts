@@ -51,6 +51,8 @@ import {
   type VectorLengthMode,
   type ZeroVectorMode,
   VECTOR_FIELD_PRESETS,
+  INK_ON_DARK,
+  INK_ON_LIGHT,
   cloneDefaultConfig,
   validateVectorFieldConfig,
   AUTO_LENGTH_MULTIPLE_3D,
@@ -118,6 +120,7 @@ import type {
 } from "../../field-rendering/gallery/types";
 import type { FlowField } from "../../field-rendering/FlowRenderer";
 import { Overlay3D } from "../../field-rendering/Overlay3D";
+import { Scene3DLayer } from "../../field-rendering/Scene3DLayer";
 import {
   Arrow3DRenderer,
   type Arrow3DOptions,
@@ -254,6 +257,12 @@ interface ValueHelper {
   observe: (event: string, callback: () => void) => void;
 }
 
+interface ListHelper {
+  listValue: number[] | undefined;
+  observe: (event: string, callback: () => void) => void;
+  unobserve: (event: string) => void;
+}
+
 type StorageKey = "serializedFieldConfig" | "serializedFieldConfig3D";
 
 const FLOW_REFRESH_DELAY_MS = 300;
@@ -284,15 +293,37 @@ function round(value: number) {
   return Math.round(value * 1000) / 1000;
 }
 
-/**
- * Where the 2D flow's particles are born, as compiled: the seed, unless it is
- * switched off, when they are born everywhere.
- */
 /** An expression's LaTeX; empty for a table, a note or a folder. */
 function itemLatex(model: ItemModel | undefined) {
   return model !== undefined && "latex" in model ? (model.latex ?? "") : "";
 }
 
+/** `name=number`, a slider's definition as the list holds it. */
+const SLIDER_DEFINITION = /^(.+?)=(-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)$/;
+
+/**
+ * Every slider's value straight from the expression list, by canonical name.
+ * The list has a dragged slider's new number the moment it moves; Desmos
+ * reports the value to a watcher only after it has recomputed the whole
+ * graph, which with a preset's exact field lines took 1.7 s, and the field
+ * stood still that long behind its own slider.
+ */
+function sliderValues(models: readonly ItemModel[]) {
+  const values = new Map<string, number>();
+  for (const model of models) {
+    const match = SLIDER_DEFINITION.exec(itemLatex(model).replace(/\s+/g, ""));
+    if (match === null) continue;
+    const value = Number(match[2]);
+    if (Number.isFinite(value))
+      values.set(canonicalIdentifier(match[1]), value);
+  }
+  return values;
+}
+
+/**
+ * Where the 2D flow's particles are born, as compiled: the seed, unless it is
+ * switched off, when they are born everywhere.
+ */
 function flowSeedLatex(config: VectorFieldConfig) {
   return config.flow.seedOn ? config.flow.seedLatex : "";
 }
@@ -645,6 +676,10 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   private environmentRevision = 0;
   private environmentTimer?: ReturnType<typeof setTimeout>;
   private clockFrame?: number;
+  private pushFrame?: number;
+  private readonly scene3d = new Scene3DLayer(this.calc);
+  private scene3dKey = "";
+  private scene3dHelpers: ListHelper[] = [];
   private clockLastFrame?: number;
   private clockSeconds = 0;
   private lastReverseContrast = false;
@@ -710,6 +745,9 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       // The presets window is mounted outside Desmos's views, so it redraws
       // on the same tick the panel does.
       if (event.type === "tick") this.presetWindowView?.update();
+      // Anything else may have moved a slider: its number is in the list
+      // already, so the field can have it on the next frame.
+      else if (this.parameterHelpers.size > 0) this.schedulePush();
       if (
         event.type === "set-item-latex" ||
         event.type === "undo" ||
@@ -1046,7 +1084,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
         }) as unknown as ValueHelper;
         // A slider being dragged reports through here rather than through the
         // expression list, so this is what keeps the picture moving with it.
-        helper.observe("numericValue", () => this.pushParameterValues());
+        helper.observe("numericValue", () => this.schedulePush());
         this.parameterHelpers.set(name, helper);
       }
       values.set(name, helper.numericValue);
@@ -1084,13 +1122,29 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
    */
   private pushParameterValues() {
     const values = new Map<string, number>();
+    const sliders = sliderValues(this.cc.getAllItemModels());
     for (const [name, helper] of this.parameterHelpers) {
-      values.set(name, helper.numericValue);
+      // A slider's number from the list, which is never behind; anything
+      // else, a value Desmos works out, from its watcher.
+      values.set(name, sliders.get(name) ?? helper.numericValue);
     }
     this.setParameterValues(values);
     // A slider dragged in the expression list moves the presets window's
     // copy of it too.
-    if (this.presetWindow.open) this.util.tick();
+    if (this.presetWindow.open && !this.dispatching()) this.util.tick();
+  }
+
+  /**
+   * One push on the next frame, however many changes arrive before it: a
+   * probe dragged moves two sliders and wakes a watcher on every value the
+   * preset has, and each pushed and redrew the panel, a dozen times a frame.
+   */
+  private schedulePush() {
+    if (this.pushFrame !== undefined) return;
+    this.pushFrame = requestAnimationFrame(() => {
+      this.pushFrame = undefined;
+      this.pushParameterValues();
+    });
   }
 
   /**
@@ -1357,7 +1411,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       // Colour tab's flow half.
       colorMode: config.flow.colorMode,
       palette: config.flow.palette,
-      fixedColor: config.color.fixedColor,
+      fixedColor: this.fixedInk(config, 3),
       saturation: config.flow.saturation,
       contrast: config.flow.contrast,
       scale: shared.scale,
@@ -1413,7 +1467,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       cloudByDirection: s.cloudByDirection,
       colorMode: config.color.mode === "fixed" ? "fixed" : "magnitude",
       palette: config.color.palette,
-      fixedColor: config.color.fixedColor,
+      fixedColor: this.fixedInk(config, 3),
       saturation: config.color.saturation,
       contrast: config.color.contrast,
       scale: s.scaleAuto ? s.scaleRule : s.scale,
@@ -1450,7 +1504,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       widthPx: s.widthPx,
       colorMode: config.color.mode === "fixed" ? "fixed" : "magnitude",
       palette: config.color.palette,
-      fixedColor: config.color.fixedColor,
+      fixedColor: this.fixedInk(config, 3),
       saturation: config.color.saturation,
       contrast: config.color.contrast,
       scale: s.scaleAuto ? s.scaleRule : s.scale,
@@ -1556,7 +1610,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       shaftWidth: 2.4,
       colorMode: config.color.mode,
       palette: config.color.palette,
-      fixedColor: config.color.fixedColor,
+      fixedColor: this.fixedInk(config, 2),
       saturation: config.color.saturation,
       contrast: config.color.contrast,
       opacity: 1,
@@ -1579,6 +1633,9 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     if (this.environmentTimer !== undefined)
       clearTimeout(this.environmentTimer);
     if (this.panelSizeTimer !== undefined) clearTimeout(this.panelSizeTimer);
+    if (this.pushFrame !== undefined) cancelAnimationFrame(this.pushFrame);
+    this.scene3d.stop();
+    this.scene3dKey = "";
     if (this.dispatcherID !== undefined)
       this.cc.dispatcher.unregister(this.dispatcherID);
     this.dispatcherID = undefined;
@@ -1626,7 +1683,73 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.syncContrast();
     this.syncLayer();
     this.fluid.sync();
+    this.syncScene3D();
     this.util.tick();
+  }
+
+  /**
+   * The names and the probe drag a preset's objects need on Desmos 3D,
+   * which draws no labels and drags no points (see `Scene3DLayer`): for the
+   * preset the field is, rebuilt only when that changes.
+   */
+  private syncScene3D() {
+    const preset = this.is3d
+      ? galleryPreset(this.activePresetId ?? "")
+      : undefined;
+    const key = preset?.id ?? "";
+    if (key === this.scene3dKey) return;
+    // Watching a value means making a HelperExpression, a dispatch.
+    if (this.dispatching()) {
+      setTimeout(() => this.syncScene3D(), 0);
+      return;
+    }
+    this.scene3dKey = key;
+    for (const helper of this.scene3dHelpers) helper.unobserve("listValue");
+    this.scene3dHelpers = [];
+    const scene = preset?.space.scene ?? [];
+    const names = scene.flatMap((item) => {
+      if (item.name3d === undefined) return [];
+      // The point's own definition, `N_{…}=…`, read coordinate by coordinate.
+      const N = item.latex.slice(0, item.latex.indexOf("="));
+      const helper = this.calc.HelperExpression({
+        latex: String.raw`\left[${N}.x,${N}.y,${N}.z\right]`,
+      }) as unknown as ListHelper;
+      helper.observe("listValue", () => this.scene3d.requestDraw());
+      this.scene3dHelpers.push(helper);
+      return [
+        {
+          ...item.name3d,
+          at: () => {
+            const v = helper.listValue;
+            return v?.length === 3 ? ([v[0], v[1], v[2]] as const) : undefined;
+          },
+        },
+      ];
+    });
+    const drag = scene.find((item) => item.drag3d !== undefined)?.drag3d;
+    const probe =
+      drag === undefined
+        ? undefined
+        : {
+            at: () => {
+              const values = sliderValues(this.cc.getAllItemModels());
+              const at = drag.map((name) =>
+                values.get(canonicalIdentifier(name))
+              );
+              return at.every((v) => v !== undefined)
+                ? ([at[0], at[1], at[2]] as const)
+                : undefined;
+            },
+            move: (to: readonly [number, number, number]) => {
+              drag.forEach((name, i) =>
+                this.calc.setExpression({
+                  id: presetVariableID(name),
+                  latex: `${name}=${Math.round(to[i] * 100) / 100}`,
+                })
+              );
+            },
+          };
+    this.scene3d.set(names, probe);
   }
 
   // ---- the Fluid tab -------------------------------------------------------
@@ -2573,6 +2696,33 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     return effectiveFlowColor(this.getConfig());
   }
 
+  /**
+   * The fixed colour as drawn: the one picked, or with Ink on Auto, ink for
+   * what is behind. In 2D that is dark when the backdrop is on, or when the
+   * graph is in reverse contrast and the field keeps its colours (otherwise
+   * the inversion turns dark ink light by itself); in 3D, when the backdrop is.
+   */
+  private fixedInk(config: VectorFieldConfig, dims: 2 | 3) {
+    if (!config.color.inkAuto) return config.color.fixedColor;
+    const dark =
+      dims === 3
+        ? config.space3d.backdrop
+        : config.flow.backdropEnabled ||
+          (this.graphReversesContrast &&
+            config.color.keepColorsInReverseContrast);
+    return dark ? INK_ON_DARK : INK_ON_LIGHT;
+  }
+
+  get inkAuto() {
+    return this.getConfig().color.inkAuto;
+  }
+
+  setInkAuto(auto: boolean) {
+    this.updateConfig((config) => {
+      config.color.inkAuto = auto;
+    });
+  }
+
   /** Whether Desmos is currently drawing the graph in reverse contrast. */
   get graphReversesContrast(): boolean {
     return this.cc.graphSettings?.config?.invertedColors ?? false;
@@ -3021,7 +3171,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
         ? ("auto" as const)
         : config.flow.colorScale,
       ...effectiveFlowColor(config),
-      fixedColor: config.color.fixedColor,
+      fixedColor: this.fixedInk(config, 2),
       margin: config.flow.edges === "auto" ? 0.1 : 0,
     };
   }

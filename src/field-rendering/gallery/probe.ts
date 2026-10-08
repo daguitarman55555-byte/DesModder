@@ -6,7 +6,10 @@
  * place, which is the question a physics problem asks.
  *
  * Every arrow shares one gain, so lengths compare: twice as long is twice
- * the field. None is normalised or shortened to fit, which would break that.
+ * the field. Near a source that runs off the screen, so by default lengths
+ * are damped, ℓ = L·tanh(|gV|/L): nearly true while short, never longer than
+ * L, and still in order, a longer arrow always the stronger field. A switch
+ * turns damping off for exact proportion.
  *
  * The names are hidden helpers, each ending in `vt` plus the arrow's key, so
  * they cannot be mistaken for the teacher's quantities in the expression
@@ -25,6 +28,8 @@ export interface ProbeArrow {
   color?: string;
   /** A named colour instead, e.g. one following a charge's sign. */
   colorLatex?: string;
+  /** A plain colour for the 3D name, which can't read a named one. */
+  nameColor: string;
   /** Its name as a math label, without the backticks: `\vec{E}_{1}`. */
   name: string;
 }
@@ -36,14 +41,49 @@ export interface ProbeSetup {
   gain: string;
   /** The 0-or-1 variable that shows the names. */
   names: string;
+  /** The 0-or-1 variable that damps the lengths. */
+  damp: string;
+  /** The longest a damped arrow gets, in graph units. */
+  reach: number;
   /** Desmos LaTeX true where the probe is somewhere the field is drawn. */
   valid: string;
   arrows: readonly ProbeArrow[];
+  dimensions: 2 | 3;
+}
+
+/**
+ * The arrow's vector as drawn: gated on (undefined when off, or when the
+ * probe is inside a source, so everything drawn from it draws nothing),
+ * gained, then damped if the switch is on.
+ */
+function displacement(p: ProbeSetup, a: ProbeArrow): SceneItem[] {
+  const k = `${a.key}vt`;
+  const R = `R_{${k}}`;
+  const M = `M_{${k}}`;
+  const z = p.dimensions === 3 ? `+${R}.z^{2}` : "";
+  const L = p.reach;
+  return [
+    {
+      key: `${a.key}R`,
+      latex: String.raw`${R}=\left\{${a.toggle}=1:\left\{${p.valid}:${p.gain}${a.vector}\right\}\right\}`,
+      hidden: true,
+    },
+    {
+      key: `${a.key}M`,
+      latex: String.raw`${M}=\sqrt{${R}.x^{2}+${R}.y^{2}${z}}`,
+      hidden: true,
+    },
+    {
+      key: `${a.key}D`,
+      latex: String.raw`D_{${k}}=${R}\left\{${p.damp}=1:\frac{${L}\tanh\left(\frac{${M}}{${L}}\right)}{\max\left(${M},10^{-9}\right)},1\right\}`,
+      hidden: true,
+    },
+  ];
 }
 
 /**
  * The arrows in the plane: a shaft that stops at the head's base, and a
- * filled triangular head, so the tip is exactly the probe plus the gained
+ * filled triangular head, so the tip is exactly the probe plus the drawn
  * vector. The head is a world-sized triangle, so it scales with zoom like
  * the rest of the figure.
  */
@@ -58,13 +98,7 @@ export function probeArrows2D(p: ProbeSetup): SceneItem[] {
     const N = String.raw`\left(-${U}.y,${U}.x\right)`;
     const colors = { color: a.color, colorLatex: a.colorLatex };
     return [
-      {
-        // Undefined when the arrow is off or the probe is inside a source:
-        // everything below is drawn from this, so nothing draws.
-        key: `${a.key}D`,
-        latex: String.raw`${D}=\left\{${a.toggle}=1:\left\{${p.valid}:${p.gain}${a.vector}\right\}\right\}`,
-        hidden: true,
-      },
+      ...displacement(p, a),
       {
         key: `${a.key}L`,
         latex: String.raw`${L}=\sqrt{${D}.x^{2}+${D}.y^{2}}`,
@@ -100,57 +134,46 @@ export function probeArrows2D(p: ProbeSetup): SceneItem[] {
         lineWidth: 1,
         ...colors,
       },
-      nameItem(a, `${Q}+0.5${U}`, p.names),
+      {
+        // A point of size 0 past the tip, labelled. Size, not opacity:
+        // Desmos hides the label of a point whose opacity is 0.
+        key: `${a.key}name`,
+        latex: String.raw`${Q}+0.5${U}\left\{${p.names}=1\right\}`,
+        points: true,
+        lines: false,
+        pointSize: 0,
+        label: `\`${a.name}\``,
+        labelSize: 1.5,
+        ...colors,
+      },
     ];
   });
 }
 
 /**
  * The arrows in space: Desmos 3D's own `vector`, shaded and lit like the
- * rest of the scene.
+ * rest of the scene, thin enough that its cone reads as a head. Desmos 3D
+ * draws no labels, so each name is a point the plugin labels itself.
  */
 export function probeArrows3D(p: ProbeSetup): SceneItem[] {
   return p.arrows.flatMap((a) => {
     const k = `${a.key}vt`;
     const D = `D_{${k}}`;
-    const U = `U_{${k}}`;
     const colors = { color: a.color, colorLatex: a.colorLatex };
     return [
-      {
-        key: `${a.key}D`,
-        latex: String.raw`${D}=\left\{${a.toggle}=1:\left\{${p.valid}:${p.gain}${a.vector}\right\}\right\}`,
-        hidden: true,
-      },
-      {
-        key: `${a.key}U`,
-        latex: String.raw`${U}=\frac{${D}}{\max\left(\sqrt{${D}.x^{2}+${D}.y^{2}+${D}.z^{2}},10^{-9}\right)}`,
-        hidden: true,
-      },
+      ...displacement(p, a),
       {
         key: `${a.key}arrow`,
         latex: String.raw`\operatorname{vector}\left(${p.at},${p.at}+${D}\right)`,
-        lineWidth: 4,
+        lineWidth: 1.5,
         ...colors,
       },
-      nameItem(a, `${p.at}+${D}+0.4${U}`, p.names),
+      {
+        key: `${a.key}name`,
+        latex: String.raw`N_{${k}}=\left(${p.at}+${D}\cdot\left(1+\frac{0.35}{\max\left(\sqrt{${D}.x^{2}+${D}.y^{2}+${D}.z^{2}},10^{-9}\right)}\right)\right)\left\{${p.names}=1\right\}`,
+        hidden: true,
+        name3d: { label: a.name, color: a.nameColor },
+      },
     ];
   });
-}
-
-/**
- * An arrow's name: a point of size 0 past its tip, labelled. Size, not
- * opacity: Desmos hides the label of a point whose opacity is 0.
- */
-function nameItem(a: ProbeArrow, at: string, names: string): SceneItem {
-  return {
-    key: `${a.key}name`,
-    latex: String.raw`${at}\left\{${names}=1\right\}`,
-    points: true,
-    lines: false,
-    pointSize: 0,
-    label: `\`${a.name}\``,
-    labelSize: 1.5,
-    color: a.color,
-    colorLatex: a.colorLatex,
-  };
 }
