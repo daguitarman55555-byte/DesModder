@@ -155,6 +155,13 @@ export interface GalleryPreset {
   /** One colour rather than a ramp, for the 2D flow. */
   fixedColor?: string;
   /**
+   * What the particles are coloured by instead of their speed: a formula,
+   * such as the charges' potential, through the palette from its negative
+   * end to its positive, `scale` three quarters of the way out. `latex3d` is
+   * the same quantity on Desmos 3D.
+   */
+  tint?: { latex: string; latex3d: string; scale: number };
+  /**
    * The same picture on Desmos 3D: the field with a third component, and
    * what is different about it in a box. Every preset has one, so loading a
    * preset on /3d never gives a field that lies flat by accident.

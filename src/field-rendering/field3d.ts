@@ -29,6 +29,8 @@ export interface Field3D {
    * makes a simulation's picture look like the thing simulated.
    */
   seed?: string;
+  /** What the `scalar` colour mode colours by, as GLSL over `vec3 p`. */
+  tint?: string;
 }
 
 /** Whether two compiled fields would build the same shader. */
@@ -39,6 +41,7 @@ export function sameField3D(a: Field3D | undefined, b: Field3D | undefined) {
     a.q === b.q &&
     a.r === b.r &&
     a.seed === b.seed &&
+    a.tint === b.tint &&
     a.usesTime === b.usesTime &&
     a.params.join() === b.params.join() &&
     a.helpers.map((h) => h.glsl).join() === b.helpers.map((h) => h.glsl).join()
@@ -68,6 +71,10 @@ vec3 vtField(vec3 p) {
 float vtSeed(vec3 p) {
   float s = ${field.seed ?? "1.0"};
   return isnan(s) || isinf(s) ? 0.0 : clamp(s, 0.0, 1.0);
+}
+float vtTint(vec3 p) {
+  float s = ${field.tint ?? "0.0"};
+  return isnan(s) ? 0.0 : s;
 }
 `;
 }

@@ -254,6 +254,14 @@ export interface FlowConfig {
   /** A black hole at the origin: its horizon absorbs, its shadow is drawn. */
   lens: boolean;
   lensHorizon: number;
+  /**
+   * What the Scalar colour mode colours by: a formula in x and y, such as a
+   * pair of charges' potential, through a diverging ramp, red where it is
+   * positive and blue where negative. "" colours everything the middle.
+   */
+  tintLatex: string;
+  /** The tint at which the ramp is three quarters of the way out. */
+  tintScale: number;
 }
 
 /** Below this the flow is too soft to read, whatever it buys back. */
@@ -415,6 +423,8 @@ export interface Space3DConfig {
    * the view moves; Always redraws them whole every frame.
    */
   particleRedraw: "auto" | "always";
+  /** The Scalar colour mode's formula in 3D, in x, y and z. */
+  tintLatex: string;
 }
 
 /**
@@ -502,6 +512,7 @@ export const DEFAULT_SPACE_3D: Space3DConfig = {
   particleSmooth: "auto",
   particleDetail: "auto",
   particleRedraw: "auto",
+  tintLatex: "",
 };
 
 export const TIME_SPEED_MINIMUM = 0.05;
@@ -1037,6 +1048,8 @@ export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
     colorScale: 1,
     lens: false,
     lensHorizon: 0.6,
+    tintLatex: "",
+    tintScale: 1,
   },
   curve: {
     enabled: false,
@@ -1602,6 +1615,8 @@ export function normalizeSpace3D(
       "quarter",
     ]),
     particleRedraw: oneOf("particleRedraw", ["auto", "always"]),
+    tintLatex:
+      typeof v?.tintLatex === "string" ? v.tintLatex : fallback.tintLatex,
   };
 }
 
@@ -1960,6 +1975,9 @@ function normalizeFlow(value: unknown, fallback: FlowConfig): FlowConfig {
       0.01,
       100
     ),
+    tintLatex:
+      typeof flow?.tintLatex === "string" ? flow.tintLatex : fallback.tintLatex,
+    tintScale: clampNumber(flow?.tintScale, fallback.tintScale, 1e-9, 1e12),
   };
 }
 
@@ -1973,7 +1991,7 @@ function clampNumber(
 }
 
 function isFlowColorMode(value: unknown): value is FlowColorMode {
-  return ["fixed", "speed", "direction"].includes(value as string);
+  return ["fixed", "speed", "direction", "scalar"].includes(value as string);
 }
 
 export function configForPreset(

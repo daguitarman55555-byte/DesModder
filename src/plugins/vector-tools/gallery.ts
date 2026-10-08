@@ -52,7 +52,7 @@ export function colorsFromGallery(
   base: VectorFieldConfig,
   dimensions: 2 | 3 = 2
 ): VectorFieldConfig {
-  return inked(preset, {
+  return finished(preset, {
     ...base,
     name: preset.name,
     source: "components",
@@ -83,16 +83,35 @@ export function colorsFromGallery(
 }
 
 /**
- * Auto ink on for a picture on paper, and off for any other, so a dark
- * picture loaded after one keeps the colour it names.
+ * What every load ends with, light or whole. Auto ink on for a picture on
+ * paper and off for any other, so a dark picture loaded after one keeps the
+ * colour it names. And the particles coloured by the preset's tint if it has
+ * one; if not, and they still were, by speed again, so the charges' potential
+ * is not left colouring a galaxy.
  */
-function inked(
+function finished(
   preset: GalleryPreset,
   config: VectorFieldConfig
 ): VectorFieldConfig {
+  const { tint } = preset;
   return {
     ...config,
     color: { ...config.color, inkAuto: preset.onPaper === true },
+    flow:
+      tint !== undefined
+        ? {
+            ...config.flow,
+            colorMode: "scalar",
+            tintLatex: tint.latex,
+            tintScale: tint.scale,
+          }
+        : config.flow.colorMode === "scalar"
+          ? { ...config.flow, colorMode: "speed", tintLatex: "" }
+          : config.flow,
+    space3d: {
+      ...config.space3d,
+      tintLatex: tint?.latex3d ?? "",
+    },
   };
 }
 
@@ -202,7 +221,7 @@ export function configFromGallery(
     mode: "count",
     count: 25,
   });
-  return inked(preset, {
+  return finished(preset, {
     ...base,
     name: preset.name,
     source: "components",

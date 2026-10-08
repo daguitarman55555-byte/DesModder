@@ -6,14 +6,12 @@
  * real browser on 2026-10-07, plain text and maths alike — and a point built
  * from sliders cannot be dragged there: the drag turns the view instead. So
  * the names are HTML placed where each point projects, through the camera of
- * the frame Desmos just drew, and a press on the probe is taken before
+ * the frame Desmos is showing, and a press on the probe is taken before
  * Desmos sees it and moves the probe in the plane facing the viewer, under
  * the cursor.
  */
 import type { Calc, Grapher3d } from "#globals";
-import { hookIntoFunction } from "#utils/listenerHelpers.ts";
 import {
-  cameraFromRedrawResult,
   mathToClip,
   projectToScreen,
   readCamera3D,
@@ -43,8 +41,9 @@ const GRAB_RADIUS_PX = 16;
 
 export class Scene3DLayer {
   private layer?: HTMLDivElement;
-  private unhook?: () => void;
-  private camera?: Camera3D;
+  /** The camera the names were last placed for, to see when it moves. */
+  private placedFor = "";
+  private watch?: number;
   private names: readonly SceneName3D[] = [];
   private probe?: SceneProbe3D;
   private frame?: number;
@@ -77,8 +76,9 @@ export class Scene3DLayer {
   stop() {
     if (this.frame !== undefined) cancelAnimationFrame(this.frame);
     this.frame = undefined;
-    this.unhook?.();
-    this.unhook = undefined;
+    if (this.watch !== undefined) cancelAnimationFrame(this.watch);
+    this.watch = undefined;
+    this.placedFor = "";
     const parent = this.layer?.parentElement;
     parent?.removeEventListener("pointerdown", this.onPointerDown, true);
     this.layer?.remove();
@@ -107,31 +107,50 @@ export class Scene3DLayer {
     this.layer = layer;
     // Captured, so a press on the probe never reaches Desmos as a rotation.
     parent.addEventListener("pointerdown", this.onPointerDown, true);
-    const { grapher } = this;
-    if (grapher !== undefined)
-      this.unhook =
-        hookIntoFunction(
-          grapher,
-          "onRedraw3dResults",
-          "dsm-vector-tools-scene3d",
-          0,
-          (_stop, result: unknown) => {
-            const camera = cameraFromRedrawResult(result);
-            if (camera === undefined) return;
-            this.camera = camera;
-            this.draw();
-          }
-        ) ?? undefined;
+    this.watchCamera();
+  }
+
+  /**
+   * Places the names again whenever the camera has moved, checked once a
+   * frame. Not by hooking Desmos's redraw, as the overlays do: the hook
+   * helper keeps one list of handlers per function, and a second hook on
+   * the same function took the first's place, so the names stayed where
+   * the view had been and the particles lost their own.
+   */
+  private watchCamera() {
+    this.watch = requestAnimationFrame(() => {
+      if (this.layer === undefined) return;
+      const camera = this.currentCamera();
+      const key =
+        camera === undefined
+          ? ""
+          : [
+              ...camera.world,
+              ...camera.view,
+              ...camera.projection,
+              camera.width,
+              camera.height,
+            ].join();
+      if (key !== this.placedFor) this.draw();
+      this.watchCamera();
+    });
   }
 
   private currentCamera() {
-    return this.camera ?? readCamera3D(this.grapher);
+    return readCamera3D(this.grapher);
   }
 
   private draw() {
     const { layer } = this;
     const camera = this.currentCamera();
     if (layer === undefined || camera === undefined) return;
+    this.placedFor = [
+      ...camera.world,
+      ...camera.view,
+      ...camera.projection,
+      camera.width,
+      camera.height,
+    ].join();
     const canvas = webglCanvasOf(this.grapher);
     if (canvas != null) {
       // On the canvas's corner, measured on screen: the canvas and the layer

@@ -83,7 +83,9 @@ export interface Flow3DOptions {
   /** A dark laid over the graph, as a simulation is drawn on; "" for none. */
   backdrop: string;
   backdropOpacity: number;
-  colorMode: "speed" | "fixed" | "direction";
+  colorMode: "speed" | "fixed" | "direction" | "scalar";
+  /** For `scalar`: the tint at which the ramp is three quarters out. */
+  tintScale?: number;
   palette: PaletteID;
   fixedColor: string;
   saturation: number;
@@ -254,6 +256,7 @@ uniform float u_dt;
 uniform float u_speed;
 uniform float u_speedScale;
 uniform int u_normalize;
+uniform int u_tinted;
 uniform float u_lifetime;
 uniform int u_absorb;
 uniform int u_lens;
@@ -342,7 +345,9 @@ void main() {
   }
   if (id >= u_count) s.w = -1.0e9;
   o_state = s;
-  o_trail = vec4(s.xyz, here);
+  // Coloured by the field's tint, the trail carries that instead of the
+  // strength: the draw has no field functions, only what each point stored.
+  o_trail = vec4(s.xyz, u_tinted == 1 ? vtTint(s.xyz) : here);
 }
 `;
 }
@@ -407,6 +412,7 @@ uniform float u_frame;
 uniform float u_speedScale;
 uniform int u_colorMode;
 uniform vec3 u_fixedColor;
+uniform float u_tintScale;
 uniform float u_opacity;
 uniform vec2 u_depthRange;
 uniform int u_lens;
@@ -505,6 +511,11 @@ uniform highp sampler2D u_paletteLUT;
 vec3 vtFlowColor(float m, vec3 along, float g) {
   if (u_colorMode == 1) return vtAdjust(u_fixedColor);
   if (u_colorMode == 2) return abs(along);
+  if (u_colorMode == 3) {
+    // m is the tint here, stored by the step.
+    float d = 0.5 + 0.5 * tanh(m / u_tintScale);
+    return texture(u_paletteLUT, vec2((d * 255.0 + 0.5) / 256.0, 0.5)).rgb;
+  }
   float t = clamp(1.0 - exp(-m / u_speedScale) + 0.3 * log2(g), 0.0, 1.0);
   return texture(u_paletteLUT, vec2((t * 255.0 + 0.5) / 256.0, 0.5)).rgb;
 }
@@ -960,6 +971,7 @@ export class Flow3DRenderer implements Overlay3DRenderer {
     gl.uniform1f(u.u_speed, o.speed);
     gl.uniform1f(u.u_speedScale, Math.max(1e-9, speedScale));
     gl.uniform1i(u.u_normalize, o.normalizeSpeed ? 1 : 0);
+    gl.uniform1i(u.u_tinted, o.colorMode === "scalar" ? 1 : 0);
     gl.uniform1f(u.u_lifetime, o.lifetime);
     gl.uniform1i(u.u_absorb, o.absorb ? 1 : 0);
     gl.uniform1i(u.u_lens, o.lens ? 1 : 0);
@@ -1280,8 +1292,15 @@ export class Flow3DRenderer implements Overlay3DRenderer {
       gl.uniform1f(u.u_speedScale, Math.max(1e-9, speedScale));
       gl.uniform1i(
         u.u_colorMode,
-        o.colorMode === "fixed" ? 1 : o.colorMode === "direction" ? 2 : 0
+        o.colorMode === "fixed"
+          ? 1
+          : o.colorMode === "direction"
+            ? 2
+            : o.colorMode === "scalar"
+              ? 3
+              : 0
       );
+      gl.uniform1f(u.u_tintScale, Math.max(1e-9, o.tintScale ?? 1));
       gl.uniform3fv(u.u_fixedColor, hexToUnitRGB(o.fixedColor));
       gl.uniform2fv(u.u_depthRange, depthRange(mathToView, box));
       gl.uniform1i(u.u_clip, o.clip ? 1 : 0);

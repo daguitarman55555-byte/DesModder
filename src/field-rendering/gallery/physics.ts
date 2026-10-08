@@ -362,34 +362,30 @@ const CHARGES_SCENE_2D: SceneItem[] = (() => {
     ...charge(1, "+", String.raw`-\frac{d}{2}`),
     ...charge(2, "-", String.raw`\frac{d}{2}`),
     {
-      // S runs between ±(|q₁| + |q₂|), so only the levels in that range are
-      // lines at all: asking Desmos for a fixed 81 made it trace 64 empty
-      // contours on every change of a charge or the distance.
-      key: "levels",
-      latex: String.raw`n_{vt}=\operatorname{ceil}\left(4\left(\left|q_{1}\right|+\left|q_{2}\right|\right)\right)`,
-      hidden: true,
-    },
-    {
+      // Every line at once, where sin(4πS) is zero, at S = k/4: one implicit
+      // curve for Desmos to trace rather than a list of them, each traced over
+      // the whole graph. On a change of a charge or the distance that took
+      // 400 ms as a list of 81 levels and 320 as the 17 that exist; this, 100.
       key: "lines",
-      latex: String.raw`\frac{q_{1}\left(x+\frac{d}{2}\right)}{${r("+")}}+\frac{q_{2}\left(x-\frac{d}{2}\right)}{${r("-")}}=0.25\cdot\left[-n_{vt}...n_{vt}\right]\left\{s_{lines}=1\right\}\left\{${outside}\right\}\left\{\left|y\right|>0.02\right\}`,
-      color: "#718296",
-      lineWidth: 1.5,
-      lineOpacity: 0.7,
+      latex: String.raw`\sin\left(4\pi\left(\frac{q_{1}\left(x+\frac{d}{2}\right)}{${r("+")}}+\frac{q_{2}\left(x-\frac{d}{2}\right)}{${r("-")}}\right)\right)=0\left\{s_{lines}=1\right\}\left\{${outside}\right\}\left\{\left|y\right|>0.02\right\}`,
+      color: "#2c3646",
+      lineWidth: 2,
+      lineOpacity: 0.85,
     },
     {
       // The axis through them, which every contour above meets edge-on.
       key: "axis",
       latex: String.raw`y=0\left\{s_{lines}=1\right\}\left\{${outside}\right\}`,
-      color: "#718296",
-      lineWidth: 1.5,
-      lineOpacity: 0.7,
+      color: "#2c3646",
+      lineWidth: 2,
+      lineOpacity: 0.85,
     },
     {
       key: "equipotentials",
       latex: String.raw`\frac{q_{1}}{${r("+")}}+\frac{q_{2}}{${r("-")}}=\left[-1,-0.5,-0.25,-0.1,0,0.1,0.25,0.5,1\right]\left\{s_{equi}=1\right\}\left\{${outside}\right\}`,
-      color: "#888888",
+      color: "#303030",
       lineStyle: "DASHED",
-      lineWidth: 1.5,
+      lineWidth: 2,
     },
     {
       key: "probe",
@@ -434,7 +430,7 @@ const CHARGES_SCENE_3D: SceneItem[] = (() => {
       color: "#222222",
       points: true,
       // In 3D a point is a ball, and 12 hid the arrows' tails inside it.
-      pointSize: 7,
+      pointSize: 4,
       drag3d: ["p_{x}", "p_{y}", "p_{z}"],
     },
     ...probeArrows3D(setup),
@@ -453,7 +449,21 @@ const BAR_3D = barMagnet(["x", "y", "z"]);
  * faint, even current of one dark colour, the field's direction everywhere
  * without competing with the arrows and lines that show its size.
  */
-const CHARGE_FLOW_COLOR = "#29486b";
+/**
+ * The charges' particles coloured by the electric potential where they are,
+ * V = q₁/r₁ + q₂/r₂ (k = 1): red where it is positive, near a positive
+ * charge; blue where negative; slate where it is zero, which between equal
+ * and opposite charges is the plane half-way. So the colours mean something
+ * a class learns, and they cross over exactly where the equipotential V = 0
+ * is drawn.
+ */
+const CHARGE_TINT = {
+  latex: String.raw`\frac{q_{1}}{\sqrt{\left(x+\frac{d}{2}\right)^{2}+y^{2}}}+\frac{q_{2}}{\sqrt{\left(x-\frac{d}{2}\right)^{2}+y^{2}}}`,
+  latex3d: String.raw`\frac{q_{1}}{\sqrt{\left(x+\frac{d}{2}\right)^{2}+y^{2}+z^{2}}}+\frac{q_{2}}{\sqrt{\left(x-\frac{d}{2}\right)^{2}+y^{2}+z^{2}}}`,
+  // A unit charge's potential 1 from it is 1: three quarters red at 0.3,
+  // so the colour reaches well out from each charge before it fades.
+  scale: 0.3,
+};
 const CHARGE_FLOW = {
   // Dense and dark enough to read as the field's grain on white: half this
   // many at 0.28 was a faint wash Rafael found too light.
@@ -551,8 +561,8 @@ export const PHYSICS: readonly GalleryPreset[] = [
     ],
     scene: CHARGES_SCENE_2D,
     onPaper: true,
-    palette: "ember",
-    fixedColor: CHARGE_FLOW_COLOR,
+    palette: "charge",
+    tint: CHARGE_TINT,
     flow: CHARGE_FLOW,
     extent: 10,
     space: {
@@ -576,14 +586,14 @@ export const PHYSICS: readonly GalleryPreset[] = [
         particles: 36_000,
         speed: 0.18,
         trail: 16,
-        lifetime: 3,
-        opacity: 0.45,
+        // Short: they stream from + to − and piled up at the sink, leaving the
+        // positive side sparse; reborn sooner, they stay spread out.
+        lifetime: 1.2,
+        opacity: 0.6,
         glow: 0,
         normalizeSpeed: true,
         absorb: true,
-        colorMode: "fixed",
-        fixedColor: CHARGE_FLOW_COLOR,
-        palette: "ember",
+        palette: "charge",
       },
     },
   },

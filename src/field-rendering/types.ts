@@ -41,7 +41,13 @@ export type VectorColorMode =
  */
 export type ColorRangeMode = "automatic" | "manual";
 
-export type FlowColorMode = "fixed" | "speed" | "direction";
+/**
+ * `scalar` colours each particle by a formula of where it is, through a
+ * diverging ramp: the field's own tint (see `FlowField.tint`), such as the
+ * potential round a pair of charges, red where it is positive and blue where
+ * it is negative.
+ */
+export type FlowColorMode = "fixed" | "speed" | "direction" | "scalar";
 
 /**
  * Where an overlay's canvas sits relative to Desmos's own graph canvas.

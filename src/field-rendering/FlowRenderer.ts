@@ -134,6 +134,12 @@ export interface FlowOptions {
    * nothing there had had time to grow a trail.
    */
   margin?: number;
+  /**
+   * For the `scalar` colour mode: the tint at which the ramp is three
+   * quarters of the way to either end. It saturates, tanh(tint / scale),
+   * so a pole in the tint runs into the ends instead of flattening the rest.
+   */
+  tintScale?: number;
 }
 
 export const DEFAULT_FLOW_OPTIONS: FlowOptions = {
@@ -674,6 +680,11 @@ export class FlowRenderer {
         : Math.max(1e-6, (xMax - xMin) / 3)
     );
 
+    gl.uniform1f(
+      program.uniforms.u_tintScale,
+      Math.max(1e-9, this.options.tintScale ?? 1)
+    );
+
     gl.drawArrays(gl.POINTS, 0, this.particleCount);
     gl.disable(gl.BLEND);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -989,7 +1000,13 @@ export class FlowRenderer {
 const MAX_PARTICLE_AGE = 400;
 
 function colorModeIndex(mode: FlowColorMode) {
-  return mode === "fixed" ? 0 : mode === "speed" ? 1 : 2;
+  return mode === "fixed"
+    ? 0
+    : mode === "speed"
+      ? 1
+      : mode === "direction"
+        ? 2
+        : 3;
 }
 
 export function hexToUnitRGB(hex: string): [number, number, number] {
@@ -1186,6 +1203,7 @@ uniform float u_opacity;
 uniform int u_colorMode;
 uniform vec3 u_fixedColor;
 uniform float u_speedScale;
+uniform float u_tintScale;
 out vec4 v_color;
 
 ${fieldFunctions(field)}
@@ -1218,6 +1236,8 @@ void main() {
     rgb = vtPalette(1.0 - exp(-length(v) / u_speedScale));
   } else if (u_colorMode == 2) {
     rgb = vtAdjust(vtHueRamp(fract(atan(v.y, v.x) / 6.2831853 + 1.0)));
+  } else if (u_colorMode == 3) {
+    rgb = vtPalette(0.5 + 0.5 * tanh(vtTint(state.xy) / u_tintScale));
   }
 
   // Ease particles in and out so respawns do not pop.

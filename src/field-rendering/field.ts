@@ -44,6 +44,12 @@ export interface FieldDependencies {
    */
   seed?: string;
   /**
+   * What the `scalar` colour mode colours by, as GLSL over `vec2 p`: any
+   * number, positive or negative, mapped through a diverging ramp. Absent,
+   * the key is absent too, so a field without one keeps its identity.
+   */
+  tint?: string;
+  /**
    * Perturbations layered on top of the compiled components.
    *
    * Absent by default, and absent means the shader is emitted exactly as it
@@ -507,6 +513,10 @@ ${body}
 float vtSeed(vec2 p) {
   float s = ${field.seed ?? "1.0"};
   return isnan(s) || isinf(s) ? 0.0 : clamp(s, 0.0, 1.0);
+}
+float vtTint(vec2 p) {
+  float s = ${field.tint ?? "0.0"};
+  return isnan(s) ? 0.0 : s;
 }
 `;
 }

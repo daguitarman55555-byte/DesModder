@@ -139,6 +139,7 @@ const FLOW_COLOR_MODES: readonly Choice<FlowColorMode>[] = [
   { value: "speed", label: "Speed" },
   { value: "direction", label: "Direction" },
   { value: "fixed", label: "Fixed color" },
+  { value: "scalar", label: "By a formula" },
 ];
 
 const OVERLAY_LAYERS: readonly Choice<OverlayLayer>[] = [
@@ -1119,7 +1120,15 @@ function colorTab(vectorTools: VectorTools, config: ConfigGetter) {
               )}
               {/* Direction runs along a cyclic ramp of its own and fixed takes
                   the shared swatch, so only speed has a ramp to choose. */}
-              <If predicate={() => config().flow.colorMode === "speed"}>
+              <If predicate={() => config().flow.colorMode === "scalar"}>
+                {() => tintInput(vectorTools)}
+              </If>
+              <If
+                predicate={() =>
+                  config().flow.colorMode === "speed" ||
+                  config().flow.colorMode === "scalar"
+                }
+              >
                 {() =>
                   paletteChooser(
                     "Particle palette",
@@ -2578,6 +2587,55 @@ function surfaceChooser(vectorTools: VectorTools, s: () => Space3DConfig) {
           </div>
         )}
       </If>
+    </div>
+  );
+}
+
+/**
+ * What the particles are coloured by in the By a formula mode: any number,
+ * a potential say, through the palette from its negative end to its positive,
+ * the middle at zero. In x and y on the calculator, and x, y and z on 3D.
+ */
+function tintInput(vectorTools: VectorTools) {
+  const is3d = () => vectorTools.is3d;
+  return (
+    <div>
+      <label class="dsm-vector-tools-label">
+        Color by (negative to positive along the palette)
+      </label>
+      <InlineMathInputViewGeneral
+        containerClass={() => ({ "dsm-vector-tools-math-input": true })}
+        placeholder="0"
+        ariaLabel="What the particles are colored by, a function of position"
+        latex={() =>
+          is3d()
+            ? vectorTools.space3d.tintLatex
+            : vectorTools.getConfig().flow.tintLatex
+        }
+        handleLatexChanged={(value) =>
+          is3d()
+            ? vectorTools.setSpace3D("tintLatex", value)
+            : vectorTools.setFlow("tintLatex", value)
+        }
+        hasError={() => false}
+        manageFocus={mathquillFocusHelper({
+          controller: vectorTools.cc,
+          location: {
+            type: "dsm-focus",
+            plugin: "vector-tools",
+            kind: "tint",
+          },
+        })}
+        controller={vectorTools.cc}
+        readonly={false}
+      />
+      {sliderControl(
+        "dsm-vector-tools-tint-scale",
+        "Color scale (the value three quarters of the way to each end)",
+        () => vectorTools.getConfig().flow.tintScale,
+        { minimum: 0.01, maximum: 5, step: 0.01, decimals: 2 },
+        (value) => vectorTools.setFlow("tintScale", value)
+      )}
     </div>
   );
 }

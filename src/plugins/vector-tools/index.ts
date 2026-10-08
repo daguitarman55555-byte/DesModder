@@ -238,6 +238,7 @@ export type VectorToolsFocusKind =
   | ComponentSlot
   | "r"
   | "seed"
+  | "tint"
   | "curve-x"
   | "curve-y";
 
@@ -324,6 +325,23 @@ function sliderValues(models: readonly ItemModel[]) {
  * Where the 2D flow's particles are born, as compiled: the seed, unless it is
  * switched off, when they are born everywhere.
  */
+/**
+ * What the flow is coloured by in the Scalar mode, as compiled: only while
+ * that mode is the one drawn, so a formula left behind changes no shader.
+ */
+function flowTintLatex(config: VectorFieldConfig) {
+  return effectiveFlowColor(config).colorMode === "scalar"
+    ? config.flow.tintLatex.trim()
+    : "";
+}
+
+/** The same for the 3D flow, whose formula has a third coordinate. */
+function spaceTintLatex(config: VectorFieldConfig) {
+  return effectiveFlowColor(config).colorMode === "scalar"
+    ? config.space3d.tintLatex.trim()
+    : "";
+}
+
 function flowSeedLatex(config: VectorFieldConfig) {
   return config.flow.seedOn ? config.flow.seedLatex : "";
 }
@@ -364,11 +382,23 @@ function compileFlowField(
       : compileFieldComponentToGLSL(seedLatex, environment);
   if (seed !== undefined && !seed.ok)
     return { ok: false, error: `Where particles are born: ${seed.error}` };
+  // And what it is coloured by, likewise.
+  const tintLatex = flowTintLatex(config);
+  const tint =
+    tintLatex === ""
+      ? undefined
+      : compileFieldComponentToGLSL(tintLatex, environment);
+  if (tint !== undefined && !tint.ok)
+    return { ok: false, error: `What the colour follows: ${tint.error}` };
   // P and Q share one shader, so their helpers merge. Both lists are already in
   // dependency order and a name means one definition, so keeping the first of
   // each name preserves that order for the union.
   const helpers = [...p.helpers];
-  for (const helper of [...q.helpers, ...(seed?.helpers ?? [])]) {
+  for (const helper of [
+    ...q.helpers,
+    ...(seed?.helpers ?? []),
+    ...(tint?.helpers ?? []),
+  ]) {
     if (!helpers.some((existing) => existing.name === helper.name)) {
       helpers.push(helper);
     }
@@ -380,9 +410,21 @@ function compileFlowField(
       p: p.glsl,
       q: q.glsl,
       ...(seed === undefined ? {} : { seed: seed.glsl }),
+      ...(tint === undefined ? {} : { tint: tint.glsl }),
       helpers,
-      params: [...new Set([...p.params, ...q.params, ...(seed?.params ?? [])])],
-      usesTime: p.usesTime || q.usesTime || (seed?.usesTime ?? false),
+      params: [
+        ...new Set([
+          ...p.params,
+          ...q.params,
+          ...(seed?.params ?? []),
+          ...(tint?.params ?? []),
+        ]),
+      ],
+      usesTime:
+        p.usesTime ||
+        q.usesTime ||
+        (seed?.usesTime ?? false) ||
+        (tint?.usesTime ?? false),
     },
   };
 }
@@ -406,6 +448,7 @@ function compileField3D(
   ) => { ok: true; latex: string[] } | { ok: false; error: string }
 ): Field3DCompilation {
   const seedLatex = spaceSeedLatex(config).trim();
+  const tintLatex = spaceTintLatex(config);
   // A gradient field's components are f's three partials, differentiated
   // symbolically — exact, so no difference step has to follow the box as it
   // zooms — and then compiled like any components.
@@ -434,7 +477,8 @@ function compileField3D(
   const compiled = [
     ...components,
     // Where particles are born rides along: the same names, the same clock.
-    ...(seedLatex === "" ? [] : [["Where particles are born", seedLatex]]),
+    ["Where particles are born", seedLatex === "" ? "1" : seedLatex],
+    ["What the colour follows", tintLatex === "" ? "0" : tintLatex],
   ].map(([name, latex]) => ({
     name,
     result: compileFieldComponentToGLSL(
@@ -464,7 +508,8 @@ function compileField3D(
       p: glsl[0],
       q: glsl[1],
       r: glsl[2],
-      seed: glsl[3],
+      ...(seedLatex === "" ? {} : { seed: glsl[3] }),
+      ...(tintLatex === "" ? {} : { tint: glsl[4] }),
       helpers,
       params: [...params],
       usesTime,
@@ -620,6 +665,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     zLatex: string;
     fLatex: string;
     seedLatex: string;
+    tintLatex: string;
     revision: number;
     clockNames: string;
     result: Field3DCompilation;
@@ -645,6 +691,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     yLatex: string;
     fLatex: string;
     seedLatex: string;
+    tintLatex: string;
     revision: number;
     clockNames: string;
     result: FlowCompilation;
@@ -1410,6 +1457,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       // The flow's own colours, as in 2D: its palette and scheme are the
       // Colour tab's flow half.
       colorMode: config.flow.colorMode,
+      tintScale: config.flow.tintScale,
       palette: config.flow.palette,
       fixedColor: this.fixedInk(config, 3),
       saturation: config.flow.saturation,
@@ -1539,6 +1587,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       cached.zLatex === config.components.zLatex &&
       cached.fLatex === config.scalar.fLatex &&
       cached.seedLatex === spaceSeedLatex(config) &&
+      cached.tintLatex === spaceTintLatex(config) &&
       cached.revision === this.environmentRevision &&
       cached.clockNames === this.clockParameterKey
     ) {
@@ -1554,6 +1603,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       zLatex: config.components.zLatex,
       fLatex: config.scalar.fLatex,
       seedLatex: spaceSeedLatex(config),
+      tintLatex: spaceTintLatex(config),
       revision: this.environmentRevision,
       clockNames: this.clockParameterKey,
       result,
@@ -3048,6 +3098,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       cached.yLatex === config.components.yLatex &&
       cached.fLatex === config.scalar.fLatex &&
       cached.seedLatex === flowSeedLatex(config) &&
+      cached.tintLatex === flowTintLatex(config) &&
       // The same component compiles to different GLSL against a different set
       // of definitions, so the environment is part of what this identifies.
       cached.revision === this.environmentRevision &&
@@ -3062,6 +3113,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       yLatex: config.components.yLatex,
       fLatex: config.scalar.fLatex,
       seedLatex: flowSeedLatex(config),
+      tintLatex: flowTintLatex(config),
       revision: this.environmentRevision,
       clockNames: this.clockParameterKey,
       result,

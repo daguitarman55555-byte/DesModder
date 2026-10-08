@@ -35,6 +35,7 @@ export type PaletteID =
   | "jet"
   | "blue-red"
   | "coolwarm"
+  | "charge"
   | "grayscale"
   | "sunset"
   | "ocean"
@@ -225,6 +226,18 @@ export const PALETTES: Record<PaletteID, Palette> = {
       { at: 0, rgb: [59, 76, 192] },
       { at: 0.5, rgb: [221, 221, 221] },
       { at: 1, rgb: [180, 4, 38] },
+    ],
+  },
+  // Negative to positive as a physics textbook colours charge: its blue, a
+  // dark slate for zero, its red. Diverging like Cool to warm, but dark all
+  // the way across, so on white graph paper the zero line is not a gap.
+  charge: {
+    name: "Charge",
+    group: "diverging",
+    stops: [
+      { at: 0, rgb: [24, 84, 170] },
+      { at: 0.5, rgb: [78, 86, 104] },
+      { at: 1, rgb: [186, 52, 34] },
     ],
   },
   grayscale: {

@@ -406,6 +406,8 @@ describe("Vector Tools field configuration", () => {
       lensHorizon: 0.6,
       seedOn: true,
       edges: "auto",
+      tintLatex: "",
+      tintScale: 1,
     });
     expect(
       normalizeVectorFieldConfig({ flow: { particleCount: 1 } }).flow
