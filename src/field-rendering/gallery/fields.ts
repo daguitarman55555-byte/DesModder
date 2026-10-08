@@ -1,5 +1,4 @@
 /** Fields: the textbook pictures. */
-import { dipole } from "./latex";
 import type { GalleryPreset } from "./types";
 
 /** The bar magnet on alternating current, along y in the plane and z in the box. */
@@ -16,7 +15,17 @@ const MAGNET_2D = {
   x: String.raw`\frac{3x\cdot${AC}y}{\left(x^{2}+y^{2}\right)^{2.5}}`,
   y: String.raw`\frac{3y\cdot${AC}y-${AC}\left(x^{2}+y^{2}\right)}{\left(x^{2}+y^{2}\right)^{2.5}}`,
 };
-const MAGNET_3D = dipole(["0", "0", AC], ["x", "y", "z"], 0.6, false, "magnet");
+/**
+ * The same point dipole in the box, along z, with nothing cut out of it
+ * either: it had a uniformly magnetised core of radius 0.6, which drew as a
+ * ball where the 2D one already went on shrinking into the centre.
+ */
+const R3 = String.raw`\left(x^{2}+y^{2}+z^{2}\right)`;
+const MAGNET_3D = {
+  x: String.raw`\frac{3x\cdot${AC}z}{${R3}^{2.5}}`,
+  y: String.raw`\frac{3y\cdot${AC}z}{${R3}^{2.5}}`,
+  z: String.raw`\frac{3z\cdot${AC}z-${AC}${R3}}{${R3}^{2.5}}`,
+};
 
 export const FIELDS: readonly GalleryPreset[] = [
   {
@@ -49,11 +58,12 @@ export const FIELDS: readonly GalleryPreset[] = [
     space: {
       blurb:
         "A bar magnet along the z-axis: field lines leave the north pole, loop round in every direction, and come back in at the south — drawn, as iron filings draw them, from around the magnet outward. On alternating current, so the field fades, reverses and returns.",
-      xLatex: MAGNET_3D.x!,
-      yLatex: MAGNET_3D.y!,
-      zLatex: MAGNET_3D.z!,
-      // Released round the magnet, as iron filings draw it.
-      seedLatex: String.raw`\frac{e^{-0.1\left(x^{2}+y^{2}+z^{2}\right)}}{1+e^{-4\left(\sqrt{x^{2}+y^{2}+z^{2}}-1.3\right)}}`,
+      xLatex: MAGNET_3D.x,
+      yLatex: MAGNET_3D.y,
+      zLatex: MAGNET_3D.z,
+      // Released everywhere, thinning outward, so the loops close to the
+      // centre are drawn too.
+      seedLatex: String.raw`e^{-0.1${R3}}`,
       look: {
         particles: 18_000,
         speed: 0.3,
@@ -62,7 +72,9 @@ export const FIELDS: readonly GalleryPreset[] = [
         opacity: 0.14,
         glow: 0.08,
         normalizeSpeed: true,
-        absorb: true,
+        // Not a sink: absorbing where the field is strong cut a hole round
+        // the centre, where a dipole's loops are smallest.
+        absorb: false,
         colorMode: "speed",
         backdrop: "#02030a",
         backdropOpacity: 1,
