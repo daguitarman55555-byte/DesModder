@@ -27,6 +27,14 @@ const COMMAND_AT_START = /^\\([A-Za-z]+)/;
 export const canonicalIdentifier = (name: string) =>
   name.replace(/_\{([A-Za-z0-9]*)\}/, "_$1");
 
+/**
+ * A canonical name back as Desmos LaTeX, braced: `s_arrow` is `s_{arrow}`.
+ * Desmos reads the unbraced `s_arrow` as s with subscript a, times r, r, o
+ * and w, so a value watched under it was never the slider's.
+ */
+export const identifierLatex = (name: string) =>
+  name.replace(/_([A-Za-z0-9]+)$/, "_{$1}");
+
 /** Where one identifier sits in the source, and what it is called. */
 export interface IdentifierOccurrence {
   /** Canonical name. */

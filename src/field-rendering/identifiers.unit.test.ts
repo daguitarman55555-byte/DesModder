@@ -1,5 +1,6 @@
 import {
   canonicalIdentifier,
+  identifierLatex,
   identifierNames,
   mentions,
   renameIdentifier,
@@ -64,5 +65,18 @@ describe("Vector Tools identifier scanning", () => {
     expect(renameIdentifier(latex, "t", "s")).toBe(
       "\\left\\{s>0\\right\\}\\ s"
     );
+  });
+});
+
+describe("a canonical name back as Desmos LaTeX", () => {
+  test("braces any subscript, so a long one stays one name", () => {
+    expect(identifierLatex("s_arrow")).toBe("s_{arrow}");
+    expect(identifierLatex("q_1")).toBe("q_{1}");
+    expect(identifierLatex("d")).toBe("d");
+  });
+
+  test("is the inverse of canonicalIdentifier", () => {
+    for (const name of ["s_{arrow}", "q_{1}", "d", "V_{x1}"])
+      expect(identifierLatex(canonicalIdentifier(name))).toBe(name);
   });
 });

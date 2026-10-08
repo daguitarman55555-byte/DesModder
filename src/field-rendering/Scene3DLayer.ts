@@ -42,8 +42,11 @@ const GRAB_RADIUS_PX = 16;
 export class Scene3DLayer {
   private layer?: HTMLDivElement;
   /** The camera the names were last placed for, to see when it moves. */
-  private placedFor = "";
+  private placedFor: number[] = [];
   private watch?: number;
+  /** Where the drag has reached and not yet been moved to: one a frame. */
+  private pendingMove?: Vec3;
+  private moveFrame?: number;
   private names: readonly SceneName3D[] = [];
   private probe?: SceneProbe3D;
   private frame?: number;
@@ -78,7 +81,8 @@ export class Scene3DLayer {
     this.frame = undefined;
     if (this.watch !== undefined) cancelAnimationFrame(this.watch);
     this.watch = undefined;
-    this.placedFor = "";
+    this.placedFor = [];
+    this.endDrag();
     const parent = this.layer?.parentElement;
     parent?.removeEventListener("pointerdown", this.onPointerDown, true);
     this.layer?.remove();
@@ -121,17 +125,11 @@ export class Scene3DLayer {
     this.watch = requestAnimationFrame(() => {
       if (this.layer === undefined) return;
       const camera = this.currentCamera();
-      const key =
-        camera === undefined
-          ? ""
-          : [
-              ...camera.world,
-              ...camera.view,
-              ...camera.projection,
-              camera.width,
-              camera.height,
-            ].join();
-      if (key !== this.placedFor) this.draw();
+      if (
+        camera !== undefined &&
+        !sameNumbers(cameraNumbers(camera), this.placedFor)
+      )
+        this.draw();
       this.watchCamera();
     });
   }
@@ -144,13 +142,7 @@ export class Scene3DLayer {
     const { layer } = this;
     const camera = this.currentCamera();
     if (layer === undefined || camera === undefined) return;
-    this.placedFor = [
-      ...camera.world,
-      ...camera.view,
-      ...camera.projection,
-      camera.width,
-      camera.height,
-    ].join();
+    this.placedFor = cameraNumbers(camera);
     const canvas = webglCanvasOf(this.grapher);
     if (canvas != null) {
       // On the canvas's corner, measured on screen: the canvas and the layer
@@ -242,22 +234,58 @@ export class Scene3DLayer {
         ],
         normal
       ) / denom;
-    this.probe?.move([
+    // Moved on the next frame, to wherever the pointer has got by then: the
+    // pointer reports faster than Desmos can recompute the graph.
+    this.pendingMove = [
       ray.from[0] + s * ray.direction[0],
       ray.from[1] + s * ray.direction[1],
       ray.from[2] + s * ray.direction[2],
-    ]);
+    ];
+    this.moveFrame ??= requestAnimationFrame(() => {
+      this.moveFrame = undefined;
+      const to = this.pendingMove;
+      this.pendingMove = undefined;
+      if (to !== undefined) this.probe?.move(to);
+    });
   };
 
   private readonly onPointerUp = (event: PointerEvent) => {
     if (this.drag === undefined || event.pointerId !== this.drag.pointer)
       return;
     event.stopPropagation();
+    this.endDrag();
+  };
+
+  /** Lets go, also when the layer stops mid-drag: no listener left behind. */
+  private endDrag() {
     this.drag = undefined;
     window.removeEventListener("pointermove", this.onPointerMove, true);
     window.removeEventListener("pointerup", this.onPointerUp, true);
     window.removeEventListener("pointercancel", this.onPointerUp, true);
-  };
+    // The last place the pointer reached still counts.
+    if (this.moveFrame !== undefined) cancelAnimationFrame(this.moveFrame);
+    this.moveFrame = undefined;
+    const to = this.pendingMove;
+    this.pendingMove = undefined;
+    if (to !== undefined) this.probe?.move(to);
+  }
+}
+
+/** A camera as the numbers that place a point on screen. */
+function cameraNumbers(camera: Camera3D) {
+  return [
+    ...camera.world,
+    ...camera.view,
+    ...camera.projection,
+    camera.width,
+    camera.height,
+  ];
+}
+
+function sameNumbers(a: readonly number[], b: readonly number[]) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }
 
 function nameElement() {

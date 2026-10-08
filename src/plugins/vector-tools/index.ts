@@ -106,6 +106,7 @@ import {
 } from "../../field-rendering/latexToGLSL";
 import {
   canonicalIdentifier,
+  identifierLatex,
   mentions,
 } from "../../field-rendering/identifiers";
 import type { FieldEnvironment } from "../../field-rendering/latexToGLSL";
@@ -829,6 +830,9 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.refreshEnvironment();
     this.syncClock();
     this.syncContrast();
+    // A graph opened with a preset already loaded: its 3D names and probe
+    // drag, which otherwise waited for the first change of a setting.
+    this.syncScene3D();
   }
 
   // ---- the animation clock -------------------------------------------------
@@ -1127,7 +1131,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       let helper = this.parameterHelpers.get(name);
       if (helper === undefined) {
         helper = this.calc.HelperExpression({
-          latex: name,
+          latex: identifierLatex(name),
         }) as unknown as ValueHelper;
         // A slider being dragged reports through here rather than through the
         // expression list, so this is what keeps the picture moving with it.
@@ -1170,11 +1174,18 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   private pushParameterValues() {
     const values = new Map<string, number>();
     const sliders = sliderValues(this.cc.getAllItemModels());
+    let changed = false;
     for (const [name, helper] of this.parameterHelpers) {
       // A slider's number from the list, which is never behind; anything
       // else, a value Desmos works out, from its watcher.
-      values.set(name, sliders.get(name) ?? helper.numericValue);
+      const value = sliders.get(name) ?? helper.numericValue;
+      values.set(name, value);
+      if (!Object.is(this.graphParameterValues.get(name), value))
+        changed = true;
     }
+    // Every graph event asks for this, most of them changing no value: the
+    // renderers and the panel are only woken when one did.
+    if (!changed) return;
     this.setParameterValues(values);
     // A slider dragged in the expression list moves the presets window's
     // copy of it too.
@@ -1456,12 +1467,11 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       backdropOpacity: s.backdropOpacity,
       // The flow's own colours, as in 2D: its palette and scheme are the
       // Colour tab's flow half.
-      colorMode: config.flow.colorMode,
+      // What 2D draws with, the match with the arrows included: read raw,
+      // a flow following the arrows was told By a formula with no formula.
+      ...effectiveFlowColor(config),
       tintScale: config.flow.tintScale,
-      palette: config.flow.palette,
       fixedColor: this.fixedInk(config, 3),
-      saturation: config.flow.saturation,
-      contrast: config.flow.contrast,
       scale: shared.scale,
       fog: s.fog,
       clip: s.clip,
@@ -1791,11 +1801,13 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
                 : undefined;
             },
             move: (to: readonly [number, number, number]) => {
-              drag.forEach((name, i) =>
-                this.calc.setExpression({
+              // One update for all three: three made Desmos recompute the
+              // graph three times a move.
+              this.calc.setExpressions(
+                drag.map((name, i) => ({
                   id: presetVariableID(name),
                   latex: `${name}=${Math.round(to[i] * 100) / 100}`,
-                })
+                }))
               );
             },
           };
