@@ -227,11 +227,19 @@ const LINES_3D = {
 
 /**
  * For a field the same all along z — long wires, a long cylinder, long
- * plates — matter in three thin slices across it: filling the box drew its
- * lines over each other into a fog, where a few slices show them as the
- * figure in the textbook does, at three depths.
+ * plates — matter in one connected piece, along a length |z| < 2.5 with soft
+ * ends, and only where the field's structure is: a tube of rings round each
+ * wire, a sheet hugging the cylinder, the gap and the fringes of the plates.
+ * So each reads as one long object. Three thin slices across it read as
+ * three stacked copies; the whole box, as fog.
  */
-const SLICES = String.raw`e^{-8z^{2}}+e^{-8\left(z-2.5\right)^{2}}+e^{-8\left(z+2.5\right)^{2}}`;
+const ALONG = String.raw`\frac{1}{1+e^{3\left(\left|z\right|-2.5\right)}}`;
+/** Rings round each wire, a little way out from it. */
+const WIRE_TUBES = String.raw`\left(e^{-4\left(\sqrt{\left(x+\frac{d}{2}\right)^{2}+y^{2}}-0.9\right)^{2}}+e^{-4\left(\sqrt{\left(x-\frac{d}{2}\right)^{2}+y^{2}}-0.9\right)^{2}}\right)${ALONG}`;
+/** A sheet of the stream hugging the cylinder's surface. */
+const CYLINDER_SHEET = String.raw`e^{-\frac{\left(\sqrt{x^{2}+y^{2}}-1.25R\right)^{2}}{0.08R^{2}}}${ALONG}`;
+/** The gap between the plates and the fringes round their ends. */
+const PLATE_GAP = String.raw`\frac{e^{-\frac{y^{2}}{d^{2}}}}{1+e^{3\left(\left|x\right|-L-1\right)}}${ALONG}`;
 
 const v = (
   name: string,
@@ -294,7 +302,7 @@ export const PHYSICS: readonly GalleryPreset[] = [
       xLatex: WIRES.x,
       yLatex: WIRES.y,
       zLatex: WIRES.z,
-      seedLatex: SLICES,
+      seedLatex: WIRE_TUBES,
       variables: [
         v("I_{1}", 1, -5, 5),
         v("I_{2}", 1, -5, 5),
@@ -364,7 +372,7 @@ export const PHYSICS: readonly GalleryPreset[] = [
       xLatex: CYLINDER.x,
       yLatex: CYLINDER.y,
       zLatex: CYLINDER.z,
-      seedLatex: SLICES,
+      seedLatex: CYLINDER_SHEET,
       variables: [v("U", 1, 0, 3), v("R", 1.5, 0.3, 3), v("w", 0.4, -2, 2)],
       look: {
         palette: "ocean",
@@ -402,7 +410,7 @@ export const PHYSICS: readonly GalleryPreset[] = [
       xLatex: CAPACITOR.x,
       yLatex: CAPACITOR.y,
       zLatex: CAPACITOR.z,
-      seedLatex: SLICES,
+      seedLatex: PLATE_GAP,
       variables: [v("s", 1, -3, 3), v("L", 2.5, 0.5, 5), v("d", 2, 0.5, 6)],
       look: { ...LINES_3D, palette: "ember", backdrop: "#07030a" },
     },

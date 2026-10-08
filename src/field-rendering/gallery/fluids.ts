@@ -96,12 +96,17 @@ export const FLUIDS: readonly GalleryPreset[] = [
     space: {
       blurb:
         "The 3D Taylor–Green vortex, the standard start of a turbulence simulation: cells that turn one way above and the other way below. It rides a steady current, so the cells sweep past.",
-      xLatex: String.raw`0.5+\sin\left(x-0.5t\right)\cos\left(y\right)\cos\left(z\right)`,
-      yLatex: String.raw`-\cos\left(x-0.5t\right)\sin\left(y\right)\cos\left(z\right)`,
+      // The same in every plane across z: each vortex a tube through the
+      // box. A factor cos z made the flow strong in three layers and dead
+      // between them, which drew as three stacked copies of the lattice.
+      xLatex: String.raw`0.5+\sin\left(x-0.5t\right)\cos\left(y\right)`,
+      yLatex: String.raw`-\cos\left(x-0.5t\right)\sin\left(y\right)`,
       zLatex: String.raw`0`,
       // Three thin layers, at z = 0 and ±π, where the flow is strongest
       // and turns opposite ways; w = 0 keeps each particle in its layer.
-      seedLatex: String.raw`e^{-\frac{z^{2}}{0.08}}+e^{-\frac{\left(z-3.1416\right)^{2}}{0.08}}+e^{-\frac{\left(z+3.1416\right)^{2}}{0.08}}`,
+      // One sheet of the lattice: the cells are the same at every depth, so
+      // one layer shows them, where filling the box hid them in each other.
+      seedLatex: String.raw`e^{-\frac{z^{2}}{0.1}}`,
       look: {
         particles: 40_000,
         speed: 0.3,
