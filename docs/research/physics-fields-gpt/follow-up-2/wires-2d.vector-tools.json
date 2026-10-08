@@ -1,0 +1,68 @@
+{
+  "format": "Deep partial VectorFieldConfig, merge into fresh defaults; activate flow separately",
+  "sourceCommit": "36d92870",
+  "seedStartingPoint": "WIRE_TUBES",
+  "patch": {
+    "source": "components",
+    "components": {
+      "xLatex": "\\left\\{1=1:f_{WVT1}(x,y)\\right\\}",
+      "yLatex": "\\left\\{1=1:g_{WVT1}(x,y)\\right\\}",
+      "zLatex": "0"
+    },
+    "arrowMode": "off",
+    "overlayLayer": "under",
+    "color": {
+      "fixedColor": "#29486b",
+      "saturation": 1,
+      "contrast": 1
+    },
+    "flow": {
+      "particleCount": 16000,
+      "speed": 0.35,
+      "opacity": 0.25,
+      "trailPersistence": 0.88,
+      "dropRate": 0.025,
+      "pointSize": 1.5,
+      "normalizeSpeed": true,
+      "glow": 0,
+      "glowEnabled": false,
+      "backdropEnabled": false,
+      "backdropOpacity": 0,
+      "colorMode": "fixed",
+      "saturation": 1,
+      "contrast": 1,
+      "seedOn": true,
+      "seedLatex": "\\left\\{1=1:\\min(1,\\left(e^{-4\\left(\\sqrt{\\left(x+\\frac{d}{2}\\right)^{2}+y^{2}}-0.9\\right)^{2}}+e^{-4\\left(\\sqrt{\\left(x-\\frac{d}{2}\\right)^{2}+y^{2}}-0.9\\right)^{2}}\\right)\\frac{1}{1+e^{3\\left(\\left|0\\right|-2.5\\right)}}),0\\right\\}",
+      "lens": false
+    },
+    "space3d": {
+      "flowLook": "particles",
+      "particlesAuto": false,
+      "particles": 20000,
+      "particleSpeed": 0.18,
+      "particleNormalize": true,
+      "particleTrail": 16,
+      "particleLifetime": 3,
+      "particleOpacity": 0.2,
+      "particleGlow": 0,
+      "particlePx": 1.5,
+      "particleAbsorb": false,
+      "backdrop": false,
+      "backdropOpacity": 0,
+      "occlusion": "hide",
+      "seedLatex": "\\left\\{1=1:\\min(1,\\left(e^{-4\\left(\\sqrt{\\left(x+\\frac{d}{2}\\right)^{2}+y^{2}}-0.9\\right)^{2}}+e^{-4\\left(\\sqrt{\\left(x-\\frac{d}{2}\\right)^{2}+y^{2}}-0.9\\right)^{2}}\\right)\\frac{1}{1+e^{3\\left(\\left|0\\right|-2.5\\right)}}),0\\right\\}",
+      "lens": false
+    },
+    "time": {
+      "playing": false,
+      "speed": 1
+    }
+  },
+  "presentation": {
+    "writing": false,
+    "nativeProbe": true,
+    "probeNames": false,
+    "gpuProbe": "optional backend from B1; same vector and gain"
+  },
+  "verification": "Structurally and compiler checked; not live imported or rendered"
+}

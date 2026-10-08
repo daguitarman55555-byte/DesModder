@@ -1,4 +1,4 @@
-import { figureEight, keplerPair } from "./orbits";
+import { eightOrbitClosure, figureEight, keplerPair } from "./orbits";
 
 /** The derivative of f at t by a centred difference, for each body. */
 function rate(f: (t: number) => number[], t: number, h = 1e-4) {
@@ -11,6 +11,12 @@ describe("the figure eight, integrated", () => {
   const w = 0.6;
   const size = 6;
   const period = (2 * Math.PI) / w;
+
+  test("the integration itself ends where it began, after one period", () => {
+    // Not the wrapped phase, which comes back by construction: the RK4 run's
+    // own last state against its first.
+    expect(eightOrbitClosure()).toBeLessThan(1e-6);
+  });
 
   test("comes back to where it started after one period", () => {
     const start = figureEight(0, w, size);
@@ -27,9 +33,9 @@ describe("the figure eight, integrated", () => {
       const vx = rate((u) => figureEight(u, w, size).x, t);
       const vy = rate((u) => figureEight(u, w, size).y, t);
       for (let i = 0; i < 3; i++) {
-        // Linear interpolation of 4,096 samples: about 1e−2 of a speed of ~5.
-        expect(Math.abs(vx[i] - s.vx[i])).toBeLessThan(0.05);
-        expect(Math.abs(vy[i] - s.vy[i])).toBeLessThan(0.05);
+        // The velocity is the interpolating curve's own derivative.
+        expect(Math.abs(vx[i] - s.vx[i])).toBeLessThan(1e-5);
+        expect(Math.abs(vy[i] - s.vy[i])).toBeLessThan(1e-5);
       }
     }
   });
@@ -71,5 +77,18 @@ describe("the Kepler pair", () => {
     }
     expect(near).toBeCloseTo(o.a * (1 - o.e), 2);
     expect(far).toBeCloseTo(o.a * (1 + o.e), 2);
+  });
+
+  test("solves Kepler's equation at high eccentricity and long times", () => {
+    // e = 0.99 at t = 100 once left a residual of 0.38 radians.
+    const high = { a: 7.5, e: 0.99, n: 0.4, ratio: 0.45 };
+    for (const t of [0, 3.3, 100, 1234.5, 1e5]) {
+      const s = keplerPair(t, high);
+      const r = Math.hypot(s.x[1] - s.x[0], s.y[1] - s.y[0]);
+      expect(r).toBeGreaterThanOrEqual(high.a * (1 - high.e) - 1e-9);
+      expect(r).toBeLessThanOrEqual(high.a * (1 + high.e) + 1e-9);
+      const v = rate((u) => keplerPair(u, high).x, t, 1e-6);
+      expect(v[1]).toBeCloseTo(s.vx[1], 2);
+    }
   });
 });

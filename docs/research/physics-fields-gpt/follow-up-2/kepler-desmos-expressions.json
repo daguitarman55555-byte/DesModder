@@ -1,0 +1,30 @@
+{
+  "status": "Eight fixed Newton steps, supported teaching range 0<=e<=0.6; use identical reduced phase and recurrence in JS",
+  "latex": [
+    "T_{K}=0",
+    "a_{K}=4.2",
+    "e_{K}=0.3",
+    "n_{K}=0.4",
+    "r_{K}=0.45",
+    "M_{K}=n_{K}T_{K}-2\\pi\\operatorname{floor}(n_{K}T_{K}/(2\\pi))",
+    "E_{K0}=M_{K}",
+    "E_{K1}=E_{K0}-\\frac{E_{K0}-e_{K}\\sin(E_{K0})-M_{K}}{1-e_{K}\\cos(E_{K0})}",
+    "E_{K2}=E_{K1}-\\frac{E_{K1}-e_{K}\\sin(E_{K1})-M_{K}}{1-e_{K}\\cos(E_{K1})}",
+    "E_{K3}=E_{K2}-\\frac{E_{K2}-e_{K}\\sin(E_{K2})-M_{K}}{1-e_{K}\\cos(E_{K2})}",
+    "E_{K4}=E_{K3}-\\frac{E_{K3}-e_{K}\\sin(E_{K3})-M_{K}}{1-e_{K}\\cos(E_{K3})}",
+    "E_{K5}=E_{K4}-\\frac{E_{K4}-e_{K}\\sin(E_{K4})-M_{K}}{1-e_{K}\\cos(E_{K4})}",
+    "E_{K6}=E_{K5}-\\frac{E_{K5}-e_{K}\\sin(E_{K5})-M_{K}}{1-e_{K}\\cos(E_{K5})}",
+    "E_{K7}=E_{K6}-\\frac{E_{K6}-e_{K}\\sin(E_{K6})-M_{K}}{1-e_{K}\\cos(E_{K6})}",
+    "E_{K8}=E_{K7}-\\frac{E_{K7}-e_{K}\\sin(E_{K7})-M_{K}}{1-e_{K}\\cos(E_{K7})}",
+    "x_{K}=a_{K}(\\cos(E_{K8})-e_{K})",
+    "y_{K}=a_{K}\\sqrt{1-e_{K}^{2}}\\sin(E_{K8})",
+    "D_{K}=n_{K}/(1-e_{K}\\cos(E_{K8}))",
+    "u_{K}=-a_{K}\\sin(E_{K8})D_{K}",
+    "v_{K}=a_{K}\\sqrt{1-e_{K}^{2}}\\cos(E_{K8})D_{K}",
+    "Q_{K1}=(-r_{K}x_{K}/(1+r_{K}),-r_{K}y_{K}/(1+r_{K}))",
+    "Q_{K2}=(x_{K}/(1+r_{K}),y_{K}/(1+r_{K}))",
+    "A_{K}=0.35",
+    "P_{K1}=(Q_{K1}.x,Q_{K1}.y\\cos(A_{K}),Q_{K1}.y\\sin(A_{K}))",
+    "P_{K2}=(Q_{K2}.x,Q_{K2}.y\\cos(A_{K}),Q_{K2}.y\\sin(A_{K}))"
+  ]
+}

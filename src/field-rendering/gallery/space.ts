@@ -477,7 +477,7 @@ export const SPACE: readonly GalleryPreset[] = [
     name: "Three-body eight",
     category: "space",
     blurb:
-      "Three equal stars on the figure-eight orbit, the one stable way found for three bodies to share a single path (Chenciner and Montgomery, 2000), each a third of an orbit behind the next. Each carries a cluster of glowing gas, and their trails draw the eight.",
+      "Three equal stars on the figure-eight orbit, the well-known choreography in which three equal masses share a single path (Chenciner and Montgomery, 2000), each a third of an orbit behind the next. Each carries a cluster of glowing gas, and their trails draw the eight.",
     xLatex: CLUSTER_2D.x!,
     yLatex: CLUSTER_2D.y!,
     seedLatex: CLUSTER_2D.seed,

@@ -1,0 +1,120 @@
+{
+  "runtime": "v24.19.0",
+  "scope": "Node V8, not a browser run",
+  "results": [
+    {
+      "id": "3d-20261009",
+      "coarse": {
+        "collision_time": 51.85830115031478,
+        "collision_pair": [2, 0],
+        "max_relative_energy_error": 0.0000759287886078103,
+        "steps": 10396
+      },
+      "fine": {
+        "collision_time": 51.85347992328356,
+        "collision_pair": [2, 0],
+        "max_relative_energy_error": 0.000060409666879318156,
+        "steps": 20744
+      },
+      "coarseTimeDifference": 4.249045559845399e-12,
+      "fineTimeDifference": 5.613287612504791e-13,
+      "passesReference": true,
+      "elapsedMs": 160.3983
+    },
+    {
+      "id": "3d-20261026",
+      "coarse": {
+        "collision_time": 46.29618424818653,
+        "collision_pair": [1, 0],
+        "max_relative_energy_error": 0.0010915200423444753,
+        "steps": 9319
+      },
+      "fine": {
+        "collision_time": 46.29632788275324,
+        "collision_pair": [1, 0],
+        "max_relative_energy_error": 0.00029616984697414744,
+        "steps": 18523
+      },
+      "coarseTimeDifference": 7.815970093361102e-14,
+      "fineTimeDifference": 1.2789769243681803e-13,
+      "passesReference": true,
+      "elapsedMs": 78.15180000000001
+    },
+    {
+      "id": "3d-20261030",
+      "coarse": {
+        "collision_time": 68.68588683418079,
+        "collision_pair": [2, 1],
+        "max_relative_energy_error": 0.00020056323661949853,
+        "steps": 13766
+      },
+      "fine": {
+        "collision_time": 68.66441513058017,
+        "collision_pair": [2, 1],
+        "max_relative_energy_error": 0.00006086335112854882,
+        "steps": 27470
+      },
+      "coarseTimeDifference": 1.2875034371973015e-11,
+      "fineTimeDifference": 1.1667111721180845e-11,
+      "passesReference": true,
+      "elapsedMs": 109.46610000000004
+    },
+    {
+      "id": "2d-20261009",
+      "coarse": {
+        "collision_time": 59.67463289438095,
+        "collision_pair": [2, 1],
+        "max_relative_energy_error": 0.0007102991015198273,
+        "steps": 12017
+      },
+      "fine": {
+        "collision_time": 59.68037889880367,
+        "collision_pair": [2, 1],
+        "max_relative_energy_error": 0.00011987867071792997,
+        "steps": 23893
+      },
+      "coarseTimeDifference": 0,
+      "fineTimeDifference": 0,
+      "passesReference": true,
+      "elapsedMs": 98.99580000000003
+    },
+    {
+      "id": "2d-20261026",
+      "coarse": {
+        "collision_time": 46.003025805798956,
+        "collision_pair": [1, 0],
+        "max_relative_energy_error": 0.00024864378599453866,
+        "steps": 9262
+      },
+      "fine": {
+        "collision_time": 46.00216566679237,
+        "collision_pair": [1, 0],
+        "max_relative_energy_error": 0.001250318580778484,
+        "steps": 18406
+      },
+      "coarseTimeDifference": 7.105427357601002e-15,
+      "fineTimeDifference": 0,
+      "passesReference": true,
+      "elapsedMs": 72.07530000000003
+    },
+    {
+      "id": "2d-20261028",
+      "coarse": {
+        "collision_time": 41.372131132620176,
+        "collision_pair": [2, 0],
+        "max_relative_energy_error": 0.00006853317266686283,
+        "steps": 8297
+      },
+      "fine": {
+        "collision_time": 41.37500663066144,
+        "collision_pair": [2, 0],
+        "max_relative_energy_error": 0.00006025380932249031,
+        "steps": 16555
+      },
+      "coarseTimeDifference": 0,
+      "fineTimeDifference": 0,
+      "passesReference": true,
+      "elapsedMs": 65.48259999999993
+    }
+  ]
+}

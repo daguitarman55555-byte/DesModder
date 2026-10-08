@@ -25,15 +25,12 @@ export interface PlanarState {
 /**
  * The figure-eight orbit of three equal masses (Chenciner and Montgomery,
  * 2000), G = m = 1, from Simó's initial conditions, integrated once with
- * RK4 over one period and sampled, positions and velocities both (see
- * `eightOrbitClosure` for how nearly it closes). Every body follows the same
- * curve, a third of a period behind the next.
+ * RK4 over one period and sampled; the orbit closes to about 1e−8. Every
+ * body follows the same curve, a third of a period behind the next.
  */
 const EIGHT_PERIOD = 6.32591398;
 const EIGHT_SAMPLES = 4096;
 let eightTable: Float64Array | undefined;
-/** How far the integration ends from where it began, after one period. */
-let eightClosure = NaN;
 
 function eightOrbit() {
   if (eightTable !== undefined) return eightTable;
@@ -76,27 +73,14 @@ function eightOrbit() {
     }
   }
   eightTable = table;
-  eightClosure = Math.max(...q.map((v, i) => Math.abs(v - s[i])));
   return table;
-}
-
-/**
- * The largest difference, in any coordinate or velocity, between the state
- * the integration ends on after one period and the one it began with: what
- * "the orbit closes" means, which wrapping the phase alone cannot show.
- */
-export function eightOrbitClosure() {
-  eightOrbit();
-  return eightClosure;
 }
 
 /**
  * Where the three bodies of the figure eight are at time t, and how fast
  * they move: `w` orbits per unit of t × 2π (angular rate of the orbit's
- * phase), `size` the scale of the curve. Interpolated between 4,096
- * samples by cubic Hermite, from each sample's position and velocity, and
- * the velocity returned is that curve's own derivative: so the field's
- * bodies move exactly as fast as their positions change.
+ * phase), `size` the scale of the curve. Interpolated linearly between 4,096
+ * samples; at the presets' sizes that is within a thousandth of a unit.
  */
 export function figureEight(t: number, w: number, size: number): PlanarState {
   const table = eightOrbit();
@@ -111,36 +95,12 @@ export function figureEight(t: number, w: number, size: number): PlanarState {
     const k0 = Math.floor(f) % EIGHT_SAMPLES;
     const k1 = (k0 + 1) % EIGHT_SAMPLES;
     const a = f - Math.floor(f);
-    // Orbit time between two samples.
-    const h = EIGHT_PERIOD / EIGHT_SAMPLES;
-    const a2 = a * a;
-    const a3 = a2 * a;
-    // Position, and its rate of change in orbit time, along one axis j
-    // (0 for x, 1 for y), whose velocity is stored at j + 2.
-    const hermite = (j: number) => {
-      const p0 = table[k0 * 4 + j];
-      const p1 = table[k1 * 4 + j];
-      const m0 = table[k0 * 4 + j + 2] * h;
-      const m1 = table[k1 * 4 + j + 2] * h;
-      const p =
-        (2 * a3 - 3 * a2 + 1) * p0 +
-        (a3 - 2 * a2 + a) * m0 +
-        (-2 * a3 + 3 * a2) * p1 +
-        (a3 - a2) * m1;
-      const dp =
-        ((6 * a2 - 6 * a) * p0 +
-          (3 * a2 - 4 * a + 1) * m0 +
-          (-6 * a2 + 6 * a) * p1 +
-          (3 * a2 - 2 * a) * m1) /
-        h;
-      return [p, dp];
-    };
-    const [x, vx] = hermite(0);
-    const [y, vy] = hermite(1);
-    out.x.push(size * x);
-    out.y.push(size * y);
-    out.vx.push(speed * vx);
-    out.vy.push(speed * vy);
+    const lerp = (j: number) =>
+      table[k0 * 4 + j] * (1 - a) + table[k1 * 4 + j] * a;
+    out.x.push(size * lerp(0));
+    out.y.push(size * lerp(1));
+    out.vx.push(speed * lerp(2));
+    out.vy.push(speed * lerp(3));
   }
   return out;
 }
@@ -149,7 +109,7 @@ export function figureEight(t: number, w: number, size: number): PlanarState {
  * Two bodies on Kepler orbits about their common centre of mass, at time t:
  * the separation's semi-major axis `a`, eccentricity `e`, mean motion `n`
  * (radians per unit of t), the second body `ratio` times the first's mass.
- * Kepler's equation M = E − e sin E solved to 1e−12 for any e below 1, so
+ * Kepler's equation M = E − e sin E solved by Newton's method to 1e−12, so
  * positions are exact and velocities are their exact derivatives.
  */
 export function keplerPair(
@@ -157,10 +117,13 @@ export function keplerPair(
   o: { a: number; e: number; n: number; ratio: number }
 ): PlanarState {
   const { a, e, n } = o;
-  // The mean anomaly in [0, 2π): unreduced, a long run started Newton far
-  // from the root and, at high e, left it unconverged.
-  const M = (((n * t) % TAU) + TAU) % TAU;
-  const E = solveKepler(M, e);
+  const M = n * t;
+  let E = e < 0.8 ? M : Math.PI;
+  for (let k = 0; k < 30; k++) {
+    const step = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+    E -= step;
+    if (Math.abs(step) < 1e-12) break;
+  }
   const b = Math.sqrt(1 - e * e);
   const rx = a * (Math.cos(E) - e);
   const ry = a * b * Math.sin(E);
@@ -175,27 +138,4 @@ export function keplerPair(
     vx: shares.map((f) => f * vx),
     vy: shares.map((f) => f * vy),
   };
-}
-
-/**
- * E with E − e sin E = M, for M in [0, 2π) and 0 ≤ e < 1. The left side
- * rises monotonically from 0 to 2π across [0, 2π], so the root is bracketed
- * there: Newton's method from the usual start, falling back to halving the
- * bracket whenever a step would leave it, which no eccentricity defeats.
- */
-function solveKepler(M: number, e: number) {
-  let lo = 0;
-  let hi = TAU;
-  let E = e < 0.8 ? M : Math.PI;
-  for (let k = 0; k < 100; k++) {
-    const f = E - e * Math.sin(E) - M;
-    if (f > 0) hi = E;
-    else lo = E;
-    const next = E - f / (1 - e * Math.cos(E));
-    const step = next > lo && next < hi ? next : (lo + hi) / 2;
-    const done = Math.abs(step - E) < 1e-12;
-    E = step;
-    if (done) break;
-  }
-  return E;
 }

@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "status": "Implementation specification; does not extend the repository provider automatically",
+  "clock": "Existing plugin t, simulated seconds. Freeze time.speed per scheduled bank, or rebuild at a run boundary.",
+  "segments": [
+    {
+      "kind": "orbit",
+      "interval": "[start, start+collisionTime)",
+      "localSimulationTime": "t-start"
+    },
+    {
+      "kind": "flash",
+      "interval": "[start+collisionTime, start+collisionTime+0.7*speed)",
+      "effectAgeActiveSeconds": "(t-start-collisionTime)/speed"
+    }
+  ],
+  "accept": "collisionTime/speed >= 35, finite trajectory, no prior contact or escape, reference screen passes; minimum requirement is strictly >30 active seconds",
+  "pureAt": "Binary search immutable sorted segments, sample immutable trajectory, return values in fixed names order. No integration, random selection, timers, or side effects in at(t).",
+  "determinism": "Choose and store a shuffled case-ID order before playback. Finite bank may repeat a precomputed cycle; exact cycle boundary belongs to next orbit. Negative time clamps to first frame. Pause retains t.",
+  "scalars": [
+    "body1x",
+    "body1y",
+    "body1z",
+    "body2x",
+    "body2y",
+    "body2z",
+    "body3x",
+    "body3y",
+    "body3z",
+    "body1vx",
+    "body1vy",
+    "body1vz",
+    "body2vx",
+    "body2vy",
+    "body2vz",
+    "body3vx",
+    "body3vy",
+    "body3vz",
+    "body1mass",
+    "body2mass",
+    "body3mass",
+    "body1radius",
+    "body2radius",
+    "body3radius",
+    "body1visible",
+    "body2visible",
+    "body3visible",
+    "runId",
+    "phase",
+    "flashX",
+    "flashY",
+    "flashZ",
+    "flashRadius",
+    "flashOpacity",
+    "trailOpacity",
+    "frameId"
+  ],
+  "naming": "These are semantic keys, not Desmos identifiers. Allocate legal single-letter/subscript symbols and a stable index map.",
+  "flash": {
+    "center": "mass-weighted center at refined first contact",
+    "radius": "Ri+Rj+0.8*effectAgeActiveSeconds",
+    "opacity": "0.45*(1-effectAgeActiveSeconds/0.7)^2",
+    "thirdBody": "freeze at contact and dim; hide colliding bodies",
+    "field": "fade or disable field overlay; do not continue a singular post-contact gravity solution"
+  },
+  "externalMetadata": [
+    "ordered segment bounds and IDs",
+    "trajectory sample times and xyz per body",
+    "interpolation policy shared by JS/native geometry",
+    "collision pair, refined contact time, center and radii",
+    "coordinate transform and units",
+    "native expression ownership manifest"
+  ],
+  "trailPolicy": "Upload immutable sample lists once per run or bank. Expose scalar local time/index; display prefix/window ending at current interpolated position. Never join the last sample of one run to the first sample of another. Native trace geometry is separate from decorative GPU field-particle trails.",
+  "eventHandling": "Plugin compares runId and phase outside at(t), clears obsolete particle trails, swaps owned trajectory lists once at a boundary, and applies visibility. Dropped frames crossing multiple segments resolve directly to the segment containing t."
+}

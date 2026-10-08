@@ -1,0 +1,10 @@
+{
+  "commit": "36d92870",
+  "originalExpandedSeeds": {
+    "ALONG": "\\frac{1}{1+e^{3\\left(\\left|z\\right|-2.5\\right)}}",
+    "WIRE_TUBES": "\\left(e^{-4\\left(\\sqrt{\\left(x+\\frac{d}{2}\\right)^{2}+y^{2}}-0.9\\right)^{2}}+e^{-4\\left(\\sqrt{\\left(x-\\frac{d}{2}\\right)^{2}+y^{2}}-0.9\\right)^{2}}\\right)\\frac{1}{1+e^{3\\left(\\left|z\\right|-2.5\\right)}}",
+    "CYLINDER_SHEET": "e^{-\\frac{\\left(\\sqrt{x^{2}+y^{2}}-1.25R\\right)^{2}}{0.08R^{2}}}\\frac{1}{1+e^{3\\left(\\left|z\\right|-2.5\\right)}}",
+    "PLATE_GAP": "\\frac{e^{-\\frac{y^{2}}{d^{2}}}}{1+e^{3\\left(\\left|x\\right|-L-1\\right)}}\\frac{1}{1+e^{3\\left(\\left|z\\right|-2.5\\right)}}"
+  },
+  "changes": "Namespace substitutions; clamp probability at 1; model-domain exclusions. 2D uses z=0."
+}

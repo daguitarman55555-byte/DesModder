@@ -1,0 +1,33 @@
+{
+  "runtime": "v24.19.0",
+  "scope": "Local Node V8 measurements, no Desmos calls or browser rendering",
+  "initMs": 81.41260000000001,
+  "warmEightUs": 0.18476399999999985,
+  "warmKeplerUs": 0.4165310000000002,
+  "maxComAtSize6": 0.0000011909761986534916,
+  "maxVelocityDerivativeErrorAtSize6": 0.006192590041058325,
+  "maxFixed8VsCurrentDifference": 9.339837026217146e-13,
+  "maxFixed8Residual": 8.881784197001252e-16,
+  "highEFailures": [
+    {
+      "e": 0.99,
+      "t": 100,
+      "residual": -0.3802965559897151
+    },
+    {
+      "e": 0.99,
+      "t": 1000,
+      "residual": 0.664490481957793
+    },
+    {
+      "e": 0.99,
+      "t": 10000,
+      "residual": 2.3921039570790508
+    },
+    {
+      "e": 0.99,
+      "t": 100000,
+      "residual": 2.4529282409881588
+    }
+  ]
+}

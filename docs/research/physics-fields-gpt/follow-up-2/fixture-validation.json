@@ -1,0 +1,205 @@
+{
+  "scope": "Scalar component and seed compiler checks, defined dependencies, unique IDs/definitions and folder references; no Desmos state import/render",
+  "results": [
+    {
+      "file": "bar-magnet-2d.state.json",
+      "slot": "xLatex",
+      "ok": true
+    },
+    {
+      "file": "bar-magnet-2d.state.json",
+      "slot": "yLatex",
+      "ok": true
+    },
+    {
+      "file": "bar-magnet-2d.state.json",
+      "slot": "zLatex",
+      "ok": true
+    },
+    {
+      "file": "bar-magnet-2d.state.json",
+      "slot": "seed",
+      "ok": true
+    },
+    {
+      "file": "bar-magnet-3d.state.json",
+      "slot": "xLatex",
+      "ok": true
+    },
+    {
+      "file": "bar-magnet-3d.state.json",
+      "slot": "yLatex",
+      "ok": true
+    },
+    {
+      "file": "bar-magnet-3d.state.json",
+      "slot": "zLatex",
+      "ok": true
+    },
+    {
+      "file": "bar-magnet-3d.state.json",
+      "slot": "seed",
+      "ok": true
+    },
+    {
+      "file": "capacitor-2d.state.json",
+      "slot": "xLatex",
+      "ok": true
+    },
+    {
+      "file": "capacitor-2d.state.json",
+      "slot": "yLatex",
+      "ok": true
+    },
+    {
+      "file": "capacitor-2d.state.json",
+      "slot": "zLatex",
+      "ok": true
+    },
+    {
+      "file": "capacitor-2d.state.json",
+      "slot": "seed",
+      "ok": true
+    },
+    {
+      "file": "capacitor-3d.state.json",
+      "slot": "xLatex",
+      "ok": true
+    },
+    {
+      "file": "capacitor-3d.state.json",
+      "slot": "yLatex",
+      "ok": true
+    },
+    {
+      "file": "capacitor-3d.state.json",
+      "slot": "zLatex",
+      "ok": true
+    },
+    {
+      "file": "capacitor-3d.state.json",
+      "slot": "seed",
+      "ok": true
+    },
+    {
+      "file": "cylinder-2d.state.json",
+      "slot": "xLatex",
+      "ok": true
+    },
+    {
+      "file": "cylinder-2d.state.json",
+      "slot": "yLatex",
+      "ok": true
+    },
+    {
+      "file": "cylinder-2d.state.json",
+      "slot": "zLatex",
+      "ok": true
+    },
+    {
+      "file": "cylinder-2d.state.json",
+      "slot": "seed",
+      "ok": true
+    },
+    {
+      "file": "cylinder-3d.state.json",
+      "slot": "xLatex",
+      "ok": true
+    },
+    {
+      "file": "cylinder-3d.state.json",
+      "slot": "yLatex",
+      "ok": true
+    },
+    {
+      "file": "cylinder-3d.state.json",
+      "slot": "zLatex",
+      "ok": true
+    },
+    {
+      "file": "cylinder-3d.state.json",
+      "slot": "seed",
+      "ok": true
+    },
+    {
+      "file": "earth-moon-2d.state.json",
+      "slot": "xLatex",
+      "ok": true
+    },
+    {
+      "file": "earth-moon-2d.state.json",
+      "slot": "yLatex",
+      "ok": true
+    },
+    {
+      "file": "earth-moon-2d.state.json",
+      "slot": "zLatex",
+      "ok": true
+    },
+    {
+      "file": "earth-moon-2d.state.json",
+      "slot": "seed",
+      "ok": true
+    },
+    {
+      "file": "earth-moon-3d.state.json",
+      "slot": "xLatex",
+      "ok": true
+    },
+    {
+      "file": "earth-moon-3d.state.json",
+      "slot": "yLatex",
+      "ok": true
+    },
+    {
+      "file": "earth-moon-3d.state.json",
+      "slot": "zLatex",
+      "ok": true
+    },
+    {
+      "file": "earth-moon-3d.state.json",
+      "slot": "seed",
+      "ok": true
+    },
+    {
+      "file": "wires-2d.state.json",
+      "slot": "xLatex",
+      "ok": true
+    },
+    {
+      "file": "wires-2d.state.json",
+      "slot": "yLatex",
+      "ok": true
+    },
+    {
+      "file": "wires-2d.state.json",
+      "slot": "zLatex",
+      "ok": true
+    },
+    {
+      "file": "wires-2d.state.json",
+      "slot": "seed",
+      "ok": true
+    },
+    {
+      "file": "wires-3d.state.json",
+      "slot": "xLatex",
+      "ok": true
+    },
+    {
+      "file": "wires-3d.state.json",
+      "slot": "yLatex",
+      "ok": true
+    },
+    {
+      "file": "wires-3d.state.json",
+      "slot": "zLatex",
+      "ok": true
+    },
+    {
+      "file": "wires-3d.state.json",
+      "slot": "seed",
+      "ok": true
+    }
+  ]
+}

@@ -784,15 +784,26 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
 
   /** Back to zero, whether or not the clock is running. */
   resetClock() {
-    this.clockSeconds = 0;
-    this.arrowOverlay.setTime(0);
-    this.flowOverlay.setTime(0);
-    this.arrow3d?.setTime(0);
-    this.volume3d?.setTime(0);
-    this.flow3d?.setTime(0);
-    this.traced3d?.setTime(0);
-    this.overlay3d.requestFrame();
+    this.showClockTime(0);
     this.util.tick();
+  }
+
+  /**
+   * Shows every renderer the same instant, the moving bodies included: a
+   * reset while paused has to move them back too, or the field shows t = 0
+   * round bodies left wherever they were.
+   */
+  private showClockTime(seconds: number) {
+    this.clockSeconds = seconds;
+    this.arrowOverlay.setTime(seconds);
+    this.flowOverlay.setTime(seconds);
+    this.arrow3d?.setTime(seconds);
+    this.volume3d?.setTime(seconds);
+    this.flow3d?.setTime(seconds);
+    this.traced3d?.setTime(seconds);
+    if (this.clockParameters !== undefined)
+      this.setParameterValues(this.graphParameterValues);
+    this.overlay3d.requestFrame();
   }
 
   /** Seconds on the clock, for the panel to show. */
@@ -826,18 +837,11 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     // Capped, because a backgrounded tab resumes with an enormous gap and an
     // uncapped step would teleport the field rather than animate it.
     const elapsed = Math.min(0.1, Math.max(0, (now - previous) / 1000));
-    this.clockSeconds += elapsed * this.getConfig().time.speed;
-    // One clock for both, so the arrows and the particles over them are always
+    // One clock for all, so the arrows and the particles over them are always
     // showing the same instant of the same field.
-    this.arrowOverlay.setTime(this.clockSeconds);
-    this.flowOverlay.setTime(this.clockSeconds);
-    this.arrow3d?.setTime(this.clockSeconds);
-    this.volume3d?.setTime(this.clockSeconds);
-    this.flow3d?.setTime(this.clockSeconds);
-    this.traced3d?.setTime(this.clockSeconds);
-    if (this.clockParameters !== undefined)
-      this.setParameterValues(this.graphParameterValues);
-    this.overlay3d.requestFrame();
+    this.showClockTime(
+      this.clockSeconds + elapsed * this.getConfig().time.speed
+    );
   };
 
   /**

@@ -1,0 +1,68 @@
+{
+  "format": "Deep partial VectorFieldConfig, merge into fresh defaults; activate flow separately",
+  "sourceCommit": "36d92870",
+  "seedStartingPoint": "uniform exterior",
+  "patch": {
+    "source": "components",
+    "components": {
+      "xLatex": "\\left\\{\\min(r_{G1VT1}(x,y,0)/R_{1},r_{G2VT1}(x,y,0)/R_{2})>1:f_{GVT1}(x,y,0)\\right\\}",
+      "yLatex": "\\left\\{\\min(r_{G1VT1}(x,y,0)/R_{1},r_{G2VT1}(x,y,0)/R_{2})>1:g_{GVT1}(x,y,0)\\right\\}",
+      "zLatex": "0"
+    },
+    "arrowMode": "off",
+    "overlayLayer": "under",
+    "color": {
+      "fixedColor": "#29486b",
+      "saturation": 1,
+      "contrast": 1
+    },
+    "flow": {
+      "particleCount": 16000,
+      "speed": 0.35,
+      "opacity": 0.25,
+      "trailPersistence": 0.88,
+      "dropRate": 0.025,
+      "pointSize": 1.5,
+      "normalizeSpeed": true,
+      "glow": 0,
+      "glowEnabled": false,
+      "backdropEnabled": false,
+      "backdropOpacity": 0,
+      "colorMode": "fixed",
+      "saturation": 1,
+      "contrast": 1,
+      "seedOn": true,
+      "seedLatex": "\\left\\{\\min(r_{G1VT1}(x,y,0)/R_{1},r_{G2VT1}(x,y,0)/R_{2})>1:\\min(1,1),0\\right\\}",
+      "lens": false
+    },
+    "space3d": {
+      "flowLook": "particles",
+      "particlesAuto": false,
+      "particles": 20000,
+      "particleSpeed": 0.18,
+      "particleNormalize": true,
+      "particleTrail": 16,
+      "particleLifetime": 3,
+      "particleOpacity": 0.2,
+      "particleGlow": 0,
+      "particlePx": 1.5,
+      "particleAbsorb": false,
+      "backdrop": false,
+      "backdropOpacity": 0,
+      "occlusion": "hide",
+      "seedLatex": "\\left\\{\\min(r_{G1VT1}(x,y,0)/R_{1},r_{G2VT1}(x,y,0)/R_{2})>1:\\min(1,1),0\\right\\}",
+      "lens": false
+    },
+    "time": {
+      "playing": false,
+      "speed": 1
+    }
+  },
+  "presentation": {
+    "writing": false,
+    "nativeProbe": true,
+    "probeNames": false,
+    "gpuProbe": "optional backend from B1; same vector and gain"
+  },
+  "verification": "Structurally and compiler checked; not live imported or rendered"
+}
