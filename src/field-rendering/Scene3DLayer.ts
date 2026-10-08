@@ -116,10 +116,11 @@ export class Scene3DLayer {
 
   /**
    * Places the names again whenever the camera has moved, checked once a
-   * frame. Not by hooking Desmos's redraw, as the overlays do: the hook
-   * helper keeps one list of handlers per function, and a second hook on
-   * the same function took the first's place, so the names stayed where
-   * the view had been and the particles lost their own.
+   * frame, rather than by hooking Desmos's redraw as the overlays do. It was
+   * a hook first, and a bug in the hook helper (fixed since) let a second
+   * hook on that function replace the first, so the names stayed where the
+   * view had been. A check that owes nothing to how Desmos redraws can't be
+   * broken that way, and one comparison a frame costs nothing.
    */
   private watchCamera() {
     this.watch = requestAnimationFrame(() => {

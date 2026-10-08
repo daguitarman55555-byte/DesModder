@@ -61,10 +61,14 @@ export function hookIntoFunction<
   priority: number,
   fn: HookedFunctionCallback<Fn>
 ) {
-  const oldfn = obj[prop].bind(obj) as MaybeHookedFunction<Fn>;
+  // Checked on the function itself: a bound copy carries none of its
+  // properties, so checking one always found it unpatched, and a second hook
+  // wrapped it again with a handler list of its own, losing the first's.
+  const current = obj[prop] as MaybeHookedFunction<Fn>;
 
   // monkeypatch the function if it isn't monkeypatched already
-  if (!oldfn.__isMonkeypatchedIn) {
+  if (!current.__isMonkeypatchedIn) {
+    const oldfn = current.bind(obj) as Fn;
     const monkeypatchedFunction = function (
       ...args: Parameters<Fn>
     ): ReturnType<Fn> {
@@ -87,8 +91,9 @@ export function hookIntoFunction<
     };
     monkeypatchedFunction.__isMonkeypatchedIn = true;
     monkeypatchedFunction.handlers = [] as HookedFunction<Fn>["handlers"];
+    // The original itself back, not the bound copy that calls it.
     monkeypatchedFunction.revert = () => {
-      obj[prop] = oldfn;
+      obj[prop] = current as Obj[Key];
     };
 
     obj[prop] = monkeypatchedFunction as unknown as any;
@@ -96,24 +101,24 @@ export function hookIntoFunction<
 
   const monkeypatchedFn = obj[prop] as HookedFunction<Fn>;
 
-  // if theres already a handler with this key, update it
+  // if theres already a handler with this key, update it; if there isn't one,
+  // add a new one
   const handler = monkeypatchedFn.handlers.find((h) => h.key === key);
   if (handler) {
     handler.priority = priority;
     handler.fn = fn;
-    return;
+  } else {
+    monkeypatchedFn.handlers.push({
+      key,
+      priority,
+      fn,
+    });
   }
-
-  // if there isn't one, add a new one
-  monkeypatchedFn.handlers.push({
-    key,
-    priority,
-    fn,
-  });
 
   monkeypatchedFn.handlers.sort((a, b) => b.priority - a.priority);
 
-  // function for removing this handler
+  // function for removing this handler: returned for an updated key too, which
+  // used to get nothing to unhook with
   return () => {
     monkeypatchedFn.handlers = monkeypatchedFn.handlers.filter(
       (h) => h.key !== key
