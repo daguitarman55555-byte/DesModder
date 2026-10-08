@@ -72,9 +72,37 @@ export function colorsFromGallery(
       backdropColor: preset.backdrop ?? GALLERY_DEFAULT_BACKDROP,
       ...flowMatterFor(preset, base.flow),
       ...GALLERY_VIVID,
+      ...(preset.onPaper === true ? PAPER_FLOW : {}),
     },
-    space3d: dimensions === 3 ? matterFor(preset, base.space3d) : base.space3d,
+    ...(preset.onPaper === true ? { overlayLayer: "under" as const } : {}),
+    space3d:
+      dimensions === 3
+        ? paperSpace(preset, matterFor(preset, base.space3d))
+        : base.space3d,
   };
+}
+
+/**
+ * A preset drawn on the graph paper, as a textbook figure is (`onPaper`):
+ * Desmos's objects — the charges, the arrows, the exact field lines — carry
+ * the picture, and the flow is a faint current under them. A dark backdrop
+ * would put the paper out, and the vivid boost is for light on the dark.
+ */
+const PAPER_FLOW = {
+  backdropEnabled: false,
+  saturation: 1,
+  contrast: 1,
+};
+
+/**
+ * In 3D, the same: no backdrop, so the flow blends over the paper instead
+ * of screening light onto the dark, and hidden where Desmos's solids cover
+ * it, so a particle behind a charge is behind it.
+ */
+function paperSpace(preset: GalleryPreset, s: Space3DConfig): Space3DConfig {
+  return preset.onPaper === true
+    ? { ...s, backdrop: false, occlusion: "hide" }
+    : s;
 }
 
 /**
@@ -195,7 +223,9 @@ export function configFromGallery(
       ...(dimensions === 3 && preset.space.look?.palette !== undefined
         ? { palette: preset.space.look.palette }
         : {}),
+      ...(preset.onPaper === true ? PAPER_FLOW : {}),
     },
+    ...(preset.onPaper === true ? { overlayLayer: "under" as const } : {}),
     ...((dimensions === 3
       ? preset.space.look?.fixedColor
       : preset.fixedColor) !== undefined
@@ -211,7 +241,9 @@ export function configFromGallery(
         }
       : {}),
     space3d:
-      dimensions === 3 ? spaceLookFor(preset, base.space3d) : base.space3d,
+      dimensions === 3
+        ? paperSpace(preset, spaceLookFor(preset, base.space3d))
+        : base.space3d,
   };
 }
 

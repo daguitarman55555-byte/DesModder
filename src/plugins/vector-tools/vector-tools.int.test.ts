@@ -2197,8 +2197,17 @@ testWithPage(
       if (!vt.presetWindow.open) vt.togglePresetWindow();
     });
     await driver.waitForSync();
-    // Defaults, in a folder of their own, and the field compiled against them.
-    expect(await variables()).toEqual(["folder", "q_{1}=1", "q_{2}=-1", "d=5"]);
+    // Defaults, in a folder of their own, and the field compiled against
+    // them; then the objects the preset draws, the probe among them.
+    const loaded = await variables();
+    expect(loaded.slice(0, 4)).toEqual([
+      "folder",
+      "q_{1}=1",
+      "q_{2}=-1",
+      "d=5",
+    ]);
+    expect(loaded).toContain("s_{net}=1");
+    expect(loaded).toContain(String.raw`\left(p_{x},p_{y}\right)`);
     expect(
       await driver.evaluate(
         () => (window as any).DSM.enabledPlugins["vector-tools"].flowMessage
@@ -2207,9 +2216,18 @@ testWithPage(
     await driver.assertSelectorEventually(".dsm-preset-window-variable");
     expect(
       await driver.evaluate(
-        () => document.querySelectorAll(".dsm-preset-window-variable").length
+        () =>
+          document.querySelectorAll(
+            ".dsm-preset-window-variable:not(.dsm-preset-window-switch)"
+          ).length
       )
-    ).toBe(3);
+    ).toBe(7);
+    // The switches are checkboxes, not sliders.
+    expect(
+      await driver.evaluate(
+        () => document.querySelectorAll(".dsm-preset-window-switch").length
+      )
+    ).toBe(6);
 
     // Set from the window; reset to the preset's own.
     await driver.evaluate(() =>

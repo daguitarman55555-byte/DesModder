@@ -48,6 +48,44 @@ export interface GalleryVariable {
   min: number;
   max: number;
   step?: number;
+  /**
+   * A switch rather than a quantity: 0 or 1, shown as a checkbox with this
+   * label, for what the preset's objects show — an arrow, the names.
+   */
+  toggle?: string;
+}
+
+/**
+ * One of the Desmos objects a preset draws with its field: a charge, a probe
+ * and its arrows, exact field lines. Desmos draws these, so they are crisp,
+ * shaded, editable and shareable; the field's particles flow round them.
+ * Written in the preset's variables, and hidden helpers alongside.
+ */
+export interface SceneItem {
+  /** Unique in the preset; the end of the item's id in the graph. */
+  key: string;
+  latex: string;
+  color?: string;
+  /** A named colour the graph defines, e.g. one that follows a sign. */
+  colorLatex?: string;
+  hidden?: boolean;
+  lines?: boolean;
+  points?: boolean;
+  lineWidth?: number;
+  lineOpacity?: number;
+  lineStyle?: "SOLID" | "DASHED" | "DOTTED";
+  pointSize?: number;
+  pointOpacity?: number;
+  fill?: boolean;
+  fillOpacity?: number;
+  /** A label at the point, Desmos LaTeX between backticks for maths. */
+  label?: string;
+  labelSize?: number;
+  /** The range of t, for a curve in t. */
+  domain?: readonly [string, string];
+  /** The ranges of u and v, for a surface in u and v on Desmos 3D. */
+  domainU?: readonly [string, string];
+  domainV?: readonly [string, string];
 }
 
 /**
@@ -93,6 +131,13 @@ export interface GalleryPreset {
   lensHorizon?: number;
   /** The numbers the field is written in, loaded as sliders. */
   variables?: readonly GalleryVariable[];
+  /** The Desmos objects drawn with the field, loaded beside its variables. */
+  scene?: readonly SceneItem[];
+  /**
+   * Drawn on the graph paper, as a textbook figure is: no dark backdrop, and
+   * the flow faint and under Desmos's objects, which carry the picture.
+   */
+  onPaper?: boolean;
   /** Numbers that move with the clock, worked out each frame. */
   clockParameters?: ClockParameters;
   /** The speed the 2D colour ramp spans, where Auto's would not suit. */
@@ -119,6 +164,8 @@ export interface GalleryPreset {
     lensHorizon?: number;
     /** The numbers the 3D field is written in, where they differ. */
     variables?: readonly GalleryVariable[];
+    /** The Desmos 3D objects drawn with the field. */
+    scene?: readonly SceneItem[];
     /** Numbers that move with the clock, for the 3D field. */
     clockParameters?: ClockParameters;
     /** How the 3D flow is drawn, over the caller's defaults. */

@@ -1,6 +1,6 @@
 import VectorTools from "..";
 import { Component, jsx } from "#DCGView";
-import { For, If } from "#components";
+import { For, If, IfElse } from "#components";
 import { paletteStops } from "../../../field-rendering/palettes";
 import type { GalleryPreset } from "../gallery";
 import { PRESET_THUMBNAILS } from "./presetThumbnails";
@@ -96,35 +96,62 @@ export class PresetWindow extends Component<{
                       key={(v: { id: string }) => v.id}
                     >
                       {(v: () => (typeof vectorTools.presetVariables)[0]) => (
-                        <label class="dsm-preset-window-variable">
-                          <span class="dsm-preset-window-variable-name">
-                            {() => nameParts(v().name).base}
-                            <span class="dsm-preset-window-variable-sub">
-                              {() => nameParts(v().name).sub}
-                            </span>
-                          </span>
-                          <input
-                            type="range"
-                            onUpdate={(element: HTMLInputElement) => {
-                              element.min = String(v().min);
-                              element.max = String(v().max);
-                              element.step = String(
-                                v().step ?? (v().max - v().min) / 200
-                              );
-                              if (document.activeElement !== element)
-                                element.value = String(v().current);
-                            }}
-                            onInput={(event: Event) =>
-                              vectorTools.setPresetVariable(
-                                v().id,
-                                Number((event.target as HTMLInputElement).value)
-                              )
-                            }
-                          />
-                          <span class="dsm-preset-window-variable-value">
-                            {() => formatValue(v().current)}
-                          </span>
-                        </label>
+                        <div>
+                          {IfElse(() => v().toggle !== undefined, {
+                            true: () => (
+                              <label class="dsm-preset-window-variable dsm-preset-window-switch">
+                                <input
+                                  type="checkbox"
+                                  onUpdate={(element: HTMLInputElement) => {
+                                    element.checked = v().current === 1;
+                                  }}
+                                  onChange={(event: Event) =>
+                                    vectorTools.setPresetVariable(
+                                      v().id,
+                                      (event.target as HTMLInputElement).checked
+                                        ? 1
+                                        : 0
+                                    )
+                                  }
+                                />
+                                <span>{() => v().toggle}</span>
+                              </label>
+                            ),
+                            false: () => (
+                              <label class="dsm-preset-window-variable">
+                                <span class="dsm-preset-window-variable-name">
+                                  {() => nameParts(v().name).base}
+                                  <span class="dsm-preset-window-variable-sub">
+                                    {() => nameParts(v().name).sub}
+                                  </span>
+                                </span>
+                                <input
+                                  type="range"
+                                  onUpdate={(element: HTMLInputElement) => {
+                                    element.min = String(v().min);
+                                    element.max = String(v().max);
+                                    element.step = String(
+                                      v().step ?? (v().max - v().min) / 200
+                                    );
+                                    if (document.activeElement !== element)
+                                      element.value = String(v().current);
+                                  }}
+                                  onInput={(event: Event) =>
+                                    vectorTools.setPresetVariable(
+                                      v().id,
+                                      Number(
+                                        (event.target as HTMLInputElement).value
+                                      )
+                                    )
+                                  }
+                                />
+                                <span class="dsm-preset-window-variable-value">
+                                  {() => formatValue(v().current)}
+                                </span>
+                              </label>
+                            ),
+                          })}
+                        </div>
                       )}
                     </For>
                   </div>

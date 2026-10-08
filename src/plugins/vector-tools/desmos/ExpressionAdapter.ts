@@ -24,6 +24,25 @@ export interface GeneratedExpressionSpec {
   points?: boolean;
   /** A slider for a definition `name=value`, between these bounds. */
   slider?: { min: string; max: string; step?: string };
+  /**
+   * The rest of how Desmos draws it, written as the graph state has it: a
+   * preset's objects need fills, labels and parameter ranges the field's own
+   * expressions never did.
+   */
+  style?: Pick<
+    ExpressionState,
+    | "lineStyle"
+    | "lineOpacity"
+    | "pointOpacity"
+    | "fill"
+    | "fillOpacity"
+    | "showLabel"
+    | "label"
+    | "labelSize"
+    | "parametricDomain"
+    | "parametricDomain3Du"
+    | "parametricDomain3Dv"
+  >;
 }
 
 export interface GeneratedFolderSpec {
@@ -262,6 +281,7 @@ function expressionState(spec: GeneratedExpressionSpec): ExpressionState {
   if (spec.pointSize !== undefined) expression.pointSize = spec.pointSize;
   if (spec.lines !== undefined) expression.lines = spec.lines;
   if (spec.points !== undefined) expression.points = spec.points;
+  if (spec.style !== undefined) Object.assign(expression, spec.style);
   if (spec.slider !== undefined) {
     expression.slider = {
       hardMin: true,

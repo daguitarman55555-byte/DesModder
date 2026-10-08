@@ -6,6 +6,7 @@ import { mountToNode, unmountFromNode, type MountedComponent } from "#DCGView";
 import { GALLERY_CATEGORIES } from "../../field-rendering/gallery";
 import {
   CalculatorExpressionAdapter,
+  type GeneratedExpressionSpec,
   type GeneratedItemSnapshot,
 } from "./desmos/ExpressionAdapter";
 import {
@@ -113,6 +114,7 @@ import {
 import type {
   ClockParameters,
   GalleryVariable,
+  SceneItem,
 } from "../../field-rendering/gallery/types";
 import type { FlowField } from "../../field-rendering/FlowRenderer";
 import { Overlay3D } from "../../field-rendering/Overlay3D";
@@ -148,6 +150,46 @@ const PRESET_VARIABLES_NAMESPACE = "vector_tools_variables";
 /** A preset variable's expression: `q_{1}` is `vector_tools_variables_q1`. */
 function presetVariableID(name: string) {
   return `${PRESET_VARIABLES_NAMESPACE}_${name.replace(/[^A-Za-z0-9]/g, "")}`;
+}
+
+/** A preset's object as the expression the graph gets. */
+function sceneItemSpec(
+  item: SceneItem,
+  folderId: string
+): GeneratedExpressionSpec {
+  const n = (value: number | undefined) =>
+    value === undefined ? undefined : String(value);
+  const range = (r: readonly [string, string] | undefined) =>
+    r === undefined ? undefined : { min: r[0], max: r[1] };
+  const style = {
+    lineStyle: item.lineStyle,
+    lineOpacity: n(item.lineOpacity),
+    pointOpacity: n(item.pointOpacity),
+    fill: item.fill,
+    fillOpacity: n(item.fillOpacity),
+    showLabel: item.label !== undefined ? true : undefined,
+    label: item.label,
+    labelSize: n(item.labelSize),
+    parametricDomain: range(item.domain),
+    parametricDomain3Du: range(item.domainU),
+    parametricDomain3Dv: range(item.domainV),
+  };
+  return {
+    // Its own part of the namespace, so no key can meet a variable's id.
+    id: `${PRESET_VARIABLES_NAMESPACE}_object_${item.key}`,
+    latex: item.latex,
+    folderId,
+    color: item.color,
+    colorLatex: item.colorLatex,
+    hidden: item.hidden,
+    lines: item.lines,
+    points: item.points,
+    lineWidth: n(item.lineWidth),
+    pointSize: n(item.pointSize),
+    style: Object.fromEntries(
+      Object.entries(style).filter(([, value]) => value !== undefined)
+    ),
+  };
 }
 
 /** The divergence and curl of a field, and whether it has a potential. */
@@ -979,11 +1021,15 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     const compiled = this.cc.is3dProduct()
       ? this.field3dCompilation
       : this.flowCompilation;
-    // On 3D the surfaces the field hides behind may read sliders too.
+    // On 3D the surfaces the field hides behind may read sliders too. And
+    // the preset's own variables, read or not: a probe dragged on the graph
+    // changes p_x without the field noticing, and the presets window, which
+    // shows it, has to.
     const names = [
       ...new Set([
         ...(compiled.ok ? (compiled.field.params ?? []) : []),
         ...this.surfaces3d.surfaces.flatMap((surface) => surface.params),
+        ...this.presetVariables.map((v) => canonicalIdentifier(v.name)),
       ]),
     ];
     const values = new Map<string, number>();
@@ -1981,13 +2027,16 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
    */
   /**
    * A preset's variables, as sliders in a folder of their own, replacing the
-   * last preset's. A name the graph already defines elsewhere is the user's
-   * — a problem's numbers, say — and is left as it is: the field then reads
-   * theirs. Removed, rather than left behind, for a preset without any.
+   * last preset's, and the Desmos objects it draws with its field beside
+   * them. A name the graph already defines elsewhere is the user's — a
+   * problem's numbers, say — and is left as it is: the field and the objects
+   * then read theirs. Removed, rather than left behind, for a preset without
+   * any.
    */
   private loadPresetVariables(
     title: string,
-    variables: readonly GalleryVariable[]
+    variables: readonly GalleryVariable[],
+    scene: readonly SceneItem[] = []
   ) {
     const namespace = PRESET_VARIABLES_NAMESPACE;
     const existing = this.expressions
@@ -2000,7 +2049,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       (v) => !theirs.has(canonicalIdentifier(v.name))
     );
     try {
-      if (wanted.length === 0) {
+      if (wanted.length === 0 && scene.length === 0) {
         if (existing.length > 0)
           this.expressions.removeGeneratedSet(namespace, existing);
       } else {
@@ -2008,16 +2057,22 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
         this.expressions.applyGeneratedSet(
           namespace,
           { id: folder, title: `${title}: the field's variables` },
-          wanted.map((v) => ({
-            id: presetVariableID(v.name),
-            latex: `${v.name}=${v.value}`,
-            folderId: folder,
-            slider: {
-              min: String(v.min),
-              max: String(v.max),
-              ...(v.step !== undefined ? { step: String(v.step) } : {}),
-            },
-          })),
+          [
+            ...wanted.map((v) => ({
+              id: presetVariableID(v.name),
+              latex: `${v.name}=${v.value}`,
+              folderId: folder,
+              slider:
+                v.toggle !== undefined
+                  ? { min: "0", max: "1", step: "1" }
+                  : {
+                      min: String(v.min),
+                      max: String(v.max),
+                      ...(v.step !== undefined ? { step: String(v.step) } : {}),
+                    },
+            })),
+            ...scene.map((item) => sceneItemSpec(item, folder)),
+          ],
           { knownIDs: existing }
         );
       }
@@ -2085,7 +2140,10 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     // before the graph defines them would fail.
     this.loadPresetVariables(
       preset.name,
-      (this.is3d ? preset.space.variables : undefined) ?? preset.variables ?? []
+      (this.is3d ? preset.space.variables : undefined) ??
+        preset.variables ??
+        [],
+      (this.is3d ? preset.space.scene : preset.scene) ?? []
     );
     this.updateConfig((config) => {
       const dimensions = this.is3d ? 3 : 2;
