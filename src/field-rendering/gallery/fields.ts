@@ -18,20 +18,29 @@ export const FIELDS: readonly GalleryPreset[] = [
     yLatex: MAGNET_2D.y,
     // Released everywhere, thinning outward: the small loops hugging the
     // magnet too, which a seed starting at 1.5 left as two black crescents.
-    seedLatex: String.raw`e^{-0.03\left(x^{2}+y^{2}\right)}`,
+    // Fewer close in, where particles moving along the lines at one pace
+    // crowd anyway (their density goes as |B|), which washed the lines there
+    // into a glow.
+    seedLatex: String.raw`\frac{\left(x^{2}+y^{2}\right)e^{-0.03\left(x^{2}+y^{2}\right)}}{x^{2}+y^{2}+2}`,
+    // By direction: the field falls as 1/r², so by strength every line but
+    // the nearest was dark; by direction each loop is a rainbow, evenly lit,
+    // and when the current reverses, every colour turns to its opposite.
+    colorByDirection: true,
     colorScale: 0.25,
     palette: "neon",
     backdrop: "#02030a",
     flow: {
-      particleCount: 30_000,
-      glow: 0.3,
-      opacity: 0.3,
-      pointSize: 1.3,
+      // Sparse, long-trailed and thin, so each particle draws a line, as
+      // iron filings do.
+      particleCount: 16_000,
+      glow: 0.15,
+      opacity: 0.5,
+      pointSize: 1.2,
       // The field is enormous at the origin and tiny at the edge, so drawing
       // it at its own pace leaves everything but the centre standing still.
       normalizeSpeed: true,
       speed: 0.35,
-      trailPersistence: 0.97,
+      trailPersistence: 0.985,
       dropRate: 0.005,
     },
     extent: 6,

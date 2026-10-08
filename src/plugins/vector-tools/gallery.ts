@@ -188,6 +188,9 @@ export function configFromGallery(
       ...(preset.fixedColor !== undefined
         ? { colorMode: "fixed" as const }
         : {}),
+      ...(dimensions === 2 && preset.colorByDirection === true
+        ? { colorMode: "direction" as const }
+        : {}),
       ...(dimensions === 3 && preset.space.look?.colorMode !== undefined
         ? { colorMode: preset.space.look.colorMode }
         : {}),

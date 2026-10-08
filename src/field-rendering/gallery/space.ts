@@ -2,53 +2,61 @@
 import {
   carriedWorlds,
   figureEightBody,
+  figureEightVelocity,
   keplerPair,
   num,
   rho,
   separation,
-  wells,
 } from "./latex";
 import type { GalleryPreset } from "./types";
 
 /**
- * Three stars on the figure-eight orbit, the gas round them falling in on
- * spirals. In the box the orbit's plane is tilted half a radian, so the eight
- * reads as an eight from Desmos's default view.
+ * Three stars on the figure-eight orbit, each carrying a cluster of glowing
+ * gas round with it, so their trails draw the eight as the well-known
+ * animations of it do. Outside the clusters, the stars' gravity: with matter
+ * everywhere, gas is seen falling in towards them. In the box the orbit's
+ * plane is tilted half a radian, so the eight reads as an eight from
+ * Desmos's default view.
  */
 const EIGHT_TILT = 0.5;
-const EIGHT_2D = [0, 1, 2].map((i) => figureEightBody(i, 0.35, 6));
-const EIGHT_3D = [0, 1, 2].map((i) => {
-  const b = figureEightBody(i, 0.35, 3.6);
-  return {
-    x: b.x,
-    y: String.raw`${num(Math.cos(EIGHT_TILT))}\left(${b.y}\right)`,
-    z: String.raw`${num(Math.sin(EIGHT_TILT))}\left(${b.y}\right)`,
-  };
-});
-/** The gas each star is gathering, thinning into a faint haze between. */
-function eightSeed(
-  stars: readonly Partial<Record<"x" | "y" | "z", string>>[],
-  axes: readonly ("x" | "y" | "z")[],
-  reach: number
-) {
-  return [
-    "0.05",
+const EIGHT_W = 0.6;
+function eight(axes: readonly ("x" | "y" | "z")[], size: number) {
+  const three = axes.length === 3;
+  const c = num(Math.cos(EIGHT_TILT));
+  const sn = num(Math.sin(EIGHT_TILT));
+  const tilt = (v: { x: string; y: string }) =>
+    three
+      ? {
+          x: v.x,
+          y: String.raw`${c}\left(${v.y}\right)`,
+          z: String.raw`${sn}\left(${v.y}\right)`,
+        }
+      : v;
+  const stars = [0, 1, 2].map((i) => ({
+    position: tilt(figureEightBody(i, EIGHT_W, size)),
+    velocity: tilt(figureEightVelocity(i, EIGHT_W, size)),
+    reach: size * 0.2,
+    swirl: size * 0.5,
+  }));
+  const field = carriedWorlds(
+    stars,
+    axes,
+    [0, -Math.sin(EIGHT_TILT), Math.cos(EIGHT_TILT)],
+    1
+  );
+  // Each star's cluster, bright and tight. Nothing else: with the seed on,
+  // the picture is the orbit, as the animations of it show it; switched off,
+  // the gravity drawing in the gas round it is the rest of the field.
+  const seed = [
     ...stars.map(
-      (c) => String.raw`e^{-\frac{${separation(c, axes).r2}}{${num(reach)}}}`
+      (b) =>
+        String.raw`e^{-\frac{${separation(b.position, axes).r2}}{${num((size * (three ? 0.1 : 0.07)) ** 2)}}}`
     ),
   ].join("+");
+  return { ...field, seed };
 }
-const CLUSTER_2D = wells(EIGHT_2D, ["x", "y"], {
-  soft: 0.3,
-  pull: 1,
-  swirl: 0.6,
-});
-const CLUSTER_3D = wells(EIGHT_3D, ["x", "y", "z"], {
-  soft: 0.2,
-  pull: 1,
-  swirl: 0.5,
-  normal: [0, -Math.sin(EIGHT_TILT), Math.cos(EIGHT_TILT)],
-});
+const CLUSTER_2D = eight(["x", "y"], 6);
+const CLUSTER_3D = eight(["x", "y", "z"], 3.6);
 
 /**
  * A double planet: a world and a moon of nearly half its mass, like Pluto
@@ -194,7 +202,7 @@ function galaxySeed(o: {
 }
 
 const GALAXY_2D_SEED = galaxySeed({
-  power: 20,
+  power: 36,
   scale: 2,
   disk: 0.12,
   edge: 9,
@@ -293,9 +301,10 @@ export const SPACE: readonly GalleryPreset[] = [
       opacity: 0.5,
       pointSize: 1.4,
       normalizeSpeed: false,
-      speed: 3,
+      speed: 2,
       trailPersistence: 0.93,
-      dropRate: 0.04,
+      // Short lives, as the young blue stars that light real arms have.
+      dropRate: 0.08,
     },
     extent: 10,
     space: {
@@ -434,38 +443,42 @@ export const SPACE: readonly GalleryPreset[] = [
     name: "Three-body eight",
     category: "space",
     blurb:
-      "Three equal stars on the figure-eight orbit, the one stable way found for three bodies to share a single path (Chenciner and Montgomery, 2000), each a third of an orbit behind the next. Gas falls into them on spirals, and the knots trace the eight as they go.",
+      "Three equal stars on the figure-eight orbit, the one stable way found for three bodies to share a single path (Chenciner and Montgomery, 2000), each a third of an orbit behind the next. Each carries a cluster of glowing gas, and their trails draw the eight.",
     xLatex: CLUSTER_2D.x!,
     yLatex: CLUSTER_2D.y!,
-    seedLatex: eightSeed(EIGHT_2D, ["x", "y"], 4),
-    colorScale: 1.2,
-    palette: "plasma",
+    seedLatex: CLUSTER_2D.seed,
+    colorScale: 4,
+    palette: "blackbody",
     backdrop: "#05030c",
     flow: {
-      particleCount: 40_000,
-      glow: 0.5,
-      opacity: 0.4,
-      pointSize: 1.3,
+      particleCount: 20_000,
+      glow: 0.6,
+      opacity: 0.5,
+      pointSize: 1.4,
       normalizeSpeed: false,
-      speed: 4,
-      trailPersistence: 0.97,
-      dropRate: 0.008,
+      // On the clock's time (see the double planet), and long-lived with
+      // long trails, so the trails are the orbit.
+      speed: 1.67,
+      trailPersistence: 0.995,
+      dropRate: 0.002,
     },
     extent: 10,
     space: {
       blurb:
-        "Three equal stars on the figure-eight orbit, the stable three-body orbit Chenciner and Montgomery proved exists, in a plane tilted to the view. Each pulls the gas round it in on a spiral, so three glowing knots chase each other round the eight.",
+        "Three equal stars on the figure-eight orbit, the stable three-body orbit Chenciner and Montgomery proved exists, in a plane tilted to the view. Each carries a cluster of glowing gas, so three comets chase each other round the eight, their trails drawing it; outside the clusters, their gravity draws in the gas.",
       xLatex: CLUSTER_3D.x!,
       yLatex: CLUSTER_3D.y!,
       zLatex: CLUSTER_3D.z!,
-      seedLatex: eightSeed(EIGHT_3D, ["x", "y", "z"], 1.5),
+      seedLatex: CLUSTER_3D.seed,
       look: {
-        palette: "plasma",
-        particles: 50_000,
-        speed: 0.25,
-        trail: 48,
-        lifetime: 3,
-        opacity: 0.4,
+        palette: "blackbody",
+        particles: 20_000,
+        speed: 0.3,
+        // Half-width 5 × speed 0.3: the gas on the clock's time.
+        scale: 1.5,
+        trail: 64,
+        lifetime: 10,
+        opacity: 0.5,
         glow: 0.35,
         normalizeSpeed: false,
         absorb: false,

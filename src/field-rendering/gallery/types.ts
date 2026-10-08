@@ -65,6 +65,12 @@ export interface GalleryPreset {
   /** One colour rather than a ramp, for the 2D flow. */
   fixedColor?: string;
   /**
+   * The 2D flow coloured by which way the field points rather than how
+   * strong it is: for a field whose strength falls so fast that colouring
+   * by it leaves all but the centre dark.
+   */
+  colorByDirection?: boolean;
+  /**
    * The same picture on Desmos 3D: the field with a third component, and
    * what is different about it in a box. Every preset has one, so loading a
    * preset on /3d never gives a field that lies flat by accident.

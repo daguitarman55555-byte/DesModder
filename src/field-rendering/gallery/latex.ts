@@ -168,13 +168,31 @@ export function sum(terms: readonly (readonly [number, string])[]) {
 
 const TAU = 2 * Math.PI;
 
-/** sin(k(wt + φ)), with its phase brought into [0, 2π). */
-function sinTurn(k: number, w: number, phase: number) {
+/** sin(k(wt + φ)), or cos, with its phase brought into [0, 2π). */
+function sinTurn(k: number, w: number, phase: number, trig = "sin") {
   const p = (((k * phase) % TAU) + TAU) % TAU;
-  return String.raw`\sin\left(${sum([
-    [k * w, "t"],
-    [p, ""],
-  ])}\right)`;
+  return (
+    `\\${trig}` +
+    String.raw`\left(${sum([
+      [k * w, "t"],
+      [p, ""],
+    ])}\right)`
+  );
+}
+
+/** How fast body `i` moves along the figure eight: its position's derivative. */
+export function figureEightVelocity(i: number, w: number, size: number) {
+  const phase = (TAU * i) / 3;
+  return {
+    x: sum([
+      [-1.1008 * size * w, sinTurn(1, w, phase, "cos")],
+      [5 * 0.0254 * size * w, sinTurn(5, w, phase, "cos")],
+    ]),
+    y: sum([
+      [-2 * 0.3388 * size * w, sinTurn(2, w, phase, "cos")],
+      [-4 * 0.056 * size * w, sinTurn(4, w, phase, "cos")],
+    ]),
+  };
 }
 
 /**
@@ -339,17 +357,20 @@ export function keplerPair(o: {
  * Worlds carried along by their orbits: round each, within a plateau of
  * radius `reach`, the flow is the body's own velocity, plus material
  * circling it at Kepler's speed, ∝ 1/√d, about the orbit's normal, and a
- * slight pull that keeps it bound. Outside every plateau, still air.
+ * slight pull that keeps it bound. Outside every plateau, each body's
+ * gravity, `gravity`/d^2.2 towards it (softened, as in `wells`), so with
+ * matter everywhere the gas round the bodies is seen falling in.
  */
 export function carriedWorlds(
   bodies: readonly {
-    position: Record<Axis, string>;
-    velocity: Record<Axis, string>;
+    position: Partial<Record<Axis, string>>;
+    velocity: Partial<Record<Axis, string>>;
     reach: number;
     swirl: number;
   }[],
   axes: readonly Axis[],
-  normal: Vec3
+  normal: Vec3,
+  gravity = 0
 ): Partial<Record<Axis, string>> {
   const out: Partial<Record<Axis, string>> = {};
   for (const axis of axes) {
@@ -365,8 +386,15 @@ export function carriedWorlds(
           axes.length === 2
             ? { x: sum([[-1, d.y]]), y: d.x, z: "0" }[axis]
             : cross(normal, d)[axis];
-        const plateau = num(1 / b.reach ** 6);
-        return String.raw`\frac{${b.velocity[axis]}+\frac{${num(b.swirl)}\left(${turn}\right)}{\left(${r2}+0.05\right)^{0.75}}-0.15${d[axis]}}{1+${plateau}\left(${r2}\right)^{3}}`;
+        const c = 1 / b.reach ** 6;
+        const plateau = num(c);
+        // Gravity outside the plateau: weighted by 1 − 1/(1 + c r⁶).
+        const fall =
+          gravity === 0
+            ? ""
+            : String.raw`-\frac{${num(gravity * c)}\left(${r2}\right)^{3}${d[axis]}}{\left(1+${plateau}\left(${r2}\right)^{3}\right)\left(${r2}+0.3\right)^{1.1}}`;
+        const carried = String.raw`\frac{${b.velocity[axis] ?? "0"}+\frac{${num(b.swirl)}\left(${turn}\right)}{\left(${r2}+0.05\right)^{0.75}}-0.15${d[axis]}}{1+${plateau}\left(${r2}\right)^{3}}`;
+        return fall === "" ? carried : `${carried}${fall}`;
       })
       .join("+")
       .replace(/\+-/g, "-");
