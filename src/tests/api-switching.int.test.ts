@@ -53,6 +53,11 @@ async function normalizedHtml(page: Page) {
   // MathQuill toggles this class on a ~500ms timer, so whether a snapshot has
   // it depends only on when the snapshot was taken.
   html = html.replace(/(class="dcg-mq-cursor) dcg-mq-blink"/g, '$1"');
+  // The style here sometimes has `display: none`, sometimes not.
+  html = html.replace(
+    /<div class="dcg-loading-div-container" style="[^"]+">/g,
+    ""
+  );
   return html;
 }
 
