@@ -1,0 +1,311 @@
+{
+  "scope": "Helper syntax and dependency compilation, documented formulas sections 4–10 and three-body field section 17. Scalar names provisioned automatically; no GPU link or Desmos UI test.",
+  "results": [
+    {
+      "section": 4,
+      "name": "r_1",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 4,
+      "name": "r_2",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 4,
+      "name": "f",
+      "ok": true,
+      "helperCount": 3
+    },
+    {
+      "section": 4,
+      "name": "g",
+      "ok": true,
+      "helperCount": 3
+    },
+    {
+      "section": 4,
+      "name": "h",
+      "ok": true,
+      "helperCount": 3
+    },
+    {
+      "section": 4,
+      "name": "V",
+      "ok": true,
+      "helperCount": 3
+    },
+    {
+      "section": 4,
+      "name": "S",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 5,
+      "name": "D_1",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 5,
+      "name": "D_2",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 5,
+      "name": "f",
+      "ok": true,
+      "helperCount": 3
+    },
+    {
+      "section": 5,
+      "name": "g",
+      "ok": true,
+      "helperCount": 3
+    },
+    {
+      "section": 5,
+      "name": "S",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 6,
+      "name": "r_1",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 6,
+      "name": "r_2",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 6,
+      "name": "D_1",
+      "ok": true,
+      "helperCount": 2
+    },
+    {
+      "section": 6,
+      "name": "D_2",
+      "ok": true,
+      "helperCount": 2
+    },
+    {
+      "section": 6,
+      "name": "f",
+      "ok": true,
+      "helperCount": 5
+    },
+    {
+      "section": 6,
+      "name": "g",
+      "ok": true,
+      "helperCount": 5
+    },
+    {
+      "section": 6,
+      "name": "h",
+      "ok": true,
+      "helperCount": 5
+    },
+    {
+      "section": 7,
+      "name": "f",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 7,
+      "name": "g",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 7,
+      "name": "S",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 7,
+      "name": "P",
+      "ok": true,
+      "helperCount": 3
+    },
+    {
+      "section": 8,
+      "name": "A",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 8,
+      "name": "C",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 8,
+      "name": "f",
+      "ok": true,
+      "helperCount": 2
+    },
+    {
+      "section": 8,
+      "name": "g",
+      "ok": true,
+      "helperCount": 2
+    },
+    {
+      "section": 8,
+      "name": "H",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 8,
+      "name": "J",
+      "ok": true,
+      "helperCount": 2
+    },
+    {
+      "section": 8,
+      "name": "S",
+      "ok": true,
+      "helperCount": 3
+    },
+    {
+      "section": 9,
+      "name": "r",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 9,
+      "name": "A",
+      "ok": true,
+      "helperCount": 2
+    },
+    {
+      "section": 9,
+      "name": "C",
+      "ok": true,
+      "helperCount": 2
+    },
+    {
+      "section": 9,
+      "name": "D",
+      "ok": true,
+      "helperCount": 2
+    },
+    {
+      "section": 9,
+      "name": "f_0",
+      "ok": true,
+      "helperCount": 3
+    },
+    {
+      "section": 9,
+      "name": "g_0",
+      "ok": true,
+      "helperCount": 3
+    },
+    {
+      "section": 9,
+      "name": "h_0",
+      "ok": true,
+      "helperCount": 3
+    },
+    {
+      "section": 9,
+      "name": "J",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 9,
+      "name": "f",
+      "ok": true,
+      "helperCount": 5
+    },
+    {
+      "section": 9,
+      "name": "g",
+      "ok": true,
+      "helperCount": 4
+    },
+    {
+      "section": 9,
+      "name": "h",
+      "ok": true,
+      "helperCount": 4
+    },
+    {
+      "section": 10,
+      "name": "r",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 10,
+      "name": "f",
+      "ok": true,
+      "helperCount": 2
+    },
+    {
+      "section": 10,
+      "name": "g",
+      "ok": true,
+      "helperCount": 2
+    },
+    {
+      "section": 10,
+      "name": "h",
+      "ok": true,
+      "helperCount": 2
+    },
+    {
+      "section": 17,
+      "name": "r_1",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 17,
+      "name": "r_2",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 17,
+      "name": "r_3",
+      "ok": true,
+      "helperCount": 1
+    },
+    {
+      "section": 17,
+      "name": "f",
+      "ok": true,
+      "helperCount": 4
+    },
+    {
+      "section": 17,
+      "name": "g",
+      "ok": true,
+      "helperCount": 4
+    },
+    {
+      "section": 17,
+      "name": "h",
+      "ok": true,
+      "helperCount": 4
+    }
+  ]
+}

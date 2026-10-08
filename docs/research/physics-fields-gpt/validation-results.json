@@ -1,0 +1,18 @@
+{
+  "charge_midpoint": [2.0, 0.0, 0.0],
+  "charge_curl_norm": 2.607547329515746e-10,
+  "charge_flux_contour_tangency": -4.422484600752341e-11,
+  "cylinder_stagnation_speed": 1.5700924586837752e-16,
+  "cylinder_max_normal_speed": 3.3306690738754696e-16,
+  "cylinder_pressure_force": [-2.3531496423054602e-16, 6.283185307179611],
+  "capacitor_midpoint": [0.0, -5.6225905975210795, 0],
+  "capacitor_curl_norm": 5.2735593669694936e-11,
+  "dipole_divergence": 9.57567393433667e-11,
+  "dipole_curl_norm": 1.1739657014595894e-10,
+  "rectangle_face_quad_error_200": 4.435686974691425e-6,
+  "bar_divergence_exterior": 8.465450562766819e-11,
+  "bar_divergence_interior": -3.7747588388370446e-10,
+  "bar_normal_jump_at_face": -2.6161778427180593e-5,
+  "nozzle_divergence": 4.3021142204224816e-11,
+  "gravity_zero_x_for_81_1_d10": 8.878048780487806
+}
