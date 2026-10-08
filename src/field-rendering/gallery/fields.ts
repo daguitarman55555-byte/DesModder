@@ -5,12 +5,17 @@ import type { GalleryPreset } from "./types";
 /** The bar magnet on alternating current, along y in the plane and z in the box. */
 const AC = String.raw`\cos\left(0.4t\right)`;
 /**
- * In the plane, the slice through the 3D magnet's own field, its centre a
- * point: Rafael's picture of it is the 3D one seen side-on, and a magnet
- * drawn as a disc of uniform field in the middle read as a sphere sitting
- * on the lines.
+ * In the plane, the slice through a point dipole's field, B = (3(m·r)r −
+ * m r²)/r⁵, with nothing cut out of it: its loops go on shrinking into the
+ * centre however far in you zoom, as a dipole's do. Any core — a disc of
+ * uniform field, even one of radius 0.25 — drew as a ball sitting on the
+ * lines, which no dipole has. At the origin itself the field is undefined,
+ * and draws nothing.
  */
-const MAGNET_2D = dipole(["0", AC], ["x", "y"], 0.25, false, "magnet");
+const MAGNET_2D = {
+  x: String.raw`\frac{3x\cdot${AC}y}{\left(x^{2}+y^{2}\right)^{2.5}}`,
+  y: String.raw`\frac{3y\cdot${AC}y-${AC}\left(x^{2}+y^{2}\right)}{\left(x^{2}+y^{2}\right)^{2.5}}`,
+};
 const MAGNET_3D = dipole(["0", "0", AC], ["x", "y", "z"], 0.6, false, "magnet");
 
 export const FIELDS: readonly GalleryPreset[] = [
@@ -20,8 +25,8 @@ export const FIELDS: readonly GalleryPreset[] = [
     category: "fields",
     blurb:
       "The field of a bar magnet, and the one picture every physics textbook opens with. On alternating current: the lines keep their shape, and the field fades, reverses and returns.",
-    xLatex: MAGNET_2D.x!,
-    yLatex: MAGNET_2D.y!,
+    xLatex: MAGNET_2D.x,
+    yLatex: MAGNET_2D.y,
     // Released everywhere, the loops hugging the magnet too: a seed that
     // started at 1.5 left two black crescents beside it.
     seedLatex: String.raw`e^{-0.04\left(x^{2}+y^{2}\right)}`,
