@@ -43,7 +43,7 @@ import { FLUIDS } from "./fluids";
 import { PHYSICS } from "./physics";
 import { SPACE } from "./space";
 import { renameIdentifier } from "../identifiers";
-import type { GalleryPreset, GalleryVariable } from "./types";
+import type { ClockParameters, GalleryPreset, GalleryVariable } from "./types";
 
 export * from "./types";
 
@@ -57,24 +57,36 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
 ];
 
 /**
- * The preset with its variables written in as their values, for a place
- * that has no sliders to give them — Audio Lab, and the tests that compile
- * every preset with nothing else in the graph.
+ * The preset with its variables written in as their values, and its clock
+ * parameters as their values at t = 0: for a place that has neither sliders
+ * nor a clock to give them — Audio Lab, and the tests that compile every
+ * preset with nothing else in the graph. A preset whose bodies move by
+ * clock parameters is a still picture there.
  */
 export function withVariablesInlined(preset: GalleryPreset): GalleryPreset {
-  const inline = (
-    latex: string | undefined,
-    variables: readonly GalleryVariable[]
-  ) =>
+  const values = (
+    variables: readonly GalleryVariable[] | undefined,
+    clock: ClockParameters | undefined
+  ): [string, number][] => {
+    const at = clock?.at(0) ?? [];
+    return [
+      ...(variables ?? []).map((v): [string, number] => [v.name, v.value]),
+      ...(clock?.names ?? []).map((name, i): [string, number] => [name, at[i]]),
+    ];
+  };
+  const inline = (latex: string | undefined, names: [string, number][]) =>
     latex === undefined
       ? undefined
-      : variables.reduce(
-          (out, v) =>
-            renameIdentifier(out, v.name, String.raw`\left(${v.value}\right)`),
+      : names.reduce(
+          (out, [name, value]) =>
+            renameIdentifier(out, name, String.raw`\left(${value}\right)`),
           latex
         );
-  const flat = preset.variables ?? [];
-  const space = preset.space.variables ?? flat;
+  const flat = values(preset.variables, preset.clockParameters);
+  const space = values(
+    preset.space.variables ?? preset.variables,
+    preset.space.clockParameters
+  );
   if (flat.length === 0 && space.length === 0) return preset;
   return {
     ...preset,
@@ -82,6 +94,7 @@ export function withVariablesInlined(preset: GalleryPreset): GalleryPreset {
     yLatex: inline(preset.yLatex, flat)!,
     seedLatex: inline(preset.seedLatex, flat),
     variables: undefined,
+    clockParameters: undefined,
     space: {
       ...preset.space,
       xLatex: inline(preset.space.xLatex, space)!,
@@ -89,6 +102,7 @@ export function withVariablesInlined(preset: GalleryPreset): GalleryPreset {
       zLatex: inline(preset.space.zLatex, space)!,
       seedLatex: inline(preset.space.seedLatex, space),
       variables: undefined,
+      clockParameters: undefined,
     },
   };
 }

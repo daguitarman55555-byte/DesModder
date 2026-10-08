@@ -110,7 +110,10 @@ import {
   environmentsDiffer,
   scanDefinitions,
 } from "../../field-rendering/environment";
-import type { GalleryVariable } from "../../field-rendering/gallery/types";
+import type {
+  ClockParameters,
+  GalleryVariable,
+} from "../../field-rendering/gallery/types";
 import type { FlowField } from "../../field-rendering/FlowRenderer";
 import { Overlay3D } from "../../field-rendering/Overlay3D";
 import {
@@ -545,6 +548,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     fLatex: string;
     seedLatex: string;
     revision: number;
+    clockNames: string;
     result: Field3DCompilation;
   };
   /**
@@ -555,6 +559,8 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   private surfaces3d: SurfaceScan = { surfaces: [], skipped: [] };
   /** The values last read for the names the field uses, for a renderer made later. */
   private parameterValues: ReadonlyMap<string, number> = new Map();
+  /** The graph's own values, before the clock parameters are added. */
+  private graphParameterValues: ReadonlyMap<string, number> = new Map();
   private arrowMessage = "";
   private flowMessage = "";
   private flowRefreshTimer?: ReturnType<typeof setTimeout>;
@@ -567,6 +573,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     fLatex: string;
     seedLatex: string;
     revision: number;
+    clockNames: string;
     result: FlowCompilation;
   };
   /**
@@ -707,6 +714,9 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
    * arrows stay the still picture they were.
    */
   get fieldUsesTime() {
+    // Bodies whose motion the clock drives move the field without it
+    // mentioning t.
+    if (this.clockParameters !== undefined) return true;
     if (this.cc.is3dProduct()) {
       const compiled = this.field3dCompilation;
       return compiled.ok && compiled.field.usesTime;
@@ -825,8 +835,54 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.volume3d?.setTime(this.clockSeconds);
     this.flow3d?.setTime(this.clockSeconds);
     this.traced3d?.setTime(this.clockSeconds);
+    if (this.clockParameters !== undefined)
+      this.setParameterValues(this.graphParameterValues);
     this.overlay3d.requestFrame();
   };
+
+  /**
+   * The loaded preset's clock parameters (see `ClockParameters`): numbers
+   * its field reads that move with the clock, worked out here once a frame.
+   * Only while the field is still that preset's: once it is renamed or
+   * edited into another, its names are ordinary names again.
+   */
+  private get clockParameters(): ClockParameters | undefined {
+    const preset = galleryPreset(this.activePresetId ?? "");
+    if (preset === undefined) return undefined;
+    return this.is3d ? preset.space.clockParameters : preset.clockParameters;
+  }
+
+  /** What identifies the clock parameters, for the compilation caches. */
+  private get clockParameterKey() {
+    return (this.clockParameters?.names ?? []).join(",");
+  }
+
+  /** Their values at the clock's current time. */
+  private clockParameterValues(): ReadonlyMap<string, number> {
+    const clock = this.clockParameters;
+    if (clock === undefined) return new Map();
+    const at = clock.at(this.clockSeconds);
+    // Keyed as the compiler names them: `V_{x1}` is `V_x1`.
+    return new Map(
+      clock.names.map((name, i) => [canonicalIdentifier(name), at[i]])
+    );
+  }
+
+  /**
+   * The environment fields are compiled against: the graph's, and the clock
+   * parameters as names with values, which the graph does not define.
+   */
+  private get compileEnvironment(): FieldEnvironment {
+    const clock = this.clockParameters;
+    if (clock === undefined) return this.environment;
+    return {
+      ...this.environment,
+      scalars: new Set([
+        ...this.environment.scalars,
+        ...clock.names.map(canonicalIdentifier),
+      ]),
+    };
+  }
 
   // ---- what the rest of the graph defines ----------------------------------
 
@@ -927,7 +983,12 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       ]),
     ];
     const values = new Map<string, number>();
+    const clock = new Set(
+      (this.clockParameters?.names ?? []).map(canonicalIdentifier)
+    );
     for (const name of names) {
+      // Worked out each frame instead (see clockParameterValues).
+      if (clock.has(name)) continue;
       let helper = this.parameterHelpers.get(name);
       if (helper === undefined) {
         helper = this.calc.HelperExpression({
@@ -943,8 +1004,14 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.setParameterValues(values);
   }
 
-  /** Hands the values to whatever is drawing. */
+  /**
+   * Hands the values to whatever is drawing: the graph's, with the clock
+   * parameters' values at this instant.
+   */
   private setParameterValues(values: ReadonlyMap<string, number>) {
+    this.graphParameterValues = values;
+    const clock = this.clockParameterValues();
+    if (clock.size > 0) values = new Map([...values, ...clock]);
     this.parameterValues = values;
     this.arrowOverlay.setParameters(values);
     this.flowOverlay.setParameters(values);
@@ -1368,11 +1435,12 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       cached.zLatex === config.components.zLatex &&
       cached.fLatex === config.scalar.fLatex &&
       cached.seedLatex === spaceSeedLatex(config) &&
-      cached.revision === this.environmentRevision
+      cached.revision === this.environmentRevision &&
+      cached.clockNames === this.clockParameterKey
     ) {
       return cached.result;
     }
-    const result = compileField3D(config, this.environment, (latex) =>
+    const result = compileField3D(config, this.compileEnvironment, (latex) =>
       this.gradient(latex, ["x", "y", "z"])
     );
     this.field3dCache = {
@@ -1383,6 +1451,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       fLatex: config.scalar.fLatex,
       seedLatex: spaceSeedLatex(config),
       revision: this.environmentRevision,
+      clockNames: this.clockParameterKey,
       result,
     };
     return result;
@@ -2769,11 +2838,12 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       cached.seedLatex === flowSeedLatex(config) &&
       // The same component compiles to different GLSL against a different set
       // of definitions, so the environment is part of what this identifies.
-      cached.revision === this.environmentRevision
+      cached.revision === this.environmentRevision &&
+      cached.clockNames === this.clockParameterKey
     ) {
       return cached.result;
     }
-    const result = compileFlowField(config, this.environment);
+    const result = compileFlowField(config, this.compileEnvironment);
     this.flowCompilationCache = {
       source: config.source,
       xLatex: config.components.xLatex,
@@ -2781,6 +2851,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       fLatex: config.scalar.fLatex,
       seedLatex: flowSeedLatex(config),
       revision: this.environmentRevision,
+      clockNames: this.clockParameterKey,
       result,
     };
     return result;

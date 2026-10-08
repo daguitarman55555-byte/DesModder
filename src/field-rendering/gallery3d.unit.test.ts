@@ -12,6 +12,12 @@ const FIELD_GALLERY = SHARED.map(withVariablesInlined);
 const PHYSICS = new Set(
   SHARED.filter((preset) => preset.variables !== undefined).map((p) => p.id)
 );
+/** Presets whose bodies the clock moves through clock parameters, not t. */
+const CLOCKED = new Set(
+  SHARED.filter((preset) => preset.clockParameters !== undefined).map(
+    (p) => p.id
+  )
+);
 const FLAT = new Set(["cellular", "karman", "wires", "cylinder", "capacitor"]);
 
 describe("every gallery preset has a 3D form", () => {
@@ -87,7 +93,7 @@ describe("every gallery preset moves with the clock", () => {
   test.each(FIELD_GALLERY.map((preset) => [preset.id, preset] as const))(
     "%s reads t in 2D and in 3D",
     (_id, preset) => {
-      if (PHYSICS.has(preset.id)) return;
+      if (PHYSICS.has(preset.id) || CLOCKED.has(preset.id)) return;
       expect(
         readsTime([preset.xLatex, preset.yLatex, preset.seedLatex], plane)
       ).toBe(true);

@@ -14,42 +14,6 @@ export const rho = String.raw`\sqrt{x^{2}+y^{2}}`;
 
 type Axis = "x" | "y" | "z";
 
-/** A number as the presets write it: `z-0.6` or `z+1.2`, never `z--1.2`. */
-function minus(v: string, c: number) {
-  return c >= 0 ? `${v}-${c}` : `${v}+${-c}`;
-}
-
-/**
- * Stars pulling the gas round them, as `−(r − c)/(|r − c|² + soft)^1.1` per
- * star — a softened gravity, slightly steeper than 1/r so streams converge —
- * with the stars at `centres` circling the z-axis together at `w` radians per
- * unit of t. Returns the field's components on the axes asked for.
- */
-export function orbitingWells(
-  centres: readonly (readonly [number, number, number])[],
-  w: number,
-  axes: readonly Axis[],
-  soft: number
-): Partial<Record<Axis, string>> {
-  const cos = String.raw`\cos\left(${w}t\right)`;
-  const sin = String.raw`\sin\left(${w}t\right)`;
-  const offsets = centres.map(([x0, y0, z0]) => ({
-    x: String.raw`\left(x-\left(${x0}${cos}${y0 >= 0 ? "-" : "+"}${Math.abs(y0)}${sin}\right)\right)`,
-    y: String.raw`\left(y-\left(${x0}${sin}${y0 >= 0 ? "+" : "-"}${Math.abs(y0)}${cos}\right)\right)`,
-    z: z0 === 0 ? "z" : String.raw`\left(${minus("z", z0)}\right)`,
-  }));
-  const out: Partial<Record<Axis, string>> = {};
-  for (const axis of axes) {
-    out[axis] = offsets
-      .map((d) => {
-        const r2 = axes.map((a) => `${d[a]}^{2}`).join("+");
-        return String.raw`\frac{-${d[axis]}}{\left(${r2}+${soft}\right)^{1.1}}`;
-      })
-      .join("+");
-  }
-  return out;
-}
-
 /**
  * Von Kármán's vortex street: two infinite rows of point vortices, spaced
  * 2π/k along the stream and `y0` either side of it, in a stream of 1, the
@@ -166,60 +130,6 @@ export function sum(terms: readonly (readonly [number, string])[]) {
   return out === "" ? "0" : out;
 }
 
-const TAU = 2 * Math.PI;
-
-/** sin(k(wt + φ)), or cos, with its phase brought into [0, 2π). */
-function sinTurn(k: number, w: number, phase: number, trig = "sin") {
-  const p = (((k * phase) % TAU) + TAU) % TAU;
-  return (
-    `\\${trig}` +
-    String.raw`\left(${sum([
-      [k * w, "t"],
-      [p, ""],
-    ])}\right)`
-  );
-}
-
-/** How fast body `i` moves along the figure eight: its position's derivative. */
-export function figureEightVelocity(i: number, w: number, size: number) {
-  const phase = (TAU * i) / 3;
-  return {
-    x: sum([
-      [-1.1008 * size * w, sinTurn(1, w, phase, "cos")],
-      [5 * 0.0254 * size * w, sinTurn(5, w, phase, "cos")],
-    ]),
-    y: sum([
-      [-2 * 0.3388 * size * w, sinTurn(2, w, phase, "cos")],
-      [-4 * 0.056 * size * w, sinTurn(4, w, phase, "cos")],
-    ]),
-  };
-}
-
-/**
- * Where body `i` of three is on the figure-eight orbit, at `w` radians of the
- * orbit per unit of t, scaled by `size`: Chenciner and Montgomery's stable
- * three-body orbit (2000), three equal masses chasing each other round one
- * figure eight, a third of a period apart.
- *
- * Its Fourier series, fitted to the orbit integrated from Simó's initial
- * conditions (it closes to 4×10⁻⁸ after one period): x is odd harmonics, y
- * even, and four terms put every body within 1% of the orbit's width of
- * where it really is.
- */
-export function figureEightBody(i: number, w: number, size: number) {
-  const phase = (TAU * i) / 3;
-  return {
-    x: sum([
-      [-1.1008 * size, sinTurn(1, w, phase)],
-      [0.0254 * size, sinTurn(5, w, phase)],
-    ]),
-    y: sum([
-      [-0.3388 * size, sinTurn(2, w, phase)],
-      [-0.056 * size, sinTurn(4, w, phase)],
-    ]),
-  };
-}
-
 type Vec3 = readonly [number, number, number];
 
 /** a − (c), bracketed; just a where c is nothing. */
@@ -257,100 +167,6 @@ function cross(n: Vec3, d: Record<Axis, string>): Record<Axis, string> {
       [-n[1], d.x],
     ]),
   };
-}
-
-/**
- * Bodies pulling the gas round them, wherever their positions put them (the
- * positions may read t): each pulls as `−pull·d/(|d|² + soft)^1.1`, a
- * softened gravity a little steeper than 1/r so streams converge, and turns
- * it round `normal` (in the plane, anticlockwise) as `swirl·n×d/(|d|² +
- * soft)`, so it falls in on a spiral, as gas does onto a star.
- */
-export function wells(
-  centres: readonly Partial<Record<Axis, string>>[],
-  axes: readonly Axis[],
-  o: { soft: number; pull: number; swirl: number; normal?: Vec3 }
-): Partial<Record<Axis, string>> {
-  const normal = o.normal ?? [0, 0, 1];
-  const out: Partial<Record<Axis, string>> = {};
-  for (const axis of axes) {
-    out[axis] = centres
-      .map((c) => {
-        const d = {
-          x: offset("x", c.x),
-          y: offset("y", c.y),
-          z: offset("z", c.z),
-        };
-        const r2 = axes.map((a) => `${d[a]}^{2}`).join("+");
-        const turn = cross(normal, d)[axis];
-        const fall = String.raw`\frac{${sum([[-o.pull, d[axis]]])}}{\left(${r2}+${o.soft}\right)^{1.1}}`;
-        return turn === "0" || o.swirl === 0
-          ? fall
-          : String.raw`${fall}+\frac{${num(o.swirl)}\left(${turn}\right)}{${r2}+${o.soft}}`;
-      })
-      .join("+")
-      .replace(/\+-/g, "-");
-  }
-  return out;
-}
-
-/**
- * Two bodies on Kepler orbits round their common centre of mass: semi-major
- * axis `a` of their separation, eccentricity `e`, mean motion `n` radians
- * per unit of t, the second body `ratio` times the first's mass. The orbit
- * lies in the plane tilted `tilt` radians about the x-axis.
- *
- * Where a body is on an ellipse at a given time is Kepler's equation, which
- * has no closed form; the true anomaly's series in e to e⁴ (the equation of
- * the centre) is within 0.02 rad at e = 0.35. Velocities are the exact
- * ones at that anomaly, v = na/√(1 − e²)·(−sin θ, e + cos θ).
- */
-export function keplerPair(o: {
-  a: number;
-  e: number;
-  n: number;
-  ratio: number;
-  tilt: number;
-}) {
-  const { a, e, n } = o;
-  const M = (k: number) => String.raw`\sin\left(${sum([[k * n, "t"]])}\right)`;
-  const theta = sum([
-    [n, "t"],
-    [2 * e - e ** 3 / 4, M(1)],
-    [(5 / 4) * e ** 2 - (11 / 24) * e ** 4, M(2)],
-    [(13 / 12) * e ** 3, M(3)],
-    [(103 / 96) * e ** 4, M(4)],
-  ]);
-  const cos = String.raw`\cos\left(${theta}\right)`;
-  const sin = String.raw`\sin\left(${theta}\right)`;
-  const p = a * (1 - e * e);
-  const K = (n * a) / Math.sqrt(1 - e * e);
-  const ci = Math.cos(o.tilt);
-  const si = Math.sin(o.tilt);
-  // Each body's share of the separation: the lighter one moves further.
-  const shares = [-o.ratio / (1 + o.ratio), 1 / (1 + o.ratio)];
-  return shares.map((f) => {
-    const radial = (c: number, trig: string) =>
-      String.raw`\frac{${sum([[c * f * p, trig]])}}{1+${num(e)}${cos}}`;
-    return {
-      position: {
-        x: radial(1, cos),
-        y: radial(ci, sin),
-        z: radial(si, sin),
-      },
-      velocity: {
-        x: sum([[-f * K, sin]]),
-        y: sum([
-          [f * K * ci * e, ""],
-          [f * K * ci, cos],
-        ]),
-        z: sum([
-          [f * K * si * e, ""],
-          [f * K * si, cos],
-        ]),
-      },
-    };
-  });
 }
 
 /**

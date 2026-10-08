@@ -1,14 +1,56 @@
 /** Space: black holes, galaxies, stars and the solar wind. */
-import {
-  carriedWorlds,
-  figureEightBody,
-  figureEightVelocity,
-  keplerPair,
-  num,
-  rho,
-  separation,
-} from "./latex";
-import type { GalleryPreset } from "./types";
+import { carriedWorlds, num, rho, separation } from "./latex";
+import { figureEight, keplerPair, type PlanarState } from "./orbits";
+import type { ClockParameters, GalleryPreset } from "./types";
+
+type Axis = "x" | "y" | "z";
+
+/**
+ * Bodies whose motion the CPU works out each frame (see orbits.ts), as the
+ * names the field reads them by: `${p}_{x1}` is body 1's x, `${v}_{x1}` its
+ * velocity's. In the box, the orbit's plane is tilted `tilt` about the
+ * x-axis. Returns each body's position and velocity as LaTeX names, and the
+ * clock parameters that fill them in.
+ */
+function movingBodies(
+  count: number,
+  axes: readonly Axis[],
+  letters: { position: string; velocity: string },
+  tilt: number,
+  state: (t: number) => PlanarState
+) {
+  const name = (letter: string, axis: Axis, i: number) =>
+    `${letter}_{${axis}${i + 1}}`;
+  const bodies = Array.from({ length: count }, (_, i) => ({
+    position: Object.fromEntries(
+      axes.map((a) => [a, name(letters.position, a, i)])
+    ) as Partial<Record<Axis, string>>,
+    velocity: Object.fromEntries(
+      axes.map((a) => [a, name(letters.velocity, a, i)])
+    ) as Partial<Record<Axis, string>>,
+  }));
+  const names = [letters.position, letters.velocity].flatMap((letter) =>
+    Array.from({ length: count }, (_, i) =>
+      axes.map((a) => name(letter, a, i))
+    ).flat()
+  );
+  const c = Math.cos(tilt);
+  const s = Math.sin(tilt);
+  // The plane's (x, y) laid into the box: y along (0, cos, sin).
+  const place = (x: number, y: number) =>
+    axes.length === 3 ? [x, c * y, s * y] : [x, y];
+  const clock: ClockParameters = {
+    names,
+    at: (t) => {
+      const st = state(t);
+      const out: number[] = [];
+      for (let i = 0; i < count; i++) out.push(...place(st.x[i], st.y[i]));
+      for (let i = 0; i < count; i++) out.push(...place(st.vx[i], st.vy[i]));
+      return out;
+    },
+  };
+  return { bodies, clock, normal: [0, -s, c] as const };
+}
 
 /**
  * Three stars on the figure-eight orbit, each carrying a cluster of glowing
@@ -20,40 +62,31 @@ import type { GalleryPreset } from "./types";
  */
 const EIGHT_TILT = 0.5;
 const EIGHT_W = 0.6;
-function eight(axes: readonly ("x" | "y" | "z")[], size: number) {
+function eight(axes: readonly Axis[], size: number) {
   const three = axes.length === 3;
-  const c = num(Math.cos(EIGHT_TILT));
-  const sn = num(Math.sin(EIGHT_TILT));
-  const tilt = (v: { x: string; y: string }) =>
-    three
-      ? {
-          x: v.x,
-          y: String.raw`${c}\left(${v.y}\right)`,
-          z: String.raw`${sn}\left(${v.y}\right)`,
-        }
-      : v;
-  const stars = [0, 1, 2].map((i) => ({
-    position: tilt(figureEightBody(i, EIGHT_W, size)),
-    velocity: tilt(figureEightVelocity(i, EIGHT_W, size)),
-    reach: size * 0.2,
-    swirl: size * 0.5,
-  }));
-  const field = carriedWorlds(
-    stars,
+  const moving = movingBodies(
+    3,
     axes,
-    [0, -Math.sin(EIGHT_TILT), Math.cos(EIGHT_TILT)],
+    { position: "S", velocity: "V" },
+    three ? EIGHT_TILT : 0,
+    (t) => figureEight(t, EIGHT_W, size)
+  );
+  const field = carriedWorlds(
+    moving.bodies.map((b) => ({ ...b, reach: size * 0.2, swirl: size * 0.5 })),
+    axes,
+    moving.normal,
     1
   );
   // Each star's cluster, bright and tight. Nothing else: with the seed on,
   // the picture is the orbit, as the animations of it show it; switched off,
   // the gravity drawing in the gas round it is the rest of the field.
-  const seed = [
-    ...stars.map(
+  const seed = moving.bodies
+    .map(
       (b) =>
         String.raw`e^{-\frac{${separation(b.position, axes).r2}}{${num((size * (three ? 0.1 : 0.07)) ** 2)}}}`
-    ),
-  ].join("+");
-  return { ...field, seed };
+    )
+    .join("+");
+  return { ...field, seed, clock: moving.clock };
 }
 const CLUSTER_2D = eight(["x", "y"], 6);
 const CLUSTER_3D = eight(["x", "y", "z"], 3.6);
@@ -64,7 +97,7 @@ const CLUSTER_3D = eight(["x", "y", "z"], 3.6);
  * carrying its own circling material; the larger one has a ring.
  */
 function doublePlanet(
-  axes: readonly ("x" | "y" | "z")[],
+  axes: readonly Axis[],
   o: {
     a: number;
     e: number;
@@ -75,29 +108,29 @@ function doublePlanet(
     swirl: readonly [number, number];
   }
 ) {
-  const pair = keplerPair({
-    a: o.a,
-    e: o.e,
-    n: 0.4,
-    ratio: 0.45,
-    tilt: o.tilt,
-  });
-  const normal = [0, -Math.sin(o.tilt), Math.cos(o.tilt)] as const;
+  const moving = movingBodies(
+    2,
+    axes,
+    { position: "P", velocity: "W" },
+    o.tilt,
+    (t) => keplerPair(t, { a: o.a, e: o.e, n: 0.4, ratio: 0.45 })
+  );
   const field = carriedWorlds(
-    pair.map((p, i) => ({
-      ...p,
+    moving.bodies.map((b, i) => ({
+      ...b,
       reach: o.reach[i],
       // Faster round each world than the world moves, so no side of its
       // material stands still in the frame it is drawn in, which drew dark.
       swirl: o.swirl[i],
     })),
     axes,
-    normal
+    moving.normal
   );
+  const { normal } = moving;
   // Each world a ball of its material; round the larger, a thin ring in the
   // orbit's plane, as Saturn's lies in its equator.
-  const seeds = pair.map((p, i) => {
-    const { d, r2 } = separation(p.position, axes);
+  const seeds = moving.bodies.map((b, i) => {
+    const { d, r2 } = separation(b.position, axes);
     const ball = String.raw`e^{-\frac{${r2}}{${num(o.ball[i] ** 2)}}}`;
     if (i !== 0) return ball;
     const height =
@@ -112,7 +145,7 @@ function doublePlanet(
       axes.length === 2 ? "" : String.raw`e^{-\frac{${height}^{2}}{0.004}}`;
     return String.raw`${ball}+0.6${flat}e^{-\frac{\left(\sqrt{${across}}-${num(o.ring)}\right)^{2}}{${num((0.12 * o.ring) ** 2)}}}`;
   });
-  return { ...field, seed: seeds.join("+") };
+  return { ...field, seed: seeds.join("+"), clock: moving.clock };
 }
 
 const PLANETS_2D = doublePlanet(["x", "y"], {
@@ -448,6 +481,7 @@ export const SPACE: readonly GalleryPreset[] = [
     xLatex: CLUSTER_2D.x!,
     yLatex: CLUSTER_2D.y!,
     seedLatex: CLUSTER_2D.seed,
+    clockParameters: CLUSTER_2D.clock,
     colorScale: 4,
     palette: "blackbody",
     backdrop: "#05030c",
@@ -471,6 +505,7 @@ export const SPACE: readonly GalleryPreset[] = [
       yLatex: CLUSTER_3D.y!,
       zLatex: CLUSTER_3D.z!,
       seedLatex: CLUSTER_3D.seed,
+      clockParameters: CLUSTER_3D.clock,
       look: {
         palette: "blackbody",
         particles: 20_000,
@@ -498,6 +533,7 @@ export const SPACE: readonly GalleryPreset[] = [
     xLatex: PLANETS_2D.x!,
     yLatex: PLANETS_2D.y!,
     seedLatex: PLANETS_2D.seed,
+    clockParameters: PLANETS_2D.clock,
     colorScale: 1.6,
     palette: "worlds",
     backdrop: "#02040c",
@@ -521,6 +557,7 @@ export const SPACE: readonly GalleryPreset[] = [
       yLatex: PLANETS_3D.y!,
       zLatex: PLANETS_3D.z!,
       seedLatex: PLANETS_3D.seed,
+      clockParameters: PLANETS_3D.clock,
       look: {
         palette: "worlds",
         particles: 30_000,

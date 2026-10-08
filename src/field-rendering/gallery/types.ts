@@ -50,6 +50,22 @@ export interface GalleryVariable {
   step?: number;
 }
 
+/**
+ * Numbers a preset's field reads that move with the clock — where its
+ * bodies are, how fast they go — worked out on the CPU once a frame and
+ * handed to the shader as uniforms, like a slider's value.
+ *
+ * For anything whose motion is a function of t alone: written into the
+ * field as a formula in t instead, every particle would work it out again
+ * in every term (see gallery/orbits.ts for what that cost).
+ */
+export interface ClockParameters {
+  /** Desmos names: a letter with a subscript, e.g. `S_{x1}`. */
+  names: readonly string[];
+  /** Their values at time t, in the order of `names`. */
+  at: (t: number) => readonly number[];
+}
+
 export interface GalleryPreset {
   id: string;
   name: string;
@@ -77,6 +93,8 @@ export interface GalleryPreset {
   lensHorizon?: number;
   /** The numbers the field is written in, loaded as sliders. */
   variables?: readonly GalleryVariable[];
+  /** Numbers that move with the clock, worked out each frame. */
+  clockParameters?: ClockParameters;
   /** The speed the 2D colour ramp spans, where Auto's would not suit. */
   colorScale?: number;
   /** One colour rather than a ramp, for the 2D flow. */
@@ -101,6 +119,8 @@ export interface GalleryPreset {
     lensHorizon?: number;
     /** The numbers the 3D field is written in, where they differ. */
     variables?: readonly GalleryVariable[];
+    /** Numbers that move with the clock, for the 3D field. */
+    clockParameters?: ClockParameters;
     /** How the 3D flow is drawn, over the caller's defaults. */
     look?: Partial<SpaceLook>;
   };
