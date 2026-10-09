@@ -18,7 +18,14 @@ const CLOCKED = new Set(
     (p) => p.id
   )
 );
-const FLAT = new Set(["cellular", "karman", "wires", "cylinder", "capacitor"]);
+const FLAT = new Set([
+  "cellular",
+  "karman",
+  "wires",
+  "cylinder",
+  "capacitor",
+  "uniform-field",
+]);
 
 describe("every gallery preset has a 3D form", () => {
   const space = { ...EMPTY_ENVIRONMENT, dimensions: 3 as const };

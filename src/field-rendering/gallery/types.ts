@@ -72,7 +72,7 @@ export interface SceneItem {
   lines?: boolean;
   points?: boolean;
   lineWidth?: number;
-  lineOpacity?: number;
+  lineOpacity?: number | string;
   lineStyle?: "SOLID" | "DASHED" | "DOTTED";
   pointSize?: number;
   pointOpacity?: number;
@@ -115,6 +115,8 @@ export interface ClockParameters {
 }
 
 export interface GalleryPreset {
+  /** Owned native scene scalar advanced by the plugin clock (no graph ticker). */
+  sceneTime?: string;
   id: string;
   name: string;
   category: GalleryCategory;

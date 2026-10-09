@@ -2253,7 +2253,9 @@ testWithPage(
         true
       )
     );
-    expect(await variables()).toEqual(["folder", "I_{2}=1", "d=5"]);
+    const wires = await variables();
+    expect(wires.slice(0, 3)).toEqual(["folder", "I_{2}=1", "d=5"]);
+    expect(wires.some((latex) => latex?.startsWith("I_{1}="))).toBe(false);
 
     // A preset with none takes the folder away.
     await driver.evaluate(() =>

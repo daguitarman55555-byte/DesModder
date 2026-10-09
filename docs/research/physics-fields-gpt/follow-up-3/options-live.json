@@ -1,0 +1,14 @@
+[
+  {
+    "id": "wires",
+    "errors": []
+  },
+  {
+    "id": "cylinder",
+    "clock": {
+      "seconds": 0.5995050000000011,
+      "native": "T_{scene}=0.6"
+    },
+    "errors": []
+  }
+]

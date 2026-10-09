@@ -161,7 +161,7 @@ function sceneItemSpec(
   item: SceneItem,
   folderId: string
 ): GeneratedExpressionSpec {
-  const n = (value: number | undefined) =>
+  const n = (value: number | string | undefined) =>
     value === undefined ? undefined : String(value);
   const range = (r: readonly [string, string] | undefined) =>
     r === undefined ? undefined : { min: r[0], max: r[1] };
@@ -845,6 +845,8 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
    * arrows stay the still picture they were.
    */
   get fieldUsesTime() {
+    if (galleryPreset(this.activePresetId ?? "")?.sceneTime !== undefined)
+      return true;
     // Bodies whose motion the clock drives move the field without it
     // mentioning t.
     if (this.clockParameters !== undefined) return true;
@@ -926,6 +928,21 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
    */
   private showClockTime(seconds: number) {
     this.clockSeconds = seconds;
+    const sceneTime = galleryPreset(this.activePresetId ?? "")?.sceneTime;
+    if (sceneTime !== undefined) {
+      const id = presetVariableID(sceneTime);
+      const old = itemLatex(this.cc.getItemModel(id));
+      const value = Math.round(seconds * 30) / 30;
+      // Only numeric output still owned by this preset; never create/overwrite a student definition.
+      if (
+        old.startsWith(`${sceneTime}=`) &&
+        Number.isFinite(Number(old.slice(old.indexOf("=") + 1))) &&
+        Number(old.slice(old.indexOf("=") + 1)) !== value
+      )
+        this.calc.withHistoryReplacement(() =>
+          this.calc.setExpression({ id, latex: `${sceneTime}=${value}` })
+        );
+    }
     this.arrowOverlay.setTime(seconds);
     this.flowOverlay.setTime(seconds);
     this.arrow3d?.setTime(seconds);

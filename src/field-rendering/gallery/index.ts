@@ -38,7 +38,6 @@
  * where it came from.
  */
 import { CHAOS } from "./chaos";
-import { FIELDS } from "./fields";
 import { FLUIDS } from "./fluids";
 import { PHYSICS } from "./physics";
 import { SPACE } from "./space";
@@ -52,7 +51,6 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   ...SPACE,
   ...FLUIDS,
   ...CHAOS,
-  ...FIELDS,
   ...PHYSICS,
 ];
 
