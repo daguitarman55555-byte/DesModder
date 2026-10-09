@@ -36,6 +36,7 @@ export type PaletteID =
   | "blue-red"
   | "coolwarm"
   | "charge"
+  | "charge-glow"
   | "grayscale"
   | "sunset"
   | "ocean"
@@ -238,6 +239,20 @@ export const PALETTES: Record<PaletteID, Palette> = {
       { at: 0, rgb: [24, 84, 170] },
       { at: 0.5, rgb: [78, 86, 104] },
       { at: 1, rgb: [186, 52, 34] },
+    ],
+  },
+  // Charge on the dark, for Majestic mode: the same blue for negative and
+  // red for positive, lit to glow, and a dim violet for zero rather than a
+  // slate that the black would swallow.
+  "charge-glow": {
+    name: "Charge glow",
+    group: "diverging",
+    stops: [
+      { at: 0, rgb: [70, 150, 255] },
+      { at: 0.25, rgb: [60, 95, 190] },
+      { at: 0.5, rgb: [70, 62, 105] },
+      { at: 0.75, rgb: [205, 70, 50] },
+      { at: 1, rgb: [255, 170, 90] },
     ],
   },
   grayscale: {
@@ -664,6 +679,29 @@ export function paletteCSSGradient(
           return rgb(hueRamp(at), at);
         })
       : paletteStops(id).map((stop) => rgb(stop.rgb, stop.at));
+  return `linear-gradient(to right, ${stops.join(", ")})`;
+}
+
+/**
+ * Part of a ramp, `from` to `to`, as a CSS gradient across its full width:
+ * a legend for a quantity that uses only half the palette, a field's
+ * strength or a well's depth, shows only that half. Sampled from the lookup
+ * table the shaders read, so it is the colours the field is drawn in.
+ */
+export function paletteCSSRange(
+  id: PaletteID,
+  from: number,
+  to: number,
+  adjust: ColorAdjust = NO_COLOR_ADJUST
+): string {
+  const lut = paletteLUT(id, adjust);
+  const samples = 12;
+  const stops = Array.from({ length: samples + 1 }, (_, i) => {
+    const t = from + ((to - from) * i) / samples;
+    const k =
+      Math.round(Math.min(1, Math.max(0, t)) * (PALETTE_LUT_SIZE - 1)) * 4;
+    return `rgb(${lut[k]},${lut[k + 1]},${lut[k + 2]}) ${Math.round((i / samples) * 100)}%`;
+  });
   return `linear-gradient(to right, ${stops.join(", ")})`;
 }
 

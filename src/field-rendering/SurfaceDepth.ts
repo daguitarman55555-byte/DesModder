@@ -187,14 +187,23 @@ export class SurfaceDepth {
     box: Box3D,
     resolution: number,
     parameters: ReadonlyMap<string, number>,
-    time: number
+    time: number,
+    cutOut = false
   ) {
     const { gl } = this;
     if (this.programs.length === 0) return;
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LESS);
     gl.depthMask(true);
-    gl.colorMask(false, false, false, false);
+    if (cutOut) {
+      // Clear what is already drawn where a surface is, colour and all: a
+      // backdrop laid over the graph is cut away from the graph's solids, so
+      // they show on the dark instead of under it. Whatever the surface's
+      // shader outputs, a blend of zero and zero leaves nothing.
+      gl.colorMask(true, true, true, true);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ZERO, gl.ZERO);
+    } else gl.colorMask(false, false, false, false);
     const res = Math.max(2, Math.round(resolution));
     for (const { surface, program, uniforms: u } of this.programs) {
       gl.useProgram(program);
@@ -210,6 +219,7 @@ export class SurfaceDepth {
       gl.drawArrays(gl.TRIANGLES, 0, res * res * 6);
     }
     gl.colorMask(true, true, true, true);
+    if (cutOut) gl.disable(gl.BLEND);
   }
 
   dispose() {

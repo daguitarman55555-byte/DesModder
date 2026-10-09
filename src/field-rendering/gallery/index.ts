@@ -38,6 +38,7 @@
  * where it came from.
  */
 import { CHAOS } from "./chaos";
+import { COLOR_MEANINGS } from "./meanings";
 import { FLUIDS } from "./fluids";
 import { PHYSICS } from "./physics";
 import { SPACE } from "./space";
@@ -46,13 +47,19 @@ import type { ClockParameters, GalleryPreset, GalleryVariable } from "./types";
 
 export * from "./types";
 
-/** Every preset, shelf by shelf, in the order the presets window shows them. */
+/**
+ * Every preset, shelf by shelf, in the order the presets window shows them,
+ * each with what its colour means.
+ */
 export const FIELD_GALLERY: readonly GalleryPreset[] = [
   ...SPACE,
   ...FLUIDS,
   ...CHAOS,
   ...PHYSICS,
-];
+].map((preset) => ({
+  ...preset,
+  meaning: preset.meaning ?? COLOR_MEANINGS[preset.id],
+}));
 
 /**
  * The preset with its variables written in as their values, and its clock

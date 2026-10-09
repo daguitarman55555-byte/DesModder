@@ -80,7 +80,16 @@ export const FLUIDS: readonly GalleryPreset[] = [
     xLatex: String.raw`0.5+\sin\left(x-0.5t\right)\cos\left(y\right)`,
     yLatex: String.raw`-\cos\left(x-0.5t\right)\sin\left(y\right)`,
     colorScale: 0.5,
-    palette: "aurora",
+    // Coloured by which way the fluid spins where it is: its vorticity,
+    // ∂v/∂x − ∂u/∂y, which for these cells is exactly 2 sin(x − 0.5t) sin y.
+    // Red turns counter-clockwise and blue clockwise, so the alternating
+    // cells read as alternating at a glance; speed would colour them alike.
+    palette: "charge-glow",
+    tint: {
+      latex: String.raw`2\sin\left(x-0.5t\right)\sin\left(y\right)`,
+      latex3d: String.raw`2\sin\left(x-0.5t\right)\sin\left(y\right)`,
+      scale: 1,
+    },
     backdrop: "#02060a",
     flow: {
       particleCount: 40_000,

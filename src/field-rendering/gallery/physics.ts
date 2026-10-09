@@ -238,6 +238,7 @@ const CHARGES_SCENE_2D: SceneItem[] = (() => {
       // the whole graph. On a change of a charge or the distance that took
       // 400 ms as a list of 81 levels and 320 as the 17 that exist; this, 100.
       key: "lines",
+      explains: true,
       latex: String.raw`\sin\left(4\pi\left(\frac{q_{1}\left(x+\frac{d}{2}\right)}{${r("+")}}+\frac{q_{2}\left(x-\frac{d}{2}\right)}{${r("-")}}\right)\right)=0\left\{s_{lines}=1\right\}\left\{${outside}\right\}\left\{\left|y\right|>0.02\right\}`,
       color: "#2c3646",
       lineWidth: 2,
@@ -246,6 +247,7 @@ const CHARGES_SCENE_2D: SceneItem[] = (() => {
     {
       // The axis through them, which every contour above meets edge-on.
       key: "axis",
+      explains: true,
       latex: String.raw`y=0\left\{s_{lines}=1\right\}\left\{${outside}\right\}`,
       color: "#2c3646",
       lineWidth: 2,
@@ -253,6 +255,7 @@ const CHARGES_SCENE_2D: SceneItem[] = (() => {
     },
     {
       key: "equipotentials",
+      explains: true,
       latex: String.raw`\frac{q_{1}}{${r("+")}}+\frac{q_{2}}{${r("-")}}=\left[-1,-0.5,-0.25,-0.1,0,0.1,0.25,0.5,1\right]\left\{s_{equi}=1\right\}\left\{${outside}\right\}`,
       color: "#303030",
       lineStyle: "DASHED",
@@ -260,6 +263,7 @@ const CHARGES_SCENE_2D: SceneItem[] = (() => {
     },
     {
       key: "probe",
+      explains: true,
       latex: String.raw`\left(p_{x},p_{y}\right)`,
       color: "#222222",
       points: true,
@@ -297,6 +301,7 @@ const CHARGES_SCENE_3D: SceneItem[] = (() => {
     ball(2, String.raw`\frac{d}{2}`),
     {
       key: "probe",
+      explains: true,
       latex: String.raw`\left(p_{x},p_{y},p_{z}\right)`,
       color: "#222222",
       points: true,

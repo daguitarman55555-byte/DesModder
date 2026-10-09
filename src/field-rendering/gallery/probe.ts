@@ -88,66 +88,68 @@ function displacement(p: ProbeSetup, a: ProbeArrow): SceneItem[] {
  * the rest of the figure.
  */
 export function probeArrows2D(p: ProbeSetup): SceneItem[] {
-  return p.arrows.flatMap((a) => {
-    const k = `${a.key}vt`;
-    const D = `D_{${k}}`;
-    const L = `l_{${k}}`;
-    const U = `U_{${k}}`;
-    const H = `H_{${k}}`;
-    const Q = `Q_{${k}}`;
-    const N = String.raw`\left(-${U}.y,${U}.x\right)`;
-    const colors = { color: a.color, colorLatex: a.colorLatex };
-    return [
-      ...displacement(p, a),
-      {
-        key: `${a.key}L`,
-        latex: String.raw`${L}=\sqrt{${D}.x^{2}+${D}.y^{2}}`,
-        hidden: true,
-      },
-      {
-        key: `${a.key}U`,
-        latex: String.raw`${U}=\frac{${D}}{\max\left(${L},10^{-9}\right)}`,
-        hidden: true,
-      },
-      {
-        key: `${a.key}H`,
-        latex: String.raw`${H}=\min\left(0.45,0.3${L}\right)`,
-        hidden: true,
-      },
-      {
-        key: `${a.key}Q`,
-        latex: String.raw`${Q}=${p.at}+${D}`,
-        hidden: true,
-      },
-      {
-        key: `${a.key}shaft`,
-        latex: String.raw`${p.at}+t\left(${D}-${H}${U}\right)`,
-        domain: ["0", "1"],
-        lineWidth: 4,
-        ...colors,
-      },
-      {
-        key: `${a.key}head`,
-        latex: String.raw`\operatorname{polygon}\left(${Q},${Q}-${H}${U}+0.45${H}${N},${Q}-${H}${U}-0.45${H}${N}\right)`,
-        fill: true,
-        fillOpacity: 1,
-        lineWidth: 1,
-        ...colors,
-      },
-      {
-        // A point of size 0 past the tip, labelled. Size, not opacity:
-        // Desmos hides the label of a point whose opacity is 0.
-        key: `${a.key}name`,
-        latex: String.raw`${Q}+0.5${U}\left\{${p.names}=1\right\}`,
-        points: true,
-        lines: false,
-        pointSize: 0,
-        label: `\`${a.name}\``,
-        labelSize: 1.5,
-        ...colors,
-      },
-    ];
-  });
+  return explaining(
+    p.arrows.flatMap((a) => {
+      const k = `${a.key}vt`;
+      const D = `D_{${k}}`;
+      const L = `l_{${k}}`;
+      const U = `U_{${k}}`;
+      const H = `H_{${k}}`;
+      const Q = `Q_{${k}}`;
+      const N = String.raw`\left(-${U}.y,${U}.x\right)`;
+      const colors = { color: a.color, colorLatex: a.colorLatex };
+      return [
+        ...displacement(p, a),
+        {
+          key: `${a.key}L`,
+          latex: String.raw`${L}=\sqrt{${D}.x^{2}+${D}.y^{2}}`,
+          hidden: true,
+        },
+        {
+          key: `${a.key}U`,
+          latex: String.raw`${U}=\frac{${D}}{\max\left(${L},10^{-9}\right)}`,
+          hidden: true,
+        },
+        {
+          key: `${a.key}H`,
+          latex: String.raw`${H}=\min\left(0.45,0.3${L}\right)`,
+          hidden: true,
+        },
+        {
+          key: `${a.key}Q`,
+          latex: String.raw`${Q}=${p.at}+${D}`,
+          hidden: true,
+        },
+        {
+          key: `${a.key}shaft`,
+          latex: String.raw`${p.at}+t\left(${D}-${H}${U}\right)`,
+          domain: ["0", "1"],
+          lineWidth: 4,
+          ...colors,
+        },
+        {
+          key: `${a.key}head`,
+          latex: String.raw`\operatorname{polygon}\left(${Q},${Q}-${H}${U}+0.45${H}${N},${Q}-${H}${U}-0.45${H}${N}\right)`,
+          fill: true,
+          fillOpacity: 1,
+          lineWidth: 1,
+          ...colors,
+        },
+        {
+          // A point of size 0 past the tip, labelled. Size, not opacity:
+          // Desmos hides the label of a point whose opacity is 0.
+          key: `${a.key}name`,
+          latex: String.raw`${Q}+0.5${U}\left\{${p.names}=1\right\}`,
+          points: true,
+          lines: false,
+          pointSize: 0,
+          label: `\`${a.name}\``,
+          labelSize: 1.5,
+          ...colors,
+        },
+      ];
+    })
+  );
 }
 
 /**
@@ -156,24 +158,31 @@ export function probeArrows2D(p: ProbeSetup): SceneItem[] {
  * draws no labels, so each name is a point the plugin labels itself.
  */
 export function probeArrows3D(p: ProbeSetup): SceneItem[] {
-  return p.arrows.flatMap((a) => {
-    const k = `${a.key}vt`;
-    const D = `D_{${k}}`;
-    const colors = { color: a.color, colorLatex: a.colorLatex };
-    return [
-      ...displacement(p, a),
-      {
-        key: `${a.key}arrow`,
-        latex: String.raw`\operatorname{vector}\left(${p.at},${p.at}+${D}\right)`,
-        lineWidth: 1.5,
-        ...colors,
-      },
-      {
-        key: `${a.key}name`,
-        latex: String.raw`N_{${k}}=\left(${p.at}+${D}\cdot\left(1+\frac{0.35}{\max\left(\sqrt{${D}.x^{2}+${D}.y^{2}+${D}.z^{2}},10^{-9}\right)}\right)\right)\left\{${p.names}=1\right\}`,
-        hidden: true,
-        name3d: { label: a.name, color: a.nameColor },
-      },
-    ];
-  });
+  return explaining(
+    p.arrows.flatMap((a) => {
+      const k = `${a.key}vt`;
+      const D = `D_{${k}}`;
+      const colors = { color: a.color, colorLatex: a.colorLatex };
+      return [
+        ...displacement(p, a),
+        {
+          key: `${a.key}arrow`,
+          latex: String.raw`\operatorname{vector}\left(${p.at},${p.at}+${D}\right)`,
+          lineWidth: 1.5,
+          ...colors,
+        },
+        {
+          key: `${a.key}name`,
+          latex: String.raw`N_{${k}}=\left(${p.at}+${D}\cdot\left(1+\frac{0.35}{\max\left(\sqrt{${D}.x^{2}+${D}.y^{2}+${D}.z^{2}},10^{-9}\right)}\right)\right)\left\{${p.names}=1\right\}`,
+          hidden: true,
+          name3d: { label: a.name, color: a.nameColor },
+        },
+      ];
+    })
+  );
+}
+
+/** A probe and everything drawn from it explain the field: Majestic hides them. */
+function explaining(items: SceneItem[]): SceneItem[] {
+  return items.map((item) => ({ ...item, explains: true }));
 }

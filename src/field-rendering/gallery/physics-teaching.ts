@@ -667,6 +667,7 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
         pointSize: dim === 2 ? 12 : 4,
         color: "#222222",
         ...(dim === 3 ? { drag3d: ["p_{x}", "p_{y}", "p_{z}"] as const } : {}),
+        explains: true,
       }),
     ];
     const setup = {
@@ -714,6 +715,7 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
           "fieldlines",
           `${sin(mul(id === "earth-moon" ? "0.15" : id === "dipole" ? "3" : id === "capacitor" ? "0.25" : "1", raw`\pi`, m.stream))}=0${only("s_{lines}=1")}${only(mask)}${only(nonzero)}${extraMask}${id === "capacitor" ? only(`${abs("y-d/2")}>0.04`) + only(`${abs("y+d/2")}>0.04`) : ""}`,
           {
+            explains: true,
             lineWidth: 1.5,
             lineOpacity:
               id === "capacitor"
@@ -732,7 +734,12 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
         item(
           "equi",
           `${sin(mul(raw`\pi`, frac(m.potential, String(m.tintScale * (id === "capacitor" ? 2 : 1)))))}=0${only("s_{equi}=1")}${only(id === "shell-theorem" ? `${root("x^{2}+y^{2}")}>R` : m.valid)}`,
-          { lineStyle: "DASHED", color: "#303030", lineWidth: 1 }
+          {
+            explains: true,
+            lineStyle: "DASHED",
+            color: "#303030",
+            lineWidth: 1,
+          }
         )
       );
     }

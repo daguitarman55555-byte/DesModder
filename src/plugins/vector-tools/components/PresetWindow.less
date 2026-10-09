@@ -163,6 +163,40 @@
     color: #555;
   }
 
+  // What the colour means: the quantity, the palette as drawn, and what each
+  // end (and the middle, for a signed one) stands for.
+  .dsm-preset-window-legend {
+    margin: 8px 4px 2px;
+  }
+
+  .dsm-preset-window-legend-quantity {
+    font-weight: bold;
+    margin-bottom: 3px;
+  }
+
+  .dsm-preset-window-legend-bar {
+    height: 10px;
+    border-radius: 3px;
+    border: 1px solid #d0d0d0;
+  }
+
+  .dsm-preset-window-legend-ends {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    margin-top: 2px;
+    font-size: 11px;
+    color: #555;
+
+    span:nth-child(2) {
+      text-align: center;
+    }
+
+    span:last-child {
+      text-align: right;
+    }
+  }
+
   // Moving or still: two halves of one pill, the chosen one filled.
   .dsm-preset-window-motion {
     display: flex;

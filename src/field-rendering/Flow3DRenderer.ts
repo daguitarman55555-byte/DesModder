@@ -1247,7 +1247,10 @@ export class Flow3DRenderer implements Overlay3DRenderer {
           ? AUTO_SURFACE_RESOLUTION
           : o.surfaceResolution,
         this.parameters,
-        this.time
+        this.time,
+        // On a backdrop, cut it away where the graph's solids are, so a
+        // charge or a plate shows on the dark rather than vanishing under it.
+        ba > 0
       );
     }
     gl.enable(gl.BLEND);

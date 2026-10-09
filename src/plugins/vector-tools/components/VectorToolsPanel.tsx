@@ -2827,6 +2827,23 @@ function gallerySection(vectorTools: VectorTools) {
             vectorTools.presetWindow.open ? "Hide presets" : "Show presets"
           }
         </Button>
+        {/* The same switch as the presets window's pill, for when the window
+            is closed: one click from the picture to the explanation. */}
+        <Button
+          color="light-gray"
+          class="dsm-vector-tools-demo-mode"
+          onTap={() =>
+            vectorTools.setDemoMode(
+              vectorTools.demoMode === "majestic" ? "explanatory" : "majestic"
+            )
+          }
+        >
+          {() =>
+            vectorTools.demoMode === "majestic"
+              ? "Switch to Explanatory"
+              : "Switch to Majestic"
+          }
+        </Button>
       </div>
       <div class="dsm-vector-tools-hint">
         {() =>

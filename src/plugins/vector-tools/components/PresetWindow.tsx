@@ -108,6 +108,64 @@ export class PresetWindow extends Component<{
                     </span>
                   ))}
                 </div>
+                <div
+                  class="dsm-preset-window-motion"
+                  role="group"
+                  aria-label="Majestic or explanatory"
+                >
+                  {(["majestic", "explanatory"] as const).map((choice) => (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      data-value={choice}
+                      class={() => ({
+                        "dsm-preset-window-motion-choice": true,
+                        "dsm-preset-window-motion-selected":
+                          choice === vectorTools.demoMode,
+                      })}
+                      aria-pressed={() =>
+                        choice === vectorTools.demoMode ? "true" : "false"
+                      }
+                      title={
+                        choice === "majestic"
+                          ? "The field as a moving picture, on the dark, with what makes it"
+                          : "The textbook figure: graph paper, a probe, arrows and exact lines"
+                      }
+                      onTap={() => vectorTools.setDemoMode(choice)}
+                    >
+                      {choice === "majestic" ? "Majestic" : "Explanatory"}
+                    </span>
+                  ))}
+                </div>
+                <If predicate={() => vectorTools.colorLegend !== undefined}>
+                  {() => (
+                    <div
+                      class="dsm-preset-window-legend"
+                      role="group"
+                      aria-label="What the colour means"
+                    >
+                      <div class="dsm-preset-window-legend-quantity">
+                        {() => vectorTools.colorLegend?.quantity ?? ""}
+                      </div>
+                      <div
+                        class="dsm-preset-window-legend-bar"
+                        onUpdate={(element: HTMLElement) => {
+                          element.style.background =
+                            vectorTools.colorLegend?.gradient ?? "";
+                        }}
+                        didMount={(element: HTMLElement) => {
+                          element.style.background =
+                            vectorTools.colorLegend?.gradient ?? "";
+                        }}
+                      />
+                      <div class="dsm-preset-window-legend-ends">
+                        <span>{() => vectorTools.colorLegend?.low ?? ""}</span>
+                        <span>{() => vectorTools.colorLegend?.zero ?? ""}</span>
+                        <span>{() => vectorTools.colorLegend?.high ?? ""}</span>
+                      </div>
+                    </div>
+                  )}
+                </If>
                 <If predicate={() => vectorTools.presetVariables.length > 0}>
                   {() => (
                     <div

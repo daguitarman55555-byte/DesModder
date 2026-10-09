@@ -14,6 +14,8 @@ import {
   configFromGallery,
   FIELD_GALLERY,
   galleryPreset,
+  presetForMode,
+  type GalleryPreset,
 } from "./gallery";
 import {
   configForPreset,
@@ -116,12 +118,14 @@ import {
 } from "../../field-rendering/environment";
 import type {
   ClockParameters,
+  DemoMode,
   GalleryVariable,
   SceneItem,
 } from "../../field-rendering/gallery/types";
 import type { FlowField } from "../../field-rendering/FlowRenderer";
 import { Overlay3D } from "../../field-rendering/Overlay3D";
 import { Scene3DLayer } from "../../field-rendering/Scene3DLayer";
+import { paletteCSSRange } from "../../field-rendering/palettes";
 import {
   Arrow3DRenderer,
   type Arrow3DOptions,
@@ -156,10 +160,24 @@ function presetVariableID(name: string) {
   return `${PRESET_VARIABLES_NAMESPACE}_${name.replace(/[^A-Za-z0-9]/g, "")}`;
 }
 
+/** Hidden by the preset, or by Majestic mode, which keeps only the solids. */
+function sceneItemHidden(item: SceneItem, mode: DemoMode) {
+  return (
+    item.hidden === true || (mode === "majestic" && item.explains === true)
+  );
+}
+
+/** A preset's scene item's id in the graph. */
+function sceneItemID(item: SceneItem) {
+  // Its own part of the namespace, so no key can meet a variable's id.
+  return `${PRESET_VARIABLES_NAMESPACE}_object_${item.key}`;
+}
+
 /** A preset's object as the expression the graph gets. */
 function sceneItemSpec(
   item: SceneItem,
-  folderId: string
+  folderId: string,
+  mode: DemoMode
 ): GeneratedExpressionSpec {
   const n = (value: number | string | undefined) =>
     value === undefined ? undefined : String(value);
@@ -179,13 +197,12 @@ function sceneItemSpec(
     parametricDomain3Dv: range(item.domainV),
   };
   return {
-    // Its own part of the namespace, so no key can meet a variable's id.
-    id: `${PRESET_VARIABLES_NAMESPACE}_object_${item.key}`,
+    id: sceneItemID(item),
     latex: item.latex,
     folderId,
     color: item.color,
     colorLatex: item.colorLatex,
-    hidden: item.hidden,
+    hidden: sceneItemHidden(item, mode),
     lines: item.lines,
     points: item.points,
     lineWidth: n(item.lineWidth),
@@ -1773,7 +1790,9 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     const preset = this.is3d
       ? galleryPreset(this.activePresetId ?? "")
       : undefined;
-    const key = preset?.id ?? "";
+    // Majestic hides the probe, and with it the names and the drag.
+    const majestic = this.demoMode === "majestic";
+    const key = `${preset?.id ?? ""}:${this.demoMode}`;
     if (key === this.scene3dKey) return;
     // Watching a value means making a HelperExpression, a dispatch.
     if (this.dispatching()) {
@@ -1783,7 +1802,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.scene3dKey = key;
     for (const helper of this.scene3dHelpers) helper.unobserve("listValue");
     this.scene3dHelpers = [];
-    const scene = preset?.space.scene ?? [];
+    const scene = majestic ? [] : (preset?.space.scene ?? []);
     const names = scene.flatMap((item) => {
       if (item.name3d === undefined) return [];
       // The point's own definition, `N_{…}=…`, read coordinate by coordinate.
@@ -2273,7 +2292,9 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
                       ...(v.step !== undefined ? { step: String(v.step) } : {}),
                     },
             })),
-            ...scene.map((item) => sceneItemSpec(item, folder)),
+            ...scene.map((item) =>
+              sceneItemSpec(item, folder, this.presetWindow.mode)
+            ),
           ],
           { knownIDs: existing }
         );
@@ -2335,6 +2356,73 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.setTimePlaying(!still);
   }
 
+  get demoMode(): DemoMode {
+    return this.presetWindow.mode;
+  }
+
+  /**
+   * The legend for what the loaded preset's colour means: its quantity,
+   * what each end and the middle stand for, and the palette as drawn, cut to
+   * the half a one-signed quantity uses. Undefined for a field that is not
+   * a preset's, whose colour means whatever its maker chose.
+   */
+  get colorLegend() {
+    const meaning = galleryPreset(this.activePresetId ?? "")?.meaning;
+    if (meaning === undefined) return undefined;
+    const { palette, saturation, contrast } = effectiveFlowColor(
+      this.getConfig()
+    );
+    const [from, to] =
+      meaning.half === "upper"
+        ? [0.5, 1]
+        : meaning.half === "lower"
+          ? [0, 0.5]
+          : [0, 1];
+    return {
+      ...meaning,
+      gradient: paletteCSSRange(palette, from, to, { saturation, contrast }),
+    };
+  }
+
+  /**
+   * Majestic or Explanatory, for the preset loaded now and every one after.
+   * The loaded one changes in place: its look again, in the new mode, and
+   * its explanation — probe, arrows, exact lines — shown or hidden. Its
+   * sliders are not reloaded, so whatever a teacher set them to stays.
+   */
+  setDemoMode(mode: DemoMode) {
+    if (mode === this.demoMode) return;
+    this.setPresetWindow({ mode });
+    const preset = galleryPreset(this.activePresetId ?? "");
+    if (preset === undefined) return;
+    this.applyPresetLook(preset, this.galleryWithLook);
+    const scene = (this.is3d ? preset.space.scene : preset.scene) ?? [];
+    const changes = scene
+      .filter((item) => item.explains === true && item.hidden !== true)
+      .filter((item) => this.cc.getItemModel(sceneItemID(item)) !== undefined)
+      .map((item) => ({
+        id: sceneItemID(item),
+        hidden: sceneItemHidden(item, mode),
+      }));
+    if (changes.length > 0) this.calc.setExpressions(changes);
+    this.syncScene3D();
+  }
+
+  /** A preset's look in the current demo mode, whole or colours only. */
+  private applyPresetLook(preset: GalleryPreset, withLook: boolean) {
+    const shown = presetForMode(preset, this.demoMode);
+    this.updateConfig((config) => {
+      const dimensions = this.is3d ? 3 : 2;
+      const loaded = withLook
+        ? configFromGallery(shown, config, dimensions)
+        : colorsFromGallery(shown, config, dimensions);
+      // The identity stays with the field: its id and token address
+      // expressions already in the graph, and the chooser points at it.
+      const { id: keepID, symbolToken } = config;
+      Object.assign(config, loaded, { id: keepID, symbolToken });
+    });
+  }
+
   applyGalleryPreset(id: string, withLook: boolean) {
     const preset = galleryPreset(id);
     if (preset === undefined) return;
@@ -2347,16 +2435,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
         [],
       (this.is3d ? preset.space.scene : preset.scene) ?? []
     );
-    this.updateConfig((config) => {
-      const dimensions = this.is3d ? 3 : 2;
-      const loaded = withLook
-        ? configFromGallery(preset, config, dimensions)
-        : colorsFromGallery(preset, config, dimensions);
-      // The identity stays with the field: its id and token address
-      // expressions already in the graph, and the chooser points at it.
-      const { id: keepID, symbolToken } = config;
-      Object.assign(config, loaded, { id: keepID, symbolToken });
-    });
+    this.applyPresetLook(preset, withLook);
     this.lastActionMessage = `Loaded ${preset.name}.`;
     if (this.presetWindow.still) this.setTimePlaying(false);
     // These are flow pictures, so the flow is what has to be running for one

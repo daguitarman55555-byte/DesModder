@@ -1,3 +1,4 @@
+import type { DemoMode } from "../../field-rendering/gallery/types";
 import {
   COLOR_CONTRAST_MAXIMUM,
   COLOR_CONTRAST_MINIMUM,
@@ -613,6 +614,11 @@ export interface PresetWindowConfig {
    * than the one that changes over time.
    */
   still: boolean;
+  /**
+   * Majestic, the field as a moving picture on the dark with its solids, or
+   * Explanatory, the textbook figure with its probe, arrows and exact lines.
+   */
+  mode: DemoMode;
 }
 
 export type PanelTab =
@@ -973,7 +979,14 @@ export const DEFAULT_PANEL_CONFIG: PanelConfig = {
   height: 650,
   tab: "field",
   // In the order the loader writes them: see the note on its flow keys.
-  presets: { open: false, collapsed: false, still: false, x: -1, y: -1 },
+  presets: {
+    open: false,
+    collapsed: false,
+    still: false,
+    x: -1,
+    y: -1,
+    mode: "explanatory",
+  },
 };
 
 export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
@@ -1875,6 +1888,7 @@ function normalizePresetWindow(
     still: flag("still"),
     x: Math.round(clampNumber(w?.x, fallback.x, -1, 10_000)),
     y: Math.round(clampNumber(w?.y, fallback.y, -1, 10_000)),
+    mode: w?.mode === "majestic" ? "majestic" : "explanatory",
   };
 }
 

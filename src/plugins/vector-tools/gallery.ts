@@ -17,6 +17,7 @@ import {
   withVariablesInlined,
   type GalleryPreset,
 } from "../../field-rendering/gallery";
+import type { DemoMode } from "../../field-rendering/gallery/types";
 import {
   cloneDefaultConfig,
   FLOW_LOOK_PRESETS,
@@ -75,9 +76,19 @@ export function colorsFromGallery(
       ...(preset.onPaper === true ? PAPER_FLOW : {}),
     },
     ...(preset.onPaper === true ? { overlayLayer: "under" as const } : {}),
+    // The backdrop with the colours, as in 2D: without it a light load in 3D
+    // left a Majestic picture on white paper.
     space3d:
       dimensions === 3
-        ? paperSpace(preset, matterFor(preset, base.space3d))
+        ? paperSpace(preset, {
+            ...matterFor(preset, base.space3d),
+            backdrop: true,
+            backdropColor:
+              preset.space.look?.backdrop ?? base.space3d.backdropColor,
+            backdropOpacity:
+              preset.space.look?.backdropOpacity ??
+              base.space3d.backdropOpacity,
+          })
         : base.space3d,
   });
 }
@@ -114,6 +125,43 @@ function finished(
     },
   };
 }
+
+/**
+ * A preset as the demo mode shows it. Explanatory is the preset as written.
+ * Majestic turns a figure on graph paper into a picture on the dark: no
+ * paper, its palette's glowing twin for the same quantity, a little glow,
+ * and the same particles. Its Desmos objects are shown or hidden separately
+ * (see `SceneItem.explains`), since they live in the graph, not the config.
+ */
+export function presetForMode(
+  preset: GalleryPreset,
+  mode: DemoMode
+): GalleryPreset {
+  if (mode === "explanatory" || preset.onPaper !== true) return preset;
+  const palette =
+    preset.majesticPalette ??
+    (preset.tint !== undefined ? "charge-glow" : preset.palette);
+  return {
+    ...preset,
+    onPaper: false,
+    palette,
+    backdrop: MAJESTIC_BACKDROP,
+    flow: { ...preset.flow, glow: 0.35, opacity: 0.5 },
+    space: {
+      ...preset.space,
+      look: {
+        ...preset.space.look,
+        palette,
+        glow: 0.15,
+        backdrop: MAJESTIC_BACKDROP,
+        backdropOpacity: 0.95,
+      },
+    },
+  };
+}
+
+/** The dark a Majestic physics preset is drawn on. */
+const MAJESTIC_BACKDROP = "#04050c";
 
 /**
  * A preset drawn on the graph paper, as a textbook figure is (`onPaper`):

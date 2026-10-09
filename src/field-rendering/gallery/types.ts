@@ -64,6 +64,12 @@ export interface GalleryVariable {
 export interface SceneItem {
   /** Unique in the preset; the end of the item's id in the graph. */
   key: string;
+  /**
+   * Part of the explanation rather than the scene: a probe, its arrows and
+   * names, exact field lines, equipotentials. Majestic mode hides these and
+   * keeps the rest, the solids that make the field.
+   */
+  explains?: boolean;
   latex: string;
   color?: string;
   /** A named colour the graph defines, e.g. one that follows a sign. */
@@ -164,6 +170,17 @@ export interface GalleryPreset {
    */
   tint?: { latex: string; latex3d: string; scale: number };
   /**
+   * What the flow's colour means, for the legend: the quantity, and what its
+   * two ends (and, for a signed one, its middle) stand for. Every preset has
+   * one, so no colour is decoration.
+   */
+  meaning?: ColorMeaning;
+  /**
+   * The palette in Majestic mode, on the dark, where the explanatory one is
+   * for the graph paper: the same quantity, coloured to glow.
+   */
+  majesticPalette?: PaletteID;
+  /**
    * The same picture on Desmos 3D: the field with a third component, and
    * what is different about it in a box. Every preset has one, so loading a
    * preset on /3d never gives a field that lies flat by accident.
@@ -225,3 +242,24 @@ export interface SpaceLook {
 
 /** The dark these are drawn on where a preset does not name its own. */
 export const GALLERY_DEFAULT_BACKDROP = "#0d1020";
+
+/** What a preset's colour stands for, read by the legend. */
+export interface ColorMeaning {
+  quantity: string;
+  low: string;
+  high: string;
+  /** For a signed quantity coloured both ways from zero: what zero is. */
+  zero?: string;
+  /**
+   * For a tint of one sign only, the half of the palette it uses: a field's
+   * strength is never negative, a gravitational potential never positive.
+   */
+  half?: "upper" | "lower";
+}
+
+/**
+ * How presets are shown: Majestic, the field as a moving picture on the
+ * dark with its solids; Explanatory, the textbook figure on graph paper,
+ * with its probe, arrows and exact lines.
+ */
+export type DemoMode = "majestic" | "explanatory";
