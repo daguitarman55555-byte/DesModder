@@ -21,9 +21,10 @@ export interface GalleryLook {
 
 /**
  * The shelves the presets window groups them on: what kind of picture each
- * is, which is how someone browsing for one thinks of it.
+ * is, which is how someone browsing for one thinks of it. The physics is
+ * shelved by AP course, since that is how a physics teacher looks for it.
  */
-export type GalleryCategory = "space" | "fluids" | "chaos" | "fields";
+export type GalleryCategory = "space" | "fluids" | "chaos" | "ap1" | "ap2";
 
 export const GALLERY_CATEGORIES: readonly {
   id: GalleryCategory;
@@ -32,7 +33,8 @@ export const GALLERY_CATEGORIES: readonly {
   { id: "space", label: "Space" },
   { id: "fluids", label: "Fluids" },
   { id: "chaos", label: "Chaos" },
-  { id: "fields", label: "Physics" },
+  { id: "ap1", label: "AP Physics 1" },
+  { id: "ap2", label: "AP Physics 2" },
 ];
 
 /**
@@ -102,6 +104,11 @@ export interface SceneItem {
    * point is made of, which dragging it moves.
    */
   drag3d?: readonly [string, string, string];
+  /**
+   * The colour in Majestic, where the paper is dark: ink that reads on
+   * paper (a grey ground, a dark wall) disappears there.
+   */
+  majesticColor?: string;
 }
 
 /**
@@ -126,6 +133,11 @@ export interface GalleryPreset {
   id: string;
   name: string;
   category: GalleryCategory;
+  /**
+   * For an AP preset, the unit of its course's CED it teaches: its order on
+   * the shelf, which follows the course.
+   */
+  apUnit?: number;
   /** What it is, in one line, under the name. */
   blurb: string;
   xLatex: string;

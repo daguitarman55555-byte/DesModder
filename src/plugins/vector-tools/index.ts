@@ -167,6 +167,11 @@ function sceneItemHidden(item: SceneItem, mode: DemoMode) {
   );
 }
 
+/** A preset's object's colour in a demo mode: lighter on Majestic's dark. */
+function sceneItemColor(item: SceneItem, mode: DemoMode) {
+  return mode === "majestic" ? (item.majesticColor ?? item.color) : item.color;
+}
+
 /** A preset's scene item's id in the graph. */
 function sceneItemID(item: SceneItem) {
   // Its own part of the namespace, so no key can meet a variable's id.
@@ -200,7 +205,7 @@ function sceneItemSpec(
     id: sceneItemID(item),
     latex: item.latex,
     folderId,
-    color: item.color,
+    color: sceneItemColor(item, mode),
     colorLatex: item.colorLatex,
     hidden: sceneItemHidden(item, mode),
     lines: item.lines,
@@ -297,10 +302,16 @@ function clampTo(value: number, low: number, high: number) {
   return Math.max(low, Math.min(Math.max(low, high), value));
 }
 
-/** The gallery grouped for the presets window, each shelf in its order. */
+/**
+ * The gallery grouped for the presets window, each shelf in its order: an
+ * AP shelf follows its course's units, a stable sort keeping each unit's
+ * presets in the gallery's order.
+ */
 const PRESET_GROUPS = GALLERY_CATEGORIES.map((category) => ({
   ...category,
-  presets: FIELD_GALLERY.filter((preset) => preset.category === category.id),
+  presets: FIELD_GALLERY.filter(
+    (preset) => preset.category === category.id
+  ).sort((a, b) => (a.apUnit ?? 0) - (b.apUnit ?? 0)),
 })).filter((group) => group.presets.length > 0);
 
 /** Every n-th trail point drawn, for a detail setting; Auto draws half. */
@@ -1159,6 +1170,12 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     const clock = new Set(
       (this.clockParameters?.names ?? []).map(canonicalIdentifier)
     );
+    // A slider's number from the list first, as pushParameterValues has it:
+    // a preset loaded over another with a variable of the same name (R in
+    // both circular motion and the conductor) left the watcher reporting the
+    // old preset's value, and every graph change put it back, so the
+    // conductor was drawn and cut out at circular motion's radius.
+    const sliders = sliderValues(this.cc.getAllItemModels());
     for (const name of names) {
       // Worked out each frame instead (see clockParameterValues).
       if (clock.has(name)) continue;
@@ -1172,7 +1189,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
         helper.observe("numericValue", () => this.schedulePush());
         this.parameterHelpers.set(name, helper);
       }
-      values.set(name, helper.numericValue);
+      values.set(name, sliders.get(name) ?? helper.numericValue);
     }
     this.setParameterValues(values);
   }
@@ -1483,6 +1500,12 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   }
 
   /** What the 3D particle flow is told, from the field's settings. */
+  /** The loaded preset's scene clock, whose moving bodies 3D paints. */
+  private get paintMoving(): readonly string[] {
+    const sceneTime = galleryPreset(this.activePresetId ?? "")?.sceneTime;
+    return sceneTime === undefined ? [] : [canonicalIdentifier(sceneTime)];
+  }
+
   get flow3dOptions(): Flow3DOptions {
     const config = this.getConfig();
     const s = config.space3d;
@@ -1512,6 +1535,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       cut: shared.cut,
       occlusion: s.occlusion,
       surfaceResolution: shared.surfaceResolution,
+      paintMoving: this.paintMoving,
       lens: s.lens,
       horizon: s.lensHorizon,
       beaming: s.beaming,
@@ -1722,6 +1746,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   }
 
   afterDisable() {
+    this.restoreDemoAxes();
     if (this.flowRefreshTimer !== undefined)
       clearTimeout(this.flowRefreshTimer);
     if (this.environmentTimer !== undefined)
@@ -2398,18 +2423,67 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.applyPresetLook(preset, this.galleryWithLook);
     const scene = (this.is3d ? preset.space.scene : preset.scene) ?? [];
     const changes = scene
-      .filter((item) => item.explains === true && item.hidden !== true)
+      .filter(
+        (item) =>
+          (item.explains === true && item.hidden !== true) ||
+          item.majesticColor !== undefined
+      )
       .filter((item) => this.cc.getItemModel(sceneItemID(item)) !== undefined)
       .map((item) => ({
         id: sceneItemID(item),
         hidden: sceneItemHidden(item, mode),
+        ...(item.majesticColor !== undefined
+          ? { color: sceneItemColor(item, mode) }
+          : {}),
       }));
     if (changes.length > 0) this.calc.setExpressions(changes);
     this.syncScene3D();
   }
 
+  /**
+   * The graph's axes and grid as they were before Majestic hid them, to put
+   * back: Majestic is the picture without writing, and the axes' numbers are
+   * writing.
+   */
+  private demoAxes?: Record<string, boolean>;
+
+  private restoreDemoAxes() {
+    if (this.demoAxes === undefined) return;
+    const axes = this.demoAxes;
+    this.demoAxes = undefined;
+    this.cc.dispatch({ type: "set-graph-settings", ...axes });
+  }
+
+  /**
+   * Hides the axes for a paper preset in Majestic, and puts the teacher's
+   * own back for anything else. Only a paper preset: one drawn on the dark
+   * already was never on paper, and its axes are as the teacher left them.
+   */
+  private syncDemoAxes(preset: GalleryPreset) {
+    if (this.demoMode !== "majestic" || preset.onPaper !== true) {
+      this.restoreDemoAxes();
+      return;
+    }
+    if (this.demoAxes !== undefined) return;
+    const graph = this.calc.getState().graph as unknown as Record<
+      string,
+      unknown
+    >;
+    const keys = this.is3d
+      ? ["showAxis3D"]
+      : ["showXAxis", "showYAxis", "showGrid"];
+    this.demoAxes = Object.fromEntries(
+      keys.map((key) => [key, graph[key] !== false])
+    );
+    this.cc.dispatch({
+      type: "set-graph-settings",
+      ...Object.fromEntries(keys.map((key) => [key, false])),
+    });
+  }
+
   /** A preset's look in the current demo mode, whole or colours only. */
   private applyPresetLook(preset: GalleryPreset, withLook: boolean) {
+    this.syncDemoAxes(preset);
     const shown = presetForMode(preset, this.demoMode);
     this.updateConfig((config) => {
       const dimensions = this.is3d ? 3 : 2;

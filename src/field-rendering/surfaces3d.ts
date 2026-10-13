@@ -31,6 +31,7 @@ export interface SurfaceItem {
   id: string;
   latex?: string;
   hidden?: boolean;
+  color?: string;
   formula?: {
     expression_type?: string;
     assignment?: string;
@@ -50,6 +51,8 @@ interface Compiled {
   /** Names read from the graph, each a uniform. */
   params: readonly string[];
   usesTime: boolean;
+  /** Its colour in the graph, for a copy that is painted, not only depth. */
+  color?: string;
 }
 
 /** A surface solved for one coordinate over the other two. */
@@ -107,14 +110,14 @@ export function scanSurfaces3D(
       const surface = graphSurface(item, latex, space);
       if (typeof surface === "string")
         skipped.push({ id: item.id, latex, reason: surface });
-      else surfaces.push(surface);
+      else surfaces.push({ ...surface, color: item.color });
       continue;
     }
     if (kind === "SURFACE_xyz_uv") {
       const surface = parametricSurface(item, latex, space);
       if (typeof surface === "string")
         skipped.push({ id: item.id, latex, reason: surface });
-      else surfaces.push(surface);
+      else surfaces.push({ ...surface, color: item.color });
     }
   }
   return { surfaces, skipped };

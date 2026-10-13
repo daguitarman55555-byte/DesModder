@@ -1,0 +1,543 @@
+[
+  {
+    "rank": 1,
+    "name": "Projectile velocity vs gravity",
+    "course": "AP1",
+    "objectives": ["1.5.B", "1.3.A", "2.6.B"],
+    "units": [1, 2],
+    "topics": ["1.3", "1.5", "2.6"],
+    "pdfPages": {
+      "1.5.B": 41,
+      "1.3.A": 37,
+      "2.6.B": 58
+    },
+    "teacher": "Separate horizontal/vertical motion; velocity can be horizontal while acceleration remains downward.",
+    "renderer": "Field + clocked native objects",
+    "color": "gy, gravitational potential per mass",
+    "majestic": "Downward glowing acceleration field and one projectile; no annotations.",
+    "explanatory": "Parabola, ground, velocity arrow on the body and gravity probe.",
+    "cost": "Small",
+    "valueJudgment": "Very high"
+  },
+  {
+    "rank": 2,
+    "name": "Oscillator phase portrait",
+    "course": "AP1",
+    "objectives": ["7.1.A", "7.2.A", "7.3.A", "7.4.A"],
+    "units": [7],
+    "topics": ["7.1", "7.2", "7.3", "7.4"],
+    "pdfPages": {
+      "7.1.A": 131,
+      "7.2.A": 132,
+      "7.3.A": 133,
+      "7.4.A": 134
+    },
+    "teacher": "Follow turning points and energy; acceleration opposes displacement, not velocity.",
+    "renderer": "Field + exact clocked marker; Physics Lab for the differential-equation analysis",
+    "color": "(mv²+kx²)/2",
+    "majestic": "Energy-colored state flow and one timed state marker.",
+    "explanatory": "Displacement–velocity plane, energy contours and derivative probe; 3D is explicitly a view of that plane.",
+    "cost": "Small",
+    "valueJudgment": "Very high"
+  },
+  {
+    "rank": 3,
+    "name": "Circular velocity vs centripetal acceleration",
+    "course": "AP1",
+    "objectives": ["2.9.A", "5.2.A", "6.1.A"],
+    "units": [2, 5, 6],
+    "topics": ["2.9", "5.2", "6.1"],
+    "pdfPages": {
+      "2.9.A": 63,
+      "5.2.A": 102,
+      "6.1.A": 114
+    },
+    "teacher": "Vary radius and angular speed; constant speed does not mean zero acceleration.",
+    "renderer": "Field + clocked native objects",
+    "color": "ω²r²/2, kinetic energy per mass",
+    "majestic": "Glowing rotating annulus and one marker.",
+    "explanatory": "Circular path, tangent velocity and inward acceleration, separately interpreted units.",
+    "cost": "Small",
+    "valueJudgment": "Very high"
+  },
+  {
+    "rank": 4,
+    "name": "Continuity and Bernoulli streamtube",
+    "course": "AP1",
+    "objectives": ["8.4.A", "8.4.B"],
+    "units": [8],
+    "topics": ["8.4"],
+    "pdfPages": {
+      "8.4.A": 144,
+      "8.4.B": 145
+    },
+    "teacher": "Compare area, flow speed and pressure; narrow does not mean slow or high pressure.",
+    "renderer": "Exact field preset; Fluid tab is a separate viscous comparison",
+    "color": "Gauge pressure",
+    "majestic": "Glowing stream inside a cutaway tube.",
+    "explanatory": "Walls, exact planar streamlines and velocity probe; explain cross-section pressure variation.",
+    "cost": "Medium",
+    "valueJudgment": "Very high"
+  },
+  {
+    "rank": 5,
+    "name": "Neutral conductor in uniform E",
+    "course": "AP2",
+    "objectives": ["10.3.B", "10.5.B"],
+    "units": [10],
+    "topics": ["10.3", "10.5"],
+    "pdfPages": {
+      "10.3.B": 55,
+      "10.5.B": 58
+    },
+    "teacher": "Polarization redirects E; zero field inside does not require zero surface charge.",
+    "renderer": "Field preset + native sphere",
+    "color": "Electric potential",
+    "majestic": "Glowing exterior field and one conducting sphere.",
+    "explanatory": "Sphere, exact meridional flux contours and E probe; move the probe inside.",
+    "cost": "Small",
+    "valueJudgment": "Very high"
+  },
+  {
+    "rank": 6,
+    "name": "Changing flux and induced E",
+    "course": "AP2",
+    "objectives": ["12.4.A"],
+    "units": [12],
+    "topics": ["12.4"],
+    "pdfPages": {
+      "12.4.A": 94
+    },
+    "teacher": "Compare B with its rate of change; large B alone does not imply a large induced emf.",
+    "renderer": "Time-dependent field + clocked native objects",
+    "color": "Signed azimuthal E",
+    "majestic": "Reversing glowing circulation and a flux-region rim.",
+    "explanatory": "Flux boundary, B-direction marker and E probe; compare inside/outside loops.",
+    "cost": "Medium",
+    "valueJudgment": "Very high"
+  },
+  {
+    "rank": 7,
+    "name": "Motion graphs and reference frames",
+    "course": "AP1",
+    "objectives": ["1.2.B", "1.3.A", "1.4.B"],
+    "units": [1],
+    "topics": ["1.2", "1.3", "1.4"],
+    "pdfPages": {
+      "1.2.B": 35,
+      "1.3.A": 37,
+      "1.4.B": 39
+    },
+    "teacher": "Link position, slope and acceleration; a descending position graph need not mean slowing down.",
+    "renderer": "Desmos objects only + clock",
+    "color": "Signed velocity on the object/trace",
+    "majestic": "Minimal moving marker and its trail; no artificial physical-space flow.",
+    "explanatory": "Synchronized x(t), v(t), a(t), with a reference-frame velocity slider.",
+    "cost": "Small",
+    "valueJudgment": "Very high"
+  },
+  {
+    "rank": 8,
+    "name": "Incline free-body diagram and friction threshold",
+    "course": "AP1",
+    "objectives": ["2.2.B", "2.4.A", "2.5.A", "2.7.B"],
+    "units": [2],
+    "topics": ["2.2", "2.4", "2.5", "2.7"],
+    "pdfPages": {
+      "2.2.B": 51,
+      "2.4.A": 55,
+      "2.5.A": 56,
+      "2.7.B": 61
+    },
+    "teacher": "Increase incline angle; static friction is an adjustable reaction, not always μsN.",
+    "renderer": "Native objects and arrows; Physics Lab for force-balance derivation",
+    "color": "Net downslope force",
+    "majestic": "Block, plane and force-colored contact; no decorative flow.",
+    "explanatory": "Weight, normal, friction and net arrows, with the breakaway threshold.",
+    "cost": "Small",
+    "valueJudgment": "Very high"
+  },
+  {
+    "rank": 9,
+    "name": "Work–energy area and power",
+    "course": "AP1",
+    "objectives": ["3.2.A", "3.4.B", "3.5.A"],
+    "units": [3],
+    "topics": ["3.2", "3.4", "3.5"],
+    "pdfPages": {
+      "3.2.A": 73,
+      "3.4.B": 78,
+      "3.5.A": 80
+    },
+    "teacher": "Compare force-position area and energy change; a large force can do zero work.",
+    "renderer": "Native curves/regions + clock",
+    "color": "Signed work or power, selectable and labeled in panel",
+    "majestic": "Moving object and energy-colored path.",
+    "explanatory": "F(x) area, energy balance and a separate power trace.",
+    "cost": "Small",
+    "valueJudgment": "Very high"
+  },
+  {
+    "rank": 10,
+    "name": "Impulse and one-dimensional collisions",
+    "course": "AP1",
+    "objectives": ["4.2.B", "4.3.A", "4.4.A"],
+    "units": [4],
+    "topics": ["4.2", "4.3", "4.4"],
+    "pdfPages": {
+      "4.2.B": 89,
+      "4.3.A": 90,
+      "4.4.A": 92
+    },
+    "teacher": "Compare equal impulses with unequal masses; momentum conservation does not imply kinetic-energy conservation.",
+    "renderer": "Native objects + analytic single-collision clock; general collisions need C1 below",
+    "color": "Kinetic energy per body",
+    "majestic": "Two colored bodies approach and separate.",
+    "explanatory": "Momentum arrows, a finite-duration force-pulse model and impulse area.",
+    "cost": "Medium",
+    "valueJudgment": "Very high"
+  },
+  {
+    "rank": 11,
+    "name": "Lever arm and rotational inertia",
+    "course": "AP1",
+    "objectives": ["5.3.B", "5.4.A", "5.6.A"],
+    "units": [5],
+    "topics": ["5.3", "5.4", "5.6"],
+    "pdfPages": {
+      "5.3.B": 103,
+      "5.4.A": 104,
+      "5.6.A": 107
+    },
+    "teacher": "Move a force or redistribute masses; torque depends on perpendicular lever arm, inertia on mass distribution.",
+    "renderer": "Native objects + arrows",
+    "color": "Signed torque on the selected force marker",
+    "majestic": "Minimal rotor with torque-colored marker.",
+    "explanatory": "Pivot, lever arm, forces and angular-acceleration comparison.",
+    "cost": "Small",
+    "valueJudgment": "High"
+  },
+  {
+    "rank": 12,
+    "name": "Rolling race: ring vs disk",
+    "course": "AP1",
+    "objectives": ["6.5.A", "6.5.B"],
+    "units": [6],
+    "topics": ["6.5"],
+    "pdfPages": {
+      "6.5.A": 121,
+      "6.5.B": 121
+    },
+    "teacher": "Release equal-radius bodies; mass alone does not determine which rolls faster.",
+    "renderer": "Native objects + analytic clock",
+    "color": "Translational/rotational energy fractions",
+    "majestic": "Two moving wheels, energy-colored sectors.",
+    "explanatory": "No-slip contact, separate energy bars and synchronized displacement.",
+    "cost": "Medium",
+    "valueJudgment": "High"
+  },
+  {
+    "rank": 13,
+    "name": "Skater: angular momentum and internal work",
+    "course": "AP1",
+    "objectives": ["6.3.A", "6.4.A"],
+    "units": [6],
+    "topics": ["6.3", "6.4"],
+    "pdfPages": {
+      "6.3.A": 116,
+      "6.4.A": 119
+    },
+    "teacher": "Contract a prescribed mass distribution; angular momentum can stay fixed while kinetic energy rises.",
+    "renderer": "Native objects + CPU/native clock",
+    "color": "Rotational kinetic energy",
+    "majestic": "A sparse rotating mass pattern.",
+    "explanatory": "L and I comparisons; show the internal-work requirement, not an unexplained energy gain.",
+    "cost": "Medium",
+    "valueJudgment": "High"
+  },
+  {
+    "rank": 14,
+    "name": "Hydrostatic pressure and buoyancy",
+    "course": "AP1",
+    "objectives": ["8.2.B", "8.3.B"],
+    "units": [8],
+    "topics": ["8.2", "8.3"],
+    "pdfPages": {
+      "8.2.B": 142,
+      "8.3.B": 143
+    },
+    "teacher": "Change depth and displaced volume; buoyancy is not set by the object’s weight alone.",
+    "renderer": "Native shaded regions and force arrows; no flow in a fluid at rest",
+    "color": "Pressure versus depth",
+    "majestic": "Quiet pressure-colored tank and object.",
+    "explanatory": "Pressure arrows and integrated buoyancy; a free-surface rigid-body simulation would need extra machinery.",
+    "cost": "Small",
+    "valueJudgment": "High"
+  },
+  {
+    "rank": 15,
+    "name": "P–V work and thermodynamic cycles",
+    "course": "AP2",
+    "objectives": ["9.2.A", "9.4.B", "9.6.A"],
+    "units": [9],
+    "topics": ["9.2", "9.4", "9.6"],
+    "pdfPages": {
+      "9.2.A": 36,
+      "9.4.B": 38,
+      "9.6.A": 41
+    },
+    "teacher": "Trace alternate paths between states; heat is not a stored state variable and cycle work depends on direction.",
+    "renderer": "Native P–V curves/regions + clock; Physics Lab for energy bookkeeping",
+    "color": "Temperature of the gas state",
+    "majestic": "A glowing colored state trace, explicitly not gas motion.",
+    "explanatory": "P–V area, Q/W/ΔU accounting and hot/cold reservoirs.",
+    "cost": "Medium",
+    "valueJudgment": "Very high"
+  },
+  {
+    "rank": 16,
+    "name": "Heat conduction and equilibration",
+    "course": "AP2",
+    "objectives": ["9.3.A", "9.5.A", "9.5.B"],
+    "units": [9],
+    "topics": ["9.3", "9.5"],
+    "pdfPages": {
+      "9.3.A": 37,
+      "9.5.A": 40,
+      "9.5.B": 40
+    },
+    "teacher": "Compare temperature and thermal energy; heat transfer is driven by temperature difference.",
+    "renderer": "Analytic temperature/heat-flux formula + native rods; a general heat solver is separate",
+    "color": "Temperature, with heat-flux arrows",
+    "majestic": "A rod cooling with a physically colored temperature profile.",
+    "explanatory": "Boundary conditions, T(x,t), heat flux and energy balance.",
+    "cost": "Small",
+    "valueJudgment": "High"
+  },
+  {
+    "rank": 17,
+    "name": "Equipotential paths and work",
+    "course": "AP2",
+    "objectives": ["10.4.A", "10.5.B", "10.7.A"],
+    "units": [10],
+    "topics": ["10.4", "10.5", "10.7"],
+    "pdfPages": {
+      "10.4.A": 56,
+      "10.5.B": 58,
+      "10.7.A": 61
+    },
+    "teacher": "Take two routes between endpoints; work by electrostatic E is path-independent.",
+    "renderer": "Extend existing charges preset with native paths; Physics Lab for integrals",
+    "color": "Electric potential",
+    "majestic": "Existing charge-potential flow, no new field invented.",
+    "explanatory": "Two paths, endpoint potential and test-charge sign; fields and force remain distinct.",
+    "cost": "Small",
+    "valueJudgment": "High"
+  },
+  {
+    "rank": 18,
+    "name": "Kirchhoff current and potential map",
+    "course": "AP2",
+    "objectives": ["11.5.A", "11.6.A", "11.7.A"],
+    "units": [11],
+    "topics": ["11.5", "11.6", "11.7"],
+    "pdfPages": {
+      "11.5.A": 74,
+      "11.6.A": 77,
+      "11.7.A": 78
+    },
+    "teacher": "Change a branch resistance; current is not consumed by a resistor.",
+    "renderer": "Needs C2 circuit network solver for editable topology; fixed templates can be native formulas",
+    "color": "Node potential; branch power available separately",
+    "majestic": "A minimal circuit with potential-colored conductors and current pulses.",
+    "explanatory": "Node/loop overlays, current arrows and conservation residuals.",
+    "cost": "Needs a new capability",
+    "valueJudgment": "Very high"
+  },
+  {
+    "rank": 19,
+    "name": "RC charging and discharging",
+    "course": "AP2",
+    "objectives": ["11.8.B"],
+    "units": [11],
+    "topics": ["11.8"],
+    "pdfPages": {
+      "11.8.B": 80
+    },
+    "teacher": "Compare initial and final states; a charging capacitor is not a steady conducting branch.",
+    "renderer": "C2 for configurable networks; a fixed RC template already fits native formulas and clock",
+    "color": "Capacitor voltage",
+    "majestic": "One circuit and a voltage-colored capacitor; current pulses diminish.",
+    "explanatory": "q(t), I(t), energy and a switch with explicit reset semantics.",
+    "cost": "Medium / C2 for generality",
+    "valueJudgment": "High"
+  },
+  {
+    "rank": 20,
+    "name": "Lorentz force and velocity selector",
+    "course": "AP2",
+    "objectives": ["12.2.B"],
+    "units": [12],
+    "topics": ["12.2"],
+    "pdfPages": {
+      "12.2.B": 90
+    },
+    "teacher": "Compare v parallel/perpendicular to B and E×B balance; magnetic force does no work.",
+    "renderer": "C1 for general trajectories; uniform-field helices can already be drawn analytically",
+    "color": "Particle kinetic energy",
+    "majestic": "Sparse true trajectories, never field-line particles mislabeled as charges.",
+    "explanatory": "v, E, B and force arrows, energy trace and selector exit.",
+    "cost": "Needs a new capability for generality",
+    "valueJudgment": "Very high"
+  },
+  {
+    "rank": 21,
+    "name": "Refraction and total internal reflection",
+    "course": "AP2",
+    "objectives": ["13.3.A"],
+    "units": [13],
+    "topics": ["13.3"],
+    "pdfPages": {
+      "13.3.A": 105
+    },
+    "teacher": "Sweep incidence angle through the critical angle; refracted rays do not always exist.",
+    "renderer": "Native objects for one flat interface; C3 for arbitrary interfaces",
+    "color": "Optical path length along each ray, not artistic hue",
+    "majestic": "A few rays and a transparent interface.",
+    "explanatory": "Normals, angles, critical angle and transmitted/reflected branches.",
+    "cost": "Small",
+    "valueJudgment": "High"
+  },
+  {
+    "rank": 22,
+    "name": "Mirror and lens imaging bench",
+    "course": "AP2",
+    "objectives": ["13.2.A", "13.4.A"],
+    "units": [13],
+    "topics": ["13.2", "13.4"],
+    "pdfPages": {
+      "13.2.A": 103,
+      "13.4.A": 107
+    },
+    "teacher": "Move an object through focus; a virtual image is a ray-backprojection intersection, not a screen image.",
+    "renderer": "C3 for an editable bench; fixed paraxial diagrams can already be native curves",
+    "color": "Optical path length, with actual wavelength reserved for chromatic models",
+    "majestic": "Few rays and optical elements.",
+    "explanatory": "Principal rays, backprojections and image orientation/magnification.",
+    "cost": "Needs a new capability for generality",
+    "valueJudgment": "Very high"
+  },
+  {
+    "rank": 23,
+    "name": "Standing waves, nodes and antinodes",
+    "course": "AP2",
+    "objectives": ["14.2.A", "14.6.A", "14.6.B"],
+    "units": [14],
+    "topics": ["14.2", "14.6"],
+    "pdfPages": {
+      "14.2.A": 119,
+      "14.6.A": 126,
+      "14.6.B": 127
+    },
+    "teacher": "Change harmonic number or relative phase; standing patterns do not mean the medium travels with the pattern.",
+    "renderer": "Native analytic curves + clock now; Audio Lab can analyze supplied tones, C4 adds coherent synthesis",
+    "color": "Signed displacement; intensity as a separate view",
+    "majestic": "A luminous moving string, colored by displacement.",
+    "explanatory": "Two counterpropagating components, their sum, nodes and period.",
+    "cost": "Medium",
+    "valueJudgment": "Very high"
+  },
+  {
+    "rank": 24,
+    "name": "Doppler wavefronts",
+    "course": "AP2",
+    "objectives": ["14.5.A"],
+    "units": [14],
+    "topics": ["14.5"],
+    "pdfPages": {
+      "14.5.A": 125
+    },
+    "teacher": "Move a source/observer independently; perceived frequency changes without changing emission frequency.",
+    "renderer": "Native analytic expanding fronts with a bounded history; C4 for coherent audible output",
+    "color": "Pressure/displacement phase, not source speed",
+    "majestic": "A small number of physical wavefronts.",
+    "explanatory": "Emission events, source path, detector arrivals and measured periods.",
+    "cost": "Medium",
+    "valueJudgment": "High"
+  },
+  {
+    "rank": 25,
+    "name": "Single/double-slit interference",
+    "course": "AP2",
+    "objectives": ["14.7.A", "14.8.A"],
+    "units": [14],
+    "topics": ["14.7", "14.8"],
+    "pdfPages": {
+      "14.7.A": 129,
+      "14.8.A": 131
+    },
+    "teacher": "Vary wavelength, slit spacing and width; fringe spacing and the diffraction envelope are different effects.",
+    "renderer": "Native analytic intensity curve now; C4 for full phase-aware wave rendering",
+    "color": "Time-averaged intensity",
+    "majestic": "Luminous fringes; no advected particles presented as waves.",
+    "explanatory": "Aperture geometry, phase/path difference and intensity graph; state far-field approximations.",
+    "cost": "Medium / C4 for wave field",
+    "valueJudgment": "Very high"
+  },
+  {
+    "rank": 26,
+    "name": "Thin-film phase reversals",
+    "course": "AP2",
+    "objectives": ["14.9.A"],
+    "units": [14],
+    "topics": ["14.9"],
+    "pdfPages": {
+      "14.9.A": 133
+    },
+    "teacher": "Change index order and thickness; an extra reflection phase can reverse bright/dark conditions.",
+    "renderer": "Native two-ray/phasor diagram now; C3+C4 for layered/general optics",
+    "color": "Monochromatic reflected intensity",
+    "majestic": "A film and intensity-colored reflected beam.",
+    "explanatory": "Optical path, reflection phase shifts and the phasor sum.",
+    "cost": "Medium",
+    "valueJudgment": "High"
+  },
+  {
+    "rank": 27,
+    "name": "Photoelectric threshold and stopping potential",
+    "course": "AP2",
+    "objectives": ["15.1.A", "15.5.A"],
+    "units": [15],
+    "topics": ["15.1", "15.5"],
+    "pdfPages": {
+      "15.1.A": 143,
+      "15.5.A": 151
+    },
+    "teacher": "Vary frequency and intensity independently; brighter subthreshold light does not eject electrons in the model.",
+    "renderer": "Native objects/graphs + event animation; Physics Lab for conservation equations",
+    "color": "Maximum photoelectron kinetic energy",
+    "majestic": "Sparse emission only above threshold; color from kinetic energy.",
+    "explanatory": "Kmax versus frequency, stopping potential and a separate emission-rate control.",
+    "cost": "Medium",
+    "valueJudgment": "Very high"
+  },
+  {
+    "rank": 28,
+    "name": "Radioactive decay and half-life statistics",
+    "course": "AP2",
+    "objectives": ["15.7.B", "15.8.A"],
+    "units": [15],
+    "topics": ["15.7", "15.8"],
+    "pdfPages": {
+      "15.7.B": 156,
+      "15.8.A": 157
+    },
+    "teacher": "Repeat small samples; half-life predicts a distribution, not a timer on each identical nucleus.",
+    "renderer": "Seeded analytic decay times from ClockParameters; C5 only for reusable branching/reaction events",
+    "color": "Decay probability or remaining fraction, not nuclear temperature",
+    "majestic": "Sparse nuclei changing state, with restrained decay flashes.",
+    "explanatory": "Repeated sample counts, expectation and uncertainty; distinguish decay channels.",
+    "cost": "Medium",
+    "valueJudgment": "High"
+  }
+]

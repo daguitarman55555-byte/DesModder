@@ -756,7 +756,7 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
   return {
     id,
     name,
-    category: "fields",
+    ...AP_PLACE[id],
     blurb,
     xLatex: a.field[0],
     yLatex: a.field[1],
@@ -806,6 +806,22 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
     },
   };
 }
+
+/**
+ * Each preset's AP course and unit (2024 CEDs, current for the 2026 and 2027
+ * exams): gravity is AP Physics 1's unit 2 and fluids its unit 8; fields of
+ * charges are AP Physics 2's unit 10 and magnetism its unit 12.
+ */
+const AP_PLACE: Record<string, Pick<GalleryPreset, "category" | "apUnit">> = {
+  "earth-moon": { category: "ap1", apUnit: 2 },
+  "shell-theorem": { category: "ap1", apUnit: 2 },
+  cylinder: { category: "ap1", apUnit: 8 },
+  "uniform-field": { category: "ap2", apUnit: 10 },
+  capacitor: { category: "ap2", apUnit: 10 },
+  wires: { category: "ap2", apUnit: 12 },
+  "bar-magnet": { category: "ap2", apUnit: 12 },
+  dipole: { category: "ap2", apUnit: 12 },
+};
 
 export const TEACHING_PHYSICS: readonly GalleryPreset[] = [
   teaching(

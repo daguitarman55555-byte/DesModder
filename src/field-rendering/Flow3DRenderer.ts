@@ -97,6 +97,11 @@ export interface Flow3DOptions {
   occlusion: Occlusion3D;
   surfaceResolution: number | "auto";
   /**
+   * On a backdrop, the names a surface moving with them is painted for
+   * rather than cut out: a scene's clock (see SurfaceDepth.draw).
+   */
+  paintMoving?: readonly string[];
+  /**
    * A black hole at the origin bending the light of what is behind it: the
    * flow behind the hole is drawn where a lens of that mass shows it, the
    * hole's shadow is drawn black, and the horizon absorbs what reaches it.
@@ -1250,7 +1255,8 @@ export class Flow3DRenderer implements Overlay3DRenderer {
         this.time,
         // On a backdrop, cut it away where the graph's solids are, so a
         // charge or a plate shows on the dark rather than vanishing under it.
-        ba > 0
+        ba > 0,
+        new Set(o.paintMoving)
       );
     }
     gl.enable(gl.BLEND);

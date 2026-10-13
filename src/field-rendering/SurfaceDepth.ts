@@ -105,6 +105,7 @@ uniform int u_res;
 uniform vec2 u_from;
 uniform vec2 u_to;
 out vec3 v_math;
+out vec3 v_view;
 ${GLSL_PRELUDE}
 ${surfacePointSource(surface)}
 const ivec2 CORNER[6] = ivec2[6](
@@ -116,7 +117,9 @@ void main() {
   vec2 ab = mix(u_from, u_to, vec2(cell) / float(u_res));
   vec3 m = vtSurfacePoint(ab);
   v_math = m;
-  gl_Position = u_projection * (u_mathToView * vec4(m, 1.0));
+  vec4 view = u_mathToView * vec4(m, 1.0);
+  v_view = view.xyz;
+  gl_Position = u_projection * view;
 }
 `;
 }
@@ -135,11 +138,46 @@ void main() {
 }
 `;
 
+/**
+ * A surface painted rather than cut out: its colour, lit from the upper left
+ * with a highlight, the way Desmos shades a solid, closely enough to stand in
+ * for it. The normal is the screen-space derivative of the position, so the
+ * grid needs none of its own.
+ */
+const PAINT_FRAGMENT = `#version 300 es
+precision highp float;
+precision highp int;
+in vec3 v_math;
+in vec3 v_view;
+uniform vec3 u_color;
+out vec4 outColor;
+${CLIP_GLSL}
+void main() {
+  if (vtOutsideBox(v_math)) discard;
+  vec3 n = normalize(cross(dFdx(v_view), dFdy(v_view)));
+  if (n.z < 0.0) n = -n;
+  vec3 light = normalize(vec3(-0.4, 0.6, 0.7));
+  float diffuse = max(dot(n, light), 0.0);
+  float highlight = pow(max(dot(n, normalize(light + vec3(0.0, 0.0, 1.0))), 0.0), 40.0);
+  outColor = vec4(u_color * (0.35 + 0.65 * diffuse) + vec3(0.35 * highlight), 1.0);
+}
+`;
+
+/** A colour from the graph, #rrggbb, as 0–1 channels; grey if unreadable. */
+function rgb(color: string | undefined): [number, number, number] {
+  const match = /^#([0-9a-f]{6})$/i.exec(color ?? "");
+  if (match === null) return [0.6, 0.6, 0.6];
+  const n = parseInt(match[1], 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+}
+
 export class SurfaceDepth {
   private programs: {
     surface: Surface3D;
     program: WebGLProgram;
     uniforms: Uniforms;
+    /** The painting program, built the first time it is needed. */
+    paint?: { program: WebGLProgram; uniforms: Uniforms } | null;
   }[] = [];
   private key = "";
 
@@ -180,6 +218,12 @@ export class SurfaceDepth {
   /**
    * Draws every surface into the depth buffer only. The caller has the
    * vertex array and the depth state it wants; this leaves colour writes on.
+   *
+   * Cutting out, a surface reading any of the names in `paint` is painted
+   * instead: one that moves with a clock Desmos is told of by a slider, a
+   * body in a preset's scene. Desmos meshes it again some frames after the
+   * slider moves, so a hole cut where it now is showed bare paper with the
+   * body trailing behind; painted, it is where the clock says, with the flow.
    */
   draw(
     mathToView: readonly number[],
@@ -188,7 +232,8 @@ export class SurfaceDepth {
     resolution: number,
     parameters: ReadonlyMap<string, number>,
     time: number,
-    cutOut = false
+    cutOut = false,
+    paint: ReadonlySet<string> = new Set()
   ) {
     const { gl } = this;
     if (this.programs.length === 0) return;
@@ -205,8 +250,34 @@ export class SurfaceDepth {
       gl.blendFunc(gl.ZERO, gl.ZERO);
     } else gl.colorMask(false, false, false, false);
     const res = Math.max(2, Math.round(resolution));
-    for (const { surface, program, uniforms: u } of this.programs) {
+    for (const entry of this.programs) {
+      const { surface } = entry;
+      const painted = cutOut && surface.params.some((name) => paint.has(name));
+      if (painted && entry.paint === undefined) {
+        // Null if it will not build: then it is cut out as before.
+        try {
+          const program = linkProgram3D(
+            gl,
+            vertexSource(surface),
+            PAINT_FRAGMENT
+          );
+          entry.paint = { program, uniforms: uniformsOf(gl, program) };
+        } catch {
+          entry.paint = null;
+        }
+      }
+      const { program, uniforms: u } =
+        painted && entry.paint ? entry.paint : entry;
       gl.useProgram(program);
+      if (cutOut) {
+        if (painted && entry.paint) {
+          gl.disable(gl.BLEND);
+          gl.uniform3fv(u.u_color, rgb(surface.color));
+        } else {
+          gl.enable(gl.BLEND);
+          gl.blendFunc(gl.ZERO, gl.ZERO);
+        }
+      }
       uploadField3DParameters(gl, u, surface, parameters, time);
       gl.uniformMatrix4fv(u.u_mathToView, false, mathToView);
       gl.uniformMatrix4fv(u.u_projection, false, projection);
@@ -223,7 +294,10 @@ export class SurfaceDepth {
   }
 
   dispose() {
-    for (const { program } of this.programs) this.gl.deleteProgram(program);
+    for (const { program, paint } of this.programs) {
+      this.gl.deleteProgram(program);
+      if (paint) this.gl.deleteProgram(paint.program);
+    }
     this.programs = [];
     this.key = "";
   }

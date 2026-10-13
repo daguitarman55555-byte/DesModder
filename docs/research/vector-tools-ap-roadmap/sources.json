@@ -1,0 +1,24 @@
+[
+  {
+    "title": "AP1 CED",
+    "url": "https://apcentral.collegeboard.org/media/pdf/ap-physics-1-course-and-exam-description.pdf",
+    "retrieved": "2026-10-09",
+    "sha256": "c994fc72062e113832e098965f27902fec03bcdc20b0d516ee2a884ab76eeb65"
+  },
+  {
+    "title": "AP2 CED",
+    "url": "https://apcentral.collegeboard.org/media/pdf/ap-physics-2-course-and-exam-description.pdf",
+    "retrieved": "2026-10-09",
+    "sha256": "81719f7fb35add121ddf70b61f6ff33e9110239511f4cf7dcc6763879007e29c"
+  },
+  {
+    "title": "AP1 clarifications",
+    "url": "https://apcentral.collegeboard.org/media/pdf/ap-physics-1-course-and-exam-description-clarifications.pdf",
+    "reviewed": "2026-10-09"
+  },
+  {
+    "title": "AP2 clarifications effective Fall 2026",
+    "url": "https://apcentral.collegeboard.org/media/pdf/ap-physics-2-course-and-exam-description-clarifications-effective-fall-2026.pdf",
+    "reviewed": "2026-10-09"
+  }
+]

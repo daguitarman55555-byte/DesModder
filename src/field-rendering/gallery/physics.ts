@@ -366,7 +366,8 @@ const t = (name: string, value: 0 | 1, label: string): GalleryVariable => ({
 const CHARGES_PRESET: GalleryPreset = {
   id: "charges",
   name: "Electric charges",
-  category: "fields",
+  category: "ap2",
+  apUnit: 10,
   blurb:
     "Two point charges, q₁ and q₂, a distance d apart: Coulomb's law. Opposite charges, and lines run from one to the other; like charges, and they push apart, with a neutral point between. Drag the probe to see the field there, each charge's part of it, and the force on a test charge q₀.",
   xLatex: CHARGES_2D.x,
