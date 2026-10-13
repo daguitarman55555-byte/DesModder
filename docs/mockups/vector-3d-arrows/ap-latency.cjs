@@ -10,7 +10,7 @@
 // IDS, DIMS and MODES (comma lists) narrow or widen a run. Prints one line
 // per preset and writes docs/assets/vector-3d/ap/latency.json, or OUTPUT,
 // in the shape the CI's Pages report reads
-// (scripts/vector-tools-pages-report.cjs).
+// (docs/mockups/vector-3d-arrows/ap-pages-report.cjs).
 const puppeteer = require("puppeteer");
 const { join } = require("node:path");
 const { writeFileSync } = require("node:fs");

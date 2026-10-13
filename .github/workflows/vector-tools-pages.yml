@@ -8,7 +8,7 @@ on:
     paths:
       - ".github/workflows/vector-tools-pages.yml"
       - "src/**"
-      - "scripts/vector-tools-pages-report.cjs"
+      - "docs/mockups/vector-3d-arrows/ap-pages-report.cjs"
       - "docs/mockups/vector-3d-arrows/ap-look.cjs"
       - "docs/mockups/vector-3d-arrows/ap-latency.cjs"
       - "package*.json"
@@ -119,7 +119,7 @@ jobs:
           node -e 'const fs=require("fs");const keys=["INSTALL","UNIT","TYPES","BUILD","LIVE","LATENCY"]; const s=Object.fromEntries(keys.map(k=>[k.toLowerCase(),process.env[k]===""?null:Number(process.env[k])])); fs.writeFileSync("out/status.json",JSON.stringify(s,null,2));'
       - name: Generate static Pages report
         if: always()
-        run: node scripts/vector-tools-pages-report.cjs
+        run: node docs/mockups/vector-3d-arrows/ap-pages-report.cjs
       - name: Upload full evidence, including logs
         uses: actions/upload-artifact@v4
         if: always()

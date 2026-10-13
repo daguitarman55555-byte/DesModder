@@ -8,7 +8,7 @@ Repo: `daguitarman55555-byte/DesModder`, working branch `feature/vector-tools-fo
 
 ## Install (the previous request said "Don't push," so this bundle was not pushed)
 
-1. The workflow, `scripts/vector-tools-pages-report.cjs`, and the `HEADFUL` switch in `ap-look.cjs` and `ap-latency.cjs` are already on the branch.
+1. The workflow, `docs/mockups/vector-3d-arrows/ap-pages-report.cjs`, and the `HEADFUL` switch in `ap-look.cjs` and `ap-latency.cjs` are already on the branch.
 2. Latency is `docs/mockups/vector-3d-arrows/ap-latency.cjs`: the time from a slider write until Desmos reports the new value, which is after its recompute. That is the 150 ms budget the presets are held to. It replaced GPT's proxy, which measured only the flow's redraw after one slider.
 3. GitHub repository **Settings → Pages → Build and deployment → Source: GitHub Actions**. The repository metadata showed `has_pages: false` at inspection, so this setting is required.
 4. Commit the new files to `feature/vector-tools-foundation`. Its **push** trigger runs the workflow automatically. A manual **Run workflow** button for a brand-new workflow generally requires the workflow file to exist on the repository default branch (`main`) first; do not assume that button will appear for a feature-branch-only file.
@@ -33,4 +33,4 @@ All failures are still published as failures so the report can explain what fail
 
 ## Local report smoke test
 
-From repository root, `mkdir -p out/logs && node scripts/vector-tools-pages-report.cjs`. This should create `site/index.html` and `site/results.json`, marking unavailable stages/views as unverified. Inspect `site/index.html` locally or serve it via a static file server.
+From repository root, `mkdir -p out/logs && node docs/mockups/vector-3d-arrows/ap-pages-report.cjs`. This should create `site/index.html` and `site/results.json`, marking unavailable stages/views as unverified. Inspect `site/index.html` locally or serve it via a static file server.
