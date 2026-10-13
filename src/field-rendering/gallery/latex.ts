@@ -5,10 +5,6 @@
  * up in front of people and in the expression list.
  */
 
-/** x² + y², bracketed. */
-export const r2 = String.raw`\left(x^{2}+y^{2}\right)`;
-/** x² + y² + z², bracketed. */
-export const r3 = String.raw`\left(x^{2}+y^{2}+z^{2}\right)`;
 /** The distance from the z-axis, √(x² + y²). */
 export const rho = String.raw`\sqrt{x^{2}+y^{2}}`;
 
@@ -49,7 +45,7 @@ export function thinVortexRing(R: number, a: number, k: number, pulse = "") {
   const d1 = String.raw`\left(\left(${rho}-${R}\right)^{2}+z^{2}\right)`;
   const d2 = String.raw`\left(\left(${rho}+${R}\right)^{2}+z^{2}\right)`;
   const core = (d: string) =>
-    String.raw`\frac{1-e^{-\frac{${d}}{${a * a}}}}{${d}}`;
+    String.raw`\frac{1-e^{-\frac{${d}}{${num(a * a)}}}}{${d}}`;
   const f1 = core(d1);
   const f2 = core(d2);
   const U =
@@ -74,7 +70,7 @@ export function num(v: number) {
  * signs: `[[2, "x"], [-1, "y"]]` is `2x-y`. Terms that round to nothing are
  * left out; nothing at all is `0`.
  */
-export function sum(terms: readonly (readonly [number, string])[]) {
+function sum(terms: readonly (readonly [number, string])[]) {
   let out = "";
   for (const [c, factor] of terms) {
     const r = Math.round(c * 1e4) / 1e4;

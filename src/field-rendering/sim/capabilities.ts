@@ -41,7 +41,7 @@ export interface SimCapabilities {
  * with the density and velocity beside them, and each cell's wall force.
  * WebGL2 guarantees four.
  */
-export const REQUIRED_DRAW_BUFFERS = 4;
+const REQUIRED_DRAW_BUFFERS = 4;
 
 const PROBE_VERTEX = `#version 300 es
 void main() {
@@ -73,9 +73,7 @@ void main() {
   );
 }`;
 
-export function probeSimCapabilities(
-  gl: WebGL2RenderingContext
-): SimCapabilities {
+function probeSimCapabilities(gl: WebGL2RenderingContext): SimCapabilities {
   const problems: string[] = [];
   const colorBufferFloat = gl.getExtension("EXT_color_buffer_float") !== null;
   const floatLinear = gl.getExtension("OES_texture_float_linear") !== null;
@@ -144,8 +142,13 @@ export function probeWithScratchContext(
   createCanvas: () => HTMLCanvasElement | OffscreenCanvas = () =>
     document.createElement("canvas")
 ): SimCapabilities {
-  const canvas = createCanvas();
-  const gl = canvas.getContext("webgl2");
+  // Through a type with only the webgl2 overload: on the union of the two
+  // canvases TypeScript cannot choose an overload and returns every kind of
+  // context, 2D included.
+  const webgl2 = (canvas: {
+    getContext: (id: "webgl2") => WebGL2RenderingContext | null;
+  }) => canvas.getContext("webgl2");
+  const gl = webgl2(createCanvas());
   if (gl === null) {
     return {
       webgl2: false,

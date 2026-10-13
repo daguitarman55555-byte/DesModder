@@ -17,10 +17,6 @@ import {
   FLOW_PARTICLE_MAXIMUM,
   FLOW_PARTICLE_MINIMUM,
   FLOW_RENDER_SCALE_MINIMUM,
-  PANEL_MAX_HEIGHT,
-  PANEL_MAX_WIDTH,
-  PANEL_MIN_HEIGHT,
-  PANEL_MIN_WIDTH,
   PANEL_TABS,
   CURVE_LINE_WIDTH_MAXIMUM,
   CURVE_LINE_WIDTH_MINIMUM,
@@ -3449,13 +3445,6 @@ function auditTable(vectorTools: VectorTools) {
 function hasIssue(issues: readonly { message: string }[], startsWith: string) {
   return issues.some((issue) => issue.message.startsWith(startsWith));
 }
-
-export const PANEL_SIZE_LIMITS = {
-  minWidth: PANEL_MIN_WIDTH,
-  maxWidth: PANEL_MAX_WIDTH,
-  minHeight: PANEL_MIN_HEIGHT,
-  maxHeight: PANEL_MAX_HEIGHT,
-};
 
 export function VectorToolsPanelFunc(vectorTools: VectorTools) {
   return <VectorToolsPanel vectorTools={() => vectorTools} />;

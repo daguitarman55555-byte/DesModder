@@ -3,96 +3,39 @@
  * The Kepler reference body uses 6 Newton iterations on Kepler's equation;
  * at e<=0.6 its numerical residual is far below ordinary display accuracy.
  */
-import type { GalleryPreset, GalleryVariable, SceneItem } from "./types";
+import { flow2D, flow3D, inked, num, toggle, variable } from "./kit";
+import type { GalleryPreset, SceneItem } from "./types";
+
 const R = String.raw;
-const v = (
-  name: string,
-  value: number,
-  min: number,
-  max: number,
-  step = 0.1
-): GalleryVariable => ({ name, value, min, max, step });
-const sw = (name: string, text: string): GalleryVariable => ({
-  ...v(name, 1, 0, 1, 1),
-  toggle: text,
-});
-const obj = (
-  key: string,
-  latex: string,
-  other: Partial<SceneItem> = {}
-): SceneItem => ({ key, latex, color: "#46536a", ...other });
+const { obj, path, surface: solid, ball: body } = inked("#46536a");
 const line = (
   key: string,
   points: readonly string[],
   domain: readonly [string, string],
   other: Partial<SceneItem> = {}
-) =>
-  obj(key, R`\left(${points.join(",")}\right)`, {
-    domain,
-    lineWidth: 2.5,
-    ...other,
-  });
+) => path(key, points, domain, { lineWidth: 2.5, ...other });
+/** A whole sphere's u and v unless it says otherwise. */
 const surface = (
   key: string,
   coords: readonly string[],
   other: Partial<SceneItem> = {}
-) =>
-  obj(key, R`\left(${coords.join(",")}\right)`, {
-    domainU: ["0", R`2\pi`],
-    domainV: ["0", R`\pi`],
-    fill: true,
-    fillOpacity: 1,
-    ...other,
-  });
+) => solid(key, coords, ["0", R`2\pi`], ["0", R`\pi`], other);
 const ball = (
   key: string,
   coords: readonly string[],
   dim: 2 | 3,
   radius = "0.16",
   other: Partial<SceneItem> = {}
-): SceneItem => {
-  if (dim === 2)
-    return obj(key, R`\left(${coords.join(",")}\right)`, {
-      points: true,
-      pointSize: 13,
+) =>
+  body(key, coords, dim, {
+    radius,
+    pointSize: 13,
+    extra: {
       color: "#d18a43",
+      ...(dim === 3 ? { majesticColor: "#e7a85a" } : {}),
       ...other,
-    });
-  const xyz = [
-    R`\left(${coords[0]}\right)+${radius}\cos(u)\sin(v)`,
-    R`\left(${coords[1]}\right)+${radius}\sin(u)\sin(v)`,
-    R`\left(${coords[2]}\right)+${radius}\cos(v)`,
-  ];
-  return surface(key, xyz, {
-    color: "#d18a43",
-    majesticColor: "#e7a85a",
-    ...other,
+    },
   });
-};
-const standardFlow = (dim: 2 | 3, speed: number, density = 1) =>
-  dim === 2
-    ? {
-        particleCount: Math.round(24000 * density),
-        speed,
-        trailPersistence: 0.84,
-        dropRate: 0.03,
-        opacity: 0.45,
-        pointSize: 1.5,
-        glow: 0,
-        normalizeSpeed: false,
-      }
-    : undefined;
-const look3D = (speed: number, density = 1) => ({
-  particles: Math.round(30000 * density),
-  speed: 0.6 * speed,
-  trail: 16,
-  lifetime: 1.2,
-  opacity: 0.55,
-  glow: 0,
-  normalizeSpeed: false,
-  absorb: false,
-  palette: "charge" as const,
-});
 
 /**
  * The exact pendulum at amplitude θ₀, not its small-angle approximation:
@@ -173,15 +116,19 @@ function pendulumScene(dim: 2 | 3): SceneItem[] {
           R`${zp}-tL\cos\left(${th}\right)`,
         ];
   const sep = R`2\sqrt{\frac{g}{L}}\cos\left(\frac{t}{2}\right)`;
-  const path = (sgn: string) => ["t", sgn + sep, ...(dim === 3 ? ["0"] : [])];
+  const separatrix = (sgn: string) => [
+    "t",
+    sgn + sep,
+    ...(dim === 3 ? ["0"] : []),
+  ];
   return [
     ...pendulumHelpers(),
-    line("separatrixUpper", path(""), [R`-\pi`, R`\pi`], {
+    line("separatrixUpper", separatrix(""), [R`-\pi`, R`\pi`], {
       explains: true,
       color: "#ac4a38",
       lineWidth: 3,
     }),
-    line("separatrixLower", path("-"), [R`-\pi`, R`\pi`], {
+    line("separatrixLower", separatrix("-"), [R`-\pi`, R`\pi`], {
       explains: true,
       color: "#ac4a38",
       lineWidth: 3,
@@ -201,12 +148,12 @@ function pendulumScene(dim: 2 | 3): SceneItem[] {
 }
 function pendulum(): GalleryPreset {
   const vars = [
-    v("g", 2, 0.5, 4, 0.1),
-    v("L", 1.3, 0.6, 2, 0.05),
+    variable("g", 2, 0.5, 4, 0.1),
+    variable("L", 1.3, 0.6, 2, 0.05),
     // Large by default: at 2.5 rad (143°) the period is 40% longer than
     // small-angle theory says, and the orbit is visibly not an ellipse.
-    v("\\theta_{0}", 2.5, 0.2, 3, 0.05),
-    v("T_{scene}", 0, 0, 1000, 0.01),
+    variable("\\theta_{0}", 2.5, 0.2, 3, 0.05),
+    variable("T_{scene}", 0, 0, 1000, 0.01),
   ];
   const fy = R`-\frac{g}{L}\sin\left(x\right)`;
   const energy = R`\frac{L^{2}y^{2}}{2}+gL\left(1-\cos\left(x\right)\right)`;
@@ -234,7 +181,7 @@ function pendulum(): GalleryPreset {
     seedLatex: "1",
     variables: vars,
     scene: pendulumScene(2),
-    flow: standardFlow(2, 0.23),
+    flow: flow2D({ speed: 0.23 }),
     space: {
       blurb:
         "The state flow is still planar (z=0). The real pendulum on the right uses z as its physical vertical axis.",
@@ -244,7 +191,7 @@ function pendulum(): GalleryPreset {
       seedLatex: R`e^{-15z^{2}}`,
       variables: vars,
       scene: pendulumScene(3),
-      look: look3D(0.23),
+      look: flow3D({ speed: 0.6 * 0.23 }),
     },
   };
 }
@@ -353,10 +300,10 @@ function keplerScene(dim: 2 | 3): SceneItem[] {
 }
 function kepler(): GalleryPreset {
   const vars = [
-    v("a_{orb}", 3, 1.7, 4.2, 0.1),
-    v("e_{orb}", 0.4, 0, 0.6, 0.02),
-    v("M_{g}", 3, 1, 6, 0.1),
-    v("T_{scene}", 0, 0, 1000, 0.01),
+    variable("a_{orb}", 3, 1.7, 4.2, 0.1),
+    variable("e_{orb}", 0.4, 0, 0.6, 0.02),
+    variable("M_{g}", 3, 1, 6, 0.1),
+    variable("T_{scene}", 0, 0, 1000, 0.01),
   ];
   const r = R`\sqrt{x^{2}+y^{2}}`;
   // Every point lies on one ellipse of this eccentricity about the focus,
@@ -396,7 +343,7 @@ function kepler(): GalleryPreset {
     seedLatex: "1",
     variables: vars,
     scene: keplerScene(2),
-    flow: standardFlow(2, 1.2),
+    flow: flow2D({ speed: 1.2 }),
     space: {
       blurb:
         "Planar Kepler orbits embedded in 3D, not a general 3D gravity field.",
@@ -406,7 +353,7 @@ function kepler(): GalleryPreset {
       seedLatex: seed3,
       variables: vars,
       scene: keplerScene(3),
-      look: look3D(0.5),
+      look: flow3D({ speed: 0.6 * 0.5 }),
     },
   };
 }
@@ -442,7 +389,7 @@ function motionScene(dim: 2 | 3): SceneItem[] {
   const X = (t: string) => R`${MOTION.t0}+${MOTION.perSecond}\left(${t}\right)`;
   // A point in the picture's plane: (X, Y) in 2D, (X, 0, Y) in 3D.
   const at = (h: string, y: string) => (dim === 2 ? [h, y] : [h, "0", y]);
-  const end = String(MOTION.t0 + 6 * MOTION.perSecond);
+  const end = num(MOTION.t0 + 6 * MOTION.perSecond);
   const traces = R`\left\{s_{traces}=1\right\}`;
   const scene: SceneItem[] = [];
   for (const strip of MOTION.strips) {
@@ -479,10 +426,7 @@ function motionScene(dim: 2 | 3): SceneItem[] {
     line(
       "now",
       at(X(now), "t"),
-      [
-        String(MOTION.strips[2].base - 1.2),
-        String(MOTION.strips[0].base + 2.4),
-      ],
+      [num(MOTION.strips[2].base - 1.2), num(MOTION.strips[0].base + 2.4)],
       { explains: true, color: "#6b7480", lineWidth: 1.5, lineStyle: "DOTTED" }
     )
   );
@@ -505,11 +449,11 @@ function motionScene(dim: 2 | 3): SceneItem[] {
 
 function motion(): GalleryPreset {
   const vars = [
-    v("x_{ini}", 0, -3, 3, 0.1),
-    v("v_{ini}", 2, -3, 3, 0.1),
-    v("a_{const}", -0.5, -2, 2, 0.1),
-    v("T_{scene}", 0, 0, 1000, 0.01),
-    sw("s_{traces}", "Live x(t), v(t), a(t) graphs"),
+    variable("x_{ini}", 0, -3, 3, 0.1),
+    variable("v_{ini}", 2, -3, 3, 0.1),
+    variable("a_{const}", -0.5, -2, 2, 0.1),
+    variable("T_{scene}", 0, 0, 1000, 0.01),
+    toggle("s_{traces}", 1, "Live x(t), v(t), a(t) graphs"),
   ];
   // The flow is the object's motion along its track: a current there moving
   // at its velocity (0.8 graph units per unit of x, as the object is drawn),
@@ -544,7 +488,7 @@ function motion(): GalleryPreset {
     seedLatex: band("y"),
     variables: vars,
     scene: motionScene(2),
-    flow: standardFlow(2, 0.5, 0.35),
+    flow: flow2D({ speed: 0.5, density: 0.35 }),
     space: {
       blurb:
         "The same picture standing in the xz-plane: the track at the top, the three graphs below it.",
@@ -554,7 +498,7 @@ function motion(): GalleryPreset {
       seedLatex: R`${band("z")}e^{-6y^{2}}`,
       variables: vars,
       scene: motionScene(3),
-      look: look3D(0.5, 0.35),
+      look: flow3D({ speed: 0.6 * 0.5, density: 0.35 }),
     },
   };
 }

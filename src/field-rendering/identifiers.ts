@@ -64,7 +64,7 @@ function skipBraceGroup(latex: string, open: number) {
  * because the letters spelling a function's name are not variables — without
  * that, `\operatorname{sort}` would report `s`, `o`, `r` and `t`.
  */
-export function scanIdentifiers(latex: string): IdentifierOccurrence[] {
+function scanIdentifiers(latex: string): IdentifierOccurrence[] {
   const found: IdentifierOccurrence[] = [];
   let i = 0;
   while (i < latex.length) {

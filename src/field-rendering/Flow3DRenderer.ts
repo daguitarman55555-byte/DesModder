@@ -138,7 +138,7 @@ export interface Flow3DOptions {
 }
 
 export const MAX_FLOW_PARTICLES_3D = 200_000;
-export const MAX_FLOW_TRAIL_3D = 64;
+const MAX_FLOW_TRAIL_3D = 64;
 
 export const DEFAULT_FLOW_3D_OPTIONS: Flow3DOptions = {
   particles: "auto",
@@ -208,7 +208,7 @@ bool vtOutsideSpawn(vec3 m) {
  * from the centre, projected: the sum of their squared lengths on screen is
  * twice the square of the box's displayed half-side, whichever way it faces.
  */
-export function boxDiagonalPx(camera: Camera3D, box: Box3D) {
+function boxDiagonalPx(camera: Camera3D, box: Box3D) {
   const clip = mathToClip(camera);
   const c = [0, 1, 2].map((i) => (box.min[i] + box.max[i]) / 2);
   const centre = projectToScreen(camera, c[0], c[1], c[2], clip);

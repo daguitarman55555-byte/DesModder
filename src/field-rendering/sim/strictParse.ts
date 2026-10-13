@@ -39,9 +39,9 @@ export type Expr =
   | { kind: "user"; name: string; args: Expr[] }
   | { kind: "piecewise"; branches: PiecewiseBranch[]; otherwise?: Expr };
 
-export type VarRole = "x" | "y" | "time" | "param" | "local";
+type VarRole = "x" | "y" | "time" | "param" | "local";
 
-export interface PiecewiseBranch {
+interface PiecewiseBranch {
   condition: Chain;
   value: Expr;
 }
@@ -53,7 +53,7 @@ export interface Chain {
 }
 
 /** A top-level inequality: its chain, and the restrictions attached to it. */
-export interface Relation {
+interface Relation {
   chain: Chain;
   /** Each restriction holds where any of its chains holds; all must hold. */
   restrictions: Chain[][];
@@ -67,7 +67,7 @@ export interface StrictProgram {
   usesTime: boolean;
 }
 
-export interface ParsedFunction {
+interface ParsedFunction {
   params: readonly string[];
   body: Expr;
 }
@@ -333,7 +333,7 @@ function isConditionList(tokens: readonly Token[]): boolean {
  * change what the visual compiler accepts. Spelling the base as the first
  * braced group of an operator name keeps that tokenizer as it is.
  */
-export function rewriteLogBases(latex: string): string {
+function rewriteLogBases(latex: string): string {
   let out = "";
   let i = 0;
   for (;;) {

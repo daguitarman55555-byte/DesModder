@@ -304,7 +304,7 @@ export class SurfaceDepth {
 }
 
 /** The two coordinates a surface's grid spans. */
-export function gridRange(
+function gridRange(
   surface: Surface3D,
   box: Box3D
 ): [[number, number], [number, number]] {

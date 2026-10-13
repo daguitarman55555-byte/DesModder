@@ -80,7 +80,7 @@ export function desmosPow(base: number, exponent: number): number {
 }
 
 /** `mod(a, b)`: the sign of the divisor, and undefined for a zero divisor. */
-export function desmosMod(a: number, b: number): number {
+function desmosMod(a: number, b: number): number {
   if (b === 0) return NaN;
   return a - b * Math.floor(a / b);
 }

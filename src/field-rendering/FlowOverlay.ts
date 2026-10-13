@@ -39,7 +39,7 @@ export interface FlowOverlayIdentity {
 }
 
 /** What Vector Tools has always used, kept so its markup does not move. */
-export const VECTOR_TOOLS_FLOW_IDENTITY: FlowOverlayIdentity = {
+const VECTOR_TOOLS_FLOW_IDENTITY: FlowOverlayIdentity = {
   canvasId: "dsm-vector-tools-flow-canvas",
   boundsObserverKey: "graphpaperBounds.dsm-vector-tools",
 };

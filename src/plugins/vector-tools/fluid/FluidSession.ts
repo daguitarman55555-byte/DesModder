@@ -133,7 +133,7 @@ interface ValueHelper {
 }
 
 /** The field the panel is editing, as far as the stirred box needs it. */
-export interface FieldDescription {
+interface FieldDescription {
   source: "components" | "gradient";
   xLatex: string;
   yLatex: string;

@@ -45,7 +45,7 @@ import { AUTO_SURFACE_RESOLUTION, SurfaceDepth } from "./SurfaceDepth";
 import type { Surface3D } from "./surfaces3d";
 import { boxScreenSize, type Occlusion3D } from "./Arrow3DRenderer";
 
-export type VolumeLook3D = "streamlines" | "cloud";
+type VolumeLook3D = "streamlines" | "cloud";
 
 export interface Volume3DOptions {
   look: VolumeLook3D;

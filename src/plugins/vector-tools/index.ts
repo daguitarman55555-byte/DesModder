@@ -234,8 +234,6 @@ export type FieldAnalysis =
     }
   | { ok: false; error: string };
 
-export { TEST_FOLDER_ID, TEST_LINE_ID, TEST_NAMESPACE } from "./ids";
-
 interface VectorToolsSettings {
   serializedFieldConfig: string;
   /**

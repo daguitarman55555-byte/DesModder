@@ -1,31 +1,31 @@
 {
-  "generatedAt": "2026-10-13T04:20:12.581Z",
+  "generatedAt": "2026-10-13T06:44:15.641Z",
   "results": [
     {
       "dimension": "2d",
       "preset": "ap-projectile",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 49,
-      "p95Ms": 66,
-      "worstMs": 66,
+      "p50Ms": 53,
+      "p95Ms": 71,
+      "worstMs": 71,
       "error": null,
       "sliders": [
         {
           "name": "g",
-          "ms": [66, 57, 49]
+          "ms": [71, 63, 62]
         },
         {
           "name": "v_{0x}",
-          "ms": [54, 49, 48]
+          "ms": [49, 53, 48]
         },
         {
           "name": "v_{0y}",
-          "ms": [48, 46, 59]
+          "ms": [59, 51, 60]
         },
         {
           "name": "h",
-          "ms": [30, 31, 28]
+          "ms": [28, 28, 28]
         }
       ]
     },
@@ -34,22 +34,22 @@
       "preset": "ap-shm",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 57,
-      "p95Ms": 87,
-      "worstMs": 87,
+      "p50Ms": 26,
+      "p95Ms": 30,
+      "worstMs": 30,
       "error": null,
       "sliders": [
         {
           "name": "k",
-          "ms": [76, 57, 53]
+          "ms": [30, 27, 26]
         },
         {
           "name": "m",
-          "ms": [75, 87, 79]
+          "ms": [25, 27, 28]
         },
         {
           "name": "A",
-          "ms": [14, 21, 15]
+          "ms": [14, 15, 20]
         }
       ]
     },
@@ -58,18 +58,18 @@
       "preset": "ap-circular",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 27,
+      "p50Ms": 23,
       "p95Ms": 28,
       "worstMs": 28,
       "error": null,
       "sliders": [
         {
           "name": "w",
-          "ms": [28, 28, 24]
+          "ms": [28, 23, 23]
         },
         {
           "name": "R",
-          "ms": [27, 20, 22]
+          "ms": [24, 23, 18]
         }
       ]
     },
@@ -78,26 +78,26 @@
       "preset": "ap-nozzle",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 62,
-      "p95Ms": 107,
-      "worstMs": 107,
+      "p50Ms": 53,
+      "p95Ms": 63,
+      "worstMs": 63,
       "error": null,
       "sliders": [
         {
           "name": "U",
-          "ms": [62, 99, 107]
+          "ms": [58, 59, 53]
         },
         {
           "name": "a",
-          "ms": [66, 65, 63]
+          "ms": [55, 63, 47]
         },
         {
           "name": "H",
-          "ms": [58, 59, 56]
+          "ms": [49, 56, 50]
         },
         {
           "name": "d",
-          "ms": [13, 14, 13]
+          "ms": [13, 13, 14]
         }
       ]
     },
@@ -106,18 +106,18 @@
       "preset": "ap-conductor",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 125,
-      "p95Ms": 136,
-      "worstMs": 136,
+      "p50Ms": 130,
+      "p95Ms": 149,
+      "worstMs": 149,
       "error": null,
       "sliders": [
         {
           "name": "E",
-          "ms": [122, 136, 28]
+          "ms": [149, 135, 24]
         },
         {
           "name": "R",
-          "ms": [131, 125, 116]
+          "ms": [130, 128, 128]
         }
       ]
     },
@@ -126,22 +126,22 @@
       "preset": "ap-induction",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 14,
-      "p95Ms": 16,
-      "worstMs": 16,
+      "p50Ms": 15,
+      "p95Ms": 18,
+      "worstMs": 18,
       "error": null,
       "sliders": [
         {
           "name": "B",
-          "ms": [14, 14, 14]
+          "ms": [16, 15, 14]
         },
         {
           "name": "w",
-          "ms": [15, 16, 13]
+          "ms": [18, 15, 14]
         },
         {
           "name": "R",
-          "ms": [14, 15, 13]
+          "ms": [14, 16, 15]
         }
       ]
     },
@@ -150,22 +150,22 @@
       "preset": "ap-motion-graphs",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 14,
-      "p95Ms": 18,
-      "worstMs": 18,
+      "p50Ms": 15,
+      "p95Ms": 16,
+      "worstMs": 16,
       "error": null,
       "sliders": [
         {
           "name": "x_{ini}",
-          "ms": [14, 14, 13]
+          "ms": [16, 15, 15]
         },
         {
           "name": "v_{ini}",
-          "ms": [14, 14, 16]
+          "ms": [15, 16, 14]
         },
         {
           "name": "a_{const}",
-          "ms": [18, 15, 14]
+          "ms": [15, 15, 15]
         }
       ]
     },
@@ -174,22 +174,22 @@
       "preset": "ap-pendulum-phase",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 26,
-      "p95Ms": 28,
-      "worstMs": 28,
+      "p50Ms": 28,
+      "p95Ms": 30,
+      "worstMs": 30,
       "error": null,
       "sliders": [
         {
           "name": "g",
-          "ms": [24, 24, 26]
+          "ms": [27, 28, 25]
         },
         {
           "name": "L",
-          "ms": [24, 26, 21]
+          "ms": [24, 28, 23]
         },
         {
           "name": "\\theta_{0}",
-          "ms": [27, 27, 28]
+          "ms": [29, 29, 30]
         }
       ]
     },
@@ -198,22 +198,22 @@
       "preset": "ap-kepler-areas",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 27,
-      "p95Ms": 33,
-      "worstMs": 33,
+      "p50Ms": 25,
+      "p95Ms": 29,
+      "worstMs": 29,
       "error": null,
       "sliders": [
         {
           "name": "a_{orb}",
-          "ms": [29, 28, 33]
+          "ms": [25, 26, 21]
         },
         {
           "name": "e_{orb}",
-          "ms": [27, 25, 27]
+          "ms": [29, 27, 28]
         },
         {
           "name": "M_{g}",
-          "ms": [19, 24, 26]
+          "ms": [22, 16, 25]
         }
       ]
     },
@@ -222,70 +222,70 @@
       "preset": "ap-gauss-flux",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 18,
-      "p95Ms": 24,
-      "worstMs": 25,
+      "p50Ms": 19,
+      "p95Ms": 28,
+      "worstMs": 29,
       "error": null,
       "sliders": [
         {
           "name": "q_{1}",
-          "ms": [24, 17, 23]
+          "ms": [26, 17, 17]
         },
         {
           "name": "q_{2}",
-          "ms": [16, 16, 16]
+          "ms": [19, 18, 17]
         },
         {
           "name": "X_{q1}",
-          "ms": [24, 25, 24]
+          "ms": [17, 23, 21]
         },
         {
           "name": "Y_{q1}",
-          "ms": [20, 18, 17]
+          "ms": [22, 26, 23]
         },
         {
           "name": "Z_{q1}",
-          "ms": [16, 16, 20]
+          "ms": [21, 27, 18]
         },
         {
           "name": "X_{q2}",
-          "ms": [20, 21, 24]
+          "ms": [18, 17, 18]
         },
         {
           "name": "Y_{q2}",
-          "ms": [17, 21, 23]
+          "ms": [21, 28, 19]
         },
         {
           "name": "Z_{q2}",
-          "ms": [17, 22, 23]
+          "ms": [24, 22, 28]
         },
         {
           "name": "C_{gx}",
-          "ms": [20, 24, 18]
+          "ms": [21, 24, 18]
         },
         {
           "name": "C_{gy}",
-          "ms": [24, 23, 16]
+          "ms": [23, 23, 17]
         },
         {
           "name": "C_{gz}",
-          "ms": [22, 16, 15]
+          "ms": [16, 18, 17]
         },
         {
           "name": "R_{g}",
-          "ms": [25, 18, 15]
+          "ms": [23, 24, 17]
         },
         {
           "name": "N_{g}",
-          "ms": [7, 17, 16]
+          "ms": [8, 17, 16]
         },
         {
           "name": "\\alpha_{g}",
-          "ms": [14, 12, 13]
+          "ms": [29, 18, 19]
         },
         {
           "name": "\\beta_{g}",
-          "ms": [12, 12, 12]
+          "ms": [18, 14, 13]
         }
       ]
     },
@@ -294,50 +294,50 @@
       "preset": "ap-ampere-loop",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 14,
-      "p95Ms": 23,
-      "worstMs": 25,
+      "p50Ms": 16,
+      "p95Ms": 26,
+      "worstMs": 27,
       "error": null,
       "sliders": [
         {
           "name": "I_{a1}",
-          "ms": [14, 13, 13]
+          "ms": [27, 16, 16]
         },
         {
           "name": "I_{a2}",
-          "ms": [13, 13, 14]
+          "ms": [14, 14, 15]
         },
         {
           "name": "X_{a1}",
-          "ms": [18, 17, 20]
+          "ms": [18, 22, 17]
         },
         {
           "name": "X_{a2}",
-          "ms": [18, 23, 25]
+          "ms": [23, 26, 18]
         },
         {
           "name": "C_{ax}",
-          "ms": [15, 14, 15]
+          "ms": [18, 17, 15]
         },
         {
           "name": "C_{ay}",
-          "ms": [16, 16, 14]
+          "ms": [18, 17, 15]
         },
         {
           "name": "C_{az}",
-          "ms": [13, 13, 12]
+          "ms": [16, 15, 14]
         },
         {
           "name": "R_{a}",
-          "ms": [15, 15, 15]
+          "ms": [15, 17, 15]
         },
         {
           "name": "\\alpha_{a}",
-          "ms": [13, 16, 13]
+          "ms": [14, 13, 16]
         },
         {
           "name": "N_{a}",
-          "ms": [8, 12, 13]
+          "ms": [7, 12, 12]
         }
       ]
     },
@@ -353,23 +353,23 @@
       "sliders": [
         {
           "name": "\\theta_{r}",
-          "ms": [29, 28, 27]
+          "ms": [30, 30, 27]
         },
         {
           "name": "\\mu_{s}",
-          "ms": [24, 24, 22]
+          "ms": [19, 25, 21]
         },
         {
           "name": "\\mu_{k}",
-          "ms": [25, 19, 22]
+          "ms": [19, 18, 16]
         },
         {
           "name": "m_{r}",
-          "ms": [30, 20, 26]
+          "ms": [25, 27, 27]
         },
         {
           "name": "g",
-          "ms": [29, 26, 24]
+          "ms": [26, 29, 25]
         }
       ]
     },
@@ -378,30 +378,30 @@
       "preset": "ap-projectile",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 61,
-      "p95Ms": 77,
-      "worstMs": 77,
+      "p50Ms": 62,
+      "p95Ms": 93,
+      "worstMs": 93,
       "error": null,
       "sliders": [
         {
           "name": "g",
-          "ms": [76, 60, 77]
+          "ms": [74, 93, 67]
         },
         {
           "name": "v_{0x}",
-          "ms": [74, 63, 55]
+          "ms": [54, 62, 61]
         },
         {
           "name": "v_{0y}",
-          "ms": [76, 65, 73]
+          "ms": [88, 64, 62]
         },
         {
           "name": "h",
-          "ms": [61, 57, 55]
+          "ms": [61, 82, 70]
         },
         {
           "name": "w",
-          "ms": [48, 42, 46]
+          "ms": [49, 42, 42]
         }
       ]
     },
@@ -410,22 +410,22 @@
       "preset": "ap-shm",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 41,
-      "p95Ms": 55,
-      "worstMs": 55,
+      "p50Ms": 44,
+      "p95Ms": 46,
+      "worstMs": 46,
       "error": null,
       "sliders": [
         {
           "name": "k",
-          "ms": [55, 42, 41]
+          "ms": [44, 46, 43]
         },
         {
           "name": "m",
-          "ms": [37, 34, 45]
+          "ms": [42, 44, 39]
         },
         {
           "name": "A",
-          "ms": [46, 40, 37]
+          "ms": [46, 43, 45]
         }
       ]
     },
@@ -434,18 +434,18 @@
       "preset": "ap-circular",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 51,
-      "p95Ms": 66,
-      "worstMs": 66,
+      "p50Ms": 94,
+      "p95Ms": 124,
+      "worstMs": 124,
       "error": null,
       "sliders": [
         {
           "name": "w",
-          "ms": [49, 51, 66]
+          "ms": [65, 94, 124]
         },
         {
           "name": "R",
-          "ms": [61, 48, 46]
+          "ms": [96, 67, 54]
         }
       ]
     },
@@ -454,26 +454,26 @@
       "preset": "ap-nozzle",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 32,
-      "p95Ms": 45,
-      "worstMs": 45,
+      "p50Ms": 33,
+      "p95Ms": 43,
+      "worstMs": 43,
       "error": null,
       "sliders": [
         {
           "name": "U",
-          "ms": [15, 16, 14]
+          "ms": [15, 17, 15]
         },
         {
           "name": "a",
-          "ms": [36, 33, 32]
+          "ms": [38, 43, 42]
         },
         {
           "name": "H",
-          "ms": [39, 45, 39]
+          "ms": [42, 36, 33]
         },
         {
           "name": "d",
-          "ms": [15, 15, 15]
+          "ms": [14, 17, 16]
         }
       ]
     },
@@ -482,18 +482,18 @@
       "preset": "ap-conductor",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 79,
-      "p95Ms": 83,
-      "worstMs": 83,
+      "p50Ms": 81,
+      "p95Ms": 105,
+      "worstMs": 105,
       "error": null,
       "sliders": [
         {
           "name": "E",
-          "ms": [67, 65, 68]
+          "ms": [73, 81, 80]
         },
         {
           "name": "R",
-          "ms": [79, 83, 81]
+          "ms": [82, 105, 80]
         }
       ]
     },
@@ -503,21 +503,21 @@
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
       "p50Ms": 16,
-      "p95Ms": 27,
-      "worstMs": 27,
+      "p95Ms": 32,
+      "worstMs": 32,
       "error": null,
       "sliders": [
         {
           "name": "B",
-          "ms": [14, 14, 16]
+          "ms": [17, 16, 15]
         },
         {
           "name": "w",
-          "ms": [15, 16, 16]
+          "ms": [15, 16, 15]
         },
         {
           "name": "R",
-          "ms": [24, 17, 27]
+          "ms": [23, 26, 32]
         }
       ]
     },
@@ -526,22 +526,22 @@
       "preset": "ap-motion-graphs",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 91,
-      "p95Ms": 120,
-      "worstMs": 120,
+      "p50Ms": 90,
+      "p95Ms": 129,
+      "worstMs": 129,
       "error": null,
       "sliders": [
         {
           "name": "x_{ini}",
-          "ms": [13, 67, 51]
+          "ms": [11, 83, 60]
         },
         {
           "name": "v_{ini}",
-          "ms": [92, 91, 91]
+          "ms": [82, 90, 95]
         },
         {
           "name": "a_{const}",
-          "ms": [120, 105, 98]
+          "ms": [111, 129, 110]
         }
       ]
     },
@@ -550,22 +550,22 @@
       "preset": "ap-pendulum-phase",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 79,
-      "p95Ms": 136,
-      "worstMs": 136,
+      "p50Ms": 75,
+      "p95Ms": 86,
+      "worstMs": 86,
       "error": null,
       "sliders": [
         {
           "name": "g",
-          "ms": [19, 136, 97]
+          "ms": [86, 66, 75]
         },
         {
           "name": "L",
-          "ms": [66, 66, 74]
+          "ms": [71, 67, 78]
         },
         {
           "name": "\\theta_{0}",
-          "ms": [81, 81, 79]
+          "ms": [80, 72, 75]
         }
       ]
     },
@@ -574,22 +574,22 @@
       "preset": "ap-kepler-areas",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 92,
-      "p95Ms": 110,
-      "worstMs": 110,
+      "p50Ms": 82,
+      "p95Ms": 96,
+      "worstMs": 96,
       "error": null,
       "sliders": [
         {
           "name": "a_{orb}",
-          "ms": [97, 110, 100]
+          "ms": [95, 81, 95]
         },
         {
           "name": "e_{orb}",
-          "ms": [100, 92, 82]
+          "ms": [96, 82, 84]
         },
         {
           "name": "M_{g}",
-          "ms": [51, 46, 47]
+          "ms": [55, 45, 47]
         }
       ]
     },
@@ -598,70 +598,70 @@
       "preset": "ap-gauss-flux",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 78,
-      "p95Ms": 172,
-      "worstMs": 1024,
+      "p50Ms": 68,
+      "p95Ms": 95,
+      "worstMs": 961,
       "error": null,
       "sliders": [
         {
           "name": "q_{1}",
-          "ms": [54, 59, 63]
+          "ms": [961, 62, 47]
         },
         {
           "name": "q_{2}",
-          "ms": [1024, 78, 62]
+          "ms": [55, 46, 48]
         },
         {
           "name": "X_{q1}",
-          "ms": [100, 92, 83]
+          "ms": [78, 72, 69]
         },
         {
           "name": "Y_{q1}",
-          "ms": [79, 74, 68]
+          "ms": [78, 66, 77]
         },
         {
           "name": "Z_{q1}",
-          "ms": [79, 73, 75]
+          "ms": [77, 68, 63]
         },
         {
           "name": "X_{q2}",
-          "ms": [77, 77, 80]
+          "ms": [68, 61, 68]
         },
         {
           "name": "Y_{q2}",
-          "ms": [74, 81, 95]
+          "ms": [66, 64, 70]
         },
         {
           "name": "Z_{q2}",
-          "ms": [82, 82, 90]
+          "ms": [72, 75, 69]
         },
         {
           "name": "C_{gx}",
-          "ms": [113, 169, 129]
+          "ms": [82, 79, 77]
         },
         {
           "name": "C_{gy}",
-          "ms": [144, 176, 172]
+          "ms": [83, 82, 80]
         },
         {
           "name": "C_{gz}",
-          "ms": [90, 118, 92]
+          "ms": [99, 95, 81]
         },
         {
           "name": "R_{g}",
-          "ms": [82, 74, 66]
+          "ms": [56, 53, 72]
         },
         {
           "name": "N_{g}",
-          "ms": [8, 25, 23]
+          "ms": [9, 24, 21]
         },
         {
           "name": "\\alpha_{g}",
-          "ms": [39, 41, 38]
+          "ms": [43, 33, 39]
         },
         {
           "name": "\\beta_{g}",
-          "ms": [42, 41, 40]
+          "ms": [37, 45, 39]
         }
       ]
     },
@@ -670,50 +670,50 @@
       "preset": "ap-ampere-loop",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 42,
-      "p95Ms": 48,
-      "worstMs": 52,
+      "p50Ms": 36,
+      "p95Ms": 47,
+      "worstMs": 54,
       "error": null,
       "sliders": [
         {
           "name": "I_{a1}",
-          "ms": [17, 17, 16]
+          "ms": [21, 27, 21]
         },
         {
           "name": "I_{a2}",
-          "ms": [20, 20, 20]
+          "ms": [20, 22, 23]
         },
         {
           "name": "X_{a1}",
-          "ms": [47, 48, 48]
+          "ms": [45, 40, 45]
         },
         {
           "name": "X_{a2}",
-          "ms": [46, 42, 46]
+          "ms": [39, 36, 38]
         },
         {
           "name": "C_{ax}",
-          "ms": [46, 45, 47]
+          "ms": [41, 36, 44]
         },
         {
           "name": "C_{ay}",
-          "ms": [46, 47, 44]
+          "ms": [54, 47, 42]
         },
         {
           "name": "C_{az}",
-          "ms": [52, 37, 43]
+          "ms": [39, 44, 42]
         },
         {
           "name": "R_{a}",
-          "ms": [22, 18, 45]
+          "ms": [21, 29, 18]
         },
         {
           "name": "\\alpha_{a}",
-          "ms": [25, 16, 17]
+          "ms": [16, 24, 25]
         },
         {
           "name": "N_{a}",
-          "ms": [9, 19, 18]
+          "ms": [7, 19, 16]
         }
       ]
     },
@@ -722,30 +722,30 @@
       "preset": "ap-incline-forces",
       "mode": "explanatory",
       "metric": "slider write until Desmos reports the new value",
-      "p50Ms": 28,
-      "p95Ms": 58,
-      "worstMs": 58,
+      "p50Ms": 23,
+      "p95Ms": 49,
+      "worstMs": 49,
       "error": null,
       "sliders": [
         {
           "name": "\\theta_{r}",
-          "ms": [58, 47, 49]
+          "ms": [49, 45, 47]
         },
         {
           "name": "\\mu_{s}",
-          "ms": [24, 23, 22]
+          "ms": [23, 23, 20]
         },
         {
           "name": "\\mu_{k}",
-          "ms": [18, 26, 25]
+          "ms": [21, 25, 21]
         },
         {
           "name": "m_{r}",
-          "ms": [28, 28, 26]
+          "ms": [22, 30, 28]
         },
         {
           "name": "g",
-          "ms": [31, 31, 45]
+          "ms": [26, 19, 21]
         }
       ]
     }

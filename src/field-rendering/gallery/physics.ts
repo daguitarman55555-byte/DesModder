@@ -7,6 +7,7 @@
  * Constants are folded into the variables (k, μ₀/2π, G are 1): the shape of
  * a field does not depend on its units, and its strength is one slider.
  */
+import { toggle } from "./kit";
 import { TEACHING_PHYSICS } from "./physics-teaching";
 import { probeArrows2D, probeArrows3D, type ProbeSetup } from "./probe";
 import type { GalleryPreset, GalleryVariable, SceneItem } from "./types";
@@ -172,11 +173,11 @@ function chargeProbe(
 const probeSwitches = (gain: number, max: number): GalleryVariable[] => [
   v("q_{0}", -1, -3, 3, 0.1),
   v("s_{arrow}", gain, 0, max),
-  t("s_{net}", 1, "Field arrow"),
-  t("s_{parts}", 0, "Each charge's arrow"),
-  t("s_{force}", 0, "Force on a test charge"),
-  t("s_{names}", 0, "Names"),
-  t("s_{damp}", 1, "Damped lengths"),
+  toggle("s_{net}", 1, "Field arrow"),
+  toggle("s_{parts}", 0, "Each charge's arrow"),
+  toggle("s_{force}", 0, "Force on a test charge"),
+  toggle("s_{names}", 0, "Names"),
+  toggle("s_{damp}", 1, "Damped lengths"),
 ];
 
 /**
@@ -345,6 +346,7 @@ const CHARGE_FLOW = {
   normalizeSpeed: true,
 };
 
+/** A slider, at Desmos's own step unless given one. */
 const v = (
   name: string,
   value: number,
@@ -352,15 +354,6 @@ const v = (
   max: number,
   step?: number
 ): GalleryVariable => ({ name, value, min, max, step });
-/** A switch for what the objects show, 0 or 1, with its checkbox's label. */
-const t = (name: string, value: 0 | 1, label: string): GalleryVariable => ({
-  name,
-  value,
-  min: 0,
-  max: 1,
-  step: 1,
-  toggle: label,
-});
 
 /** The charges: the preset the others were built after. */
 const CHARGES_PRESET: GalleryPreset = {
@@ -380,8 +373,8 @@ const CHARGES_PRESET: GalleryPreset = {
     v("p_{x}", 0, -9, 9, 0.05),
     v("p_{y}", 3, -9, 9, 0.05),
     ...probeSwitches(30, 100),
-    t("s_{lines}", 1, "Field lines"),
-    t("s_{equi}", 0, "Equipotentials"),
+    toggle("s_{lines}", 1, "Field lines"),
+    toggle("s_{equi}", 0, "Equipotentials"),
   ],
   scene: CHARGES_SCENE_2D,
   onPaper: true,

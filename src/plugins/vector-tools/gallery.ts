@@ -332,7 +332,7 @@ export function configFromGallery(
  * A preset's field for the product it is loaded on: its 3D form on Desmos 3D,
  * so it never lies flat there by accident, and its 2D form everywhere else.
  */
-export function componentsFor(
+function componentsFor(
   preset: GalleryPreset,
   dimensions: 2 | 3
 ): VectorFieldConfig["components"] {

@@ -19,6 +19,23 @@
  */
 import { renameIdentifier } from "../identifiers";
 import { energyBars } from "./energy-bars";
+import {
+  cos,
+  flow2D,
+  flow3D,
+  frac,
+  guard,
+  inked,
+  mod,
+  mul,
+  only,
+  par,
+  point,
+  sin,
+  sq,
+  toggle,
+  variable,
+} from "./kit";
 import { probeArrows2D, probeArrows3D, type ProbeArrow } from "./probe";
 import type {
   ColorMeaning,
@@ -28,30 +45,6 @@ import type {
 } from "./types";
 
 const { raw } = String;
-const par = (s: string) => raw`\left(${s}\right)`;
-const mul = (...s: string[]) => s.map(par).join(raw`\cdot`);
-const sq = (s: string) => `${par(s)}^{2}`;
-const frac = (a: string, b: string) => raw`\frac{${a}}{${b}}`;
-const sin = (s: string) => raw`\sin${par(s)}`;
-const cos = (s: string) => raw`\cos${par(s)}`;
-const point = (s: readonly string[]) => par(s.join(","));
-const only = (s: string) => raw`\left\{${s}\right\}`;
-const guard = (s: string, f: string) => raw`\left\{${s}:${f},0\right\}`;
-const mod = (a: string, b: string) =>
-  raw`\operatorname{mod}${par(`${a},${b}`)}`;
-
-const variable = (
-  name: string,
-  value: number,
-  min: number,
-  max: number,
-  step = 0.1
-): GalleryVariable => ({ name, value, min, max, step });
-const toggle = (
-  name: string,
-  value: 0 | 1,
-  label: string
-): GalleryVariable => ({ ...variable(name, value, 0, 1, 1), toggle: label });
 
 /** Ink for paper, and the lighter one the same object needs on the dark. */
 const INK = "#394555";
@@ -59,54 +52,24 @@ const BODY = "#c37229";
 const ARROW = "#244779";
 const SECOND_ARROW = "#a55222";
 
-const obj = (
-  key: string,
-  latex: string,
-  extra: Partial<SceneItem> = {}
-): SceneItem => ({ key, latex, color: INK, ...extra });
-const curve = (
-  key: string,
-  xyz: readonly string[],
-  domain: readonly [string, string],
-  extra: Partial<SceneItem> = {}
-) => obj(key, point(xyz), { domain, lineWidth: 2, ...extra });
-const surface = (
-  key: string,
-  xyz: readonly string[],
-  u: readonly [string, string],
-  v: readonly [string, string],
-  extra: Partial<SceneItem> = {}
-) =>
-  obj(key, point(xyz), {
-    domainU: u,
-    domainV: v,
-    fill: true,
-    fillOpacity: 1,
-    ...extra,
-  });
-/**
- * A moving body: a point in 2D, a small sphere in 3D. A Desmos 3D point is
- * covered by Majestic's dark, which is cut away only where a surface is, so
- * there the body would vanish; a sphere also reads as a solid. Its centre is
- * written out in each coordinate, as the depth pass compiles the surface's
- * own LaTeX and cannot follow a named point.
- */
+const { obj, path, surface, ball } = inked(INK);
+/** A moving body, in the body's orange. */
 const body = (key: string, at: readonly string[], dim: 2 | 3) =>
-  dim === 2
-    ? obj(key, point(at), { points: true, pointSize: 16, color: BODY })
-    : surface(
-        key,
-        [
-          `${par(at[0])}+${mul("0.3", cos("u"), sin("v"))}`,
-          `${par(at[1])}+${mul("0.3", sin("u"), sin("v"))}`,
-          `${par(at[2])}+${mul("0.3", cos("v"))}`,
-        ],
-        ["0", raw`2\pi`],
-        ["0", raw`\pi`],
-        { color: BODY }
-      );
+  ball(key, at, dim, { extra: { color: BODY } });
 const atProbe = (s: string) =>
   ["x", "y", "z"].reduce((v, a) => renameIdentifier(v, a, `p_{${a}}`), s);
+
+/** The whole numbers 1 to 8, a list Desmos draws one curve per element of. */
+const WHOLE = raw`\left[1,...,8\right]`;
+
+/** Circles of radius 1, 2, 3…, evenly spaced: parametric, not implicit. */
+const CIRCLES = (rho: string) => ({
+  latex: raw`\sqrt{${rho}}`,
+  perUnit: "1",
+  label: "Circles",
+  explicit: point(mul(WHOLE, cos("t")), mul(WHOLE, sin("t"))),
+  domain: ["0", raw`2\pi`] as const,
+});
 
 /** One preset in one dimension, before it is assembled. */
 interface Demo {
@@ -140,6 +103,8 @@ interface Demo {
      * over the whole plane cost the projectile 200 ms a slider move.
      */
     explicit?: string;
+    /** Its range of t, when `explicit` is a parametric curve in t. */
+    domain?: readonly [string, string];
   };
   /**
    * The flow's display speed, per unit of the field's speed: a slow field
@@ -197,7 +162,7 @@ function projectile(m: Demo, dim: 2 | 3) {
       ? [`-6+${mul("v_{0x}", t)}`, height(t)]
       : [`-6+${mul("v_{0x}", t)}`, mul("w", t), height(t)];
   m.scene.push(
-    curve("trajectory", position("t"), ["0", flight], {
+    path("trajectory", position("t"), ["0", flight], {
       explains: true,
       lineStyle: "DASHED",
     }),
@@ -223,16 +188,16 @@ function projectile(m: Demo, dim: 2 | 3) {
     );
   const g3 = dim === 2 ? ["0", "-g"] : ["0", "0", "-g"];
   m.body = {
-    at: point(position(time)),
+    at: point(...position(time)),
     valid: `${phase}<${flight}`,
     label: "Projectile's v and g",
     arrows: [
       {
         key: "bodyv",
         vector: point(
-          dim === 2
+          ...(dim === 2
             ? ["v_{0x}", `v_{0y}-${mul("g", time)}`]
-            : ["v_{0x}", "w", `v_{0y}-${mul("g", time)}`]
+            : ["v_{0x}", "w", `v_{0y}-${mul("g", time)}`])
         ),
         toggle: "s_{body}",
         name: raw`\vec{v}`,
@@ -241,7 +206,7 @@ function projectile(m: Demo, dim: 2 | 3) {
       },
       {
         key: "bodyg",
-        vector: point(g3),
+        vector: point(...g3),
         toggle: "s_{body}",
         name: raw`\vec{g}`,
         color: SECOND_ARROW,
@@ -292,6 +257,13 @@ function oscillator(m: Demo, dim: 2 | 3) {
     latex: raw`\sqrt{\frac{2}{k}${par(m.tint)}}`,
     perUnit: "1",
     label: "Energy contours",
+    // Parametric ellipses, x = n cos t and v = n√(k/m) sin t, for n = 1…8:
+    // Desmos draws those far faster than the implicit curves of √(2E/k).
+    explicit: point(
+      mul(WHOLE, cos("t")),
+      mul(WHOLE, raw`\sqrt{\frac{k}{m}}`, sin("t"))
+    ),
+    domain: ["0", raw`2\pi`],
   };
   // No surface for the phase plane in 3D: a translucent one drew as an
   // opaque slab over the flow, and Desmos's own grid already marks z = 0.
@@ -316,11 +288,11 @@ function circular(m: Demo, dim: 2 | 3) {
     dim === 3 ? "e^{-6z^{2}}" : "1"
   );
   // Circles of radius 1, 2, 3…: evenly spaced, unlike circles of ρ.
-  m.stream = { latex: raw`\sqrt{${rho}}`, perUnit: "1", label: "Circles" };
+  m.stream = CIRCLES(rho);
   const flat = (s: string[]) => (dim === 3 ? [...s, "0"] : s);
   const angle = mul("w", "T_{scene}");
   m.scene.push(
-    curve(
+    path(
       "orbit",
       flat([mul("R", cos("t")), mul("R", sin("t"))]),
       ["0", raw`2\pi`],
@@ -329,13 +301,13 @@ function circular(m: Demo, dim: 2 | 3) {
     body("marker", flat([mul("R", cos(angle)), mul("R", sin(angle))]), dim)
   );
   m.body = {
-    at: point(flat([mul("R", cos(angle)), mul("R", sin(angle))])),
+    at: point(...flat([mul("R", cos(angle)), mul("R", sin(angle))])),
     valid: "1>0",
     label: "Body's v and a",
     arrows: [
       {
         key: "bodyv",
-        vector: point(flat([mul("-wR", sin(angle)), mul("wR", cos(angle))])),
+        vector: point(...flat([mul("-wR", sin(angle)), mul("wR", cos(angle))])),
         toggle: "s_{body}",
         name: raw`\vec{v}`,
         color: ARROW,
@@ -344,7 +316,7 @@ function circular(m: Demo, dim: 2 | 3) {
       {
         key: "bodya",
         vector: point(
-          flat([mul("-w^{2}R", cos(angle)), mul("-w^{2}R", sin(angle))])
+          ...flat([mul("-w^{2}R", cos(angle)), mul("-w^{2}R", sin(angle))])
         ),
         toggle: "s_{body}",
         name: raw`\vec{a}`,
@@ -381,13 +353,19 @@ function streamtube(m: Demo, dim: 2 | 3) {
     perUnit: "4",
     label: "Streamlines",
     mask: only(raw`\left|x\right|<4`) + only(raw`\left|y\right|<${width}`),
+    // Explicitly, y = c/(U(1 + ax)) for c = n/4: cheaper than the implicit
+    // curve, and it never trips the implicit plotter's restrictions.
+    explicit:
+      `y=${frac(raw`\left[-14,...,14\right]`, mul("4U", f))}` +
+      only(raw`\left|x\right|<4`) +
+      only(raw`\left|y\right|<${width}`),
   };
   const wall = "#6a7980";
   const majesticWall = "#9fb0bd";
   if (dim === 2)
     for (const s of [-1, 1])
       m.scene.push(
-        curve(
+        path(
           "wall" + (s > 0 ? "p" : "m"),
           ["t", mul(String(s), frac("H", "1+at"))],
           ["-4", "4"],
@@ -456,7 +434,7 @@ function conductor(m: Demo, dim: 2 | 3) {
       ["minus", blue, raw`+\pi`],
     ] as const)
       m.scene.push(
-        curve(
+        path(
           key,
           [
             mul("R", cos(`t+${side}${shift}`)),
@@ -467,10 +445,12 @@ function conductor(m: Demo, dim: 2 | 3) {
             color,
             lineWidth: 6,
             latex:
-              point([
-                mul("R", cos(`t+${side}${shift}`)),
-                mul("R", sin(`t+${side}${shift}`)),
-              ]) + only("E^{2}>0"),
+              point(
+                ...[
+                  mul("R", cos(`t+${side}${shift}`)),
+                  mul("R", sin(`t+${side}${shift}`)),
+                ]
+              ) + only("E^{2}>0"),
           }
         )
       );
@@ -517,7 +497,7 @@ function induction(m: Demo, dim: 2 | 3) {
   ];
   m.valid = `${rho}>0`;
   m.tint = mul("-.5", derivative, factor, raw`\sqrt{${rho}}`);
-  m.stream = { latex: raw`\sqrt{${rho}}`, perUnit: "1", label: "Circles" };
+  m.stream = CIRCLES(rho);
   m.speed = 0.5;
   // Born mostly near the solenoid, where the field is: it falls off as 1/r
   // outside, and particles spread evenly were faint there for nothing.
@@ -530,7 +510,7 @@ function induction(m: Demo, dim: 2 | 3) {
   const levels = dim === 3 ? ["-1.5", "0", "1.5"] : ["0"];
   for (const [i, level] of levels.entries())
     m.scene.push(
-      curve(
+      path(
         `flux${i}`,
         [mul("R", cos("t")), mul("R", sin("t")), ...(dim === 3 ? [level] : [])],
         ["0", raw`2\pi`],
@@ -542,14 +522,14 @@ function induction(m: Demo, dim: 2 | 3) {
     m.scene.push(
       obj(
         "Bvector",
-        raw`\operatorname{vector}${par(point(["0", "0", "0"]) + "," + point(["0", "0", B]))}`,
+        raw`\operatorname{vector}${par(point(...["0", "0", "0"]) + "," + point(...["0", "0", B]))}`,
         { explains: true, color: SECOND_ARROW }
       )
     );
   else {
     // B out of the page as a dot, into it as a cross, sized by |B|.
     m.scene.push(
-      obj("Bdot", point(["0", "0"]) + only(`${B}>0`), {
+      obj("Bdot", point(...["0", "0"]) + only(`${B}>0`), {
         explains: true,
         points: true,
         pointSize: 9,
@@ -558,7 +538,7 @@ function induction(m: Demo, dim: 2 | 3) {
     );
     for (const s of [-1, 1])
       m.scene.push(
-        curve(
+        path(
           "Bcross" + (s > 0 ? "p" : "m"),
           [".2t", mul(String(s * 0.2), "t")],
           ["-1", "1"],
@@ -566,7 +546,8 @@ function induction(m: Demo, dim: 2 | 3) {
             explains: true,
             color: SECOND_ARROW,
             lineWidth: 3,
-            latex: point([".2t", mul(String(s * 0.2), "t")]) + only(`${B}<0`),
+            latex:
+              point(...[".2t", mul(String(s * 0.2), "t")]) + only(`${B}<0`),
           }
         )
       );
@@ -698,7 +679,6 @@ function preset(id: string): GalleryPreset {
   const create = (dim: 2 | 3) => {
     const m = model(id, dim);
     const bars = energyBars(id, dim);
-    m.scene.push(...bars.scene);
     const coords = dim === 2 ? ["x", "y"] : ["x", "y", "z"];
     const vars = [
       ...m.vars,
@@ -710,11 +690,9 @@ function preset(id: string): GalleryPreset {
       toggle("s_{names}", 0, "Vector names"),
       toggle("s_{damp}", 1, "Damped arrow lengths"),
     ];
-    const probe = point(coords.map((s) => `p_{${s}}`));
+    const probe = point(...coords.map((s) => `p_{${s}}`));
     const arrows = dim === 2 ? probeArrows2D : probeArrows3D;
     const reach = dim === 2 ? 4 : 2.5;
-    const explaining = (items: SceneItem[]) =>
-      items.map((s) => ({ ...s, explains: true }));
     m.scene.push(
       obj("probe", probe, {
         explains: true,
@@ -722,42 +700,38 @@ function preset(id: string): GalleryPreset {
         pointSize: dim === 2 ? 10 : 4,
         ...(dim === 3 ? { drag3d: ["p_{x}", "p_{y}", "p_{z}"] as const } : {}),
       }),
-      ...explaining(
-        arrows({
-          at: probe,
+      ...arrows({
+        at: probe,
+        gain: "s_{gain}",
+        names: "s_{names}",
+        damp: "s_{damp}",
+        reach,
+        valid: atProbe(m.valid),
+        dimensions: dim,
+        arrows: [
+          {
+            key: id.replace(/-/g, "") + "net",
+            vector: point(...m.field.slice(0, dim).map(atProbe)),
+            toggle: "s_{net}",
+            name: raw`\vec{${m.label}}`,
+            color: ARROW,
+            nameColor: ARROW,
+          },
+        ],
+      })
+    );
+    if (m.body !== undefined)
+      m.scene.push(
+        ...arrows({
+          at: m.body.at,
           gain: "s_{gain}",
           names: "s_{names}",
           damp: "s_{damp}",
           reach,
-          valid: atProbe(m.valid),
+          valid: m.body.valid,
           dimensions: dim,
-          arrows: [
-            {
-              key: id.replace(/-/g, "") + "net",
-              vector: point(m.field.slice(0, dim).map(atProbe)),
-              toggle: "s_{net}",
-              name: raw`\vec{${m.label}}`,
-              color: ARROW,
-              nameColor: ARROW,
-            },
-          ],
+          arrows: m.body.arrows,
         })
-      )
-    );
-    if (m.body !== undefined)
-      m.scene.push(
-        ...explaining(
-          arrows({
-            at: m.body.at,
-            gain: "s_{gain}",
-            names: "s_{names}",
-            damp: "s_{damp}",
-            reach,
-            valid: m.body.valid,
-            dimensions: dim,
-            arrows: m.body.arrows,
-          })
-        )
       );
     if (dim === 2 && m.stream !== undefined) {
       AP_STREAMS[id] = m.stream.latex;
@@ -766,10 +740,21 @@ function preset(id: string): GalleryPreset {
         obj(
           "lines",
           `${m.stream.explicit ?? `${sin(mul(m.stream.perUnit, raw`\pi`, m.stream.latex))}=0${m.stream.mask ?? only(m.valid)}`}${only("s_{lines}=1")}${id === "ap-conductor" ? only(raw`\left|y\right|>0.025`) + only("E^{2}>0") : ""}`,
-          { explains: true, lineOpacity: 0.7, lineWidth: 1.5, color: "#303030" }
+          {
+            explains: true,
+            lineOpacity: 0.7,
+            lineWidth: 1.5,
+            color: "#303030",
+            ...(m.stream.domain === undefined
+              ? {}
+              : { domain: m.stream.domain }),
+          }
         )
       );
     }
+    // Last, so the card under the bars covers the guide curves too: Desmos
+    // draws later expressions on top.
+    m.scene.push(...bars.scene);
     const gpu = (s: string) => renameIdentifier(s, "T_{scene}", "t");
     return {
       m,
@@ -800,18 +785,7 @@ function preset(id: string): GalleryPreset {
     scene: a.m.scene,
     tint: { latex: a.tint, latex3d: b.tint, scale: a.m.scale },
     ...(a.m.clock ? { sceneTime: "T_{scene}" } : {}),
-    flow: {
-      // The charges' density: at 6,000 the flow was too sparse to read as a
-      // field on paper, and barely there on the dark.
-      particleCount: Math.round(24_000 * a.m.density),
-      speed: a.m.speed,
-      trailPersistence: 0.84,
-      dropRate: 0.03,
-      opacity: 0.45,
-      pointSize: 1.5,
-      glow: 0,
-      normalizeSpeed: false,
-    },
+    flow: flow2D({ speed: a.m.speed, density: a.m.density }),
     space: {
       blurb,
       xLatex: b.field[0],
@@ -820,17 +794,7 @@ function preset(id: string): GalleryPreset {
       seedLatex: b.seed,
       variables: b.vars,
       scene: b.m.scene,
-      look: {
-        particles: Math.round(30_000 * b.m.density),
-        speed: b.m.speed * 0.6,
-        trail: 16,
-        lifetime: 1.2,
-        opacity: 0.55,
-        glow: 0,
-        normalizeSpeed: false,
-        absorb: false,
-        palette: "charge",
-      },
+      look: flow3D({ speed: b.m.speed * 0.6, density: b.m.density }),
     },
   };
 }

@@ -24,7 +24,7 @@
 /** The lattice speed the Accurate setting uses, measured safe at every Re. */
 export const ACCURATE_LATTICE_SPEED = 0.05;
 /** The faster speed Lively keeps, and Auto starts at. */
-export const LIVELY_LATTICE_SPEED = 0.1;
+const LIVELY_LATTICE_SPEED = 0.1;
 /** Above this, the closure switches on. */
 export const CLOSURE_REYNOLDS = 200;
 /** The Smagorinsky constant measured stable to Re 2000. */

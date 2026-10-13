@@ -3,98 +3,43 @@
  * Numerical Desmos sums are quadratures; exact enclosed-source sums are separate.
  */
 import { probeArrows2D, probeArrows3D } from "./probe";
-import type { GalleryPreset, GalleryVariable, SceneItem } from "./types";
+import {
+  flow2D,
+  flow3D,
+  inked,
+  norm2,
+  only as on,
+  point,
+  toggle as toggleOf,
+  variable,
+} from "./kit";
+import type { GalleryPreset, SceneItem } from "./types";
+
 const R = String.raw;
-const variable = (
-  name: string,
-  value: number,
-  min: number,
-  max: number,
-  step = 0.1
-): GalleryVariable => ({ name, value, min, max, step });
-const toggle = (name: string, text: string): GalleryVariable => ({
-  ...variable(name, 1, 0, 1, 1),
-  toggle: text,
-});
-const obj = (
-  key: string,
-  latex: string,
-  other: Partial<SceneItem> = {}
-): SceneItem => ({ key, latex, color: "#4b6276", ...other });
-const point = (...coords: string[]) => R`\left(${coords.join(",")}\right)`;
+const toggle = (name: string, text: string) => toggleOf(name, 1, text);
+const { obj, path, surface: surf, ball } = inked("#4b6276");
 const curve = (
   key: string,
   coordinates: string[],
   domain: readonly [string, string],
   other: Partial<SceneItem> = {}
-) => obj(key, point(...coordinates), { domain, lineWidth: 2.5, ...other });
-const surf = (
-  key: string,
-  coordinates: string[],
-  u: readonly [string, string],
-  v: readonly [string, string],
-  other: Partial<SceneItem> = {}
-) =>
-  obj(key, point(...coordinates), {
-    domainU: u,
-    domainV: v,
-    fill: true,
-    fillOpacity: 1,
-    ...other,
-  });
+) => path(key, coordinates, domain, { lineWidth: 2.5, ...other });
 const sphere = (
   key: string,
   coords: string[],
   dim: 2 | 3,
   radius = "0.19",
   other: Partial<SceneItem> = {}
-): SceneItem =>
-  dim === 2
-    ? obj(key, point(coords[0], coords[1]), {
-        points: true,
-        pointSize: 13,
-        color: "#c58143",
-        ...other,
-      })
-    : surf(
-        key,
-        [
-          R`\left(${coords[0]}\right)+${radius}\cos(u)\sin(v)`,
-          R`\left(${coords[1]}\right)+${radius}\sin(u)\sin(v)`,
-          R`\left(${coords[2]}\right)+${radius}\cos(v)`,
-        ],
-        ["0", R`2\pi`],
-        ["0", R`\pi`],
-        { color: "#c58143", majesticColor: "#e9a95d", ...other }
-      );
-const on = (test: string) => R`\left\{${test}\right\}`;
-const norm2 = (a: string[]) => a.map((v) => R`\left(${v}\right)^{2}`).join("+");
-/**
- * `normalize` draws direction only, at one speed: for a point source's
- * field, whose strength spans orders of magnitude, every particle away from
- * the sources otherwise stood still as a dot (the colour carries strength).
- */
-const universalFlow = (speed: number, density = 1, normalize = false) => ({
-  particleCount: Math.round(24000 * density),
-  speed,
-  trailPersistence: 0.84,
-  dropRate: 0.03,
-  opacity: 0.47,
-  pointSize: 1.5,
-  glow: 0,
-  normalizeSpeed: normalize,
-});
-const flow3D = (speed: number, density = 1, normalize = false) => ({
-  particles: Math.round(30000 * density),
-  speed: speed * 0.6,
-  trail: 16,
-  lifetime: 1.2,
-  opacity: 0.55,
-  glow: 0,
-  normalizeSpeed: normalize,
-  absorb: false,
-  palette: "charge" as const,
-});
+) =>
+  ball(key, coords, dim, {
+    radius,
+    pointSize: 13,
+    extra: {
+      color: "#c58143",
+      ...(dim === 3 ? { majesticColor: "#e9a95d" } : {}),
+      ...other,
+    },
+  });
 
 /** Point-charge field, in normalized units epsilon_0=1, k_e=1/(4 pi).
  * The 2D view is a section of the full 3D Coulomb field, not 2D electrostatics.
@@ -379,7 +324,7 @@ function gauss(): GalleryPreset {
     },
     variables: values,
     scene: scene(2),
-    flow: universalFlow(0.35, 0.7, true),
+    flow: flow2D({ speed: 0.35, density: 0.7, normalize: true, opacity: 0.47 }),
     space: {
       blurb:
         "3D Coulomb field and movable Gaussian sphere. Φ_g is a finite quadrature, Q_g is exact. Sphere neutral; a selected point's E·n is in the expression list; continuous surface colouring is NOT claimed.",
@@ -388,7 +333,7 @@ function gauss(): GalleryPreset {
       zLatex: fields3[2],
       variables: values,
       scene: scene(3),
-      look: flow3D(0.35, 0.8, true),
+      look: flow3D({ speed: 0.35 * 0.6, density: 0.8, normalize: true }),
     },
   };
 }
@@ -538,7 +483,12 @@ function ampere(): GalleryPreset {
     tint: { latex: strength, latex3d: strength, scale: 0.15 },
     variables: values,
     scene: scene(2),
-    flow: universalFlow(0.35, 0.85, true),
+    flow: flow2D({
+      speed: 0.35,
+      density: 0.85,
+      normalize: true,
+      opacity: 0.47,
+    }),
     space: {
       blurb:
         "Loop is a plane ellipse in xy projection and a circle in 3D; B remains horizontal. A tilted loop changes the sampled circulation but not its exact topological count.",
@@ -547,7 +497,7 @@ function ampere(): GalleryPreset {
       zLatex: "0",
       variables: values,
       scene: scene(3),
-      look: flow3D(0.35, 0.8, true),
+      look: flow3D({ speed: 0.35 * 0.6, density: 0.8, normalize: true }),
     },
   };
 }
@@ -609,7 +559,7 @@ function incline(): GalleryPreset {
         color: f.color,
         nameColor: f.color,
       })),
-    }).map((item) => ({ ...item, explains: true }));
+    });
   const scene = (dim: 2 | 3): SceneItem[] => {
     const weight = dim === 2 ? ["0", "-m_{r}g"] : ["0", "0", "-m_{r}g"];
     const norm =
@@ -697,7 +647,7 @@ function incline(): GalleryPreset {
     },
     variables: vars,
     scene: scene(2),
-    flow: universalFlow(0.24, 0.58),
+    flow: flow2D({ speed: 0.24, density: 0.58, opacity: 0.47 }),
     space: {
       blurb:
         "Z is up. A uniform gravitational field is shown by the particle stream; the body need not follow that stream because the normal and friction act on it.",
@@ -706,7 +656,7 @@ function incline(): GalleryPreset {
       zLatex: "-g",
       variables: vars,
       scene: scene(3),
-      look: flow3D(0.24, 0.5),
+      look: flow3D({ speed: 0.24 * 0.6, density: 0.5 }),
     },
   };
 }

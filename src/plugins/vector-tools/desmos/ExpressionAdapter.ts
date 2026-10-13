@@ -67,7 +67,7 @@ export interface GeneratedTickerSpec {
   minStepLatex: string;
 }
 
-export interface DesmosExpressionAdapter {
+interface DesmosExpressionAdapter {
   applyGeneratedSet: (
     namespace: string,
     folder: GeneratedFolderSpec,

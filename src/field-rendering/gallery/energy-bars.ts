@@ -2,6 +2,9 @@
  * Energies are per unit mass for projectile and circular motion; oscillator
  * has m and k in arbitrary coherent units. Bars are explanatory-only.
  */
+// Numbers through num(): 3.6 − 0.3 is 3.3000000000000003 in floating point,
+// and this LaTeX is shown in the expression list.
+import { num } from "./kit";
 import type { GalleryVariable, SceneItem } from "./types";
 const R = String.raw;
 const check = R`\left\{s_{energy}=1\right\}`;
@@ -18,7 +21,7 @@ const rect = (
   fill: true,
   fillOpacity: 0.65,
   lineWidth: 1,
-  latex: R`\operatorname{polygon}\left(\left(${x},${base}\right),\left(${x + 0.52},${base}\right),\left(${x + 0.52},${base}+${h}\right),\left(${x},${base}+${h}\right)\right)${check}`,
+  latex: R`\operatorname{polygon}\left(\left(${num(x)},${base}\right),\left(${num(x + 0.52)},${base}\right),\left(${num(x + 0.52)},${base}+${h}\right),\left(${num(x)},${base}+${h}\right)\right)${check}`,
 });
 export function energyBars(
   id: string,
@@ -75,7 +78,7 @@ export function energyBars(
       // A surface rather than a point/label: Desmos 3D has no native labels
       // and Majestic's overlay renders surfaces instead of graph points.
       // In Explanatory the 3D panel legend gives the K/U/D/E order.
-      const x3 = 2.0 + 0.66 * i;
+      const x3 = num(2 + 0.66 * i);
       return [
         {
           key: `energy${lab[i]}`,
@@ -93,7 +96,7 @@ export function energyBars(
       rect(x0, y, H, `energy${lab[i]}`, col[i]),
       {
         key: `energyLabel${lab[i]}`,
-        latex: R`\left(${x0 + 0.26},${y - 0.26}\right)${check}`,
+        latex: R`\left(${num(x0 + 0.26)},${num(y - 0.26)}\right)${check}`,
         label: lab[i],
         points: true,
         pointSize: 1,
@@ -105,10 +108,11 @@ export function energyBars(
   if (dim === 2) {
     // A paper card under the bars: on top of the flow they were read
     // through a field of particles. First in the list, so drawn beneath.
-    const right = x + vals.length * 0.75 - 0.05;
+    const right = num(x + vals.length * 0.75 - 0.05);
+    const [left, bottom, top] = [num(x - 0.3), num(y - 0.6), num(y + 2.55)];
     scene.unshift({
       key: "energyCard",
-      latex: R`\operatorname{polygon}\left(\left(${x - 0.3},${y - 0.6}\right),\left(${right},${y - 0.6}\right),\left(${right},${y + 2.55}\right),\left(${x - 0.3},${y + 2.55}\right)\right)${check}`,
+      latex: R`\operatorname{polygon}\left(\left(${left},${bottom}\right),\left(${right},${bottom}\right),\left(${right},${top}\right),\left(${left},${top}\right)\right)${check}`,
       color: "#ffffff",
       fill: true,
       fillOpacity: 0.9,

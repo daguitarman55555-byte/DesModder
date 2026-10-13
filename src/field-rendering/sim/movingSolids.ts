@@ -88,7 +88,7 @@ export interface ObstacleSamples {
 export const WALL_SPEED_LIMIT = 0.05;
 
 /** Cells a solid may move in one update and still count as having swept them. */
-export const TELEPORT_CELLS = 2;
+const TELEPORT_CELLS = 2;
 
 /**
  * Coverage and wall velocity for every moving row. `previous` is the last

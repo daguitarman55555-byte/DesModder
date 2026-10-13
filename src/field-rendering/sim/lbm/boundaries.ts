@@ -86,7 +86,7 @@ export function validateBoundaries(b: Boundaries) {
 }
 
 /** The direction j with velocity (cx, cy). */
-export function directionOf(cx: number, cy: number): number {
+function directionOf(cx: number, cy: number): number {
   for (let i = 0; i < Q; i++) if (CX[i] === cx && CY[i] === cy) return i;
   throw new Error(`No D2Q9 direction (${cx}, ${cy}).`);
 }

@@ -75,8 +75,8 @@ export const SYMBOL_TOKENS = [
 /** How many fields one library may hold. */
 export const MAX_FIELDS = SYMBOL_TOKENS.length;
 
-export const VECTOR_COUNT_WARNING = 2_500;
-export const VECTOR_COUNT_HARD_MAXIMUM = 10_000;
+const VECTOR_COUNT_WARNING = 2_500;
+const VECTOR_COUNT_HARD_MAXIMUM = 10_000;
 export const ZERO_VECTOR_TOLERANCE = 1e-9;
 
 export type SamplingMode = "step" | "count";
@@ -450,7 +450,7 @@ export type Occlusion3D = "hide" | "fade" | "over";
 /** Auto's arrow length, as a multiple of the spacing; see the plan's §5. */
 export const AUTO_LENGTH_MULTIPLE_3D = 0.8;
 
-export const DEFAULT_SPACE_3D: Space3DConfig = {
+const DEFAULT_SPACE_3D: Space3DConfig = {
   look: "arrows",
   shape: "auto",
   placement: "jitter",
@@ -651,7 +651,7 @@ export interface SamplingAxisConfig {
   count: number;
 }
 
-export interface VectorLengthConfig {
+interface VectorLengthConfig {
   mode: VectorLengthMode;
   autoLength: boolean;
   targetLength: number;
@@ -672,7 +672,7 @@ export interface VectorLengthConfig {
  * It lives here rather than in the panel because it is a fact about what the
  * modes mean, not about how the button that uses it is drawn.
  */
-export function flowColorModeFor(mode: VectorColorMode): FlowColorMode {
+function flowColorModeFor(mode: VectorColorMode): FlowColorMode {
   switch (mode) {
     case "direction":
       return "direction";
@@ -759,12 +759,12 @@ export function lengthInputsFor(mode: VectorLengthMode): {
   }
 }
 
-export interface ArrowheadConfig {
+interface ArrowheadConfig {
   size: number;
   angleRadians: number;
 }
 
-export interface VectorColorConfig {
+interface VectorColorConfig {
   mode: VectorColorMode;
   palette: ColorPalette;
   rangeMode: ColorRangeMode;
@@ -908,7 +908,7 @@ export interface VectorFieldLibrary {
   galleryWithLook: boolean;
 }
 
-export interface ValidationIssue {
+interface ValidationIssue {
   level: "error" | "warning";
   message: string;
 }
@@ -927,7 +927,7 @@ export interface DensityPreset {
   yCount: number;
 }
 
-export interface ProbeDefinition {
+interface ProbeDefinition {
   point: readonly [number, number];
   expected: readonly [number, number];
 }
@@ -974,7 +974,7 @@ const DEFAULT_AXIS_Y: SamplingAxisConfig = {
  * enough to look deliberate. The old default was 420×560, from before the tab
  * held a field chooser or two axis cards.
  */
-export const DEFAULT_PANEL_CONFIG: PanelConfig = {
+const DEFAULT_PANEL_CONFIG: PanelConfig = {
   width: 460,
   height: 650,
   tab: "field",
@@ -989,7 +989,7 @@ export const DEFAULT_PANEL_CONFIG: PanelConfig = {
   },
 };
 
-export const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
+const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
   schemaVersion: VECTOR_FIELD_SCHEMA_VERSION,
   id: "default",
   name: "Vector Field",
@@ -1298,7 +1298,7 @@ export function getAxisSpacing(axis: SamplingAxisConfig): number {
     : axis.step;
 }
 
-export function estimateVectorCount(config: VectorFieldConfig): number {
+function estimateVectorCount(config: VectorFieldConfig): number {
   return (
     getAxisSampleCount(config.domain.x) * getAxisSampleCount(config.domain.y)
   );
@@ -1529,7 +1529,7 @@ export function normalizeVectorFieldConfig(value: unknown): VectorFieldConfig {
  * Each 3D setting read back on its own, so a stored config from before one
  * existed takes that one's default and keeps the rest.
  */
-export function normalizeSpace3D(
+function normalizeSpace3D(
   value: unknown,
   fallback: Space3DConfig
 ): Space3DConfig {

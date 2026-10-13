@@ -1,61 +1,31 @@
 /** Exact exterior teaching models. Native solids cover the excluded domains;
  * particle density is illustrative, while tint and probes have stated units. */
 import { renameIdentifier } from "../identifiers";
+import {
+  abs,
+  atan,
+  cos,
+  flow2D,
+  flow3D,
+  frac,
+  guard,
+  inked,
+  ln,
+  mul,
+  only,
+  par,
+  point,
+  root,
+  sin,
+  sq,
+  toggle,
+  variable,
+} from "./kit";
 import { probeArrows2D, probeArrows3D, type ProbeArrow } from "./probe";
 import type { GalleryPreset, GalleryVariable, SceneItem } from "./types";
 
 const { raw } = String;
-const par = (x: string) => raw`\left(${x}\right)`;
-const sq = (x: string) => `${par(x)}^{2}`;
-const root = (x: string) => raw`\sqrt{${x}}`;
-const abs = (x: string) => raw`\left|${x}\right|`;
-const frac = (x: string, y: string) => raw`\frac{${x}}{${y}}`;
-const mul = (...x: string[]) => x.map(par).join(raw`\cdot`);
-const sin = (x: string) => raw`\sin${par(x)}`;
-const cos = (x: string) => raw`\cos${par(x)}`;
-const log = (x: string) => raw`\ln${par(x)}`;
-const atan = (x: string) => raw`\arctan${par(x)}`;
-const point = (...x: string[]) => par(x.join(","));
-const guard = (test: string, x: string) => raw`\left\{${test}:${x},0\right\}`;
-const only = (test: string) => raw`\left\{${test}\right\}`;
-const varr = (
-  name: string,
-  value: number,
-  min: number,
-  max: number,
-  step = 0.1
-): GalleryVariable => ({ name, value, min, max, step });
-const toggle = (
-  name: string,
-  value: number,
-  label: string
-): GalleryVariable => ({ ...varr(name, value, 0, 1, 1), toggle: label });
-const ink = "#2c3646";
-const item = (
-  key: string,
-  latex: string,
-  extra: Partial<SceneItem> = {}
-): SceneItem => ({ key, latex, color: ink, ...extra });
-const curve = (
-  key: string,
-  latex: string,
-  domain: readonly [string, string],
-  extra: Partial<SceneItem> = {}
-) => item(key, latex, { domain, lineWidth: 2, ...extra });
-const surface = (
-  key: string,
-  xyz: string[],
-  u: readonly [string, string],
-  v: readonly [string, string],
-  extra: Partial<SceneItem> = {}
-) =>
-  item(key, point(...xyz), {
-    domainU: u,
-    domainV: v,
-    fill: true,
-    fillOpacity: 1,
-    ...extra,
-  });
+const { obj, curve, surface } = inked("#2c3646");
 const ALONG = frac("1", `1+e^{3${par(`${abs("z")}-2.5`)}}`);
 
 function ball(
@@ -67,7 +37,7 @@ function ball(
   colorLatex?: string
 ): SceneItem {
   return dim === 2
-    ? item(key, `${sq(`x-${par(cx)}`)}+y^{2}\\le ${sq(R)}`, {
+    ? obj(key, `${sq(`x-${par(cx)}`)}+y^{2}\\le ${sq(R)}`, {
         fill: true,
         fillOpacity: 1,
         color,
@@ -116,7 +86,7 @@ function box(
 ): SceneItem[] {
   if (dim === 2)
     return [
-      item(
+      obj(
         key,
         raw`\operatorname{polygon}${par([point(lo[0], lo[1]), point(hi[0], lo[1]), point(hi[0], hi[1]), point(lo[0], hi[1])].join(","))}`,
         { color, colorLatex, fill: true, fillOpacity: 1 }
@@ -177,14 +147,14 @@ function model(id: string, dim: 2 | 3): Model {
     const grav = id === "earth-moon";
     m.vars = grav
       ? [
-          varr("M_{1}", 81, 1, 100, 1),
-          varr("M_{2}", 1, 0.1, 20),
-          varr("d", dim === 2 ? 6 : 3, 2, dim === 2 ? 12 : 7),
+          variable("M_{1}", 81, 1, 100, 1),
+          variable("M_{2}", 1, 0.1, 20),
+          variable("d", dim === 2 ? 6 : 3, 2, dim === 2 ? 12 : 7),
         ]
       : [
-          varr("I_{1}", 1, -3, 3),
-          varr("I_{2}", 1, -3, 3),
-          varr("d", dim === 2 ? 5 : 3, 1, 8),
+          variable("I_{1}", 1, -3, 3),
+          variable("I_{2}", 1, -3, 3),
+          variable("d", dim === 2 ? 5 : 3, 1, 8),
         ];
     const centers = grav
       ? [`-${frac("dM_{2}", "M_{1}+M_{2}")}`, frac("dM_{1}", "M_{1}+M_{2}")]
@@ -205,7 +175,7 @@ function model(id: string, dim: 2 | 3): Model {
       .map((s, i) =>
         grav
           ? `-${frac(`M_{${i + 1}}`, root(s))}`
-          : `-${mul(`I_{${i + 1}}/2`, log(s))}`
+          : `-${mul(`I_{${i + 1}}/2`, ln(s))}`
       )
       .join("+");
     m.stream = grav
@@ -228,7 +198,7 @@ function model(id: string, dim: 2 | 3): Model {
         m.scene.push(...rod(`wire${i}`, cx, radii[i], dim));
         if (dim === 2) {
           m.scene.push(
-            item(`dot${i}`, point(cx, "0") + only(`I_{${i + 1}}>0`), {
+            obj(`dot${i}`, point(cx, "0") + only(`I_{${i + 1}}>0`), {
               points: true,
               pointSize: 5,
               color: "#ffffff",
@@ -246,7 +216,7 @@ function model(id: string, dim: 2 | 3): Model {
             );
         } else
           m.scene.push(
-            item(
+            obj(
               `current${i}`,
               raw`\operatorname{vector}${par(point(`${cx}+0.4`, "0", "0") + "," + point(`${cx}+0.4`, "0", raw`\left\{I_{${i + 1}}>0:1,I_{${i + 1}}<0:-1,0\right\}`))}`,
               { color: "#a23c26", lineWidth: 1.5 }
@@ -278,7 +248,7 @@ function model(id: string, dim: 2 | 3): Model {
               );
         if (dim === 3)
           m.scene.push(
-            item(
+            obj(
               `color${i}`,
               `C_{planet${i}vt}=\\operatorname{rgb}${par(channels.join(","))}`,
               { hidden: true }
@@ -297,12 +267,12 @@ function model(id: string, dim: 2 | 3): Model {
         if (dim === 2 && i === 0) {
           const disk = only(`${sq(`x-${par(cx)}`)}+y^{2}<${sq(radii[i])}`);
           m.scene.push(
-            item(
+            obj(
               "land",
               `${sin(`4${par(X)}+2${par(Y)}`)}+0.5${sin(`7${par(Y)}`)}>0.6${disk}`,
               { fill: true, fillOpacity: 1, color: "#4b733a", lineOpacity: 0 }
             ),
-            item("ice", `${abs(Y)}>0.88${disk}`, {
+            obj("ice", `${abs(Y)}>0.88${disk}`, {
               fill: true,
               fillOpacity: 1,
               color: "#dce4e4",
@@ -333,10 +303,10 @@ function model(id: string, dim: 2 | 3): Model {
     }
   } else if (id === "cylinder") {
     m.vars = [
-      varr("U", 1, 0.2, 3),
-      varr("R", dim === 2 ? 2 : 1.2, 0.4, dim === 2 ? 3 : 2),
-      varr("w", 0.4, -2, 2),
-      varr("T_{scene}", 0, 0, 1000, 0.01),
+      variable("U", 1, 0.2, 3),
+      variable("R", dim === 2 ? 2 : 1.2, 0.4, dim === 2 ? 3 : 2),
+      variable("w", 0.4, -2, 2),
+      variable("T_{scene}", 0, 0, 1000, 0.01),
       toggle("s_{force}", 0, "Pressure traction at rim"),
     ];
     const rho = "x^{2}+y^{2}";
@@ -347,7 +317,7 @@ function model(id: string, dim: 2 | 3): Model {
       "0",
     ];
     m.potential = frac(`U^{2}-${sq(m.field[0])}-${sq(m.field[1])}`, "2");
-    m.stream = `Uy${par(`1-${frac("R^{2}", rho)}`)}-${mul("R^{2}w/2", log(frac(rho, "R^{2}")))}`;
+    m.stream = `Uy${par(`1-${frac("R^{2}", rho)}`)}-${mul("R^{2}w/2", ln(frac(rho, "R^{2}")))}`;
     m.seed = mul(
       `e^{-${frac(sq(`${root(rho)}-1.25R`), "0.08R^{2}")}}`,
       dim === 3 ? ALONG : "1"
@@ -383,19 +353,19 @@ function model(id: string, dim: 2 | 3): Model {
     ];
   } else if (id === "capacitor") {
     m.vars = [
-      varr("s", 1, -2, 2),
-      varr("L", dim === 2 ? 4 : 2.5, 1, 5),
-      varr("d", dim === 2 ? 3 : 1.5, 0.5, 4),
+      variable("s", 1, -2, 2),
+      variable("L", dim === 2 ? 4 : 2.5, 1, 5),
+      variable("d", dim === 2 ? 3 : 1.5, 0.5, 4),
     ];
     const b = ["y-d/2", "y+d/2"];
     const A = (b: string) =>
-      mul("0.5", log(frac(`${sq("x+L")}+${sq(b)}`, `${sq("x-L")}+${sq(b)}`)));
+      mul("0.5", ln(frac(`${sq("x+L")}+${sq(b)}`, `${sq("x-L")}+${sq(b)}`)));
     const C = (b: string) =>
       raw`\left\{${b}=0:0,${atan(frac("x+L", b))}-${atan(frac("x-L", b))}\right\}`;
-    // Integral of log(distance), using |b| to preserve the physical potential across strips.
+    // Integral of ln(distance), using |b| to preserve the physical potential across strips.
     const H = (u: string, b: string) =>
       par(
-        `${mul(u, log(`${sq(u)}+${sq(b)}`))}-2${par(u)}+${mul("2", abs(b), atan(frac(u, abs(b))))}`
+        `${mul(u, ln(`${sq(u)}+${sq(b)}`))}-2${par(u)}+${mul("2", abs(b), atan(frac(u, abs(b))))}`
       );
     const V = (b: string) =>
       `-${mul("0.5", par(`${H("x+L", b)}-${H("x-L", b)}`))}`;
@@ -405,13 +375,13 @@ function model(id: string, dim: 2 | 3): Model {
       mul("s", `${C(b[0])}-${C(b[1])}`),
       "0",
     ];
-    // b=0 outside the plate: limiting primitive u log(u²)-2u.
+    // b=0 outside the plate: limiting primitive u ln(u²)-2u.
     const J = (bb: string) =>
-      raw`\left\{${bb}=0:-0.5${par(`${mul("x+L", log(sq("x+L")))}-2${par("x+L")}-${mul("x-L", log(sq("x-L")))}+2${par("x-L")}`)},${V(bb)}\right\}`;
+      raw`\left\{${bb}=0:-0.5${par(`${mul("x+L", ln(sq("x+L")))}-2${par("x+L")}-${mul("x-L", ln(sq("x-L")))}+2${par("x-L")}`)},${V(bb)}\right\}`;
     m.potential = mul("s", `${J(b[0])}-${J(b[1])}`);
     // Stream function branch constants are kept separate by restrictions in the scene.
     const K = (u: string, bb: string) =>
-      `${mul(u, atan(frac(u, bb)))}-${mul(frac(bb, "2"), log(`${sq(u)}+${sq(bb)}`))}`;
+      `${mul(u, atan(frac(u, bb)))}-${mul(frac(bb, "2"), ln(`${sq(u)}+${sq(bb)}`))}`;
     const S = (bb: string) => par(`-${par(K("x+L", bb))}+${par(K("x-L", bb))}`);
     // Charge changes direction and strength, not the geometric family of lines.
     m.stream = par(`${S(b[0])}-${S(b[1])}`);
@@ -429,7 +399,7 @@ function model(id: string, dim: 2 | 3): Model {
       const q = i === 0 ? "s" : "-s";
       const cl = `C_{plate${i}vt}`;
       m.scene.push(
-        item(`color${i}`, `${cl}=${signColor(q)}`, { hidden: true }),
+        obj(`color${i}`, `${cl}=${signColor(q)}`, { hidden: true }),
         ...box(
           `plate${i}`,
           ["-L", `${cy}-0.04`, "-2.5"],
@@ -461,10 +431,10 @@ function model(id: string, dim: 2 | 3): Model {
     }
   } else if (id === "bar-magnet") {
     m.vars = [
-      varr("a", 1.5, 0.5, 3),
-      varr("b", 0.4, 0.2, 0.8),
-      varr("c", 0.4, 0.2, 0.8),
-      varr("p", 1, -2, 2),
+      variable("a", 1.5, 0.5, 3),
+      variable("b", 0.4, 0.2, 0.8),
+      variable("c", 0.4, 0.2, 0.8),
+      variable("p", 1, -2, 2),
     ];
     // Integrated charged-face exterior field of a uniformly magnetized rectangular prism.
     const face = (X: string, axis: number) =>
@@ -477,14 +447,14 @@ function model(id: string, dim: 2 | 3): Model {
             const val =
               axis === 0
                 ? atan(frac(mul(Y, Z), mul(X, rr)))
-                : log(`${axis === 1 ? Z : Y}+${rr}`);
+                : ln(`${axis === 1 ? Z : Y}+${rr}`);
             return mul(String((axis === 0 ? 1 : -1) * j * k), val);
           })
         )
         .join("+");
     // On the extension of an x face the normal face integral tends to zero outside its rectangle.
     const logPair = (h: string, lo: string, hi: string) =>
-      raw`\left\{${h}=0:\operatorname{sign}${par(hi)}${log(abs(frac(hi, lo)))},${log(`${hi}+${root(`${h}+${sq(hi)}`)}`)}-${log(`${lo}+${root(`${h}+${sq(lo)}`)}`)}\right\}`;
+      raw`\left\{${h}=0:\operatorname{sign}${par(hi)}${ln(abs(frac(hi, lo)))},${ln(`${hi}+${root(`${h}+${sq(hi)}`)}`)}-${ln(`${lo}+${root(`${h}+${sq(lo)}`)}`)}\right\}`;
     const F = (X: string, axis: number) =>
       axis === 0
         ? raw`\left\{${X}=0:0,${face(X, axis)}\right\}`
@@ -509,7 +479,7 @@ function model(id: string, dim: 2 | 3): Model {
     for (let i = 0; i < 2; i++) {
       const cl = `C_{bar${i}vt}`;
       m.scene.push(
-        item(`color${i}`, `${cl}=${signColor(i === 0 ? "-p" : "p")}`, {
+        obj(`color${i}`, `${cl}=${signColor(i === 0 ? "-p" : "p")}`, {
           hidden: true,
         }),
         ...box(
@@ -523,7 +493,7 @@ function model(id: string, dim: 2 | 3): Model {
       );
     }
   } else if (id === "dipole") {
-    m.vars = [varr("m", 1, -3, 3)];
+    m.vars = [variable("m", 1, -3, 3)];
     m.valid = `${r2}>0`;
     m.field = [
       frac("3mxy", `${par(r2)}^{2.5}`),
@@ -539,8 +509,8 @@ function model(id: string, dim: 2 | 3): Model {
     m.seed = `e^{-0.1${par(r2)}}`;
   } else if (id === "shell-theorem") {
     m.vars = [
-      varr("M", 8, 1, 20),
-      varr("R", dim === 2 ? 2.5 : 1.5, 0.5, 3),
+      variable("M", 8, 1, 20),
+      variable("R", dim === 2 ? 2.5 : 1.5, 0.5, 3),
       toggle("s_{cut}", 1, "Cutaway view (field unchanged)"),
     ];
     m.field = ["x", "y", z].map((a) =>
@@ -576,8 +546,8 @@ function model(id: string, dim: 2 | 3): Model {
     m.stream = frac("y", r);
   } else if (id === "uniform-field") {
     m.vars = [
-      varr("E_{0}", 1, -3, 3),
-      varr("q_{0}", -1, -3, 3),
+      variable("E_{0}", 1, -3, 3),
+      variable("q_{0}", -1, -3, 3),
       toggle("s_{force}", 0, "Force on test charge"),
     ];
     m.valid = `${abs("x")}<3`;
@@ -589,7 +559,7 @@ function model(id: string, dim: 2 | 3): Model {
     for (let i = 0; i < 2; i++) {
       const cl = `C_{uniform${i}vt}`;
       m.scene.push(
-        item(`color${i}`, `${cl}=${signColor(i === 0 ? "E_{0}" : "-E_{0}")}`, {
+        obj(`color${i}`, `${cl}=${signColor(i === 0 ? "E_{0}" : "-E_{0}")}`, {
           hidden: true,
         }),
         ...box(
@@ -623,16 +593,16 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
     const probe = point(...args.map((a) => `p_{${a}}`));
     const vars = [
       ...m.vars,
-      varr("p_{x}", id === "bar-magnet" ? 2.5 : 0, -9, 9, 0.05),
-      varr(
+      variable("p_{x}", id === "bar-magnet" ? 2.5 : 0, -9, 9, 0.05),
+      variable(
         "p_{y}",
         id === "cylinder" ? 3.2 : id === "capacitor" ? 0 : 1.5,
         -9,
         9,
         0.05
       ),
-      ...(dim === 3 ? [varr("p_{z}", 0.6, -5, 5, 0.05)] : []),
-      varr("s_{arrow}", m.gain, 0, 20),
+      ...(dim === 3 ? [variable("p_{z}", 0.6, -5, 5, 0.05)] : []),
+      variable("s_{arrow}", m.gain, 0, 20),
       toggle("s_{net}", 1, "Field arrow"),
       toggle("s_{names}", 0, "Names"),
       toggle("s_{damp}", 1, "Damped lengths"),
@@ -662,7 +632,7 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
     }
     const scene = [
       ...m.scene,
-      item("probe", probe, {
+      obj("probe", probe, {
         points: true,
         pointSize: dim === 2 ? 12 : 4,
         color: "#222222",
@@ -682,7 +652,7 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
     };
     scene.push(...(dim === 2 ? probeArrows2D(setup) : probeArrows3D(setup)));
     if (m.extras) {
-      vars.push(varr("s_{forcegain}", 1, 0, 10));
+      vars.push(variable("s_{forcegain}", 1, 0, 10));
       const extra = {
         ...setup,
         gain: "s_{forcegain}",
@@ -711,7 +681,7 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
             ? `${abs("m")}>0`
             : "1>0";
       scene.push(
-        item(
+        obj(
           "fieldlines",
           `${sin(mul(id === "earth-moon" ? "0.15" : id === "dipole" ? "3" : id === "capacitor" ? "0.25" : "1", raw`\pi`, m.stream))}=0${only("s_{lines}=1")}${only(mask)}${only(nonzero)}${extraMask}${id === "capacitor" ? only(`${abs("y-d/2")}>0.04`) + only(`${abs("y+d/2")}>0.04`) : ""}`,
           {
@@ -731,7 +701,7 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
     ) {
       vars.push(toggle("s_{equi}", 0, "Equipotentials"));
       scene.push(
-        item(
+        obj(
           "equi",
           `${sin(mul(raw`\pi`, frac(m.potential, String(m.tintScale * (id === "capacitor" ? 2 : 1)))))}=0${only("s_{equi}=1")}${only(id === "shell-theorem" ? `${root("x^{2}+y^{2}")}>R` : m.valid)}`,
           {
@@ -772,18 +742,7 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
       scale: a.m.tintScale,
     },
     ...(id === "cylinder" ? { sceneTime: "T_{scene}" } : {}),
-    flow: {
-      // Near the charges' density: at 6,000 the flow was too sparse to read
-      // as a field on paper.
-      particleCount: 24_000,
-      speed: 0.35,
-      trailPersistence: 0.84,
-      dropRate: 0.03,
-      opacity: 0.45,
-      pointSize: 1.5,
-      glow: 0,
-      normalizeSpeed: true,
-    },
+    flow: flow2D({ speed: 0.35, normalize: true }),
     space: {
       blurb,
       xLatex: b.field[0],
@@ -792,17 +751,11 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
       variables: b.vars,
       scene: b.scene,
       seedLatex: b.seed,
-      look: {
-        particles: id === "bar-magnet" ? 12000 : 30000,
+      look: flow3D({
         speed: 0.18,
-        trail: 16,
-        lifetime: 1.2,
-        opacity: 0.55,
-        glow: 0,
-        normalizeSpeed: true,
-        absorb: false,
-        palette: "charge",
-      },
+        density: id === "bar-magnet" ? 0.4 : 1,
+        normalize: true,
+      }),
     },
   };
 }

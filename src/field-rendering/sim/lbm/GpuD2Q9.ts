@@ -57,7 +57,7 @@ export interface GpuLatticeOptions {
 export type PopulationStorage = "fp32" | "fp16s";
 
 /** FP16S's scale: half(32768·g) is stored, and read back over 32768. */
-export const FP16S_SCALE = 32768;
+const FP16S_SCALE = 32768;
 
 const KIND_CODE: Record<BoundaryKind, number> = {
   periodic: 0,
@@ -567,7 +567,7 @@ export function sumForceTexels(
 }
 
 /** δρ, ux and uy from macroscopic-target texels (`g8 δρ ux uy`). */
-export function macroFromTexels(texel: Float32Array): {
+function macroFromTexels(texel: Float32Array): {
   deltaRho: Float32Array;
   ux: Float32Array;
   uy: Float32Array;

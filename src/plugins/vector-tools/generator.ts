@@ -20,7 +20,7 @@ import type {
   GeneratedItemSnapshot,
 } from "./desmos/ExpressionAdapter";
 
-export type VectorFieldPurpose =
+type VectorFieldPurpose =
   | "x samples"
   | "y samples"
   | "grid x coordinates"
@@ -45,13 +45,12 @@ export type VectorFieldPurpose =
   | "parametric curve"
   | "curve position";
 
-export interface GeneratedVectorFieldExpression
-  extends GeneratedExpressionSpec {
+interface GeneratedVectorFieldExpression extends GeneratedExpressionSpec {
   purpose: VectorFieldPurpose;
 }
 
 /** The graph-level ticker a generated field needs, if it needs one. */
-export interface GeneratedTicker {
+interface GeneratedTicker {
   handlerLatex: string;
   minStepLatex: string;
 }
@@ -80,7 +79,7 @@ export interface GenerationOptions {
   animateTime?: boolean;
 }
 
-export interface ExpressionAuditRow {
+interface ExpressionAuditRow {
   id: string;
   purpose: string;
   present: boolean;

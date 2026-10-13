@@ -56,7 +56,7 @@ interface Compiled {
 }
 
 /** A surface solved for one coordinate over the other two. */
-export interface GraphSurface3D extends Compiled {
+interface GraphSurface3D extends Compiled {
   id: string;
   kind: "graph";
   /** The coordinate the expression gives: 0 x, 1 y, 2 z. */
@@ -65,7 +65,7 @@ export interface GraphSurface3D extends Compiled {
 }
 
 /** A parametric surface over u and v. */
-export interface ParametricSurface3D extends Compiled {
+interface ParametricSurface3D extends Compiled {
   id: string;
   kind: "uv";
   xyz: readonly [string, string, string];

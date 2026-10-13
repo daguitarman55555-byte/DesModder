@@ -24,7 +24,7 @@ export interface FlowBounds {
  * fields, so leaving values out of this type is what makes that true rather
  * than something each renderer has to remember.
  */
-export interface FieldDependencies {
+interface FieldDependencies {
   /** Definitions compiled to GLSL functions, dependencies first. */
   helpers?: readonly CompiledHelper[];
   /** Desmos names the field reads, each declared as a uniform. */
@@ -306,7 +306,7 @@ export function uploadFieldParameters(
  * here, because the two disagreeing means a shader reading an uninitialised
  * float, which is a field of ripples that are all infinitely old.
  */
-export function fieldReadsTime(field: FlowField) {
+function fieldReadsTime(field: FlowField) {
   return field.usesTime === true || (field.disturbances?.ripples ?? 0) > 0;
 }
 
