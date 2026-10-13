@@ -1,0 +1,153 @@
+name: Vector Tools visual verification + Pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/vector-tools-foundation
+    paths:
+      - ".github/workflows/vector-tools-pages.yml"
+      - "src/**"
+      - "scripts/vector-tools-pages-report.cjs"
+      - "docs/mockups/vector-3d-arrows/ap-look.cjs"
+      - "docs/mockups/vector-3d-arrows/ap-latency.cjs"
+      - "package*.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vector-tools-pages
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Prepare report folders
+        run: mkdir -p out/logs out/screenshots
+      - name: Record runner identity
+        run: |
+          node -e 'const fs=require("fs"),os=require("os"); fs.writeFileSync("out/machine.json", JSON.stringify({platform:process.platform,arch:process.arch,cpus:os.cpus().map(x=>x.model).filter((x,i,a)=>a.indexOf(x)===i),memoryGiB:Math.round(os.totalmem()/2**30),node:process.version,runner:process.env.RUNNER_IMAGE,sha:process.env.GITHUB_SHA,ref:process.env.GITHUB_REF},null,2));'
+          cat out/machine.json
+      - name: Install dependencies
+        id: dependencies
+        shell: bash
+        run: |
+          set +e
+          npm ci 2>&1 | tee out/logs/install.log
+          echo "code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Jest unit tests
+        id: unit
+        if: steps.dependencies.outputs.code == '0'
+        shell: bash
+        run: |
+          set +e
+          npm run test:unit 2>&1 | tee out/logs/unit.log
+          echo "code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: TypeScript full project
+        id: types
+        if: steps.dependencies.outputs.code == '0'
+        shell: bash
+        run: |
+          set +e
+          npx tsc --build 2>&1 | tee out/logs/typescript.log
+          echo "code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Build Chrome extension
+        id: build
+        if: steps.dependencies.outputs.code == '0'
+        shell: bash
+        run: |
+          set +e
+          npm run build 2>&1 | tee out/logs/build.log
+          echo "code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Install virtual screen for extension-enabled Chrome
+        if: steps.build.outputs.code == '0'
+        run: |
+          if ! command -v xvfb-run >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y xvfb
+          fi
+      - name: Verify live 2D/3D, Explanatory/Majestic
+        id: live
+        if: steps.build.outputs.code == '0'
+        shell: bash
+        env:
+          HEADFUL: "1"
+          DIMS: 2d,3d
+          MODES: explanatory,majestic
+          IDS: ap-projectile,ap-shm,ap-circular,ap-nozzle,ap-conductor,ap-induction,ap-motion-graphs,ap-pendulum-phase,ap-kepler-areas
+        run: |
+          set +e
+          OUT="$GITHUB_WORKSPACE/out/screenshots" xvfb-run -a -s '-screen 0 1365x900x24' node docs/mockups/vector-3d-arrows/ap-look.cjs 2>&1 | tee out/logs/live.log
+          echo "code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Measure Desmos recompute after each slider (p50/p95, budget 150 ms)
+        id: latency
+        if: steps.build.outputs.code == '0'
+        shell: bash
+        env:
+          HEADFUL: "1"
+          IDS: ap-projectile,ap-shm,ap-circular,ap-nozzle,ap-conductor,ap-induction,ap-motion-graphs,ap-pendulum-phase,ap-kepler-areas
+          DIMS: 2d,3d
+          MODES: explanatory,majestic
+          OUTPUT: out/slider-latency.json
+        run: |
+          set +e
+          xvfb-run -a -s '-screen 0 1365x900x24' node docs/mockups/vector-3d-arrows/ap-latency.cjs 2>&1 | tee out/logs/latency.log
+          echo "code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Record stage exit codes
+        env:
+          INSTALL: ${{ steps.dependencies.outputs.code }}
+          UNIT: ${{ steps.unit.outputs.code }}
+          TYPES: ${{ steps.types.outputs.code }}
+          BUILD: ${{ steps.build.outputs.code }}
+          LIVE: ${{ steps.live.outputs.code }}
+          LATENCY: ${{ steps.latency.outputs.code }}
+        run: |
+          node -e 'const fs=require("fs");const keys=["INSTALL","UNIT","TYPES","BUILD","LIVE","LATENCY"]; const s=Object.fromEntries(keys.map(k=>[k.toLowerCase(),process.env[k]===""?null:Number(process.env[k])])); fs.writeFileSync("out/status.json",JSON.stringify(s,null,2));'
+      - name: Generate static Pages report
+        if: always()
+        run: node scripts/vector-tools-pages-report.cjs
+      - name: Upload full evidence, including logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vector-tools-verification
+          path: out/
+          if-no-files-found: warn
+      - name: Configure Pages
+        if: always()
+        uses: actions/configure-pages@v5
+      - name: Upload Pages website
+        if: always()
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site/
+
+  deploy:
+    needs: verify
+    if: always() && needs.verify.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy report to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -23,7 +23,9 @@ const modes = list("MODES", "explanatory,majestic");
 (async () => {
   const ext = join(root, "dist");
   const b = await puppeteer.launch({
-    headless: "new",
+    // HEADFUL=1 shows the window: CI runs it under a virtual screen, as a
+    // headless Chrome there will not load the unpacked extension.
+    headless: process.env.HEADFUL === "1" ? false : "new",
     args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`],
   });
   try {

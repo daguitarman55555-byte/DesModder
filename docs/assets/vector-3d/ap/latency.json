@@ -1,0 +1,441 @@
+{
+  "generatedAt": "2026-10-13T03:15:00.091Z",
+  "results": [
+    {
+      "dimension": "2d",
+      "preset": "ap-projectile",
+      "mode": "explanatory",
+      "metric": "slider write until Desmos reports the new value",
+      "p50Ms": 48,
+      "p95Ms": 58,
+      "worstMs": 58,
+      "error": null,
+      "sliders": [
+        {
+          "name": "g",
+          "ms": [58, 50, 48]
+        },
+        {
+          "name": "v_{0x}",
+          "ms": [46, 49, 44]
+        },
+        {
+          "name": "v_{0y}",
+          "ms": [46, 50, 50]
+        },
+        {
+          "name": "h",
+          "ms": [26, 28, 21]
+        }
+      ]
+    },
+    {
+      "dimension": "2d",
+      "preset": "ap-shm",
+      "mode": "explanatory",
+      "metric": "slider write until Desmos reports the new value",
+      "p50Ms": 61,
+      "p95Ms": 77,
+      "worstMs": 77,
+      "error": null,
+      "sliders": [
+        {
+          "name": "k",
+          "ms": [77, 60, 72]
+        },
+        {
+          "name": "m",
+          "ms": [62, 77, 61]
+        },
+        {
+          "name": "A",
+          "ms": [14, 14, 15]
+        }
+      ]
+    },
+    {
+      "dimension": "2d",
+      "preset": "ap-circular",
+      "mode": "explanatory",
+      "metric": "slider write until Desmos reports the new value",
+      "p50Ms": 23,
+      "p95Ms": 25,
+      "worstMs": 25,
+      "error": null,
+      "sliders": [
+        {
+          "name": "w",
+          "ms": [19, 23, 20]
+        },
+        {
+          "name": "R",
+          "ms": [25, 22, 25]
+        }
+      ]
+    },
+    {
+      "dimension": "2d",
+      "preset": "ap-nozzle",
+      "mode": "explanatory",
+      "metric": "slider write until Desmos reports the new value",
+      "p50Ms": 57,
+      "p95Ms": 92,
+      "worstMs": 92,
+      "error": null,
+      "sliders": [
+        {
+          "name": "U",
+          "ms": [57, 92, 65]
+        },
+        {
+          "name": "a",
+          "ms": [60, 64, 57]
+        },
+        {
+          "name": "H",
+          "ms": [50, 62, 52]
+        },
+        {
+          "name": "d",
+          "ms": [23, 13, 13]
+        }
+      ]
+    },
+    {
+      "dimension": "2d",
+      "preset": "ap-conductor",
+      "mode": "explanatory",
+      "metric": "slider write until Desmos reports the new value",
+      "p50Ms": 114,
+      "p95Ms": 125,
+      "worstMs": 125,
+      "error": null,
+      "sliders": [
+        {
+          "name": "E",
+          "ms": [111, 113, 21]
+        },
+        {
+          "name": "R",
+          "ms": [114, 114, 125]
+        }
+      ]
+    },
+    {
+      "dimension": "2d",
+      "preset": "ap-induction",
+      "mode": "explanatory",
+      "metric": "slider write until Desmos reports the new value",
+      "p50Ms": 17,
+      "p95Ms": 24,
+      "worstMs": 24,
+      "error": null,
+      "sliders": [
+        {
+          "name": "B",
+          "ms": [20, 24, 15]
+        },
+        {
+          "name": "w",
+          "ms": [18, 14, 17]
+        },
+        {
+          "name": "R",
+          "ms": [17, 14, 14]
+        }
+      ]
+    },
+    {
+      "dimension": "2d",
+      "preset": "ap-motion-graphs",
+      "mode": "explanatory",
+      "metric": "slider write until Desmos reports the new value",
+      "p50Ms": 14,
+      "p95Ms": 18,
+      "worstMs": 18,
+      "error": null,
+      "sliders": [
+        {
+          "name": "x_{ini}",
+          "ms": [14, 13, 13]
+        },
+        {
+          "name": "v_{ini}",
+          "ms": [18, 14, 13]
+        },
+        {
+          "name": "a_{const}",
+          "ms": [14, 17, 16]
+        }
+      ]
+    },
+    {
+      "dimension": "2d",
+      "preset": "ap-pendulum-phase",
+      "mode": "explanatory",
+      "metric": "slider write until Desmos reports the new value",
+      "p50Ms": 23,
+      "p95Ms": 29,
+      "worstMs": 29,
+      "error": null,
+      "sliders": [
+        {
+          "name": "g",
+          "ms": [23, 23, 25]
+        },
+        {
+          "name": "L",
+          "ms": [20, 19, 23]
+        },
+        {
+          "name": "\\theta_{0}",
+          "ms": [26, 26, 29]
+        }
+      ]
+    },
+    {
+      "dimension": "2d",
+      "preset": "ap-kepler-areas",
+      "mode": "explanatory",
+      "metric": "slider write until Desmos reports the new value",
+      "p50Ms": 23,
+      "p95Ms": 27,
+      "worstMs": 27,
+      "error": null,
+      "sliders": [
+        {
+          "name": "a_{orb}",
+          "ms": [27, 25, 21]
+        },
+        {
+          "name": "e_{orb}",
+          "ms": [25, 25, 23]
+        },
+        {
+          "name": "M_{g}",
+          "ms": [16, 16, 21]
+        }
+      ]
+    },
+    {
+      "dimension": "3d",
+      "preset": "ap-projectile",
+      "mode": "explanatory",
+      "metric": "slider write until Desmos reports the new value",
+      "p50Ms": 57,
+      "p95Ms": 73,
+      "worstMs": 73,
+      "error": null,
+      "sliders": [
+        {
+          "name": "g",
+          "ms": [66, 64, 58]
+        },
+        {
+          "name": "v_{0x}",
+          "ms": [61, 57, 54]
+        },
+        {
+          "name": "v_{0y}",
+          "ms": [73, 56, 58]
+        },
+        {
+          "name": "h",
+          "ms": [57, 57, 57]
+        },
+        {
+          "name": "w",
+          "ms": [46, 43, 37]
+        }
+      ]
+    },
+    {
+      "dimension": "3d",
+      "preset": "ap-shm",
+      "mode": "explanatory",
+      "metric": "slider write until Desmos reports the new value",
+      "p50Ms": 39,
+      "p95Ms": 46,
+      "worstMs": 46,
+      "error": null,
+      "sliders": [
+        {
+          "name": "k",
+          "ms": [46, 45, 44]
+        },
+        {
+          "name": "m",
+          "ms": [39, 38, 39]
+        },
+        {
+          "name": "A",
+          "ms": [43, 39, 32]
+        }
+      ]
+    },
+    {
+      "dimension": "3d",
+      "preset": "ap-circular",
+      "mode": "explanatory",
+      "metric": "slider write until Desmos reports the new value",
+      "p50Ms": 61,
+      "p95Ms": 74,
+      "worstMs": 74,
+      "error": null,
+      "sliders": [
+        {
+          "name": "w",
+          "ms": [58, 61, 74]
+        },
+        {
+          "name": "R",
+          "ms": [49, 53, 62]
+        }
+      ]
+    },
+    {
+      "dimension": "3d",
+      "preset": "ap-nozzle",
+      "mode": "explanatory",
+      "metric": "slider write until Desmos reports the new value",
+      "p50Ms": 36,
+      "p95Ms": 71,
+      "worstMs": 71,
+      "error": null,
+      "sliders": [
+        {
+          "name": "U",
+          "ms": [30, 19, 32]
+        },
+        {
+          "name": "a",
+          "ms": [51, 44, 71]
+        },
+        {
+          "name": "H",
+          "ms": [36, 42, 37]
+        },
+        {
+          "name": "d",
+          "ms": [14, 29, 14]
+        }
+      ]
+    },
+    {
+      "dimension": "3d",
+      "preset": "ap-conductor",
+      "mode": "explanatory",
+      "metric": "slider write until Desmos reports the new value",
+      "p50Ms": 75,
+      "p95Ms": 92,
+      "worstMs": 92,
+      "error": null,
+      "sliders": [
+        {
+          "name": "E",
+          "ms": [64, 75, 74]
+        },
+        {
+          "name": "R",
+          "ms": [78, 92, 67]
+        }
+      ]
+    },
+    {
+      "dimension": "3d",
+      "preset": "ap-induction",
+      "mode": "explanatory",
+      "metric": "slider write until Desmos reports the new value",
+      "p50Ms": 15,
+      "p95Ms": 28,
+      "worstMs": 28,
+      "error": null,
+      "sliders": [
+        {
+          "name": "B",
+          "ms": [15, 15, 15]
+        },
+        {
+          "name": "w",
+          "ms": [15, 14, 14]
+        },
+        {
+          "name": "R",
+          "ms": [28, 27, 15]
+        }
+      ]
+    },
+    {
+      "dimension": "3d",
+      "preset": "ap-motion-graphs",
+      "mode": "explanatory",
+      "metric": "slider write until Desmos reports the new value",
+      "p50Ms": 80,
+      "p95Ms": 117,
+      "worstMs": 117,
+      "error": null,
+      "sliders": [
+        {
+          "name": "x_{ini}",
+          "ms": [13, 58, 62]
+        },
+        {
+          "name": "v_{ini}",
+          "ms": [80, 81, 79]
+        },
+        {
+          "name": "a_{const}",
+          "ms": [98, 110, 117]
+        }
+      ]
+    },
+    {
+      "dimension": "3d",
+      "preset": "ap-pendulum-phase",
+      "mode": "explanatory",
+      "metric": "slider write until Desmos reports the new value",
+      "p50Ms": 74,
+      "p95Ms": 107,
+      "worstMs": 107,
+      "error": null,
+      "sliders": [
+        {
+          "name": "g",
+          "ms": [84, 68, 65]
+        },
+        {
+          "name": "L",
+          "ms": [107, 66, 71]
+        },
+        {
+          "name": "\\theta_{0}",
+          "ms": [74, 81, 76]
+        }
+      ]
+    },
+    {
+      "dimension": "3d",
+      "preset": "ap-kepler-areas",
+      "mode": "explanatory",
+      "metric": "slider write until Desmos reports the new value",
+      "p50Ms": 82,
+      "p95Ms": 92,
+      "worstMs": 92,
+      "error": null,
+      "sliders": [
+        {
+          "name": "a_{orb}",
+          "ms": [92, 84, 82]
+        },
+        {
+          "name": "e_{orb}",
+          "ms": [78, 84, 84]
+        },
+        {
+          "name": "M_{g}",
+          "ms": [45, 47, 42]
+        }
+      ]
+    }
+  ]
+}

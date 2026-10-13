@@ -18,6 +18,7 @@
  * surface, and the induced field satisfies Faraday's law.
  */
 import { renameIdentifier } from "../identifiers";
+import { energyBars } from "./energy-bars";
 import { probeArrows2D, probeArrows3D, type ProbeArrow } from "./probe";
 import type {
   ColorMeaning,
@@ -134,6 +135,11 @@ interface Demo {
      * plotter draws nothing under some restrictions the GPU takes happily.
      */
     mask?: string;
+    /**
+     * The same curves written explicitly, if they can be: an implicit curve
+     * over the whole plane cost the projectile 200 ms a slider move.
+     */
+    explicit?: string;
   };
   /**
    * The flow's display speed, per unit of the field's speed: a slow field
@@ -248,6 +254,8 @@ function projectile(m: Demo, dim: 2 | 3) {
     latex: `y+${frac(sq(vy), "2g")}`,
     perUnit: "1",
     label: "Trajectories",
+    // As explicit curves, y = S − v_y²/2g for each whole peak height S.
+    explicit: `y=${raw`\left[-2,-1,...,8\right]`}-${frac(sq(vy), "2g")}${only(`y>${ground}`)}`,
   };
 }
 
@@ -689,9 +697,12 @@ export const AP_STREAMS: Record<string, string> = {};
 function preset(id: string): GalleryPreset {
   const create = (dim: 2 | 3) => {
     const m = model(id, dim);
+    const bars = energyBars(id, dim);
+    m.scene.push(...bars.scene);
     const coords = dim === 2 ? ["x", "y"] : ["x", "y", "z"];
     const vars = [
       ...m.vars,
+      ...bars.variables,
       ...(m.clock ? [variable("T_{scene}", 0, 0, 1000, 0.01)] : []),
       ...coords.map((c, i) => variable(`p_{${c}}`, m.probe[i], -6, 6, 0.05)),
       variable("s_{gain}", 1, 0, 5),
@@ -754,7 +765,7 @@ function preset(id: string): GalleryPreset {
       m.scene.push(
         obj(
           "lines",
-          `${sin(mul(m.stream.perUnit, raw`\pi`, m.stream.latex))}=0${m.stream.mask ?? only(m.valid)}${only("s_{lines}=1")}${id === "ap-conductor" ? only(raw`\left|y\right|>0.025`) + only("E^{2}>0") : ""}`,
+          `${m.stream.explicit ?? `${sin(mul(m.stream.perUnit, raw`\pi`, m.stream.latex))}=0${m.stream.mask ?? only(m.valid)}`}${only("s_{lines}=1")}${id === "ap-conductor" ? only(raw`\left|y\right|>0.025`) + only("E^{2}>0") : ""}`,
           { explains: true, lineOpacity: 0.7, lineWidth: 1.5, color: "#303030" }
         )
       );

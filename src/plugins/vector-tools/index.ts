@@ -943,6 +943,13 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     });
   }
 
+  /** One deterministic scene-clock frame. Pause first so an animation cannot race the step. */
+  stepClock() {
+    this.setTimePlaying(false);
+    this.showClockTime(this.clockSeconds + 1 / 30);
+    this.util.tick();
+  }
+
   /** Back to zero, whether or not the clock is running. */
   resetClock() {
     this.showClockTime(0);

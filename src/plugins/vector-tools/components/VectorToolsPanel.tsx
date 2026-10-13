@@ -2735,6 +2735,20 @@ function timeControls(vectorTools: VectorTools) {
         >
           {() => (vectorTools.timeConfig.playing ? "Pause" : "Play")}
         </Button>
+        <Button
+          color="light-gray"
+          class="dsm-vector-tools-time-slow"
+          onTap={() => vectorTools.setTimeSpeed(0.25)}
+        >
+          0.25× slow
+        </Button>
+        <Button
+          color="light-gray"
+          class="dsm-vector-tools-time-step"
+          onTap={() => vectorTools.stepClock()}
+        >
+          Step 1/30 s
+        </Button>
       </div>
       {sliderControl(
         "dsm-vector-tools-time-speed",

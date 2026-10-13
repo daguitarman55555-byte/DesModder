@@ -25,6 +25,10 @@ const FLAT = new Set([
   "cylinder",
   "capacitor",
   "uniform-field",
+  // Planar by what they show: a 1D motion, a phase plane, a Kepler orbit.
+  "ap-motion-graphs",
+  "ap-pendulum-phase",
+  "ap-kepler-areas",
 ]);
 
 describe("every gallery preset has a 3D form", () => {

@@ -1,5 +1,7 @@
 # PhET against AP Physics 1, 2 and C: what to take, what to beat
 
+> **Corrected by GPT's audit:** `docs/research/vector-tools-phet/answers.md`. It covers current screens, which ideas have no PhET counterpart, and Physics C exam boundaries. Where the two disagree, the audit is right.
+
 October 2026. All 112 simulations on PhET's physics shelf were checked (73 HTML5, 39 Java or Flash), from the live catalogue at phet.colorado.edu. Each was placed against the AP Physics 1 and 2 CEDs (units 1–15) and AP Physics C (Mechanics and E&M). There is no AP Physics 3; "C" is the calculus-based pair.
 
 This is a survey of what PhET teaches and how, from the catalogue and its descriptions and from knowing the simulations. It is not a run-through of every screen of every one. Before building anything taken from one, open that simulation and check what it does now.

@@ -1,0 +1,8 @@
+{
+  "pendulum_separatrix_max_error": 7.105427357601002e-15,
+  "kepler_max_newton_residual": 4.440892098500626e-16,
+  "kepler_equal_area_max_difference": 3.552713678800501e-15,
+  "circular_energy_consistency": "pass",
+  "harmonic_energy_consistency": "pass",
+  "projectile_energy_with_impact_loss": "pass"
+}

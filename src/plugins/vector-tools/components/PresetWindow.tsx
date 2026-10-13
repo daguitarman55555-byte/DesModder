@@ -341,10 +341,32 @@ export class PresetWindow extends Component<{
   }
 }
 
-/** A variable's name split for display: `q_{1}` is q with a subscript 1. */
+/** Greek letters a preset's variable may be named with, as shown. */
+const GREEK: Record<string, string> = {
+  alpha: "α",
+  beta: "β",
+  gamma: "γ",
+  theta: "θ",
+  lambda: "λ",
+  mu: "μ",
+  rho: "ρ",
+  sigma: "σ",
+  tau: "τ",
+  phi: "φ",
+  omega: "ω",
+};
+
+/**
+ * A variable's name split for display: `q_{1}` is q with a subscript 1, and
+ * `\theta_{0}` is θ with a subscript 0.
+ */
 function nameParts(name: string) {
-  const match = /^([A-Za-z])(?:_\{?([A-Za-z0-9]+)\}?)?$/.exec(name);
-  return { base: match?.[1] ?? name, sub: match?.[2] ?? "" };
+  const match = /^(?:([A-Za-z])|\\([a-z]+))(?:_\{?([A-Za-z0-9]+)\}?)?$/.exec(
+    name
+  );
+  if (match === null) return { base: name, sub: "" };
+  const base = match[1] ?? GREEK[match[2]] ?? name;
+  return { base, sub: match[3] ?? "" };
 }
 
 /** A slider's value, to three significant figures. */

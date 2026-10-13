@@ -6,3 +6,7 @@ coverage
 
 # macOS Finder metadata files
 .DS_Store
+
+# The Vector Tools CI report's working folders (vector-tools-pages.yml)
+/out/
+/site/
