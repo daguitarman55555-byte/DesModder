@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - feature/vector-tools-foundation
+      # GPT's branches: its own Chromium blocks every site and extension, so
+      # it pushes here and reads the published report instead.
+      - "gpt/**"
     paths:
       - ".github/workflows/vector-tools-pages.yml"
       - "src/**"
@@ -16,8 +19,9 @@ on:
 permissions:
   contents: read
 
+# One run per branch: a push to a GPT branch does not cancel Rafael's.
 concurrency:
-  group: vector-tools-pages
+  group: vector-tools-pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
