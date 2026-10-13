@@ -1,0 +1,228 @@
+{
+  "generatedAt": "2026-10-13T16:38:00.699Z",
+  "seconds": 8,
+  "results": [
+    {
+      "case": "baseline",
+      "fps": 59.1,
+      "p95FrameMs": 17,
+      "worstFrameMs": 84,
+      "realTimeFactor": 0.97,
+      "behind": false,
+      "simulating": true,
+      "peakMach": 0.3,
+      "latticeSpeed": 0.05,
+      "restarts": [
+        "The flow reached Mach 0.30, too fast to be accurate, so Auto halved the lattice speed and carried on."
+      ],
+      "measurementsFinite": true,
+      "measurements": [
+        {
+          "drag": 3.4803432672064942,
+          "lift": 0.28966522399004485
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "case": "re-2000",
+      "fps": 60.1,
+      "p95FrameMs": 17,
+      "worstFrameMs": 17,
+      "realTimeFactor": 1,
+      "behind": false,
+      "simulating": true,
+      "peakMach": 0.303,
+      "latticeSpeed": 0.05,
+      "restarts": [
+        "The flow reached Mach 0.30, too fast to be accurate, so Auto halved the lattice speed and carried on."
+      ],
+      "measurementsFinite": true,
+      "measurements": [
+        {
+          "drag": 3.186002818441747,
+          "lift": -2.0763296975104706
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "case": "fast-inflow",
+      "fps": 60,
+      "p95FrameMs": 17,
+      "worstFrameMs": 17,
+      "realTimeFactor": 0.32,
+      "behind": true,
+      "simulating": true,
+      "peakMach": 0.182,
+      "latticeSpeed": 0.05,
+      "restarts": [
+        "The flow reached Mach 0.31, too fast to be accurate, so Auto halved the lattice speed and carried on."
+      ],
+      "measurementsFinite": true,
+      "measurements": [
+        {
+          "drag": 4.184201078423938,
+          "lift": 0.07173513668628098,
+          "strouhal": 0.1382729509531665
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "case": "fine-grid",
+      "fps": 6.3,
+      "p95FrameMs": 183,
+      "worstFrameMs": 200,
+      "realTimeFactor": 0.36,
+      "behind": true,
+      "simulating": true,
+      "peakMach": 0.292,
+      "latticeSpeed": 0.1,
+      "restarts": [],
+      "measurementsFinite": true,
+      "measurements": [
+        {
+          "drag": 2.5659603292319026,
+          "lift": 0.0005300869539906992
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "case": "eight-solids",
+      "fps": 60.1,
+      "p95FrameMs": 17,
+      "worstFrameMs": 17,
+      "realTimeFactor": 1,
+      "behind": false,
+      "simulating": true,
+      "peakMach": 0.301,
+      "latticeSpeed": 0.05,
+      "restarts": [
+        "The flow reached Mach 0.30, too fast to be accurate, so Auto halved the lattice speed and carried on."
+      ],
+      "measurementsFinite": true,
+      "measurements": [
+        {
+          "drag": 2.7351229232800605,
+          "lift": 0.47475397877214054
+        },
+        {
+          "drag": 2.623230743014978,
+          "lift": -0.392786828490595
+        },
+        {
+          "drag": 1.376277568620733,
+          "lift": -2.1032203874654236
+        },
+        {
+          "drag": -0.6139251391610338,
+          "lift": 0.33853306015953416
+        },
+        {
+          "drag": 1.8874428204726423,
+          "lift": 3.363993400112829
+        },
+        {
+          "drag": 0.7914166258803258,
+          "lift": -1.2217929239074388
+        },
+        {
+          "drag": 0.9385671642246759,
+          "lift": -2.0163107704591106
+        },
+        {
+          "drag": 0.07307006462684107,
+          "lift": 1.988927751339765
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "case": "nearly-blocked",
+      "fps": 60.1,
+      "p95FrameMs": 17,
+      "worstFrameMs": 17,
+      "realTimeFactor": 1,
+      "behind": false,
+      "simulating": true,
+      "peakMach": 0.175,
+      "latticeSpeed": 0.1,
+      "restarts": [],
+      "measurementsFinite": true,
+      "measurements": [
+        {
+          "drag": 201.688521917661,
+          "lift": -0.0054078226288159685
+        }
+      ],
+      "pageErrors": []
+    },
+    {
+      "case": "sharp-plate-at-inlet",
+      "fps": 59.9,
+      "p95FrameMs": 17,
+      "worstFrameMs": 33,
+      "realTimeFactor": 1,
+      "behind": false,
+      "simulating": false,
+      "peakMach": null,
+      "latticeSpeed": 0.05,
+      "restarts": [
+        "The flow reached Mach 0.39, too fast to be accurate, so Auto halved the lattice speed and carried on.",
+        "Speed limit exceeded: the flow reached Mach 0.32, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.33, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.34, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.35, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.36, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.37, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.39, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.41, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.43, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.44, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.46, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.45, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.49, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.51, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.52, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.54, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.53, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.57, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.67, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.65, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "Speed limit exceeded: the flow reached Mach 0.74, past the 0.3 where the lattice stays accurate, so what it shows now is not accurate.",
+        "The flow became unstable and has stopped. Try Accurate, a lower Reynolds number, or more cells.",
+        "The browser took the graphics context away from the fluid. Restart it from the Fluid tab."
+      ],
+      "measurementsFinite": true,
+      "measurements": [],
+      "pageErrors": []
+    },
+    {
+      "case": "dragged-fast",
+      "fps": 60.1,
+      "p95FrameMs": 17,
+      "worstFrameMs": 17,
+      "realTimeFactor": 1,
+      "behind": false,
+      "simulating": true,
+      "peakMach": 0.304,
+      "latticeSpeed": 0.05,
+      "restarts": [
+        "A solid jumped too far in one frame to push the fluid aside, so it was placed there without a wall velocity.",
+        "A solid moved at 0.05 cells a step, faster than the fluid can follow, so its walls were slowed to 0.05.",
+        "The flow reached Mach 0.30, too fast to be accurate, so Auto halved the lattice speed and carried on.",
+        "A solid moved at 0.06 cells a step, faster than the fluid can follow, so its walls were slowed to 0.05."
+      ],
+      "measurementsFinite": true,
+      "measurements": [
+        {
+          "drag": 1.1140972015225306,
+          "lift": -1.0287125171301137
+        }
+      ],
+      "pageErrors": []
+    }
+  ]
+}
