@@ -173,7 +173,15 @@ function gauss(): GalleryPreset {
             }
           ),
           // The law, read off the graph: the flux summed beside the charge
-          // inside, which agree wherever the sphere is.
+          // inside, which agree wherever the sphere is. To two places: the
+          // seventh of a Riemann sum is noise, not physics.
+          obj(
+            "gaussRound",
+            R`F_{gr}=\operatorname{round}\left(\Phi_{g},2\right)`,
+            {
+              hidden: true,
+            }
+          ),
           obj(
             "gaussReadout",
             point("C_{gx}", R`C_{gy}+R_{g}+0.6`) + on("s_{gauss}=1"),
@@ -182,7 +190,7 @@ function gauss(): GalleryPreset {
               points: true,
               pointSize: 0,
               color: "#245c8e",
-              label: R`Φ = ${"$"}{\Phi_{g}}     Q_enc/ε₀ = ${"$"}{Q_{g}}`,
+              label: R`${"`"}\Phi_{E}=${"$"}{F_{gr}}${"`"}     ${"`"}\frac{Q_{\mathrm{enc}}}{\varepsilon_{0}}=${"$"}{Q_{g}}${"`"}`,
               labelSize: 1.2,
             }
           ),
@@ -414,6 +422,11 @@ function ampere(): GalleryPreset {
     ...(dim === 2
       ? [
           obj(
+            "ampereRound",
+            R`C_{ar}=\operatorname{round}\left(C_{a},2\right)`,
+            { hidden: true }
+          ),
+          obj(
             "ampereReadout",
             point("C_{ax}", "C_{ay}+R_{a}+0.6") + on("s_{amp}=1"),
             {
@@ -421,7 +434,8 @@ function ampere(): GalleryPreset {
               points: true,
               pointSize: 0,
               color: "#245c8e",
-              label: `∮B·dl = \${C_{a}}     μ₀I_enc = \${I_{enc}}`,
+              // Desmos sets no \oint, so the sign is the character.
+              label: R`∮ ${"`"}\vec{B}\cdot d\vec{l}=${"$"}{C_{ar}}${"`"}     ${"`"}\mu_{0}I_{\mathrm{enc}}=${"$"}{I_{enc}}${"`"}`,
               labelSize: 1.2,
             }
           ),
@@ -615,7 +629,7 @@ function incline(): GalleryPreset {
         {
           key: "netForce",
           vector: total,
-          name: String.raw`\vec{F}_{net}`,
+          name: String.raw`\vec{F}_{\mathrm{net}}`,
           color: "#9b62ac",
         },
       ]),

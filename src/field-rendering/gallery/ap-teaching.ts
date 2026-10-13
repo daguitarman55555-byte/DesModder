@@ -60,10 +60,13 @@ const body = (key: string, at: readonly string[], dim: 2 | 3) =>
 const atProbe = (s: string) =>
   ["x", "y", "z"].reduce((v, a) => renameIdentifier(v, a, `p_{${a}}`), s);
 
-/** The whole numbers 1 to 8, a list Desmos draws one curve per element of. */
-const WHOLE = raw`\left[1,...,8\right]`;
+/**
+ * 2, 4, 6 and 8, a list Desmos draws one curve per element of: four guides,
+ * not eight, which crowded the probe and its arrows out of the picture.
+ */
+const WHOLE = raw`\left[2,4,...,8\right]`;
 
-/** Circles of radius 1, 2, 3…, evenly spaced: parametric, not implicit. */
+/** Circles of radius 2, 4, 6 and 8, evenly spaced: parametric, not implicit. */
 const CIRCLES = (rho: string) => ({
   latex: raw`\sqrt{${rho}}`,
   perUnit: "1",
@@ -221,7 +224,7 @@ function projectile(m: Demo, dim: 2 | 3) {
     perUnit: "1",
     label: "Trajectories",
     // As explicit curves, y = S − v_y²/2g for each whole peak height S.
-    explicit: `y=${raw`\left[-2,-1,...,8\right]`}-${frac(sq(vy), "2g")}${only(`y>${ground}`)}`,
+    explicit: `y=${raw`\left[-2,0,...,8\right]`}-${frac(sq(vy), "2g")}${only(`y>${ground}`)}`,
   };
 }
 

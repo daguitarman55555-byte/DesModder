@@ -46,15 +46,18 @@ import { FLUIDS } from "./fluids";
 import { PHYSICS } from "./physics";
 import { SPACE } from "./space";
 import { TAKEAWAYS } from "./takeaways";
+import { handlesFor } from "./handles";
 import { tidy } from "./latex";
 import { renameIdentifier } from "../identifiers";
 import type { ClockParameters, GalleryPreset, GalleryVariable } from "./types";
 
 export * from "./types";
+export { sceneParts, type ScenePart } from "./parts";
 
 /**
  * Every preset, shelf by shelf, in the order the presets window shows them,
- * each with what its colour means.
+ * each with what its colour means, what to take away from it, and handles
+ * on the graph for what its sliders place.
  */
 export const FIELD_GALLERY: readonly GalleryPreset[] = [
   ...SPACE,
@@ -64,13 +67,17 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   ...AP_TEACHING,
   ...AP_EXTENSIONS,
   ...AP_NEXT,
-].map((preset) =>
-  tidied({
+].map((preset) => {
+  const handles = handlesFor(preset.id);
+  return tidied({
     ...preset,
     meaning: preset.meaning ?? COLOR_MEANINGS[preset.id],
     takeaway: preset.takeaway ?? TAKEAWAYS[preset.id],
-  })
-);
+    ...(handles.length > 0
+      ? { scene: [...(preset.scene ?? []), ...handles] }
+      : {}),
+  });
+});
 
 /** Where a preset keeps LaTeX: every one of these goes through `tidy`. */
 function isLatexKey(key: string) {

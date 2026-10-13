@@ -211,6 +211,13 @@ export class PresetWindow extends Component<{
                                 <label class="dsm-preset-window-variable dsm-preset-window-switch">
                                   <input
                                     type="checkbox"
+                                    // On mount too: onUpdate does not run
+                                    // there, and a box left unticked over a
+                                    // switch that was on swallowed the first
+                                    // click.
+                                    didMount={(element: HTMLInputElement) => {
+                                      element.checked = v().current === 1;
+                                    }}
                                     onUpdate={(element: HTMLInputElement) => {
                                       element.checked = v().current === 1;
                                     }}
@@ -237,6 +244,14 @@ export class PresetWindow extends Component<{
                                   </span>
                                   <input
                                     type="range"
+                                    didMount={(element: HTMLInputElement) => {
+                                      element.min = String(v().min);
+                                      element.max = String(v().max);
+                                      element.step = String(
+                                        v().step ?? (v().max - v().min) / 200
+                                      );
+                                      element.value = String(v().current);
+                                    }}
                                     onUpdate={(element: HTMLInputElement) => {
                                       element.min = String(v().min);
                                       element.max = String(v().max);
@@ -263,6 +278,52 @@ export class PresetWindow extends Component<{
                               ),
                             })}
                           </div>
+                        )}
+                      </For>
+                    </div>
+                  )}
+                </If>
+                <If predicate={() => vectorTools.presetParts.length > 0}>
+                  {() => (
+                    <div
+                      class="dsm-preset-window-variables"
+                      role="group"
+                      aria-label="What is drawn"
+                    >
+                      <div class="dsm-preset-window-variables-head">
+                        <span class="dsm-preset-window-group-label">Show</span>
+                      </div>
+                      <For
+                        each={() => vectorTools.presetParts}
+                        key={(part: { id: string }) => part.id}
+                      >
+                        {(part: () => (typeof vectorTools.presetParts)[0]) => (
+                          <label class="dsm-preset-window-variable dsm-preset-window-switch">
+                            <input
+                              type="checkbox"
+                              didMount={(element: HTMLInputElement) => {
+                                element.checked = part().shown;
+                              }}
+                              onUpdate={(element: HTMLInputElement) => {
+                                element.checked = part().shown;
+                              }}
+                              onChange={(event: Event) =>
+                                vectorTools.setPresetPartShown(
+                                  part().id,
+                                  (event.target as HTMLInputElement).checked
+                                )
+                              }
+                            />
+                            <span>
+                              {() => part().label}{" "}
+                              <span class="dsm-preset-window-variable-name">
+                                {() => nameParts(part().name ?? "").base}
+                                <span class="dsm-preset-window-variable-sub">
+                                  {() => nameParts(part().name ?? "").sub}
+                                </span>
+                              </span>
+                            </span>
+                          </label>
                         )}
                       </For>
                     </div>
@@ -335,6 +396,9 @@ export class PresetWindow extends Component<{
                 <label class="dsm-preset-window-look">
                   <input
                     type="checkbox"
+                    didMount={(element: HTMLInputElement) => {
+                      element.checked = vectorTools.galleryWithLook;
+                    }}
                     onUpdate={(element: HTMLInputElement) => {
                       element.checked = vectorTools.galleryWithLook;
                     }}

@@ -304,18 +304,21 @@ function nameElement() {
 
 /**
  * A name as maths, from the little LaTeX the presets use: `\vec{E}_{1}` is
- * E with an arrow over it and a subscript 1. Anything else, as text.
+ * E with an arrow over it and a subscript 1, and `\vec{F}_{\mathrm{net}}`
+ * has an upright word for a subscript, as a label rather than a variable
+ * is set. Anything else, as text.
  */
 function fillName(element: HTMLElement, latex: string) {
   element.textContent = "";
-  const match = /^(\\vec\{)?([A-Za-z])\}?(?:_\{?([A-Za-z0-9]+)\}?)?$/.exec(
-    latex
-  );
+  const match =
+    /^(\\vec\{)?([A-Za-z])\}?(?:_\{?(\\mathrm\{)?([A-Za-z0-9]+)\}?\}?)?$/.exec(
+      latex
+    );
   if (match === null) {
     element.textContent = latex;
     return;
   }
-  const [, vec, letter, sub] = match;
+  const [, vec, letter, upright, sub] = match;
   const base = document.createElement("span");
   base.textContent = letter;
   if (vec !== undefined) {
@@ -337,7 +340,10 @@ function fillName(element: HTMLElement, latex: string) {
   if (sub !== undefined) {
     const s = document.createElement("sub");
     s.textContent = sub;
-    s.style.fontStyle = "normal";
+    // A variable's subscript in italic, as Desmos sets it; a word or a
+    // number upright.
+    s.style.fontStyle =
+      upright !== undefined || /^\d+$/.test(sub) ? "normal" : "italic";
     s.style.fontSize = "0.65em";
     element.appendChild(s);
   }

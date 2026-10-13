@@ -144,6 +144,28 @@ function pendulumScene(dim: 2 | 3): SceneItem[] {
       majesticColor: "#9baab8",
     }),
     ball("pendulumBob", bob, dim, "0.2"),
+    // The phase plane's axes by name: x here is the angle θ and y the
+    // angular velocity ω, which the bare graph paper does not say.
+    ...(dim === 2
+      ? (
+          [
+            ["thetaAxis", "9.3", "0.45", R`\theta`],
+            ["omegaAxis", "0.45", "5.6", R`\omega`],
+          ] as const
+        ).map(
+          ([key, x, y, name]): SceneItem => ({
+            key,
+            latex: R`\left(${x},${y}\right)`,
+            label: `\`${name}\``,
+            labelSize: 1.4,
+            points: true,
+            pointSize: 1,
+            color: "#5b6470",
+            majesticColor: "#c8d5dd",
+            explains: true,
+          })
+        )
+      : []),
   ];
 }
 function pendulum(): GalleryPreset {
@@ -409,6 +431,19 @@ function motionScene(dim: 2 | 3): SceneItem[] {
         }
       )
     );
+    // Its name at its left end: three unnamed lines were three guesses.
+    if (dim === 2)
+      scene.push({
+        key: `${strip.key}Name`,
+        latex: R`\left(${num(MOTION.t0 - 0.9)},${strip.base}\right)`,
+        label: `\`${strip.key}\\left(t\\right)\``,
+        labelSize: 1.2,
+        points: true,
+        pointSize: 1,
+        color: strip.color,
+        majesticColor: strip.majestic,
+        explains: true,
+      });
     const trace = line(strip.key + "Trace", at(X("t"), Y("t")), ["0", now], {
       color: strip.color,
       majesticColor: strip.majestic,

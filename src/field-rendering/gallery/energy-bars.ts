@@ -66,7 +66,8 @@ export function energyBars(
     U = "0"; // A constraint force does no work; this is NOT a gravitational potential.
     E = K;
   }
-  const [x, y] = id === "ap-projectile" ? [3.6, 3] : [3.6, -5.5];
+  // Clear of the bottom edge, where its letters were cut off.
+  const [x, y] = id === "ap-projectile" ? [3.6, 3] : [3.6, -4.9];
   const vals = id === "ap-projectile" ? [K, U, thermal, E] : [K, U, E];
   const col = ["#b66a22", "#326aa6", "#8a5ba8", "#367b58"];
   const lab = id === "ap-projectile" ? ["K", "U", "D", "E"] : ["K", "U", "E"];

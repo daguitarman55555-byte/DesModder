@@ -3,7 +3,7 @@ import { PluginController } from "../PluginController";
 import { VectorToolsPanelFunc } from "./components/VectorToolsPanel";
 import { PresetWindow } from "./components/PresetWindow";
 import { mountToNode, unmountFromNode, type MountedComponent } from "#DCGView";
-import { GALLERY_CATEGORIES } from "../../field-rendering/gallery";
+import { GALLERY_CATEGORIES, sceneParts } from "../../field-rendering/gallery";
 import {
   CalculatorExpressionAdapter,
   type GeneratedExpressionSpec,
@@ -754,6 +754,11 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   private readonly scene3d = new Scene3DLayer(this.calc);
   private scene3dKey = "";
   private scene3dHelpers: ListHelper[] = [];
+  /**
+   * The 3D names hidden from the presets window. Their items are hidden
+   * helpers in the graph whatever is shown, so the graph cannot hold this.
+   */
+  private hiddenNames3d = new Set<string>();
   private clockLastFrame?: number;
   private clockSeconds = 0;
   private lastReverseContrast = false;
@@ -1834,7 +1839,8 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.scene3dHelpers = [];
     const scene = majestic ? [] : (preset?.space.scene ?? []);
     const names = scene.flatMap((item) => {
-      if (item.name3d === undefined) return [];
+      if (item.name3d === undefined || this.hiddenNames3d.has(item.key))
+        return [];
       // The point's own definition, `N_{…}=…`, read coordinate by coordinate.
       const N = item.latex.slice(0, item.latex.indexOf("="));
       const helper = this.calc.HelperExpression({
@@ -2396,6 +2402,73 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
    * the half a one-signed quantity uses. Undefined for a field that is not
    * a preset's, whose colour means whatever its maker chose.
    */
+  /**
+   * The loaded preset's objects as parts to show or hide (see
+   * `sceneParts`), each shown while any of its objects is drawn. Read from
+   * the graph, so hiding one in the expression list unticks it here.
+   */
+  get presetParts() {
+    const preset = galleryPreset(this.activePresetId ?? "");
+    if (preset === undefined) return [];
+    const scene = (this.is3d ? preset.space.scene : preset.scene) ?? [];
+    // A part every object of which waits on one of the preset's own
+    // switches (`{s_{lines}=1}`) already has its checkbox, among the
+    // variables; a second one beside it, named the same, was two controls
+    // for one thing that disagreed.
+    const switches = (
+      (this.is3d ? preset.space.variables : undefined) ??
+      preset.variables ??
+      []
+    )
+      .filter((v) => v.toggle !== undefined)
+      .map((v) => `${v.name}=1`);
+    const latex = new Map(scene.map((item) => [item.key, item.latex]));
+    const switched = (key: string) =>
+      switches.some((s) => (latex.get(key) ?? "").includes(s));
+    return sceneParts(scene).flatMap((part) => {
+      if (part.keys.length > 0 && part.keys.every(switched)) return [];
+      const drawn = part.keys.filter(
+        (key) =>
+          this.cc.getItemModel(sceneItemID({ key, latex: "" })) !== undefined
+      );
+      // A part none of whose objects is in the graph has nothing to show.
+      if (drawn.length === 0 && part.names3d.length === 0) return [];
+      const shown =
+        drawn.length > 0
+          ? drawn.some(
+              (key) =>
+                (
+                  this.cc.getItemModel(sceneItemID({ key, latex: "" })) as
+                    | { hidden?: boolean }
+                    | undefined
+                )?.hidden !== true
+            )
+          : !part.names3d.every((key) => this.hiddenNames3d.has(key));
+      return [{ ...part, keys: drawn, shown }];
+    });
+  }
+
+  /** Shows or hides one of `presetParts`, objects and 3D names together. */
+  setPresetPartShown(id: string, shown: boolean) {
+    const part = this.presetParts.find((p) => p.id === id);
+    if (part === undefined) return;
+    if (part.keys.length > 0)
+      this.calc.setExpressions(
+        part.keys.map((key) => ({
+          id: sceneItemID({ key, latex: "" }),
+          hidden: !shown,
+        }))
+      );
+    if (part.names3d.length > 0) {
+      for (const key of part.names3d)
+        if (shown) this.hiddenNames3d.delete(key);
+        else this.hiddenNames3d.add(key);
+      this.scene3dKey = "";
+      this.syncScene3D();
+    }
+    this.util.tick();
+  }
+
   /** What the loaded preset is for: the one thing to take away from it. */
   get presetTakeaway() {
     return galleryPreset(this.activePresetId ?? "")?.takeaway;
@@ -2520,6 +2593,11 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       (this.is3d ? preset.space.scene : preset.scene) ?? []
     );
     this.applyPresetLook(preset, withLook);
+    if (this.hiddenNames3d.size > 0) {
+      this.hiddenNames3d = new Set();
+      this.scene3dKey = "";
+      this.syncScene3D();
+    }
     this.lastActionMessage = `Loaded ${preset.name}.`;
     if (this.presetWindow.still) this.setTimePlaying(false);
     // These are flow pictures, so the flow is what has to be running for one
