@@ -29,6 +29,8 @@ const FLAT = new Set([
   "ap-motion-graphs",
   "ap-pendulum-phase",
   "ap-kepler-areas",
+  // Straight currents along z: B has no z-component anywhere.
+  "ap-ampere-loop",
 ]);
 
 describe("every gallery preset has a 3D form", () => {

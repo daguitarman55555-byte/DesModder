@@ -73,6 +73,9 @@ const expected = [
   "ap-motion-graphs",
   "ap-pendulum-phase",
   "ap-kepler-areas",
+  "ap-gauss-flux",
+  "ap-ampere-loop",
+  "ap-incline-forces",
 ].flatMap((preset) =>
   ["2d", "3d"].flatMap((dimension) =>
     ["explanatory", "majestic"].map((mode) => `${dimension}|${preset}|${mode}`)

@@ -90,7 +90,7 @@ jobs:
           HEADFUL: "1"
           DIMS: 2d,3d
           MODES: explanatory,majestic
-          IDS: ap-projectile,ap-shm,ap-circular,ap-nozzle,ap-conductor,ap-induction,ap-motion-graphs,ap-pendulum-phase,ap-kepler-areas
+          IDS: ap-projectile,ap-shm,ap-circular,ap-nozzle,ap-conductor,ap-induction,ap-motion-graphs,ap-pendulum-phase,ap-kepler-areas,ap-gauss-flux,ap-ampere-loop,ap-incline-forces
         run: |
           set +e
           OUT="$GITHUB_WORKSPACE/out/screenshots" xvfb-run -a -s '-screen 0 1365x900x24' node docs/mockups/vector-3d-arrows/ap-look.cjs 2>&1 | tee out/logs/live.log
@@ -102,7 +102,7 @@ jobs:
         shell: bash
         env:
           HEADFUL: "1"
-          IDS: ap-projectile,ap-shm,ap-circular,ap-nozzle,ap-conductor,ap-induction,ap-motion-graphs,ap-pendulum-phase,ap-kepler-areas
+          IDS: ap-projectile,ap-shm,ap-circular,ap-nozzle,ap-conductor,ap-induction,ap-motion-graphs,ap-pendulum-phase,ap-kepler-areas,ap-gauss-flux,ap-ampere-loop,ap-incline-forces
           DIMS: 2d,3d
           MODES: explanatory,majestic
           OUTPUT: out/slider-latency.json

@@ -41,6 +41,7 @@ import { CHAOS } from "./chaos";
 import { COLOR_MEANINGS } from "./meanings";
 import { AP_TEACHING } from "./ap-teaching";
 import { AP_EXTENSIONS } from "./ap-extensions";
+import { AP_NEXT } from "./ap-next";
 import { FLUIDS } from "./fluids";
 import { PHYSICS } from "./physics";
 import { SPACE } from "./space";
@@ -60,6 +61,7 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   ...PHYSICS,
   ...AP_TEACHING,
   ...AP_EXTENSIONS,
+  ...AP_NEXT,
 ].map((preset) => ({
   ...preset,
   meaning: preset.meaning ?? COLOR_MEANINGS[preset.id],

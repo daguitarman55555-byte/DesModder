@@ -12,7 +12,7 @@ The fragments and merged file are owned by root. Their institutional origin is n
 
 - `.github/workflows/vector-tools-pages.yml`: feature-branch GitHub Actions workflow: npm ci, Jest, TypeScript, extension build, Desmos live check, latency check, Pages upload/deploy.
 - `scripts/vector-tools-slider-latency.cjs`: per-view, ten-update redraw-latency benchmark.
-- `scripts/vector-tools-pages-report.cjs`: produces `site/index.html` and `site/results.json`; unmeasured views remain unverified.
+- `docs/mockups/vector-3d-arrows/ap-pages-report.cjs`: produces `site/index.html` and `site/results.json`; unmeasured views remain unverified.
 - `changes/ap-look.headful.patch`: enables HEADFUL=1 for Chrome under Xvfb, preserving existing defaults.
 - `docs/VERIFY_GITHUB_PAGES.md`: install and usage guide, limitations, and verification distinctions.
 

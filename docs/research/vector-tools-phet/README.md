@@ -37,7 +37,7 @@ GPT could not run the tests, the type check or Desmos. All of that was done here
 
 ## The GitHub Pages verification
 
-GPT's workflow is at `.github/workflows/vector-tools-pages.yml`, with its report at `scripts/vector-tools-pages-report.cjs`. See `docs/VERIFY_GITHUB_PAGES.md`.
+GPT's workflow is at `.github/workflows/vector-tools-pages.yml`, with its report at `docs/mockups/vector-3d-arrows/ap-pages-report.cjs`. See `docs/VERIFY_GITHUB_PAGES.md`.
 
 Its latency proxy (one slider, flow redraw only) is replaced by `docs/mockups/vector-3d-arrows/ap-latency.cjs`. That script times Desmos's recompute for every physics slider, which is the 150 ms budget.
 
