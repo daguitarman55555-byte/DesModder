@@ -137,6 +137,20 @@ export class PresetWindow extends Component<{
                     </span>
                   ))}
                 </div>
+                <If predicate={() => vectorTools.presetTakeaway !== undefined}>
+                  {() => (
+                    <div
+                      class="dsm-preset-window-takeaway"
+                      role="note"
+                      aria-label="What to take away"
+                    >
+                      <span class="dsm-preset-window-takeaway-head">
+                        Takeaway
+                      </span>
+                      {() => vectorTools.presetTakeaway ?? ""}
+                    </div>
+                  )}
+                </If>
                 <If predicate={() => vectorTools.colorLegend !== undefined}>
                   {() => (
                     <div

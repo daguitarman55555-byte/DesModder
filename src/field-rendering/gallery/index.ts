@@ -45,6 +45,8 @@ import { AP_NEXT } from "./ap-next";
 import { FLUIDS } from "./fluids";
 import { PHYSICS } from "./physics";
 import { SPACE } from "./space";
+import { TAKEAWAYS } from "./takeaways";
+import { tidy } from "./latex";
 import { renameIdentifier } from "../identifiers";
 import type { ClockParameters, GalleryPreset, GalleryVariable } from "./types";
 
@@ -62,10 +64,47 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   ...AP_TEACHING,
   ...AP_EXTENSIONS,
   ...AP_NEXT,
-].map((preset) => ({
-  ...preset,
-  meaning: preset.meaning ?? COLOR_MEANINGS[preset.id],
-}));
+].map((preset) =>
+  tidied({
+    ...preset,
+    meaning: preset.meaning ?? COLOR_MEANINGS[preset.id],
+    takeaway: preset.takeaway ?? TAKEAWAYS[preset.id],
+  })
+);
+
+/** Where a preset keeps LaTeX: every one of these goes through `tidy`. */
+function isLatexKey(key: string) {
+  return [
+    "xLatex",
+    "yLatex",
+    "zLatex",
+    "seedLatex",
+    "latex",
+    "latex3d",
+    "colorLatex",
+    "lineOpacity",
+    "domain",
+    "domainU",
+    "domainV",
+  ].includes(key);
+}
+
+/** The preset with its LaTeX tidied (see `tidy`), and nothing else changed. */
+function tidied<T>(value: T, key = ""): T {
+  if (typeof value === "string")
+    return (isLatexKey(key) ? tidy(value) : value) as T;
+  if (Array.isArray(value))
+    return value.map((v) => tidied(v, key)) as unknown as T;
+  if (value === null || typeof value !== "object") return value;
+  // Clock parameters' functions, and anything else not plain data, as is.
+  if (Object.getPrototypeOf(value) !== Object.prototype) return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([k, v]) => [
+      k,
+      typeof v === "function" ? v : tidied(v, k),
+    ])
+  ) as T;
+}
 
 /**
  * The preset with its variables written in as their values, and its clock

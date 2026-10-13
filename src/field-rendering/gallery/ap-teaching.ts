@@ -23,6 +23,7 @@ import {
   cos,
   flow2D,
   flow3D,
+  abs,
   frac,
   guard,
   inked,
@@ -156,7 +157,7 @@ function projectile(m: Demo, dim: 2 | 3) {
   const phase = mod("T_{scene}", `${flight}+1`);
   const time = raw`\min${par(`${phase},${flight}`)}`;
   const height = (t: string) =>
-    `${ground}+h+${mul("v_{0y}", t)}-${mul("g/2", sq(t))}`;
+    `${ground}+h+${mul("v_{0y}", t)}-${mul(frac("g", "2"), sq(t))}`;
   const position = (t: string) =>
     dim === 2
       ? [`-6+${mul("v_{0x}", t)}`, height(t)]
@@ -247,8 +248,8 @@ function oscillator(m: Demo, dim: 2 | 3) {
   );
   // x is displacement and y velocity. In 3D the same plane is drawn at
   // z = 0: z is a display thickness, not a third physical state.
-  m.field = ["y", "-kx/m", "0"];
-  m.tint = "my^{2}/2+kx^{2}/2";
+  m.field = ["y", `-${frac("kx", "m")}`, "0"];
+  m.tint = frac("my^{2}+kx^{2}", "2");
   m.scale = 4;
   m.seed = dim === 3 ? "e^{-30z^{2}}" : "1";
   // Contours of energy, drawn at whole amplitudes, √(2E/k) = 1, 2, 3…:
@@ -278,7 +279,7 @@ function circular(m: Demo, dim: 2 | 3) {
   ];
   const rho = "x^{2}+y^{2}";
   m.field = ["-wy", "wx", "0"];
-  m.tint = `w^{2}${par(rho)}/2`;
+  m.tint = frac(`w^{2}${par(rho)}`, "2");
   m.scale = 3;
   m.clock = true;
   m.extent = 6;
@@ -338,13 +339,16 @@ function streamtube(m: Demo, dim: 2 | 3) {
   m.probe = dim === 2 ? [1, 0.3] : [1, 0.3, 0.3];
   const z = dim === 3 ? "z" : "0";
   const f = "1+ax";
-  const den = dim === 2 ? "1" : "2";
-  m.field = [mul("U", f), `-${frac("Uay", den)}`, dim === 3 ? "-Uaz/2" : "0"];
+  m.field = [
+    mul("U", f),
+    dim === 2 ? "-Uay" : `-${frac("Uay", "2")}`,
+    dim === 3 ? `-${frac("Uaz", "2")}` : "0",
+  ];
   const width = dim === 2 ? frac("H", f) : frac("H", raw`\sqrt{${f}}`);
-  m.valid = raw`\max${par(`\\left|x\\right|/4,${frac(raw`\sqrt{y^{2}+${sq(z)}}`, width)}`)}<1`;
+  m.valid = raw`\max${par(`${frac(abs("x"), "4")},${frac(raw`\sqrt{y^{2}+${sq(z)}}`, width)}`)}<1`;
   // Pressure against the pressure where the speed is U: higher where the
   // tube is wide and the flow slow, lower where it narrows and speeds up.
-  m.tint = mul("d/2", `U^{2}-${par(m.field.map(sq).join("+"))}`);
+  m.tint = mul("\\frac{d}{2}", `U^{2}-${par(m.field.map(sq).join("+"))}`);
   m.scale = 0.5;
   m.speed = 0.4;
   m.density = 0.4;

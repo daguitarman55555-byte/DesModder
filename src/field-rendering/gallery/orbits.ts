@@ -29,7 +29,7 @@ export interface PlanarState {
  * `eightOrbitClosure` for how nearly it closes). Every body follows the same
  * curve, a third of a period behind the next.
  */
-const EIGHT_PERIOD = 6.32591398;
+export const EIGHT_PERIOD = 6.32591398;
 const EIGHT_SAMPLES = 4096;
 let eightTable: Float64Array | undefined;
 /** How far the integration ends from where it began, after one period. */

@@ -1,7 +1,20 @@
 /** Space: black holes, galaxies, stars and the solar wind. */
 import { carriedWorlds, num, rho, separation } from "./latex";
-import { figureEight, keplerPair, type PlanarState } from "./orbits";
-import type { ClockParameters, GalleryPreset } from "./types";
+import {
+  EIGHT_PERIOD,
+  figureEight,
+  keplerPair,
+  type PlanarState,
+} from "./orbits";
+import {
+  flashAt,
+  integrateThreeBody,
+  playbackScene,
+  recordMotion,
+  stateAt,
+  type ThreeBodyRun,
+} from "./three-body";
+import type { ClockParameters, GalleryPreset, SpaceLook } from "./types";
 
 type Axis = "x" | "y" | "z";
 
@@ -90,6 +103,196 @@ function eight(axes: readonly Axis[], size: number) {
 }
 const CLUSTER_2D = eight(["x", "y"], 6);
 const CLUSTER_3D = eight(["x", "y", "z"], 3.6);
+
+/** The stars' colours, and the white a crash flashes and leaves. */
+const STARS = ["#ffd27a", "#8ec9ff", "#ff9a7a", "#ffffff"] as const;
+
+/**
+ * The eight as Desmos draws it in the plane: the three stars, a trail behind
+ * each, and the orbit they share. One period recorded from the same table the
+ * field reads, at the field's own rate, so each star sits in its cluster.
+ */
+const EIGHT_SCENE = playbackScene(
+  recordMotion(
+    (tau) => figureEight(tau, (2 * Math.PI) / EIGHT_PERIOD, 1),
+    EIGHT_PERIOD,
+    240
+  ),
+  {
+    scale: 6,
+    rate: (EIGHT_W * EIGHT_PERIOD) / (2 * Math.PI),
+    colors: STARS,
+    trail: EIGHT_PERIOD / 3,
+    paths: 1,
+  }
+);
+
+/**
+ * A three-body run that crashes, as a field and its clock: each star
+ * carries its gas as in the eight, and a crash is a flash of gas born where
+ * it happened (`F_{c}` at `C`), which the merged star then carries off.
+ * The run is scaled into the picture by `scale` and played at `rate` of its
+ * time a second; in the box, its plane is tilted `tilt`.
+ */
+function crashing(
+  axes: readonly Axis[],
+  run: ThreeBodyRun,
+  o: { scale: number; rate: number; tilt: number }
+) {
+  const three = axes.length === 3;
+  const tilt = three ? o.tilt : 0;
+  const [k, v] = [o.scale, o.scale * o.rate];
+  const moving = movingBodies(
+    3,
+    axes,
+    { position: "S", velocity: "V" },
+    tilt,
+    (t) => {
+      const s = stateAt(run, o.rate * t);
+      return {
+        x: s.x.map((a) => a * k),
+        y: s.y.map((a) => a * k),
+        vx: s.vx.map((a) => a * v),
+        vy: s.vy.map((a) => a * v),
+      };
+    }
+  );
+  const field = carriedWorlds(
+    moving.bodies.map((b) => ({ ...b, reach: k * 0.2, swirl: k * 0.5 })),
+    axes,
+    moving.normal,
+    1
+  );
+  const centre = Object.fromEntries(axes.map((a) => [a, `C_{${a}}`]));
+  const [c, s] = [Math.cos(tilt), Math.sin(tilt)];
+  const clock: ClockParameters = {
+    names: [...moving.clock.names, "F_{c}", ...axes.map((a) => `C_{${a}}`)],
+    at: (t) => {
+      const f = flashAt(run, o.rate * t);
+      const at = three
+        ? [f.x * k, c * f.y * k, s * f.y * k]
+        : [f.x * k, f.y * k];
+      return [...moving.clock.at(t), f.brightness, ...at];
+    },
+  };
+  const width = num((k * (three ? 0.1 : 0.07)) ** 2);
+  const seed = [
+    ...moving.bodies.map(
+      (b) =>
+        String.raw`e^{-\frac{${separation(b.position, axes).r2}}{${width}}}`
+    ),
+    String.raw`4F_{c}e^{-\frac{${separation(centre, axes).r2}}{${num((k * 0.3) ** 2)}}}`,
+  ].join("+");
+  return { ...field, seed, clock };
+}
+
+/**
+ * Lagrange's equilateral triangle, three equal stars turning about their
+ * centre, with one star 12% faster: equal masses make the triangle unstable,
+ * so it turns twice, breaks up, passes close and crashes, and what the crash
+ * leaves orbits the third star. Each star's radius is 0.05 of the triangle's.
+ */
+function lagrangeRun() {
+  const turn = [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3];
+  // Equal masses 1 at radius 1, sides √3: ω² = 3/√3³.
+  const w = Math.sqrt(3 / Math.sqrt(3) ** 3);
+  const kick = [1.12, 1, 1];
+  const vx = turn.map((q, i) => -w * Math.sin(q) * kick[i]);
+  const vy = turn.map((q, i) => w * Math.cos(q) * kick[i]);
+  // The kick's momentum taken out, so the centre of mass stays put.
+  const [px, py] = [vx, vy].map((u) => u.reduce((a, b) => a + b, 0) / 3);
+  return integrateThreeBody({
+    masses: [1, 1, 1],
+    x: turn.map(Math.cos),
+    y: turn.map(Math.sin),
+    vx: vx.map((u) => u - px),
+    vy: vy.map((u) => u - py),
+    radius: 0.05,
+    duration: 25.4,
+    dt: 0.02,
+  });
+}
+const LAGRANGE = lagrangeRun();
+const LAGRANGE_2D = crashing(["x", "y"], LAGRANGE, {
+  scale: 1.9,
+  rate: 1,
+  tilt: 0,
+});
+const LAGRANGE_3D = crashing(["x", "y", "z"], LAGRANGE, {
+  scale: 1.15,
+  rate: 1,
+  tilt: 0.5,
+});
+const LAGRANGE_SCENE = playbackScene(LAGRANGE, {
+  scale: 1.9,
+  rate: 1,
+  colors: STARS,
+  trail: 2.5,
+  paths: 0,
+});
+
+/**
+ * Burrau's Pythagorean problem (1913): masses 3, 4 and 5 let go from rest at
+ * the corners of a 3-4-5 right triangle, each opposite the side of its own
+ * length. As point masses they dance chaotically for some sixty units of
+ * time before one is thrown out (Szebehely and Peters, 1967). Given a size
+ * (0.1 for a mass of 1), the first close pass of the 4 and the 5 is a crash
+ * instead, and what it leaves falls into the 3: two crashes in three units.
+ */
+const PYTHAGOREAN = integrateThreeBody({
+  masses: [3, 4, 5],
+  x: [1, -2, 1],
+  y: [3, -1, -1],
+  vx: [0, 0, 0],
+  vy: [0, 0, 0],
+  radius: 0.1,
+  duration: 5.4,
+  dt: 0.01,
+});
+const PYTHAGOREAN_2D = crashing(["x", "y"], PYTHAGOREAN, {
+  scale: 1.6,
+  rate: 0.8,
+  tilt: 0,
+});
+const PYTHAGOREAN_3D = crashing(["x", "y", "z"], PYTHAGOREAN, {
+  scale: 1.4,
+  rate: 0.8,
+  tilt: 0.5,
+});
+const PYTHAGOREAN_SCENE = playbackScene(PYTHAGOREAN, {
+  scale: 1.6,
+  rate: 0.8,
+  colors: STARS,
+  trail: 1.5,
+  paths: 1,
+});
+
+/** How a crashing run's gas is drawn: as the eight's, long-lived and glowing. */
+const CRASH_FLOW = {
+  particleCount: 20_000,
+  glow: 0.6,
+  opacity: 0.5,
+  pointSize: 1.4,
+  normalizeSpeed: false,
+  speed: 1.67,
+  trailPersistence: 0.99,
+  dropRate: 0.004,
+};
+const CRASH_LOOK: Partial<SpaceLook> = {
+  palette: "blackbody",
+  particles: 20_000,
+  speed: 0.3,
+  scale: 1.5,
+  trail: 48,
+  lifetime: 6,
+  opacity: 0.5,
+  glow: 0.35,
+  normalizeSpeed: false,
+  absorb: false,
+  colorMode: "speed",
+  backdrop: "#05030c",
+  backdropOpacity: 1,
+};
 
 /**
  * A double planet: a world and a moon of nearly half its mass, like Pluto
@@ -482,6 +685,9 @@ export const SPACE: readonly GalleryPreset[] = [
     yLatex: CLUSTER_2D.y!,
     seedLatex: CLUSTER_2D.seed,
     clockParameters: CLUSTER_2D.clock,
+    sceneTime: "T_{scene}",
+    variables: EIGHT_SCENE.variables,
+    scene: EIGHT_SCENE.scene,
     colorScale: 4,
     palette: "blackbody",
     backdrop: "#05030c",
@@ -506,6 +712,8 @@ export const SPACE: readonly GalleryPreset[] = [
       zLatex: CLUSTER_3D.z!,
       seedLatex: CLUSTER_3D.seed,
       clockParameters: CLUSTER_3D.clock,
+      // Desmos 3D's curves are under the dark here; the gas is the picture.
+      variables: [],
       look: {
         palette: "blackbody",
         particles: 20_000,
@@ -522,6 +730,66 @@ export const SPACE: readonly GalleryPreset[] = [
         backdrop: "#05030c",
         backdropOpacity: 1,
       },
+    },
+  },
+  {
+    id: "three-body-crash",
+    name: "Three-body crash",
+    category: "space",
+    blurb:
+      "Three equal stars in Lagrange's triangle, one nudged 12% faster. Equal masses make the triangle unstable: it turns twice, breaks up, two stars pass close and crash, merging into one twice as heavy that then orbits the third. Momentum is conserved through the crash; the energy it loses becomes heat.",
+    xLatex: LAGRANGE_2D.x!,
+    yLatex: LAGRANGE_2D.y!,
+    seedLatex: LAGRANGE_2D.seed,
+    clockParameters: LAGRANGE_2D.clock,
+    sceneTime: "T_{scene}",
+    variables: LAGRANGE_SCENE.variables,
+    scene: LAGRANGE_SCENE.scene,
+    colorScale: 4,
+    palette: "blackbody",
+    backdrop: "#05030c",
+    flow: CRASH_FLOW,
+    extent: 10,
+    space: {
+      blurb:
+        "Lagrange's triangle of three equal stars, one nudged faster, in a plane tilted to the view: two turns, a break-up, a crash in a flash of gas, and the merged star orbiting the third.",
+      xLatex: LAGRANGE_3D.x!,
+      yLatex: LAGRANGE_3D.y!,
+      zLatex: LAGRANGE_3D.z!,
+      seedLatex: LAGRANGE_3D.seed,
+      clockParameters: LAGRANGE_3D.clock,
+      variables: [],
+      look: CRASH_LOOK,
+    },
+  },
+  {
+    id: "pythagorean",
+    name: "Pythagorean three-body",
+    category: "space",
+    blurb:
+      "Burrau's problem: masses 3, 4 and 5 let go from rest at the corners of a 3-4-5 triangle. As points they would dance chaotically for sixty time units until one is thrown out; as stars of real size, the 4 and the 5 crash at their first close pass, and the merged star falls into the 3.",
+    xLatex: PYTHAGOREAN_2D.x!,
+    yLatex: PYTHAGOREAN_2D.y!,
+    seedLatex: PYTHAGOREAN_2D.seed,
+    clockParameters: PYTHAGOREAN_2D.clock,
+    sceneTime: "T_{scene}",
+    variables: PYTHAGOREAN_SCENE.variables,
+    scene: PYTHAGOREAN_SCENE.scene,
+    colorScale: 4,
+    palette: "blackbody",
+    backdrop: "#05030c",
+    flow: CRASH_FLOW,
+    extent: 10,
+    space: {
+      blurb:
+        "Burrau's Pythagorean three-body problem in a tilted plane: masses 3, 4 and 5 fall together from rest, the 4 and the 5 crash, and the merged star falls into the 3.",
+      xLatex: PYTHAGOREAN_3D.x!,
+      yLatex: PYTHAGOREAN_3D.y!,
+      zLatex: PYTHAGOREAN_3D.z!,
+      seedLatex: PYTHAGOREAN_3D.seed,
+      clockParameters: PYTHAGOREAN_3D.clock,
+      variables: [],
+      look: CRASH_LOOK,
     },
   },
   {

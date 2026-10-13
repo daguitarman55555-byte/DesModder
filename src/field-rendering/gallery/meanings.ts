@@ -26,6 +26,8 @@ export const COLOR_MEANINGS: Readonly<Record<string, ColorMeaning>> = {
   aurora: speed("the charged particles along the field"),
   pulsar: speed("the plasma streaming off the star"),
   "star-cluster": speed("the gas each star carries"),
+  "three-body-crash": speed("the gas each star carries"),
+  pythagorean: speed("the gas each star carries"),
   binary: speed("the gas the two planets carry"),
   "solar-wind": speed("the solar wind"),
   cellular: {

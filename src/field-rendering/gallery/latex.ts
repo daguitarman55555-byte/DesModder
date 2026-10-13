@@ -59,6 +59,36 @@ export function thinVortexRing(R: number, a: number, k: number, pulse = "") {
   };
 }
 
+/**
+ * The LaTeX as a person would write it, from what the builders join: `a+-b`
+ * is `a-b`, `0+a` and `a+0` are `a`, `1\cdot a` and `1a` are `a`, and
+ * `((a))` is `(a)`. Every rewrite leaves the value exactly as it was; the
+ * expression list is where students read these, and `\left(0+-1c\right)`
+ * there taught nothing but that a program wrote it.
+ */
+export function tidy(latex: string) {
+  // Where a term starts: the string's start, an opening bracket that is not
+  // a subscript's or a power's, or an operator.
+  const start = String.raw`(^|(?<![_^])\{|\\left\(|\\left\[|[,=:+\-])`;
+  let out = latex;
+  for (;;) {
+    const before = out;
+    out = out
+      .replace(/\+-/g, "-")
+      .replace(new RegExp(String.raw`${start}0\+`, "g"), "$1")
+      .replace(new RegExp(String.raw`${start}0(?=-)`, "g"), "$1")
+      .replace(/\+0(?=\\right|\}|,|$)/g, "")
+      .replace(/\+\\left\(0\\right\)\^\{2\}/g, "")
+      .replace(new RegExp(String.raw`${start}1\\cdot ?`, "g"), "$1")
+      .replace(new RegExp(String.raw`${start}1(?=[A-Za-z])`, "g"), "$1")
+      .replace(
+        /\\left\(\\left\(([^()]*)\\right\)\\right\)/g,
+        String.raw`\left($1\right)`
+      );
+    if (out === before) return out;
+  }
+}
+
 /** A number as the presets write it: at most four decimals. */
 export function num(v: number) {
   const r = Math.round(v * 1e4) / 1e4;

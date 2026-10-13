@@ -140,6 +140,11 @@ export interface GalleryPreset {
   apUnit?: number;
   /** What it is, in one line, under the name. */
   blurb: string;
+  /**
+   * What it is for: the one idea someone should leave with. Every preset
+   * has one (see takeaways.ts), shown while it is loaded.
+   */
+  takeaway?: string;
   xLatex: string;
   yLatex: string;
   palette: PaletteID;

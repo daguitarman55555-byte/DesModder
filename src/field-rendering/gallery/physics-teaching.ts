@@ -158,7 +158,7 @@ function model(id: string, dim: 2 | 3): Model {
         ];
     const centers = grav
       ? [`-${frac("dM_{2}", "M_{1}+M_{2}")}`, frac("dM_{1}", "M_{1}+M_{2}")]
-      : ["-d/2", "d/2"];
+      : ["-\\frac{d}{2}", "\\frac{d}{2}"];
     const radii = grav ? ["0.75", "0.20475"] : ["0.22", "0.22"];
     const ds = centers.map((c) => `x-${par(c)}`);
     const rs = ds.map((dx) => `${sq(dx)}+y^{2}${grav ? `+${sq(z)}` : ""}`);
@@ -175,7 +175,7 @@ function model(id: string, dim: 2 | 3): Model {
       .map((s, i) =>
         grav
           ? `-${frac(`M_{${i + 1}}`, root(s))}`
-          : `-${mul(`I_{${i + 1}}/2`, ln(s))}`
+          : `-${mul(frac(`I_{${i + 1}}`, "2"), ln(s))}`
       )
       .join("+");
     m.stream = grav
@@ -317,7 +317,7 @@ function model(id: string, dim: 2 | 3): Model {
       "0",
     ];
     m.potential = frac(`U^{2}-${sq(m.field[0])}-${sq(m.field[1])}`, "2");
-    m.stream = `Uy${par(`1-${frac("R^{2}", rho)}`)}-${mul("R^{2}w/2", ln(frac(rho, "R^{2}")))}`;
+    m.stream = `Uy${par(`1-${frac("R^{2}", rho)}`)}-${mul(frac("R^{2}w", "2"), ln(frac(rho, "R^{2}")))}`;
     m.seed = mul(
       `e^{-${frac(sq(`${root(rho)}-1.25R`), "0.08R^{2}")}}`,
       dim === 3 ? ALONG : "1"
@@ -357,7 +357,7 @@ function model(id: string, dim: 2 | 3): Model {
       variable("L", dim === 2 ? 4 : 2.5, 1, 5),
       variable("d", dim === 2 ? 3 : 1.5, 0.5, 4),
     ];
-    const b = ["y-d/2", "y+d/2"];
+    const b = ["y-\\frac{d}{2}", "y+\\frac{d}{2}"];
     const A = (b: string) =>
       mul("0.5", ln(frac(`${sq("x+L")}+${sq(b)}`, `${sq("x-L")}+${sq(b)}`)));
     const C = (b: string) =>
@@ -395,7 +395,7 @@ function model(id: string, dim: 2 | 3): Model {
       dim === 3 ? ALONG : "1"
     );
     for (let i = 0; i < 2; i++) {
-      const cy = i === 0 ? "d/2" : "-d/2";
+      const cy = i === 0 ? "\\frac{d}{2}" : "-\\frac{d}{2}";
       const q = i === 0 ? "s" : "-s";
       const cl = `C_{plate${i}vt}`;
       m.scene.push(
@@ -410,7 +410,7 @@ function model(id: string, dim: 2 | 3): Model {
         )
       );
       for (let j = 0; j < 3; j++) {
-        const xx = `${j - 1}\\cdot 0.65L`;
+        const xx = ["-0.65L", "0", "0.65L"][j];
         m.scene.push(
           curve(
             `minus${i}${j}`,
@@ -659,7 +659,7 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
         valid: id === "uniform-field" ? setup.valid : "1>0",
         at:
           id === "wires"
-            ? point("d/2", "0", ...(dim === 3 ? ["0"] : []))
+            ? point("\\frac{d}{2}", "0", ...(dim === 3 ? ["0"] : []))
             : id === "cylinder"
               ? point("0", "R", ...(dim === 3 ? ["0"] : []))
               : probe,
@@ -683,7 +683,7 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
       scene.push(
         obj(
           "fieldlines",
-          `${sin(mul(id === "earth-moon" ? "0.15" : id === "dipole" ? "3" : id === "capacitor" ? "0.25" : "1", raw`\pi`, m.stream))}=0${only("s_{lines}=1")}${only(mask)}${only(nonzero)}${extraMask}${id === "capacitor" ? only(`${abs("y-d/2")}>0.04`) + only(`${abs("y+d/2")}>0.04`) : ""}`,
+          `${sin(mul(id === "earth-moon" ? "0.15" : id === "dipole" ? "3" : id === "capacitor" ? "0.25" : "1", raw`\pi`, m.stream))}=0${only("s_{lines}=1")}${only(mask)}${only(nonzero)}${extraMask}${id === "capacitor" ? only(`${abs("y-\\frac{d}{2}")}>0.04`) + only(`${abs("y+\\frac{d}{2}")}>0.04`) : ""}`,
           {
             explains: true,
             lineWidth: 1.5,

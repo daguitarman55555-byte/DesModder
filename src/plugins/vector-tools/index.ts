@@ -2396,6 +2396,11 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
    * the half a one-signed quantity uses. Undefined for a field that is not
    * a preset's, whose colour means whatever its maker chose.
    */
+  /** What the loaded preset is for: the one thing to take away from it. */
+  get presetTakeaway() {
+    return galleryPreset(this.activePresetId ?? "")?.takeaway;
+  }
+
   get colorLegend() {
     const meaning = galleryPreset(this.activePresetId ?? "")?.meaning;
     if (meaning === undefined) return undefined;
