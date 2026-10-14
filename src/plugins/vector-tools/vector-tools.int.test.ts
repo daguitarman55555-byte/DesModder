@@ -6,6 +6,7 @@ import {
 } from "../../tests/puppeteer-utils";
 import type { Calc as CalcType } from "#globals";
 import { PANEL_TABS, type PanelTab } from "./model";
+import { SYMPY_FRACTIONAL_FIELD } from "./pastedField.fixtures";
 
 declare let Calc: CalcType;
 declare let DSM: Window["DSM"];
@@ -2265,6 +2266,115 @@ testWithPage(
       )
     );
     expect(await variables()).toEqual([]);
+
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);
+
+testWithPage(
+  "a vector pasted from a CAS becomes a field Desmos, the GPU and the analysis all read",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await resetLibrary(driver);
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+    await driver.assertSelector(PANEL);
+    await openTab(driver, "field");
+
+    // A real paste into P's MathQuill — the first math field on the tab —
+    // carrying the text on the event's clipboard the way a browser paste does.
+    await driver.evaluate((latex: string) => {
+      const textarea = document.querySelector<HTMLTextAreaElement>(
+        ".dsm-vector-tools-math-input textarea"
+      )!;
+      textarea.focus();
+      const clipboardData = new DataTransfer();
+      clipboardData.setData("text/plain", latex);
+      textarea.value = latex;
+      textarea.dispatchEvent(
+        new ClipboardEvent("paste", { clipboardData, bubbles: true })
+      );
+    }, SYMPY_FRACTIONAL_FIELD);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await driver.waitForSync();
+
+    const state = await driver.evaluate(() => {
+      const vt = DSM.enabledPlugins["vector-tools"] as any;
+      const config = vt.getConfig();
+      return {
+        source: config.source as string,
+        p: config.components.xLatex as string,
+        q: config.components.yLatex as string,
+        message: vt.message as string,
+        flow: vt.flowCompilation.ok as boolean,
+      };
+    });
+    expect(state.source).toBe("components");
+    expect(state.p).toMatch(/^\\sum_\{j=0\}\^\{20\}/);
+    // MathQuill hands the paste over in its own spelling, spaces gone.
+    expect(state.q).toContain(String.raw`\left(2-\pi-1\right)!`);
+    for (const part of [state.p, state.q])
+      expect(part).not.toMatch(/\\Gamma|\\infty|\\langle/);
+    expect(state.message).toContain("Split the pasted vector");
+    expect(state.flow).toBe(true);
+
+    // Desmos reads both definitions it was given, at the value it should:
+    // P(1,1) is what live Desmos gave for this sum on 2026-10-14.
+    await driver.click(GENERATE);
+    await driver.waitForSync();
+    const errors = await driver.evaluate(() =>
+      ["p", "q"].map(
+        (slot) =>
+          (Calc as any).controller.getItemModel(
+            `vector_tools_vf_default_${slot}_function`
+          )?.error ?? null
+      )
+    );
+    expect(errors).toEqual([null, null]);
+    const atOne = await driver.page.evaluate(
+      async () =>
+        await new Promise<number>((resolve) => {
+          const helper = Calc.HelperExpression({
+            latex: String.raw`v_{tfdp}\left(1,1\right)`,
+          }) as any;
+          helper.observe("numericValue", () =>
+            setTimeout(() => resolve(helper.numericValue), 20)
+          );
+          setTimeout(() => resolve(helper.numericValue), 4000);
+        })
+    );
+    expect(atOne).toBeCloseTo(0.6812287910108682, 9);
+
+    // Divergence and curl, term by term through the sum.
+    const analysis = await driver.evaluate(() => {
+      const result = (DSM.enabledPlugins["vector-tools"] as any).fieldAnalysis;
+      return result.ok ? "ok" : (result.error as string);
+    });
+    expect(analysis).toBe("ok");
+
+    await driver.evaluate(() => {
+      const vt = DSM.enabledPlugins["vector-tools"] as any;
+      if (!vt.isFlowRunning) vt.toggleFlow();
+      Calc.setMathBounds({ left: 0, right: 6, bottom: -3, top: 3 });
+    });
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    expect(
+      await driver.evaluate(
+        () => (DSM.enabledPlugins["vector-tools"] as any).flowMessage
+      )
+    ).toBeFalsy();
+    await driver.page.screenshot({
+      path: "docs/assets/vector-tools-pasted-series.png",
+    });
+    // And the field itself, with the panel out of the way.
+    await driver.click(BUTTON);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    await driver.page.screenshot({
+      path: "docs/assets/vector-tools-pasted-series-graph.png",
+    });
 
     await driver.disablePlugin("vector-tools");
     await driver.setBlank();

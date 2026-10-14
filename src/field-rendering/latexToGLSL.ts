@@ -142,6 +142,26 @@ float vtMod(float a, float b) { return b == 0.0 ? 0.0 : mod(a, b); }
 float vtUndefined() { return uintBitsToFloat(0x7fc00000u); }
 float vtCoth(float a) { float t = tanh(a); return 1.0 / (abs(t) < 1e-12 ? 1e-12 : t); }
 float vtCsch(float a) { float s = sinh(a); return 1.0 / (abs(s) < 1e-12 ? 1e-12 : s); }
+// The gamma function, for Desmos's factorial: z! is gamma(z + 1) at every z,
+// not only whole ones. Stirling's series after shifting z up past 8, where its
+// next term is below float precision, rather than Lanczos: Lanczos sums
+// coefficients of alternating sign in the hundreds and keeps three or four
+// digits in single precision; this sums nothing that cancels.
+float vtGammaShifted(float z) {
+  float shift = 1.0;
+  while (z < 8.0) { shift *= z; z += 1.0; }
+  float inv = 1.0 / z;
+  float inv2 = inv * inv;
+  float lg = (z - 0.5) * log(z) - z + 0.91893853320467274
+    + inv * (1.0 / 12.0 - inv2 * (1.0 / 360.0 - inv2 / 1260.0));
+  return exp(lg) / shift;
+}
+float vtGamma(float z) {
+  // The poles: Desmos's (-1)! is undefined, not infinite.
+  if (z <= 0.0 && z == floor(z)) return vtUndefined();
+  if (z < 0.5) return 3.1415926535897932 / (sin(3.1415926535897932 * z) * vtGammaShifted(1.0 - z));
+  return vtGammaShifted(z);
+}
 `;
 
 const PI = "3.1415926535897932";
@@ -304,6 +324,44 @@ class CompileContext {
     this.compiled.set(name, glslName);
     return glslName;
   }
+
+  /**
+   * The helper that evaluates one sum or product, named after its own text.
+   *
+   * P and Q are compiled separately and their helpers merged by name, so a
+   * name has to mean one body: a counter would give P's first sum and Q's
+   * first sum the same name and the merge would silently keep only one.
+   */
+  declareRepeated(
+    kind: "sum" | "prod",
+    term: string,
+    index: string,
+    outer: readonly string[]
+  ): string {
+    const params = [
+      this.env.dimensions === 3 ? "vec3 p" : "vec2 p",
+      ...outer.map((glsl) => `float ${glsl}`),
+      "float vtLo",
+      "float vtHi",
+    ].join(", ");
+    const [start, op] = kind === "sum" ? ["0.0", "+="] : ["1.0", "*="];
+    const body =
+      `{ float vtAcc = ${start}; ` +
+      `for (float vtK = floor(vtLo + 0.5); vtK <= floor(vtHi + 0.5); vtK += 1.0) ` +
+      `{ float ${index} = vtK; vtAcc ${op} ${term}; } return vtAcc; }`;
+    const name = `vt${kind === "sum" ? "Sum" : "Prod"}_${textHash(params + body)}`;
+    if (!this.helpers.some((helper) => helper.name === name))
+      this.helpers.push({ name, glsl: `float ${name}(${params}) ${body}` });
+    return name;
+  }
+}
+
+/** A short stable name for a piece of text (djb2, in base 36). */
+function textHash(text: string): string {
+  let hash = 5381;
+  for (let i = 0; i < text.length; i++)
+    hash = ((hash << 5) + hash + text.charCodeAt(i)) | 0;
+  return (hash >>> 0).toString(36);
 }
 
 export type Token =
@@ -325,7 +383,12 @@ export type Token =
   | { kind: "frac" | "sqrt" }
   /** `\left\{` and `\right\}`: a piecewise or a restriction. */
   | { kind: "pieceOpen" | "pieceClose" | "colon" }
-  | { kind: "cmp"; value: "<" | ">" | "<=" | ">=" | "=" };
+  | { kind: "cmp"; value: "<" | ">" | "<=" | ">=" | "=" }
+  /** `\sum` or `\prod`, then `_{n=a}^{b}` — the `_` is its own token. */
+  | { kind: "repeated"; value: "sum" | "prod" }
+  | { kind: "underscore" }
+  /** A factorial's `!`. */
+  | { kind: "bang" };
 
 /** The comparison commands Desmos writes, as GLSL operators. */
 const COMPARISONS: Record<string, "<=" | ">="> = {
@@ -541,6 +604,20 @@ export function tokenize(latex: string): Token[] {
         tokens.push({ kind: "cmp", value: COMPARISONS[name] });
         continue;
       }
+      if (name === "sum" || name === "prod") {
+        tokens.push({ kind: "repeated", value: name });
+        continue;
+      }
+      // `\sum\limits_{…}` only moves where the bounds are typeset.
+      if (name === "limits") continue;
+      if (name === "infty") {
+        // Desmos refuses an infinite bound too (measured 2026-10-14), and a
+        // shader has to stop somewhere; the panel's paste import rewrites one
+        // to a number of terms the user can see and change.
+        throw new CompileError(
+          "A sum or product to ∞ cannot be evaluated: give it a last term."
+        );
+      }
       throw new CompileError(
         `\\${name} is not supported by the flow visualizer.`
       );
@@ -596,6 +673,12 @@ export function tokenize(latex: string): Token[] {
         continue;
       case ":":
         tokens.push({ kind: "colon" });
+        continue;
+      case "_":
+        tokens.push({ kind: "underscore" });
+        continue;
+      case "!":
+        tokens.push({ kind: "bang" });
         continue;
       default:
         throw new CompileError(`"${char}" is not supported.`);
@@ -683,7 +766,13 @@ class Parser {
   }
 
   private parsePower(): string {
-    const base = this.parsePrimary();
+    let base = this.parsePrimary();
+    // Desmos's factorial is gamma(z + 1) everywhere, and binds tighter than a
+    // power: `2!^{2}` is 4 (measured 2026-10-14).
+    while (this.peek()?.kind === "bang") {
+      this.index++;
+      base = `vtGamma(${base} + 1.0)`;
+    }
     const token = this.peek();
     if (token?.kind === "op" && token.value === "^") {
       this.index++;
@@ -773,6 +862,10 @@ class Parser {
       case "pieceOpen": {
         this.index++;
         return this.parsePiecewise();
+      }
+      case "repeated": {
+        this.index++;
+        return this.parseRepeated(token.value);
       }
       default:
         throw new CompileError(
@@ -891,6 +984,55 @@ class Parser {
   }
 
   /**
+   * `\sum_{n=a}^{b} body` or `\prod`, as live Desmos reads it (measured
+   * 2026-10-14): the body is the whole product that follows and ends at the
+   * next `+` or `−` (`\sum_{n=1}^{3}n+1` is 7, `\sum_{n=1}^{3}2n\cdot2` is 24,
+   * and `2\sum n\sum m` nests), the bounds are rounded to whole numbers, and a
+   * range that runs backwards is empty.
+   *
+   * A loop cannot sit inside a GLSL expression, so each one becomes a helper
+   * function. It is handed the point, every name the surrounding definition
+   * binds, and the two bounds, and declares the index itself.
+   */
+  private parseRepeated(kind: "sum" | "prod"): string {
+    const example = `\\${kind}_{n=1}^{10}`;
+    this.expect("underscore", `_{n=…} after \\${kind}, as in ${example}`);
+    this.expect("openBrace", `{ after the _, as in ${example}`);
+    const indexToken = this.peek();
+    const equals = this.tokens[this.index + 1];
+    if (
+      indexToken?.kind !== "variable" ||
+      equals?.kind !== "cmp" ||
+      equals.value !== "="
+    )
+      throw new CompileError(`A ${kind} needs an index, as in ${example}.`);
+    this.index += 2;
+    const lower = this.parseExpression();
+    this.expect("closeBrace", "a closing }");
+    const caret = this.peek();
+    if (caret?.kind !== "op" || caret.value !== "^")
+      throw new CompileError(`A ${kind} needs a last term, as in ${example}.`);
+    this.index++;
+    const upper = this.parseGroupOrAtom();
+
+    const index = indexToken.value;
+    const local = glslLocalName(index);
+    const scope = new Map(this.scope);
+    scope.set(index, local);
+    const outer = [...this.scope]
+      .filter(([name]) => name !== index)
+      .map(([, glsl]) => glsl);
+    const body = new Parser(this.tokens, this.context, scope);
+    body.index = this.index;
+    body.barDepth = this.barDepth;
+    const term = body.parseTerm();
+    this.index = body.index;
+
+    const name = this.context.declareRepeated(kind, term, local, outer);
+    return `${name}(p${outer.map((glsl) => `, ${glsl}`).join("")}, ${lower}, ${upper})`;
+  }
+
+  /**
    * `{c₁: v₁, c₂: v₂, …, otherwise}`, as Desmos reads it: the first branch
    * whose condition holds, the last bare value if none does, and undefined if
    * there is no such value. A branch with no value is 1 where it holds, so a
@@ -970,7 +1112,8 @@ class Parser {
       token.kind === "frac" ||
       token.kind === "sqrt" ||
       token.kind === "function" ||
-      token.kind === "pieceOpen"
+      token.kind === "pieceOpen" ||
+      token.kind === "repeated"
     );
   }
 

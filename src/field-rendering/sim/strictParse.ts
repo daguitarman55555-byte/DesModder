@@ -164,9 +164,7 @@ export function parseStrictRelation(
 ): StrictParseResult {
   try {
     const context = new Context(env);
-    const { body, groups } = splitRestrictions(
-      tokenize(rewriteLogBases(latex))
-    );
+    const { body, groups } = splitRestrictions(strictTokens(latex));
     const relation = new Parser(body, context, new Set()).parseRelation();
     for (const group of groups) {
       relation.restrictions.push(
@@ -208,11 +206,7 @@ export function parseStrictExpression(
 ): StrictExpressionResult {
   try {
     const context = new Context(env);
-    const parser = new Parser(
-      tokenize(rewriteLogBases(latex)),
-      context,
-      new Set()
-    );
+    const parser = new Parser(strictTokens(latex), context, new Set());
     const expr = parser.parseExpression();
     parser.expectEnd();
     const empty: Relation = {
@@ -327,10 +321,31 @@ function isConditionList(tokens: readonly Token[]): boolean {
 }
 
 /**
+ * The shared tokenizer's tokens, minus what a solid cannot hold.
+ *
+ * Sums, products and factorials became tokens when the field compiler learned
+ * them (2026-10-14). A solid is evaluated on the CPU by this file's own
+ * evaluator, which has neither, so they are refused here by name, as they were
+ * when the tokenizer itself refused them, rather than surfacing as leftover
+ * input somewhere after them.
+ */
+function strictTokens(latex: string): Token[] {
+  const tokens = tokenize(rewriteLogBases(latex));
+  for (const token of tokens) {
+    if (token.kind === "bang") throw new CompileError(`"!" is not supported.`);
+    if (token.kind === "repeated")
+      throw new CompileError(`\\${token.value} is not supported in a solid.`);
+    if (token.kind === "underscore")
+      throw new CompileError(`"_" is not supported.`);
+  }
+  return tokens;
+}
+
+/**
  * `\log_{b}` as a two-argument call the shared tokenizer already reads.
  *
- * The tokenizer refuses `_` after a command, and teaching it subscripts would
- * change what the visual compiler accepts. Spelling the base as the first
+ * The tokenizer has no subscripts after a command (its `_` belongs to
+ * `\sum`), and teaching it them would change what the visual compiler accepts. Spelling the base as the first
  * braced group of an operator name keeps that tokenizer as it is.
  */
 function rewriteLogBases(latex: string): string {
@@ -381,7 +396,7 @@ class Context {
     }
     this.expanding.push(name);
     const parser = new Parser(
-      tokenize(rewriteLogBases(definition.latex)),
+      strictTokens(definition.latex),
       this,
       new Set(definition.params)
     );

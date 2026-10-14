@@ -319,7 +319,7 @@ describe("Vector Tools LaTeX referencing the expression list", () => {
     // graph is the one the shader cannot follow.
     const result = compileFieldComponentToGLSL(
       "f\\left(x\\right)",
-      environment([], { f: [["u"], "\\sum_{n=1}^{3}u"] })
+      environment([], { f: [["u"], "\\int_{0}^{u}tdt"] })
     );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("not supported");

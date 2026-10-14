@@ -67,6 +67,28 @@ const FUNCTIONS: Record<string, (x: number) => number> = {
  * denominator at its pole — and it should skip that point rather than abandon
  * the check.
  */
+const LANCZOS = [
+  0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+  771.32342877765313, -176.61502916214059, 12.507343278686905,
+  -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7,
+];
+
+/**
+ * The gamma function, by Lanczos (g = 7) with reflection below ½: about
+ * fifteen digits in double precision. The GPU's copy in `latexToGLSL.ts` uses
+ * Stirling instead, because Lanczos's cancelling coefficients are what single
+ * precision cannot afford; here they cost nothing.
+ */
+export function gamma(z: number): number {
+  if (z <= 0 && Number.isInteger(z)) return NaN;
+  if (z < 0.5) return Math.PI / (Math.sin(Math.PI * z) * gamma(1 - z));
+  const w = z - 1;
+  const t = w + 7.5;
+  let [a] = LANCZOS;
+  for (let i = 1; i < LANCZOS.length; i += 1) a += LANCZOS[i] / (w + i);
+  return Math.sqrt(2 * Math.PI) * Math.pow(t, w + 0.5) * Math.exp(-t) * a;
+}
+
 export function evaluate(node: Node, bindings: Bindings): number {
   switch (node.type) {
     case "Constant":
@@ -84,23 +106,28 @@ export function evaluate(node: Node, bindings: Bindings): number {
       return fn(evaluate(node.args[0], bindings));
     }
     case "Factorial": {
-      // Integers only. The gamma function would extend it and nothing here
-      // produces a factorial of anything else -- a series index is a whole
-      // number by construction -- so a non-integer is a sign that something
-      // upstream is wrong rather than something to interpolate through.
+      // Desmos's factorial is Γ(z+1) at every z, and a field pasted from a CAS
+      // reaches it as exactly that: Γ(2j−π+1) arrives as (2j−π)!. Whole
+      // numbers keep the exact product; (−1)! and the other poles are
+      // undefined, as they are in Desmos.
       const value = evaluate(node.arg, bindings);
-      if (!Number.isInteger(value) || value < 0) return NaN;
-      let total = 1;
-      for (let i = 2; i <= value; i += 1) total *= i;
-      return total;
+      if (Number.isInteger(value)) {
+        if (value < 0) return NaN;
+        let total = 1;
+        for (let i = 2; i <= value; i += 1) total *= i;
+        return total;
+      }
+      return gamma(value + 1);
     }
     case "RepeatedOperator": {
       // A finite sum or product. Needed because a series antiderivative *is*
       // one of these, and a check that cannot evaluate the answer is not a
       // check at all.
-      const start = evaluate(node.start, bindings);
-      const end = evaluate(node.end, bindings);
-      if (!Number.isInteger(start) || !Number.isInteger(end)) return NaN;
+      // Desmos rounds the bounds (measured 2026-10-14: an upper bound of 2.5
+      // sums to 3, a lower bound of 0.5 starts at 1), which Math.round does.
+      const start = Math.round(evaluate(node.start, bindings));
+      const end = Math.round(evaluate(node.end, bindings));
+      if (!Number.isFinite(start) || !Number.isFinite(end)) return NaN;
       const isSum = node.name === "Sum";
       let total = isSum ? 0 : 1;
       for (let i = start; i <= end; i += 1) {

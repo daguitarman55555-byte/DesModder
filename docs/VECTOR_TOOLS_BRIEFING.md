@@ -310,8 +310,33 @@ chain of ternaries in Desmos's order, a condition may be a chain (`-1 ≤ x ≤ 
 a branch with no value is 1, and no branch holding is undefined — a NaN the
 field reads as no arrow, which is what Desmos draws there.
 
-**Explicitly refused**: lists, sums, integrals, actions, and any name the
-expression list does not define.
+Finite sums and products and the factorial compile too (2026-10-14). A
+`\sum_{n=a}^{b}` reads as live Desmos reads it: its body is the whole product
+that follows, ending at the next `+` or `−`, its bounds are rounded, and a
+backwards range is empty. Each one becomes a GLSL helper with a loop, named by
+a hash of its own text so P's and Q's helpers can be merged without colliding.
+`z!` is `vtGamma(z + 1)`, as Desmos's factorial is Γ at every z. The gamma
+function is Stirling's series after shifting z past 8, not Lanczos, whose
+cancelling coefficients keep only three or four digits in single precision.
+There is **no cap on the number of terms**, as there is none in Desmos (a
+million is accepted); a sum that long is the user's to ask for, and costs a
+GPU what it costs.
+
+**Explicitly refused**: lists, integrals, actions, a sum to `\infty`, and any
+name the expression list does not define.
+
+**Pasting from a CAS** (`vector-tools/pastedField.ts`). What a CAS prints is
+not what Desmos reads, measured 2026-10-14: `\left\langle P, Q\right\rangle`
+is an unrecognised symbol; `\Gamma(z)` is **silently** a variable Γ times z,
+offered as a slider; and `\sum_{j=0}^{\infty}` is refused outright. `setSlot`
+therefore passes every edit through `importPastedField`, which splits a whole
+vector into P and Q (and R), writes Γ(z) as `(z-1)!` (Γ(n+1) as `n!`), turns an
+infinite bound into `INFINITE_SUM_LAST` (20), written into the slot where it can
+be changed, and drops the braces of `\cos{\left(1\right)}`. The status line says
+which of these it did. Ordinary typing matches none of them and passes through.
+Twenty, because past it the GPU's gamma overflows single precision and further
+terms add nothing to the live arrows or the flow; Desmos's own arrows are double
+precision and can take more.
 
 ### 4.3 `environment.ts` — reaching the rest of the graph
 
@@ -691,6 +716,14 @@ call and is refused rather than guessed at. `x(y-1)^2` is x·(y-1)² and
 bracket as `parenWrapped` for exactly this. The shared rewrite is
 `implicitProducts` in `src/symbolic/products.ts`; Physics Lab's integral and
 limit use it with the one variable.
+
+A finite sum is differentiated term by term, and a factorial whose argument
+does not move is a constant (2026-10-14), which is what a pasted series needs:
+its coefficients are `(2j−π)!`. A factorial _of_ the variable is refused —
+its derivative needs digamma, which Desmos lacks — as is a sum whose bounds
+move. The shared evaluator now computes a non-integer factorial as Γ(z+1)
+(Lanczos, double precision) and rounds a sum's bounds as Desmos does, so the
+49-point conservative check can evaluate such a field at all.
 
 Two halves:
 

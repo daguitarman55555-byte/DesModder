@@ -94,6 +94,34 @@ function derivative(node: Node, variable: string): Node {
       return binaryDerivative(node, variable);
     case "FunctionCall":
       return functionCallDerivative(node, variable);
+    case "Factorial":
+      // z! is Γ(z+1), whose derivative needs the digamma function, which
+      // Desmos does not have. A factorial of a constant is just a number,
+      // and is what a series coefficient almost always is.
+      if (!dependsOn(node.arg, variable)) return number(0);
+      throw new SymbolicError(
+        "The derivative of a factorial of the variable needs the digamma function, which Desmos does not have."
+      );
+    case "RepeatedOperator":
+      // A finite sum is differentiated term by term; that is linearity and
+      // needs nothing more. The bounds have to stay put, and an index that
+      // shadows the variable leaves nothing inside depending on it.
+      if (dependsOn(node.start, variable) || dependsOn(node.end, variable))
+        throw new SymbolicError(
+          "A sum or product whose bounds depend on the variable cannot be differentiated symbolically."
+        );
+      if (node.index.symbol === variable) return number(0);
+      if (node.name === "Sum")
+        // Simplified here because the folder does not reach inside a sum,
+        // and the quotient rule leaves a `0·y` in every term otherwise.
+        return {
+          ...node,
+          expression: simplify(derivative(node.expression, variable)),
+        };
+      if (!dependsOn(node.expression, variable)) return number(0);
+      throw new SymbolicError(
+        "A product of terms that depend on the variable cannot be differentiated symbolically."
+      );
     default:
       throw new SymbolicError(
         `${describe(node)} cannot be differentiated symbolically.`

@@ -99,6 +99,7 @@ import {
 } from "../../../text-mode-core";
 import { FlowOverlay } from "../../field-rendering/FlowOverlay";
 import { FLUID_SAMPLE_SOURCE, FluidSession } from "./fluid/FluidSession";
+import { importPastedField } from "./pastedField";
 import { ArrowOverlay } from "../../field-rendering/ArrowOverlay";
 import type { ArrowOptions } from "../../field-rendering/ArrowRenderer";
 import {
@@ -2663,7 +2664,17 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     return slotBody(this.getConfig(), slot);
   }
 
-  setSlot(slot: ComponentSlot, latex: string) {
+  setSlot(slot: ComponentSlot, typed: string) {
+    // A field pasted from a CAS arrives in notation Desmos misreads; see
+    // pastedField.ts. Ordinary typing passes through untouched.
+    const imported = importPastedField(typed);
+    if (imported.notes.length > 0)
+      this.lastActionMessage = imported.notes.join(" ");
+    const [latex, ...rest] = imported.components;
+    if (rest.length > 0 && slot !== "f") {
+      this.setVector(imported.components);
+      return;
+    }
     const config = this.getConfig();
     if (slotBody(config, slot) === latex) return;
     this.updateConfig((next) => {
@@ -2678,6 +2689,23 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       this.writeComponentExpression("p");
       this.writeComponentExpression("q");
     }
+    this.refreshFlow();
+  }
+
+  /**
+   * A whole vector pasted into one slot: its components go into P and Q (and
+   * R, which only Desmos 3D reads), and the source becomes components, since a
+   * vector is not a potential.
+   */
+  setVector(components: readonly string[]) {
+    const [p, q, r] = components;
+    this.updateConfig((next) => {
+      next.source = "components";
+      next.components.xLatex = p;
+      next.components.yLatex = q;
+      if (r !== undefined) next.components.zLatex = r;
+    });
+    for (const slot of ["p", "q"] as const) this.writeComponentExpression(slot);
     this.refreshFlow();
   }
 

@@ -90,6 +90,34 @@ describe("Vector Tools symbolic differentiation", () => {
     expect(derive(pow(number(2), x), "x")).toBe("2^{x}\\ln\\left(2\\right)");
   });
 
+  test("differentiates a sum term by term, through constant factorials", () => {
+    // Σ x^{2j} y / (2j−π)!, the shape of a pasted series coefficient.
+    const j = id("j");
+    const sum = (index: Node, end: Node, expression: Node): Node => ({
+      type: "RepeatedOperator",
+      name: "Sum",
+      index: index as Aug.Latex.Identifier,
+      start: number(0),
+      end,
+      expression,
+    });
+    const term = div(mul(pow(x, mul(number(2), j)), y), {
+      type: "Factorial",
+      arg: sub(mul(number(2), j), id("pi")),
+    });
+    const dy = differentiate(sum(j, number(5), term), "y");
+    expect(dy.type).toBe("RepeatedOperator");
+    expect(emit(dy)).not.toContain("y");
+    // An index that shadows the variable leaves nothing depending on it.
+    expect(derive(sum(x, number(3), x), "x")).toBe("0");
+    // Bounds that move with the variable are not term-by-term any more.
+    expect(() => differentiate(sum(j, x, j), "x")).toThrow(SymbolicError);
+    // A factorial of the variable needs digamma, which Desmos lacks.
+    expect(() => differentiate({ type: "Factorial", arg: x }, "x")).toThrow(
+      "digamma"
+    );
+  });
+
   test("refuses what it cannot do exactly, rather than guessing", () => {
     // An unknown function has no derivative rule, and inventing one would
     // produce a plausible, wrong answer.
