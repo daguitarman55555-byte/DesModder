@@ -76,6 +76,12 @@ import {
   type ObstacleRow,
 } from "../fluid/FluidSession";
 import type { ComponentSlot } from "../generator";
+import {
+  FORMULA_PRESETS,
+  LINEAR_PRESETS,
+  type MatrixConfig,
+  type MatrixShows,
+} from "../matrix/matrixModel";
 import "./VectorToolsPanel.less";
 
 interface Choice<T extends string> {
@@ -201,6 +207,7 @@ export class VectorToolsPanel extends Component<{
             curve: () => curveTab(vectorTools, config),
             flow: () => flowTab(vectorTools, config),
             fluid: () => fluidTab(vectorTools, config),
+            matrix: () => matrixTab(vectorTools),
           })}
           <If predicate={() => vectorTools.isTestLabVisible}>
             {() => testLab(vectorTools)}
@@ -2384,6 +2391,518 @@ function drawFluidMask(canvas: HTMLCanvasElement, session: FluidSession) {
 }
 
 /** Three significant figures, without scientific notation for ordinary sizes. */
+// ---- the Matrix tab -------------------------------------------------------
+
+const MATRIX_KINDS: readonly Choice<MatrixConfig["kind"]>[] = [
+  { value: "linear", label: "Matrix A (linear)" },
+  { value: "formula", label: "Formula T(x, y)" },
+];
+
+const MATRIX_ROUTES: readonly Choice<MatrixConfig["route"]>[] = [
+  { value: "exact", label: "Exact: Desmos redraws it" },
+  { value: "redraw", label: "Redraw what Desmos drew" },
+];
+
+const MATRIX_SOURCES: readonly Choice<MatrixConfig["source"]>[] = [
+  { value: "typed", label: "Typed here" },
+  { value: "expression", label: "A matrix in the list" },
+];
+
+const MATRIX_LEVELS: readonly Choice<MatrixConfig["level"]>[] = [
+  { value: "simple", label: "Simple" },
+  { value: "full", label: "Full" },
+];
+
+const REDRAW_DETAILS: readonly Choice<MatrixConfig["detail"]>[] = [
+  { value: "fine", label: "Fine" },
+  { value: "balanced", label: "Balanced" },
+  { value: "fast", label: "Fast" },
+];
+
+/**
+ * The overlays, each a toggle. Eigenvectors are a linear idea and the probe
+ * reads a Jacobian, so each is offered only for the kind of map it means
+ * something for.
+ */
+const MATRIX_SHOWS: readonly {
+  key: keyof MatrixShows;
+  label: string;
+  only?: MatrixConfig["kind"];
+}[] = [
+  { key: "grid", label: "Grid" },
+  { key: "square", label: "Unit square" },
+  { key: "circle", label: "Unit circle" },
+  { key: "eigen", label: "Eigenvectors", only: "linear" },
+  { key: "probe", label: "Jacobian probe", only: "formula" },
+  { key: "field", label: "Field T(x)" },
+  { key: "ghost", label: "Original, faint" },
+];
+
+const SUBSCRIPT_DIGITS = "₀₁₂₃₄₅₆₇₈₉";
+const sub = (n: number) =>
+  String(n).replace(/\d/g, (d) => SUBSCRIPT_DIGITS[Number(d)]);
+
+/**
+ * The Matrix tab: one map applied to everything on the graph, built from the
+ * approved mock-up (docs/mockups/matrix-transform.html).
+ *
+ * The switch comes first because it is the one control that decides whether
+ * anything else here does something, and turning it off is the promise that
+ * the graph comes back exactly as typed. The explanation has two levels,
+ * because the course's language and the mathematics behind it have different
+ * readers.
+ */
+function matrixTab(vectorTools: VectorTools) {
+  const m = vectorTools.matrix;
+  const c = () => m.config;
+  const linear = () => c().kind === "linear";
+  return (
+    <div class="dsm-vector-tools-matrix" data-vector-tools="matrix">
+      <section class="dsm-vector-tools-section">
+        <div class="dsm-vector-tools-matrix-switch">
+          <div>
+            <div class="dsm-vector-tools-matrix-switch-title">
+              {() => (c().on ? "Transforming the graph" : "Graph as typed")}
+            </div>
+            <div class="dsm-vector-tools-hint">
+              {() =>
+                c().on
+                  ? "Everything on the graph is drawn through the map. Turn it off to see the graph exactly as typed."
+                  : "Turn it on to send every curve, point and shaded region through the map."
+              }
+            </div>
+          </div>
+          <span
+            role="switch"
+            tabIndex={0}
+            aria-label="Transform the graph"
+            class={() => ({
+              "dsm-vector-tools-toggle": true,
+              "dsm-vector-tools-toggle-on": c().on,
+            })}
+            aria-checked={() => (c().on ? "true" : "false")}
+            data-vector-tools="matrix-on"
+            onTap={() => m.setOn(!c().on)}
+          />
+        </div>
+        <For each={() => m.status} key={(note: string) => note}>
+          {(note: () => string) => (
+            <div
+              class="dsm-vector-tools-matrix-status"
+              data-vector-tools="matrix-status"
+            >
+              {note}
+            </div>
+          )}
+        </For>
+      </section>
+
+      <section class="dsm-vector-tools-section">
+        {chipGroup(
+          "Map",
+          () => c().kind,
+          MATRIX_KINDS,
+          (value) => m.setKind(value),
+          "dsm-vector-tools-matrix-kind"
+        )}
+        {chipGroup(
+          "Drawing the graph",
+          () => c().route,
+          MATRIX_ROUTES,
+          (value) => m.setRoute(value),
+          "dsm-vector-tools-matrix-route"
+        )}
+        <div
+          class="dsm-vector-tools-hint"
+          data-vector-tools="matrix-route-note"
+        >
+          {() => m.routeNote}
+        </div>
+        {chipGroup(
+          "Redraw detail (how closely a curved map bends what it redraws)",
+          () => c().detail,
+          REDRAW_DETAILS,
+          (value) => m.setDetail(value),
+          "dsm-vector-tools-matrix-detail"
+        )}
+      </section>
+
+      <section class="dsm-vector-tools-section">
+        {IfElse(linear, {
+          true: () => (
+            <div>
+              {chipGroup(
+                "A is",
+                () => c().source,
+                MATRIX_SOURCES,
+                (value) => m.setSource(value),
+                "dsm-vector-tools-matrix-source"
+              )}
+              {IfElse(() => c().source === "typed", {
+                true: () => (
+                  <div class="dsm-vector-tools-matrix-line">
+                    <span class="dsm-vector-tools-matrix-name">A =</span>
+                    <span class="dsm-vector-tools-matrix-brackets">
+                      {matrixCell(vectorTools, 0, "Row 1, column 1")}
+                      {matrixCell(vectorTools, 1, "Row 1, column 2")}
+                      {matrixCell(vectorTools, 2, "Row 2, column 1")}
+                      {matrixCell(vectorTools, 3, "Row 2, column 2")}
+                    </span>
+                  </div>
+                ),
+                false: () => (
+                  <div>
+                    {textControl(
+                      "dsm-vector-tools-matrix-expression",
+                      "The matrix's name in the expression list",
+                      () => c().expressionName,
+                      (value) => m.setExpressionName(value)
+                    )}
+                    <div class="dsm-vector-tools-hint">
+                      Define it in the list as a 2×2 matrix, for example
+                      A=[[1,1],[0,1]] in text or with the matrix template. Its
+                      value is the one Desmos computed, so a slider inside it
+                      moves the whole graph.
+                    </div>
+                  </div>
+                ),
+              })}
+            </div>
+          ),
+          false: () => (
+            <div>
+              <div class="dsm-vector-tools-math-row">
+                {matrixFormulaInput(vectorTools, "x′ =", "xLatex", "matrix-x")}
+                {matrixFormulaInput(vectorTools, "y′ =", "yLatex", "matrix-y")}
+              </div>
+              <div class="dsm-vector-tools-label">
+                T⁻¹, for the exact route (leave empty if there is none)
+              </div>
+              <div class="dsm-vector-tools-math-row">
+                {matrixFormulaInput(
+                  vectorTools,
+                  "x =",
+                  "inverseXLatex",
+                  "matrix-ix"
+                )}
+                {matrixFormulaInput(
+                  vectorTools,
+                  "y =",
+                  "inverseYLatex",
+                  "matrix-iy"
+                )}
+              </div>
+            </div>
+          ),
+        })}
+      </section>
+
+      <section class="dsm-vector-tools-section">
+        {IfElse(linear, {
+          true: () =>
+            chipGroup(
+              "Presets",
+              () => c().presetId,
+              LINEAR_PRESETS.map((p) => ({ value: p.id, label: p.name })),
+              (id) => m.loadPreset(id),
+              "dsm-vector-tools-matrix-presets"
+            ),
+          false: () =>
+            chipGroup(
+              "Presets",
+              () => c().presetId,
+              FORMULA_PRESETS.map((p) => ({ value: p.id, label: p.name })),
+              (id) => m.loadPreset(id),
+              "dsm-vector-tools-matrix-presets"
+            ),
+        })}
+        <div
+          class="dsm-vector-tools-matrix-takeaway"
+          data-vector-tools="matrix-takeaway"
+        >
+          {() => m.takeaway}
+        </div>
+        <div class="dsm-vector-tools-link-row">
+          <Button
+            color="light-gray"
+            class="dsm-vector-tools-matrix-reset"
+            onTap={() => m.reset()}
+          >
+            Reset this tab
+          </Button>
+          <div class="dsm-vector-tools-hint">
+            Every setting here back to its default, and the map off, so the
+            graph is drawn as typed.
+          </div>
+        </div>
+      </section>
+
+      <section class="dsm-vector-tools-section">
+        <div class="dsm-vector-tools-matrix-scrub">
+          <Button
+            color="light-gray"
+            class="dsm-vector-tools-matrix-play"
+            onTap={() => (c().on ? m.play() : m.setOn(true))}
+          >
+            Play
+          </Button>
+          <label class="dsm-vector-tools-label" for="dsm-vector-tools-matrix-t">
+            {() => (linear() ? "I → A" : "I → T")}
+          </label>
+          <input
+            id="dsm-vector-tools-matrix-t"
+            class="dsm-vector-tools-slider"
+            type="range"
+            min="0"
+            max="1"
+            step="0.005"
+            onUpdate={(element: HTMLInputElement) => {
+              element.disabled = m.frozen || !c().on;
+              if (document.activeElement !== element || m.playing)
+                element.value = String(m.t);
+            }}
+            onInput={(event: Event) =>
+              m.setT(Number((event.target as HTMLInputElement).value))
+            }
+          />
+          <span class="dsm-vector-tools-slider-value">
+            {() => `t = ${m.t.toFixed(2)}`}
+          </span>
+        </div>
+        <div class="dsm-vector-tools-hint">
+          {() =>
+            m.frozen
+              ? "The exact route draws a formula's finished map only, so the scrubber waits at t = 1. Redraw scrubs any map."
+              : "From doing nothing (t = 0) to the whole map (t = 1), along the straight path p + t(T(p) − p)."
+          }
+        </div>
+      </section>
+
+      <section class="dsm-vector-tools-section">
+        <div class="dsm-vector-tools-label">Show</div>
+        <div
+          class="dsm-vector-tools-chip-row"
+          role="group"
+          aria-label="Show"
+          id="dsm-vector-tools-matrix-shows"
+        >
+          {MATRIX_SHOWS.map((show) => (
+            <span
+              role="button"
+              tabIndex={0}
+              data-value={show.key}
+              style={() => ({
+                display:
+                  show.only === undefined || show.only === c().kind
+                    ? ""
+                    : "none",
+              })}
+              class={() => ({
+                "dsm-vector-tools-chip": true,
+                "dsm-vector-tools-chip-selected": c().show[show.key],
+              })}
+              aria-pressed={() => (c().show[show.key] ? "true" : "false")}
+              onTap={() => m.toggleShow(show.key)}
+            >
+              {show.label}
+            </span>
+          ))}
+        </div>
+        <If predicate={() => c().show.field}>
+          {() => (
+            <div class="dsm-vector-tools-hint">
+              {() =>
+                vectorTools.arrowStatus ||
+                "The live arrows draw T(x, y) at each point while this is on, sized and coloured by the Arrows and Color tabs."
+              }
+            </div>
+          )}
+        </If>
+      </section>
+
+      <section class="dsm-vector-tools-section">
+        <div class="dsm-vector-tools-section-head">
+          <h3>Vectors</h3>
+          <Button
+            color="light-gray"
+            class="dsm-vector-tools-matrix-add-vector"
+            onTap={() => m.addVector()}
+          >
+            Add vector
+          </Button>
+        </div>
+        <For each={() => c().vectors.map((_, k) => k)} key={(k: number) => k}>
+          {(k: () => number) => matrixVectorRow(vectorTools, k)}
+        </For>
+        {checkboxControl(
+          "Write each v and its image into the expression list",
+          () => c().writeVectors,
+          (checked) => m.setWriteVectors(checked),
+          "dsm-vector-tools-matrix-write-vectors"
+        )}
+        <div class="dsm-vector-tools-hint">
+          Drag a gray tip on the graph to move it: each v is an ordinary point
+          in the list.
+        </div>
+      </section>
+
+      <section
+        class="dsm-vector-tools-section"
+        data-vector-tools="matrix-facts"
+      >
+        <h3>{() => (linear() ? "What A does" : "What T does near p")}</h3>
+        {chipGroup(
+          "Explanation",
+          () => c().level,
+          MATRIX_LEVELS,
+          (value) => m.setLevel(value),
+          "dsm-vector-tools-matrix-level"
+        )}
+        <div class="dsm-vector-tools-matrix-facts">
+          <For
+            each={() => m.facts.rows}
+            key={(row: [string, string]) => row[0]}
+          >
+            {(row: () => [string, string]) => (
+              <div class="dsm-vector-tools-matrix-fact">
+                <span class="dsm-vector-tools-matrix-fact-name">
+                  {() => row()[0]}
+                </span>
+                <span class="dsm-vector-tools-matrix-fact-value">
+                  {() => row()[1]}
+                </span>
+              </div>
+            )}
+          </For>
+        </div>
+        <div class="dsm-vector-tools-matrix-plain">{() => m.facts.plain}</div>
+      </section>
+
+      <If predicate={() => c().on && m.writtenLines.length > 0}>
+        {() => (
+          <section class="dsm-vector-tools-section">
+            <h3>Written to the expression list</h3>
+            <div
+              class="dsm-vector-tools-matrix-latex"
+              data-vector-tools="matrix-written"
+            >
+              {() => m.writtenLines.join("\n")}
+            </div>
+            <div class="dsm-vector-tools-hint">
+              {() =>
+                linear()
+                  ? "Desmos multiplies a matrix by a point and draws the point it gets; a column matrix it multiplies but does not draw. So each v is written as a point, and the arrows are drawn by this tab."
+                  : "A function that returns a point is ordinary Desmos, so T(v) is drawn as a point there too. The curved arrows and the mapped graph are drawn by this tab."
+              }
+            </div>
+          </section>
+        )}
+      </If>
+    </div>
+  );
+}
+
+/** One entry of A, typed as a number. */
+function matrixCell(vectorTools: VectorTools, index: number, label: string) {
+  const m = vectorTools.matrix;
+  return (
+    <input
+      id={`dsm-vector-tools-matrix-entry-${index}`}
+      class="dsm-vector-tools-matrix-cell"
+      type="number"
+      step="any"
+      aria-label={label}
+      onUpdate={(element: HTMLInputElement) => {
+        if (document.activeElement !== element)
+          element.value = String(m.config.entries[index]);
+      }}
+      onInput={(event: Event) =>
+        commitNumber(event, (value) => m.setEntry(index, value))
+      }
+    />
+  );
+}
+
+/** One coordinate of T or of T⁻¹, in Desmos's own math field. */
+function matrixFormulaInput(
+  vectorTools: VectorTools,
+  label: string,
+  key: keyof MatrixConfig["formula"],
+  kind: "matrix-x" | "matrix-y" | "matrix-ix" | "matrix-iy"
+) {
+  return (
+    <div data-vector-tools={kind}>
+      <label class="dsm-vector-tools-label">{label}</label>
+      <InlineMathInputViewGeneral
+        containerClass={() => ({ "dsm-vector-tools-math-input": true })}
+        placeholder=""
+        ariaLabel={`${label} as a formula in x and y`}
+        latex={() => vectorTools.matrix.config.formula[key]}
+        handleLatexChanged={(latex) =>
+          vectorTools.matrix.setFormula(key, latex)
+        }
+        hasError={() => false}
+        manageFocus={mathquillFocusHelper({
+          controller: vectorTools.cc,
+          location: { type: "dsm-focus", plugin: "vector-tools", kind },
+        })}
+        controller={vectorTools.cc}
+        readonly={false}
+      />
+    </div>
+  );
+}
+
+/** v_k's two coordinates, its image, and a way to remove it. */
+function matrixVectorRow(vectorTools: VectorTools, k: () => number) {
+  const m = vectorTools.matrix;
+  const v = () => m.config.vectors[k()] ?? ([0, 0] as const);
+  const coordinate = (axis: 0 | 1) => (
+    <input
+      class="dsm-vector-tools-matrix-cell"
+      type="number"
+      step="any"
+      aria-label={() => `${axis === 0 ? "x" : "y"} of v${k() + 1}`}
+      onUpdate={(element: HTMLInputElement) => {
+        if (document.activeElement !== element)
+          element.value = String(v()[axis]);
+      }}
+      onInput={(event: Event) =>
+        commitNumber(event, (value) => m.setVector(k(), axis, value))
+      }
+    />
+  );
+  return (
+    <div
+      class="dsm-vector-tools-matrix-vector"
+      data-vector-tools="matrix-vector"
+    >
+      <span class="dsm-vector-tools-matrix-vector-name">
+        {() => `v${sub(k() + 1)}`}
+      </span>
+      {coordinate(0)}
+      {coordinate(1)}
+      <span class="dsm-vector-tools-matrix-image">
+        {() => {
+          const image = m.imageOf(v());
+          return image === undefined
+            ? ""
+            : `${m.vectorName(k())} = (${formatNumber(image[0])}, ${formatNumber(image[1])})`;
+        }}
+      </span>
+      <span
+        role="button"
+        tabIndex={0}
+        class="dsm-vector-tools-chip dsm-vector-tools-matrix-remove-vector"
+        aria-label={() => `Remove v${k() + 1}`}
+        onTap={() => m.removeVector(k())}
+      >
+        ×
+      </span>
+    </div>
+  );
+}
+
 function formatNumber(value: number) {
   if (!Number.isFinite(value)) return String(value);
   const magnitude = Math.abs(value);

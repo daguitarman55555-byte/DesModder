@@ -652,3 +652,205 @@
 .dsm-vector-tools-fluid-gpu-ready {
   color: #2f7a3f;
 }
+
+// ---- the Matrix tab ----
+//
+// The on/off switch is the tab's first and loudest control, because it is
+// the one that decides whether anything else here does something.
+
+.dsm-vector-tools-matrix-switch {
+  align-items: center;
+  background: #f5f6f8;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 7px 10px;
+
+  .dsm-vector-tools-hint {
+    margin: 2px 0 0;
+  }
+}
+
+.dsm-vector-tools-matrix-switch-title {
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.dsm-vector-tools-toggle {
+  background: #c9ccd1;
+  border-radius: 999px;
+  cursor: pointer;
+  flex: none;
+  height: 22px;
+  position: relative;
+  width: 40px;
+
+  &::after {
+    background: #fff;
+    border-radius: 50%;
+    content: "";
+    height: 16px;
+    left: 3px;
+    position: absolute;
+    top: 3px;
+    transition: transform 0.15s;
+    width: 16px;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #2f72dc;
+    outline-offset: 2px;
+  }
+}
+
+.dsm-vector-tools-toggle-on {
+  background: #2f72dc;
+
+  &::after {
+    transform: translateX(18px);
+  }
+}
+
+.dsm-vector-tools-matrix-status {
+  background: #fdf1e2;
+  border-radius: 4px;
+  color: #7a4a00;
+  font-size: 11px;
+  line-height: 1.4;
+  margin-top: 6px;
+  padding: 5px 8px;
+}
+
+.dsm-vector-tools-matrix-line {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.dsm-vector-tools-matrix-name {
+  font:
+    italic 18px "Times New Roman",
+    Times,
+    serif;
+  white-space: nowrap;
+}
+
+// Brackets drawn as borders, so the two columns read as one matrix.
+.dsm-vector-tools-matrix-brackets {
+  border-left: 2px solid #333;
+  border-radius: 3px;
+  border-right: 2px solid #333;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(2, 64px);
+  padding: 3px 6px;
+}
+
+.dsm-vector-tools-matrix-cell {
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  box-sizing: border-box;
+  font:
+    14px "Times New Roman",
+    Times,
+    serif;
+  padding: 3px 4px;
+  text-align: center;
+  width: 100%;
+}
+
+.dsm-vector-tools-matrix-takeaway {
+  background: #edf6ee;
+  border-radius: 4px;
+  color: #2d6a35;
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 6px;
+  padding: 7px 9px;
+}
+
+.dsm-vector-tools-matrix-scrub {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+
+  .dsm-vector-tools-label {
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .dsm-vector-tools-slider {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .dsm-vector-tools-slider-value {
+    font-variant-numeric: tabular-nums;
+    min-width: 6ch;
+    text-align: right;
+  }
+}
+
+.dsm-vector-tools-matrix-vector {
+  align-items: center;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: 26px 58px 58px minmax(0, 1fr) auto;
+  margin: 4px 0;
+}
+
+.dsm-vector-tools-matrix-vector-name {
+  font:
+    italic 15px "Times New Roman",
+    Times,
+    serif;
+}
+
+.dsm-vector-tools-matrix-image {
+  color: #555;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dsm-vector-tools-matrix-facts {
+  display: grid;
+  font-size: 12px;
+  gap: 2px;
+  margin: 6px 0 4px;
+}
+
+.dsm-vector-tools-matrix-fact {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 9.5em minmax(0, 1fr);
+}
+
+.dsm-vector-tools-matrix-fact-name {
+  color: #666;
+}
+
+.dsm-vector-tools-matrix-fact-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.dsm-vector-tools-matrix-plain {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.dsm-vector-tools-matrix-latex {
+  background: #f5f6f8;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font:
+    11px/1.5 ui-monospace,
+    Consolas,
+    monospace;
+  margin: 0;
+  overflow-x: auto;
+  padding: 6px 8px;
+  white-space: pre;
+}

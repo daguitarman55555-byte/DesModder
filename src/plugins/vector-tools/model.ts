@@ -1,5 +1,11 @@
 import type { DemoMode } from "../../field-rendering/gallery/types";
 import {
+  DEFAULT_MATRIX_CONFIG,
+  cloneMatrixConfig,
+  normalizeMatrixConfig,
+  type MatrixConfig,
+} from "./matrix/matrixModel";
+import {
   COLOR_CONTRAST_MAXIMUM,
   COLOR_CONTRAST_MINIMUM,
   COLOR_SATURATION_MAXIMUM,
@@ -627,7 +633,8 @@ export type PanelTab =
   | "color"
   | "curve"
   | "flow"
-  | "fluid";
+  | "fluid"
+  | "matrix";
 
 export const PANEL_TABS: readonly { id: PanelTab; label: string }[] = [
   { id: "field", label: "Field" },
@@ -636,6 +643,7 @@ export const PANEL_TABS: readonly { id: PanelTab; label: string }[] = [
   { id: "curve", label: "Curve" },
   { id: "flow", label: "Flow" },
   { id: "fluid", label: "Fluid" },
+  { id: "matrix", label: "Matrix" },
 ];
 
 export const PANEL_MIN_WIDTH = 320;
@@ -906,6 +914,14 @@ export interface VectorFieldLibrary {
    * how the gallery behaves rather than a property of any particular field.
    */
   galleryWithLook: boolean;
+  /**
+   * The Matrix tab: a map applied to the whole graph. On the library rather
+   * than on a field, because transforming the graph is not a property of the
+   * vector field being drawn, and switching fields should not switch it off.
+   * It carries its own `schemaVersion` and is normalised on its own, so the
+   * library's version did not have to move for it.
+   */
+  matrix: MatrixConfig;
 }
 
 interface ValidationIssue {
@@ -1231,6 +1247,7 @@ export function cloneDefaultLibrary(): VectorFieldLibrary {
       presets: { ...DEFAULT_PANEL_CONFIG.presets },
     },
     galleryWithLook: false,
+    matrix: cloneMatrixConfig(DEFAULT_MATRIX_CONFIG),
   };
 }
 
@@ -1692,6 +1709,7 @@ export function normalizeVectorFieldLibrary(
     activeId,
     panel: normalizePanel(value.panel, fallback.panel),
     galleryWithLook: value.galleryWithLook === true,
+    matrix: normalizeMatrixConfig(value.matrix),
   };
 }
 

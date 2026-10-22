@@ -100,6 +100,7 @@ import {
 import { FlowOverlay } from "../../field-rendering/FlowOverlay";
 import { FLUID_SAMPLE_SOURCE, FluidSession } from "./fluid/FluidSession";
 import { importPastedField } from "./pastedField";
+import { MatrixSession } from "./matrix/MatrixSession";
 import { ArrowOverlay } from "../../field-rendering/ArrowOverlay";
 import type { ArrowOptions } from "../../field-rendering/ArrowRenderer";
 import {
@@ -262,7 +263,11 @@ export type VectorToolsFocusKind =
   | "seed"
   | "tint"
   | "curve-x"
-  | "curve-y";
+  | "curve-y"
+  | "matrix-x"
+  | "matrix-y"
+  | "matrix-ix"
+  | "matrix-iy";
 
 /** The compiled shader field, or the reason it could not be put on the GPU. */
 type FlowCompilation =
@@ -811,6 +816,49 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     },
   });
 
+  /**
+   * The Matrix tab: a map applied to the whole graph, drawn exactly through
+   * its inverse by Desmos or by redrawing what Desmos drew (see `matrix/`).
+   */
+  readonly matrix = new MatrixSession({
+    getState: () => this.calc.getState(),
+    setState: (state) =>
+      this.calc.setState(state as never, { allowUndo: true }),
+    setExpressions: (expressions) => this.calc.setExpressions(expressions),
+    grapher: () => (this.cc as unknown as { grapher2d?: unknown }).grapher2d,
+    items: () => this.cc.getAllItemModels() as never,
+    bounds: () => this.calc.graphpaperBounds.mathCoordinates,
+    scale: () => {
+      const { mathCoordinates: m, pixelCoordinates: p } =
+        this.calc.graphpaperBounds;
+      return [
+        p.width / (m.right - m.left),
+        p.height / (m.top - m.bottom),
+      ] as const;
+    },
+    watchBounds: (callback) => {
+      const key = "graphpaperBounds.vectorToolsMatrix";
+      this.calc.observe(key, callback);
+      return () => this.calc.unobserve(key);
+    },
+    config: () => this.getLibrary().matrix,
+    update: (change) => this.updateLibrary((library) => change(library.matrix)),
+    parse: (latex) =>
+      this.parseField(buildConfigFromGlobals(Desmos, this.calc), latex),
+    sliders: () => sliderValues(this.cc.getAllItemModels()),
+    dispatching: () => this.dispatching(),
+    focusInList: () => this.cc.getFocusLocation()?.type === "expression",
+    is3d: () => this.cc.is3dProduct(),
+    changed: () => this.util.tick(),
+    fieldChanged: () => this.refreshArrows(),
+  });
+  private matrixFieldCache?: {
+    xLatex: string;
+    yLatex: string;
+    revision: number;
+    result: FlowCompilation;
+  };
+
   afterEnable() {
     this.ensureStoredConfigIsCurrent();
     this.syncPresetWindow();
@@ -827,6 +875,11 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       // The presets window is mounted outside Desmos's views, so it redraws
       // on the same tick the panel does.
       if (event.type === "tick") this.presetWindowView?.update();
+      // The Matrix tab follows the whole list: an edit, a show or hide, a
+      // focus change it was waiting for. The sync coalesces and returns at
+      // once when nothing differs, so this costs a timer per event.
+      if (event.type !== "tick" && this.matrix.config.on)
+        this.matrix.schedule();
       // Anything else may have moved a slider: its number is in the list
       // already, so the field can have it on the next frame.
       else if (this.parameterHelpers.size > 0) this.schedulePush();
@@ -867,6 +920,8 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     // A graph opened with a preset already loaded: its 3D names and probe
     // drag, which otherwise waited for the first change of a setting.
     this.syncScene3D();
+    // A graph opened with the map on, or saved with the tab's folder in it.
+    this.matrix.schedule();
   }
 
   // ---- the animation clock -------------------------------------------------
@@ -1354,14 +1409,20 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       this.refreshArrows3D();
       return;
     }
-    if (this.arrowMode !== "live") {
+    // The Matrix tab's Field toggle draws T(x, y) with the live arrows
+    // whatever they were set to, since that is what pressing it asks for.
+    const matrixField = this.matrix.field;
+    if (this.arrowMode !== "live" && matrixField === undefined) {
       if (this.arrowOverlay.isRunning) {
         this.arrowOverlay.stop();
         this.arrowMessage = "";
       }
       return;
     }
-    const compiled = this.flowAvailability;
+    const compiled =
+      matrixField === undefined
+        ? this.flowAvailability
+        : this.matrixFieldCompilation(matrixField);
     if (!compiled.ok) {
       this.arrowOverlay.stop();
       this.arrowMessage = compiled.error;
@@ -1372,6 +1433,39 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     // A start may have mounted a canvas, and a fresh canvas lands wherever the
     // overlay's own default puts it until it is told which side it is on.
     this.syncLayer();
+  }
+
+  /**
+   * T as a field, compiled as the Field tab's components would be: the same
+   * compiler and environment, so a slider T reads moves its arrows too.
+   */
+  private matrixFieldCompilation(field: {
+    xLatex: string;
+    yLatex: string;
+  }): FlowCompilation {
+    const cached = this.matrixFieldCache;
+    if (
+      cached !== undefined &&
+      cached.xLatex === field.xLatex &&
+      cached.yLatex === field.yLatex &&
+      cached.revision === this.environmentRevision
+    )
+      return cached.result;
+    const config = this.getConfig();
+    const result = compileFlowField(
+      {
+        ...config,
+        source: "components",
+        components: { ...config.components, ...field },
+      },
+      this.compileEnvironment
+    );
+    this.matrixFieldCache = {
+      ...field,
+      revision: this.environmentRevision,
+      result,
+    };
+    return result;
   }
 
   /**
@@ -1783,6 +1877,10 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.stop3D();
     this.stopFlow3D();
     this.fluid.dispose();
+    // The switch that would turn the map off goes with the plugin, so the
+    // graph is put back as typed rather than left transformed with no way
+    // back.
+    this.matrix.stop();
     this.dsm.pillboxMenus?.removePillboxButton("dsm-vector-tools-menu");
   }
 
@@ -1816,6 +1914,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.syncLayer();
     this.fluid.sync();
     this.syncScene3D();
+    this.matrix.schedule();
     this.util.tick();
   }
 

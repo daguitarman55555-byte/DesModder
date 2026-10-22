@@ -263,6 +263,55 @@ more; the 2D flow still does.
 Not yet: gradient fields in 3D, arrows placed on a surface, and generated
 Desmos-native 3D vectors.
 
+### 3.5 The Matrix tab — one map applied to the whole graph
+
+Built 2026-10-22 from the approved mock-up (`docs/mockups/matrix-transform.html`),
+in `matrix/`. The map is a 2×2 matrix A (typed, or read from a matrix the list
+defines, whose value arrives as `formula.typed_constant_value` with value type 42) or a formula T(x, y) with an optional typed T⁻¹. An on/off switch, a
+scrubber and Play along the straight path p + t(T(p) − p), and two routes for
+the graph behind a chip:
+
+- **Exact** writes, into one folder the tab owns (`vector_tools_mx`), a copy
+  of every graphed expression and hides the original; the copy's id carries
+  the original's, so turning the switch off, disabling the plugin or reloading
+  a saved graph shows exactly those again (`withOwnedItems`). Curves and
+  inequalities become F(T⁻¹(q)) = 0: each side is the body of a function of
+  (x, y) — so `\frac{d}{dx}`, sums and comprehensions keep their own x — called
+  at `X_{vtmx}(x,y), Y_{vtmx}(x,y)`. Points and parametrics go forwards,
+  T(p). **Explicit curves (y = f(x), x = g(y), f(x) = …) go forwards too, as
+  the parametric T(t, f(t))**, because measured on the fisheye Desmos's
+  implicit plotter left y = sin x up to 4 px off its true image near the rim
+  and the parametric sampler kept it within 0.86 px everywhere; t runs as far
+  as the grid reaches, rounded to a power of two so a pan seldom rewrites it.
+  Desmos has no `inv`, so A⁻¹'s entries are written as numbers, and on a scrub
+  only the map's own definitions are rewritten.
+- **Redraw** leaves the list alone. Desmos draws every sketch through
+  `grapher2d.graphsLayer.redrawToCtx(ctx, sketches, images, drawOrder, …)`;
+  the tab wraps that call on the live instance (an own property, deleted on
+  uninstall), leaves its ids out of `drawOrder`, and paints the mapped
+  polylines in the same frame and layer. A one-sided inequality carries only
+  its boundary and an operator (y < f(x) fills to the screen's bottom edge),
+  so the region is rebuilt from the viewport. Desmos samples only what is on
+  screen, so a map that pulls points inward shows an empty rim — said in the
+  panel. Used automatically, with the reason stated, when there is no inverse.
+
+The grid's image is found by walking outward from the preimage of the screen's
+middle and doubling the spacing where neighbouring lines crowd within 5 px, so
+the fisheye's grid reaches its rim within a pixel in about a hundred lines
+(`grid.ts`); Detail (Fine/Balanced/Fast) sets the redraw tolerance and how far
+the walk may go. Vectors are written as points, `v_{1}=\left(1,2\right)` and
+`A\cdot v_{1}` (or `T\left(v_{1}\right)`), drawn as arrows curved by a
+nonlinear T, and dragged on the graph like any point. Field T(x) hands T to
+the live arrows; the Jacobian probe compares T and J(p) on a small square.
+
+Facts found on the way, each now in a test or a comment:
+`formula` on an item model holds only `error, operator, variables` until
+Desmos has evaluated it, and stays that way for a moment after anything it
+depends on changes — so classifications are cached by LaTeX and the folder is
+never rebuilt from a pending analysis. `Y(x,y)=f(…)` with a call on the left is
+read as a second definition of Y. A `setState` rebuild takes the cursor out of
+the expression being typed, so rebuilds wait for focus to leave the list.
+
 ## 4. Shared libraries
 
 ### 4.1 `palettes.ts`
@@ -767,7 +816,11 @@ Click the graph to release particles from a point. **Line Integral Convolution**
 as a dense static alternative to particles — a field texture with the field's
 structure everywhere at once, no animation, no trails.
 
-### Open design question: custom graph transformations
+### Custom graph transformations — **built as the Matrix tab** (§3.5)
+
+The two candidates below were both taken, as the tab's two routes: the exact
+route rewrites through the inverse, and the grid's image is drawn over the
+undeformed paper. What follows is the original question, kept for its reasons.
 
 Drawing the field through a user-supplied map `X(x,y)`, `Y(x,y)`. Achievable on
 our own canvas since arbitrary LaTeX already compiles to GLSL — but **incoherent
