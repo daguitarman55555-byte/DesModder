@@ -1,0 +1,2127 @@
+<title>Vector Tools Matrix Tab</title>
+<style>
+  /* Layout: the graph on the left, the Vector Tools panel that would host a
+     Matrix tab on the right; they stack below 960px. Desmos's own look is the
+     design system, as in the other mock-ups. */
+  :root {
+    --ground: #eceef1;
+    --surface: #ffffff;
+    --surface-2: #f5f6f8;
+    --rule: #d8dbe0;
+    --ink: #1f2226;
+    --ink-2: #5f6670;
+    --accent: #2f6fd6;
+    --accent-ink: #ffffff;
+    --chip: #eceef1;
+    --chip-rule: #cdd1d7;
+    --paper: #ffffff;
+    --grid-minor: #eef0f3;
+    --grid-major: #d5d9de;
+    --axis: #3a3f45;
+    --good-bg: #edf6ee;
+    --good-ink: #2d6a35;
+    --warn-bg: #fdf1e2;
+    --warn-ink: #8a5200;
+    --d-red: #c74440;
+    --d-blue: #2d70b3;
+    --d-green: #388c46;
+    --d-purple: #6042a6;
+    --d-orange: #e46f12;
+    --d-gray: #8a9099;
+    --font-ui: Arial, "Helvetica Neue", Helvetica, sans-serif;
+    --font-math: "Times New Roman", Times, "Liberation Serif", serif;
+    --font-num:
+      ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #141619;
+      --surface: #1e2125;
+      --surface-2: #25292e;
+      --rule: #353a41;
+      --ink: #e6e8eb;
+      --ink-2: #a2a9b3;
+      --accent: #5b93ef;
+      --accent-ink: #0d1420;
+      --chip: #2a2f35;
+      --chip-rule: #3e444c;
+      --paper: #1a1c1f;
+      --grid-minor: #24272b;
+      --grid-major: #353a40;
+      --axis: #c9ced5;
+      --good-bg: #1d3221;
+      --good-ink: #93d39e;
+      --warn-bg: #3a2b16;
+      --warn-ink: #f2c27b;
+      --d-red: #e26a66;
+      --d-blue: #5b9ae0;
+      --d-green: #5fb86b;
+      --d-purple: #9a80e0;
+      --d-orange: #f39a4a;
+      --d-gray: #8f96a0;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #141619;
+    --surface: #1e2125;
+    --surface-2: #25292e;
+    --rule: #353a41;
+    --ink: #e6e8eb;
+    --ink-2: #a2a9b3;
+    --accent: #5b93ef;
+    --accent-ink: #0d1420;
+    --chip: #2a2f35;
+    --chip-rule: #3e444c;
+    --paper: #1a1c1f;
+    --grid-minor: #24272b;
+    --grid-major: #353a40;
+    --axis: #c9ced5;
+    --good-bg: #1d3221;
+    --good-ink: #93d39e;
+    --warn-bg: #3a2b16;
+    --warn-ink: #f2c27b;
+    --d-red: #e26a66;
+    --d-blue: #5b9ae0;
+    --d-green: #5fb86b;
+    --d-purple: #9a80e0;
+    --d-orange: #f39a4a;
+    --d-gray: #8f96a0;
+    color-scheme: dark;
+  }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font: 14px/1.45 var(--font-ui);
+  }
+  .page {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding-inline: 16px;
+    padding-block: 18px 28px;
+    display: grid;
+    gap: 14px;
+  }
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 14px;
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .badge {
+    font-size: 12px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--warn-bg);
+    color: var(--warn-ink);
+  }
+  .lede {
+    margin: 0;
+    color: var(--ink-2);
+    max-width: 78ch;
+  }
+  .work {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 14px;
+    align-items: start;
+  }
+  @media (max-width: 960px) {
+    .work {
+      grid-template-columns: 1fr;
+    }
+  }
+  .graph {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    overflow: hidden;
+    display: grid;
+    min-width: 0;
+  }
+  canvas {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    max-width: 100%;
+    display: block;
+    touch-action: none;
+    cursor: crosshair;
+  }
+  .scrub {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--rule);
+    background: var(--surface);
+  }
+  .scrub input {
+    flex: 1;
+    min-width: 0;
+  }
+  .scrub output {
+    font-family: var(--font-num);
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-2);
+    min-width: 7ch;
+    text-align: right;
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    padding: 8px 12px 12px;
+    background: var(--surface);
+    color: var(--ink-2);
+    font-size: 12px;
+  }
+  .legend i {
+    display: inline-block;
+    width: 18px;
+    height: 3px;
+    vertical-align: middle;
+    margin-right: 6px;
+    border-radius: 2px;
+  }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--ink) 10%, transparent);
+    padding: 12px 14px 14px;
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+  }
+  .panel h2 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 400;
+    color: var(--accent);
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 2px;
+  }
+  .tabs {
+    display: flex;
+    border: 1px solid var(--chip-rule);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .tabs span {
+    flex: 1;
+    text-align: center;
+    padding: 6px 2px;
+    font-size: 13px;
+    color: var(--ink-2);
+    border-right: 1px solid var(--chip-rule);
+  }
+  .tabs span:last-child {
+    border-right: 0;
+  }
+  .tabs .on {
+    background: var(--ink-2);
+    color: var(--surface);
+    font-weight: 700;
+  }
+  .label {
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    display: block;
+  }
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chip {
+    font: inherit;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--chip-rule);
+    background: var(--chip);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .chip[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+  }
+  .chip:focus-visible,
+  button:focus-visible,
+  input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .matrix {
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+  }
+  .cells {
+    display: grid;
+    grid-template-columns: repeat(2, 64px);
+    gap: 4px;
+    padding-block: 4px;
+  }
+  .bracket {
+    width: 7px;
+    border: 2px solid var(--ink);
+  }
+  .bracket.l {
+    border-right: 0;
+  }
+  .bracket.r {
+    border-left: 0;
+  }
+  .matrix input,
+  .vec input {
+    font: 16px var(--font-math);
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+    padding: 4px;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .mathline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .mathline .name {
+    font: italic 20px var(--font-math);
+    white-space: nowrap;
+  }
+  .takeaway {
+    background: var(--good-bg);
+    color: var(--good-ink);
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+  .vecs {
+    display: grid;
+    gap: 6px;
+  }
+  .vec {
+    display: grid;
+    grid-template-columns: 34px 1fr 1fr 1.6fr 22px;
+    gap: 6px;
+    align-items: center;
+    font-size: 13px;
+  }
+  .vec .swatch {
+    font: italic 16px var(--font-math);
+  }
+  .vec .img {
+    font-family: var(--font-num);
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-2);
+    font-size: 12px;
+  }
+  .vec button,
+  .add {
+    font: inherit;
+    border: 1px solid var(--chip-rule);
+    background: var(--chip);
+    color: var(--ink);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .add {
+    justify-self: start;
+    font-size: 12px;
+    padding: 4px 10px;
+  }
+  dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 3px 12px;
+    margin: 0;
+    font-size: 13px;
+  }
+  dt {
+    color: var(--ink-2);
+  }
+  dd {
+    margin: 0;
+    font-family: var(--font-num);
+    font-variant-numeric: tabular-nums;
+  }
+  .plain {
+    margin: 6px 0 0;
+    font-size: 13px;
+  }
+  pre {
+    margin: 0;
+    font: 12px/1.5 var(--font-num);
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 8px;
+    overflow-x: auto;
+  }
+  .note {
+    font-size: 12px;
+    color: var(--ink-2);
+    margin: 4px 0 0;
+  }
+  .notes {
+    max-width: 78ch;
+    color: var(--ink-2);
+    font-size: 13px;
+    display: grid;
+    gap: 6px;
+  }
+  .notes p {
+    margin: 0;
+  }
+  .exprs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--rule);
+    background: var(--surface);
+    align-items: center;
+  }
+  .exprs .label {
+    margin: 0 4px 0 0;
+  }
+  .expr {
+    font: inherit;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 9px 3px 5px;
+    border-radius: 999px;
+    border: 1px solid var(--chip-rule);
+    background: var(--chip);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .expr .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+  }
+  .expr[aria-pressed="true"] .dot {
+    background: currentColor;
+  }
+  .expr[aria-pressed="false"] {
+    opacity: 0.55;
+  }
+  .expr i {
+    font-family: var(--font-math);
+    font-size: 15px;
+  }
+  .switch {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+  }
+  .switch b {
+    font-size: 14px;
+  }
+  .switch .note {
+    margin: 2px 0 0;
+  }
+  .toggle {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    flex: none;
+    border-radius: 999px;
+    border: 0;
+    background: var(--chip-rule);
+    cursor: pointer;
+  }
+  .toggle::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--surface);
+    transition: transform 0.15s;
+  }
+  .toggle[aria-checked="true"] {
+    background: var(--accent);
+  }
+  .toggle[aria-checked="true"]::after {
+    transform: translateX(20px);
+  }
+  .formula {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 6px 8px;
+    align-items: center;
+    font: italic 16px var(--font-math);
+  }
+  .formula input {
+    font: 14px var(--font-num);
+    width: 100%;
+    box-sizing: border-box;
+    padding: 5px 6px;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .formula input[aria-invalid="true"] {
+    border-color: var(--d-red);
+  }
+  .err {
+    color: var(--d-red);
+    font-size: 12px;
+    margin: 4px 0 0;
+  }
+  .panel > * {
+    min-width: 0;
+  }
+  .off .needs-on {
+    opacity: 0.45;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none !important;
+    }
+  }
+</style>
+
+<div class="page">
+  <header>
+    <h1>Vector Tools · Matrix tab</h1>
+    <span class="badge">Mock-up, not built</span>
+    <p class="lede">
+      Desmos's 2D calculator now has matrices, but it does not draw vectors.
+      This tab would apply a map to the whole graph, either a 2×2 matrix
+      <i>A</i> or any formula <i>T</i>(<i>x</i>, <i>y</i>). It carries along
+      every curve, point and shaded region, plus the grid and your vectors. Turn
+      it off to see the graph as typed. Drag the gray arrow tips and the purple
+      probe, or scrub from doing nothing to the full map.
+    </p>
+  </header>
+
+  <div class="work" id="work">
+    <div class="graph">
+      <div class="exprs" id="exprs">
+        <span class="label">Expression list</span>
+      </div>
+      <canvas id="plot" aria-label="Graph of the transformation"></canvas>
+      <div class="scrub">
+        <button class="chip" id="play" type="button">Play</button>
+        <label for="t" class="note" style="margin: 0" id="tLabel">I → A</label>
+        <input id="t" type="range" min="0" max="1" step="0.005" value="1" />
+        <output id="tOut" for="t">t = 1.00</output>
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <aside class="panel" aria-label="Vector Tools panel">
+      <h2>Vector Tools</h2>
+      <div class="tabs" aria-hidden="true">
+        <span>Field</span><span>Arrows</span><span>Color</span><span>Flow</span
+        ><span class="on">Matrix</span>
+      </div>
+
+      <div class="switch">
+        <div>
+          <b id="onLabel">Transforming the graph</b>
+          <p class="note" id="onNote">
+            Everything on the graph is drawn through the map.
+          </p>
+        </div>
+        <button
+          class="toggle"
+          id="onOff"
+          type="button"
+          role="switch"
+          aria-checked="true"
+          aria-labelledby="onLabel"
+        ></button>
+      </div>
+
+      <div class="needs-on">
+        <span class="label">Map</span>
+        <div class="row">
+          <button
+            class="chip"
+            aria-pressed="true"
+            type="button"
+            id="kindLinear"
+          >
+            Matrix A (linear)
+          </button>
+          <button
+            class="chip"
+            aria-pressed="false"
+            type="button"
+            id="kindFormula"
+          >
+            Formula T(x, y)
+          </button>
+        </div>
+      </div>
+
+      <div class="needs-on">
+        <span class="label">Drawing the graph</span>
+        <div class="row">
+          <button
+            class="chip"
+            aria-pressed="true"
+            type="button"
+            id="routeExact"
+          >
+            Exact: Desmos redraws it
+          </button>
+          <button
+            class="chip"
+            aria-pressed="false"
+            type="button"
+            id="routeRedraw"
+          >
+            Redraw what Desmos drew
+          </button>
+        </div>
+        <p class="note" id="routeNote"></p>
+      </div>
+
+      <div class="needs-on" id="linearBox">
+        <div class="row" style="margin-bottom: 6px">
+          <button class="chip" aria-pressed="true" type="button" id="srcTyped">
+            Typed here
+          </button>
+          <button class="chip" aria-pressed="false" type="button" id="srcExpr">
+            Expression A in the list
+          </button>
+        </div>
+        <div class="mathline">
+          <span class="name">A =</span>
+          <div class="matrix">
+            <span class="bracket l"></span>
+            <span class="cells">
+              <input id="a" aria-label="Row 1, column 1" value="1" />
+              <input id="b" aria-label="Row 1, column 2" value="1" />
+              <input id="c" aria-label="Row 2, column 1" value="0" />
+              <input id="d" aria-label="Row 2, column 2" value="1" />
+            </span>
+            <span class="bracket r"></span>
+          </div>
+        </div>
+        <p class="note" id="srcNote"></p>
+      </div>
+
+      <div class="needs-on" id="formulaBox" hidden>
+        <div class="formula">
+          <label for="fx">x′ =</label>
+          <input id="fx" spellcheck="false" autocomplete="off" />
+          <label for="fy">y′ =</label>
+          <input id="fy" spellcheck="false" autocomplete="off" />
+        </div>
+        <p class="err" id="fErr" hidden></p>
+        <span class="label" style="margin-top: 8px">
+          T⁻¹, for the exact route (leave empty if there is none)
+        </span>
+        <div class="formula">
+          <label for="gx">x =</label>
+          <input id="gx" spellcheck="false" autocomplete="off" />
+          <label for="gy">y =</label>
+          <input id="gy" spellcheck="false" autocomplete="off" />
+        </div>
+        <p class="err" id="gErr" hidden></p>
+        <p class="note">
+          In the plugin these are MathQuill fields, like the Field tab's P and
+          Q. Here: + − * / ^, sin cos tan exp ln sqrt abs, pi.
+        </p>
+      </div>
+
+      <div class="needs-on">
+        <span class="label">Presets</span>
+        <div class="row" id="presets"></div>
+      </div>
+      <div class="takeaway" id="takeaway"></div>
+
+      <div>
+        <span class="label">Show</span>
+        <div class="row" id="shows"></div>
+      </div>
+
+      <div>
+        <span class="label">Vectors</span>
+        <div class="vecs" id="vecs"></div>
+        <button class="add" id="addVec" type="button">Add vector</button>
+      </div>
+
+      <div>
+        <span class="label" id="factsTitle">What A does</span>
+        <div class="row" style="margin-bottom: 6px">
+          <button class="chip" aria-pressed="true" type="button" id="lvlSimple">
+            Simple
+          </button>
+          <button class="chip" aria-pressed="false" type="button" id="lvlFull">
+            Full
+          </button>
+        </div>
+        <dl id="facts"></dl>
+        <p class="plain" id="plain"></p>
+      </div>
+
+      <div>
+        <span class="label">Written to the expression list</span>
+        <pre id="latex"></pre>
+        <p class="note" id="latexNote"></p>
+      </div>
+    </aside>
+  </div>
+
+  <div class="notes">
+    <p>
+      <b>Measured in live Desmos, 2026-10-22.</b> <code>A·(1,2)</code> with
+      <code>A=[[1,2],[3,4]]</code> is the point (5, 11), drawn.
+      <code>A·[1;2]</code> is the column [5; 11], not drawn.
+      <code>vector(…)</code> is refused in 2D. <code>A·[x;y]</code> is refused
+      (“too many variables”), so Desmos cannot draw the field <i>A</i>x itself;
+      the Field toggle would draw it on the GPU, as the Field tab does now.
+    </p>
+    <p>
+      <b>How the real tab would transform everything.</b> Desmos keeps every
+      curve, point and shaded region it has drawn as polylines in graph
+      coordinates (<code>grapher2d.graphSketches</code>, measured). The tab
+      would send each vertex through <i>T</i>, after subdividing long segments
+      so a nonlinear map can bend them, and draw the result over the paper. It
+      would hide the originals, or keep them faint. Desmos only samples what is
+      on screen, though, and its headless calculator has no grapher to sample
+      more. So a map that pulls far-away points inward, like the fisheye, would
+      show an empty rim. This mock-up samples a wide box to show the intended
+      look.
+    </p>
+    <p>
+      <b>Both routes, behind the “Drawing the graph” toggle.</b>
+      <i>Exact</i> rewrites each expression with (<i>x</i>, <i>y</i>) replaced
+      by <i>T</i>⁻¹(<i>x</i>, <i>y</i>), and Desmos draws the result itself,
+      inequalities included, sharp all the way to the edge. Here that is
+      emulated faithfully: each curve is plotted as the points <i>q</i> where
+      <i>F</i>(<i>T</i>⁻¹(<i>q</i>)) = 0. It needs an inverse. Every matrix with
+      det ≠ 0 has one; of the formula presets, Swirl and Fisheye do, and Wave,
+      z² and Polar do not. With a formula, it draws the finished map only, since
+      the in-between maps have no formula for their inverse. <i>Redraw</i> works
+      for any map and scrubs smoothly. Here it samples only the visible window,
+      as Desmos does, so the empty band you see at the edge is real. The tab
+      falls back to Redraw by itself when there is no inverse, and says so.
+    </p>
+  </div>
+</div>
+
+<script>
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const canvas = $("plot");
+  const ctx = canvas.getContext("2d");
+
+  // ---- a small formula compiler for the mock-up's T(x, y) -------------------
+  // Recursive descent over + − * / ^, unary minus, implicit products such as
+  // 2x or 0.4sin(y), and the usual functions. It returns a JS function.
+  const FUNS = {
+    sin: Math.sin,
+    cos: Math.cos,
+    tan: Math.tan,
+    exp: Math.exp,
+    ln: Math.log,
+    log: Math.log,
+    sqrt: Math.sqrt,
+    abs: Math.abs,
+    atan: Math.atan,
+  };
+  function compile(src) {
+    const toks =
+      src.match(/\d*\.?\d+(?:e[+-]?\d+)?|[A-Za-z]+|\*\*|[-+*/^(),]|\S/g) || [];
+    let i = 0;
+    const peek = () => toks[i];
+    const eat = (t) => {
+      if (toks[i] !== t)
+        throw new Error(
+          `Expected “${t}”${toks[i] ? ` before “${toks[i]}”` : " at the end"}.`
+        );
+      i++;
+    };
+    const startsAtom = (t) =>
+      t !== undefined && (/^[\d.]/.test(t) || /^[A-Za-z]/.test(t) || t === "(");
+    function expr() {
+      let f = term();
+      while (peek() === "+" || peek() === "-") {
+        const op = toks[i++],
+          g = term(),
+          a = f;
+        f =
+          op === "+"
+            ? (x, y) => a(x, y) + g(x, y)
+            : (x, y) => a(x, y) - g(x, y);
+      }
+      return f;
+    }
+    function term() {
+      let f = unary();
+      for (;;) {
+        const t = peek();
+        if (t === "*" || t === "/") {
+          i++;
+          const g = unary(),
+            a = f;
+          f =
+            t === "*"
+              ? (x, y) => a(x, y) * g(x, y)
+              : (x, y) => a(x, y) / g(x, y);
+        } else if (startsAtom(t)) {
+          const g = power(),
+            a = f; // implicit product
+          f = (x, y) => a(x, y) * g(x, y);
+        } else return f;
+      }
+    }
+    function unary() {
+      if (peek() === "-") {
+        i++;
+        const g = unary();
+        return (x, y) => -g(x, y);
+      }
+      if (peek() === "+") {
+        i++;
+        return unary();
+      }
+      return power();
+    }
+    function power() {
+      const base = atom();
+      if (peek() === "^" || peek() === "**") {
+        i++;
+        const e = unary();
+        return (x, y) => Math.pow(base(x, y), e(x, y));
+      }
+      return base;
+    }
+    function atom() {
+      const t = toks[i++];
+      if (t === undefined) throw new Error("The formula ends too soon.");
+      if (/^[\d.]/.test(t)) {
+        const v = parseFloat(t);
+        return () => v;
+      }
+      if (t === "(") {
+        const f = expr();
+        eat(")");
+        return f;
+      }
+      if (t === "x") return (x) => x;
+      if (t === "y") return (x, y) => y;
+      if (t === "pi") return () => Math.PI;
+      if (t === "e") return () => Math.E;
+      if (FUNS[t]) {
+        const fn = FUNS[t];
+        let arg;
+        if (peek() === "(") {
+          i++;
+          arg = expr();
+          eat(")");
+        } else arg = power();
+        return (x, y) => fn(arg(x, y));
+      }
+      throw new Error(`“${t}” is not x, y, pi or a known function.`);
+    }
+    const f = expr();
+    if (i < toks.length) throw new Error(`Unexpected “${toks[i]}”.`);
+    return f;
+  }
+
+  // ---- presets ----------------------------------------------------------------
+  const LINEAR = [
+    {
+      name: "Shear",
+      m: [1, 1, 0, 1],
+      take: "A shear slides each row of the grid sideways. Area stays 1 (det = 1), and only the x-axis keeps its direction.",
+    },
+    {
+      name: "Rotate 90°",
+      m: [0, -1, 1, 0],
+      take: "A rotation turns every vector by the same angle, so no real direction survives: the eigenvalues are ±i. Area is unchanged.",
+    },
+    {
+      name: "Stretch",
+      m: [2, 0, 0, 0.5],
+      take: "Stretching x by 2 and squeezing y by ½ keeps the area (det = 1). The axes are the eigenvectors, with λ = 2 and ½.",
+    },
+    {
+      name: "Reflect",
+      m: [1, 0, 0, -1],
+      take: "A reflection flips orientation, so det is negative. The square turns orange because its corners now run clockwise.",
+    },
+    {
+      name: "Project",
+      m: [1, 0, 0, 0],
+      take: "A projection flattens the plane onto a line. det = 0: every curve collapses onto the x-axis, and A has no inverse.",
+    },
+    {
+      name: "[[1,2],[3,4]]",
+      m: [1, 2, 3, 4],
+      take: "A general matrix mixes all of these. Two real directions survive, one flipped (λ < 0), so det is negative.",
+    },
+    {
+      name: "Spiral",
+      m: [0.9, -0.5, 0.5, 0.9],
+      take: "Complex eigenvalues mean a rotation with scaling. Here |λ| ≈ 1.03, so applying A again and again spirals a vector slowly outward.",
+    },
+  ];
+  const FORMULAS = [
+    {
+      name: "Wave",
+      fx: "x + 0.4sin(y)",
+      fy: "y + 0.4sin(x)",
+      gx: "",
+      gy: "",
+      tex: String.raw`T\left(x,y\right)=\left(x+0.4\sin\left(y\right),y+0.4\sin\left(x\right)\right)`,
+      take: "Straight lines bend, but look closely at the probe: a tiny square still lands on a near-parallelogram. Up close every smooth map is a matrix, its Jacobian.",
+    },
+    {
+      name: "Swirl",
+      fx: "x cos(1.5exp(-(x^2+y^2)/8)) - y sin(1.5exp(-(x^2+y^2)/8))",
+      fy: "x sin(1.5exp(-(x^2+y^2)/8)) + y cos(1.5exp(-(x^2+y^2)/8))",
+      // A rotation keeps the radius, so turning back by the same angle undoes it.
+      gx: "x cos(1.5exp(-(x^2+y^2)/8)) + y sin(1.5exp(-(x^2+y^2)/8))",
+      gy: "-x sin(1.5exp(-(x^2+y^2)/8)) + y cos(1.5exp(-(x^2+y^2)/8))",
+      tex: String.raw`T\left(x,y\right)=\left(x\cos\left(a\right)-y\sin\left(a\right),x\sin\left(a\right)+y\cos\left(a\right)\right)`,
+      take: "Each point is rotated by an angle that fades with distance. It is a rotation everywhere, so det J = 1 and no area is gained or lost, yet the grid twists.",
+    },
+    {
+      name: "Square z²",
+      fx: "x^2 - y^2",
+      fy: "2x y",
+      gx: "",
+      gy: "",
+      tex: String.raw`T\left(x,y\right)=\left(x^{2}-y^{2},2xy\right)`,
+      take: "Squaring a complex number doubles angles: the upper half-plane covers the whole plane. det J = 4(x² + y²), so area grows away from the origin and vanishes at it. Two points square to each one, so there is no inverse: only Redraw can draw it.",
+    },
+    {
+      name: "Fisheye",
+      fx: "x/(1 + sqrt(x^2+y^2)/4)",
+      fy: "y/(1 + sqrt(x^2+y^2)/4)",
+      // Defined only inside the disc of radius 4: sqrt(4 − r)/sqrt(4 − r) is 1
+      // there and undefined outside, where nothing maps to.
+      gx: "x/(1 - sqrt(x^2+y^2)/4) sqrt(4 - sqrt(x^2+y^2))/sqrt(4 - sqrt(x^2+y^2))",
+      gy: "y/(1 - sqrt(x^2+y^2)/4) sqrt(4 - sqrt(x^2+y^2))/sqrt(4 - sqrt(x^2+y^2))",
+      tex: String.raw`T\left(x,y\right)=\frac{\left(x,y\right)}{1+\frac{\sqrt{x^{2}+y^{2}}}{4}}`,
+      take: "Far points are pulled in, so the entire plane fits inside a disc of radius 4. Lines through the origin stay straight; the others curve.",
+    },
+    {
+      name: "Polar",
+      fx: "x cos(y)",
+      fy: "x sin(y)",
+      gx: "",
+      gy: "",
+      tex: String.raw`T\left(x,y\right)=\left(x\cos\left(y\right),x\sin\left(y\right)\right)`,
+      take: "Reads (x, y) as (r, θ). Vertical lines become circles and horizontal lines become rays, which is how polar graphs are drawn. det J = x, which is 0 along the y-axis. θ wraps, so there is no single inverse: only Redraw can draw it.",
+    },
+  ];
+  const SHOWS = [
+    ["grid", "Grid", true],
+    ["square", "Unit square", true],
+    ["circle", "Unit circle", false],
+    ["eigen", "Eigenvectors", true],
+    ["field", "Field T(x)", false],
+    ["ghost", "Original, faint", true],
+  ];
+  // A small graph standing in for whatever is in the expression list.
+  const EXPRS = [
+    { key: "sin", color: "--d-blue", text: "y = sin x" },
+    { key: "circle", color: "--d-green", text: "x² + y² = 4" },
+    { key: "parab", color: "--d-orange", text: "y = x²/4 − 3" },
+    { key: "region", color: "--d-red", text: "y < x − 1" },
+    { key: "point", color: "--d-purple", text: "(1, 2)" },
+  ];
+
+  const state = {
+    on: true,
+    kind: "linear",
+    route: "exact",
+    inv: null,
+    m: [1, 1, 0, 1],
+    f: null,
+    fx: FORMULAS[0].fx,
+    fy: FORMULAS[0].fy,
+    formulaTex: FORMULAS[0].tex,
+    t: 1,
+    show: Object.fromEntries(SHOWS.map(([k, , on]) => [k, on])),
+    exprs: Object.fromEntries(EXPRS.map((e) => [e.key, true])),
+    vecs: [
+      [1, 2],
+      [2, -1],
+    ],
+    probe: [-2, 1.5],
+    level: "simple",
+    drag: null,
+  };
+
+  // ---- the map ----------------------------------------------------------------
+  // T itself, then T_t = (1 − t)·identity + t·T, the straight-line homotopy the
+  // scrubber plays. For a matrix that is (1 − t)I + tA, as before.
+  function baseMap(p) {
+    if (state.kind === "linear") {
+      const [a, b, c, d] = state.m;
+      return [a * p[0] + b * p[1], c * p[0] + d * p[1]];
+    }
+    if (!state.f) return p;
+    return [state.f[0](p[0], p[1]), state.f[1](p[0], p[1])];
+  }
+  function map(p) {
+    if (!state.on) return p;
+    const q = baseMap(p);
+    const t = state.t;
+    return [p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])];
+  }
+  // T_t⁻¹ where the exact route can have it: a matrix's (1 − t)I + tA at any
+  // t, and a formula's typed inverse at t = 1 only.
+  function inverseMap() {
+    if (!state.on) return (q) => q;
+    if (state.kind === "linear") {
+      const [a, b, c, d] = state.m,
+        t = state.t;
+      const m = [1 + t * (a - 1), t * b, t * c, 1 + t * (d - 1)];
+      const det = m[0] * m[3] - m[1] * m[2];
+      if (Math.abs(det) < 1e-9) return null;
+      return (q) => [
+        (m[3] * q[0] - m[1] * q[1]) / det,
+        (-m[2] * q[0] + m[0] * q[1]) / det,
+      ];
+    }
+    if (!state.inv) return null;
+    return (q) => [state.inv[0](q[0], q[1]), state.inv[1](q[0], q[1])];
+  }
+  // Which route actually draws, and why, for the panel to say.
+  function routeInUse() {
+    if (!state.on || state.route === "redraw") return { route: "redraw" };
+    if (state.kind === "linear") {
+      const [a, b, c, d] = state.m;
+      if (Math.abs(a * d - b * c) < 1e-9)
+        return {
+          route: "redraw",
+          why: "A has no inverse (det A = 0), so this map is redrawn instead.",
+        };
+      return { route: "exact" };
+    }
+    if (!state.inv)
+      return {
+        route: "redraw",
+        why: "This formula has no T⁻¹ typed in, so it is redrawn instead.",
+      };
+    return { route: "exact" };
+  }
+
+  function jacobian(p, f = map) {
+    const h = 1e-4;
+    const xp = f([p[0] + h, p[1]]),
+      xm = f([p[0] - h, p[1]]);
+    const yp = f([p[0], p[1] + h]),
+      ym = f([p[0], p[1] - h]);
+    return [
+      (xp[0] - xm[0]) / (2 * h),
+      (yp[0] - ym[0]) / (2 * h),
+      (xp[1] - xm[1]) / (2 * h),
+      (yp[1] - ym[1]) / (2 * h),
+    ];
+  }
+  const curM = () => jacobian([0, 0]); // exact for a matrix
+  const apply = (m, [x, y]) => [m[0] * x + m[1] * y, m[2] * x + m[3] * y];
+  function eigen(m) {
+    const [a, b, c, d] = m;
+    const tr = a + d,
+      det = a * d - b * c,
+      disc = tr * tr - 4 * det,
+      eps = 1e-9;
+    if (disc < -eps)
+      return { tr, det, complex: [tr / 2, Math.sqrt(-disc) / 2] };
+    const r = Math.sqrt(Math.max(disc, 0));
+    const lams = disc <= eps ? [tr / 2] : [(tr + r) / 2, (tr - r) / 2];
+    const out = [];
+    for (const l of lams) {
+      if (Math.abs(b) > eps) out.push({ l, v: [b, l - a] });
+      else if (Math.abs(c) > eps) out.push({ l, v: [l - d, c] });
+      else {
+        if (Math.abs(a - l) < 1e-6) out.push({ l, v: [1, 0] });
+        if (Math.abs(d - l) < 1e-6) out.push({ l, v: [0, 1] });
+      }
+    }
+    const everyVector =
+      Math.abs(b) < eps && Math.abs(c) < eps && Math.abs(a - d) < eps;
+    return { tr, det, real: out, everyVector };
+  }
+  function singular(m) {
+    const [a, b, c, d] = m;
+    const p = a * a + c * c,
+      q = a * b + c * d,
+      r = b * b + d * d;
+    const h = Math.sqrt(((p - r) / 2) ** 2 + q * q),
+      mid = (p + r) / 2;
+    return [Math.sqrt(mid + h), Math.sqrt(Math.max(mid - h, 0))];
+  }
+  const fmt = (x) => {
+    if (!isFinite(x)) return "—";
+    const r = Math.round(x * 1000) / 1000;
+    return (Object.is(r, -0) ? 0 : r).toString().replace("-", "−");
+  };
+  const tex = (x) => {
+    const r = Math.round(x * 1000) / 1000;
+    return (Object.is(r, -0) ? 0 : r).toString();
+  };
+  const sub = (n) => String(n).replace(/\d/g, (d) => "₀₁₂₃₄₅₆₇₈₉"[d]);
+
+  // ---- drawing ----------------------------------------------------------------
+  const view = { unit: 40, w: 0, h: 0 };
+  const css = (name) =>
+    getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    view.w = rect.width;
+    view.h = rect.height;
+    view.unit = Math.min(rect.width, rect.height) / 12;
+    draw();
+  }
+  const sx = (x) => view.w / 2 + x * view.unit;
+  const sy = (y) => view.h / 2 - y * view.unit;
+  const mx = (px) => (px - view.w / 2) / view.unit;
+  const my = (py) => (view.h / 2 - py) / view.unit;
+
+  // A polyline in graph coordinates, subdivided so a curved map can bend it,
+  // then sent through f. Breaks where the map is not finite or jumps.
+  function mappedPath(pts, f, step = 0.08) {
+    const out = [];
+    for (let k = 0; k < pts.length; k++) {
+      const p = pts[k];
+      if (k > 0) {
+        const q = pts[k - 1];
+        const n = Math.max(
+          1,
+          Math.ceil(Math.hypot(p[0] - q[0], p[1] - q[1]) / step)
+        );
+        for (let s = 1; s < n; s++)
+          out.push(
+            f([q[0] + ((p[0] - q[0]) * s) / n, q[1] + ((p[1] - q[1]) * s) / n])
+          );
+      }
+      out.push(f(p));
+    }
+    return out;
+  }
+  function tracePath(path, close = false) {
+    ctx.beginPath();
+    let pen = false;
+    for (const p of path) {
+      const ok =
+        isFinite(p[0]) &&
+        isFinite(p[1]) &&
+        Math.abs(p[0]) < 1e4 &&
+        Math.abs(p[1]) < 1e4;
+      if (!ok) {
+        pen = false;
+        continue;
+      }
+      if (pen) ctx.lineTo(sx(p[0]), sy(p[1]));
+      else ctx.moveTo(sx(p[0]), sy(p[1]));
+      pen = true;
+    }
+    if (close) ctx.closePath();
+  }
+  function stroke(path, color, width, dash, close) {
+    tracePath(path, close);
+    ctx.setLineDash(dash || []);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  function head(from, tip, color) {
+    const x0 = sx(from[0]),
+      y0 = sy(from[1]),
+      x1 = sx(tip[0]),
+      y1 = sy(tip[1]);
+    const len = Math.hypot(x1 - x0, y1 - y0);
+    if (len < 0.5) return;
+    const ux = (x1 - x0) / len,
+      uy = (y1 - y0) / len,
+      h = 12;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x1 - ux * h - uy * h * 0.45, y1 - uy * h + ux * h * 0.45);
+    ctx.lineTo(x1 - ux * h + uy * h * 0.45, y1 - uy * h - ux * h * 0.45);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // An arrow from T(0) along the image of the segment 0→v: straight for a
+  // matrix, a curve for anything else, since a map moves the whole segment.
+  function mappedArrow(v, color, width, f) {
+    const pts = [];
+    for (let s = 0; s <= 40; s++)
+      pts.push(f([(v[0] * s) / 40, (v[1] * s) / 40]));
+    const tip = pts[40];
+    // Stop the shaft short of the head.
+    let k = 39;
+    while (
+      k > 0 &&
+      Math.hypot(sx(pts[k][0]) - sx(tip[0]), sy(pts[k][1]) - sy(tip[1])) < 10
+    )
+      k--;
+    stroke(pts.slice(0, k + 1).concat([pts[k]]), color, width);
+    head(pts[Math.max(0, Math.min(k, 38))], tip, color);
+  }
+  function label(text, p, color, dx = 8, dy = -8) {
+    if (!isFinite(p[0]) || !isFinite(p[1])) return;
+    ctx.font = "italic 16px " + css("--font-math");
+    ctx.fillStyle = color;
+    ctx.fillText(text, sx(p[0]) + dx, sy(p[1]) + dy);
+  }
+
+  const R = 16; // the box the "Desmos" curves are sampled over
+  const range = (a, b, step) => {
+    const out = [];
+    for (let x = a; x <= b + 1e-9; x += step) out.push(x);
+    return out;
+  };
+  const SAMPLES = {
+    sin: range(-R, R, 0.05).map((x) => [x, Math.sin(x)]),
+    circle: range(0, 2 * Math.PI, Math.PI / 90).map((a) => [
+      2 * Math.cos(a),
+      2 * Math.sin(a),
+    ]),
+    parab: range(-R, R, 0.05)
+      .map((x) => [x, (x * x) / 4 - 3])
+      .filter((p) => p[1] < R),
+    regionEdge: range(-R + 1, R, 0.05).map((x) => [x, x - 1]),
+    region: [
+      [-R + 1, -R],
+      [R, -R],
+      [R, R - 1],
+    ],
+  };
+
+  // ---- the exact route: each expression F = 0 becomes F(T⁻¹(q)) = 0 ----------
+  // Plotted on a pixel lattice by marching squares, which is close to how
+  // Desmos itself draws an implicit curve.
+  const IMPLICIT = {
+    sin: (p) => p[1] - Math.sin(p[0]),
+    circle: (p) => p[0] * p[0] + p[1] * p[1] - 4,
+    parab: (p) => p[1] - (p[0] * p[0]) / 4 + 3,
+    region: (p) => p[1] - p[0] + 1,
+  };
+  function lattice(inv, cell) {
+    const nx = Math.ceil(view.w / cell) + 1,
+      ny = Math.ceil(view.h / cell) + 1;
+    const pre = new Array(nx * ny);
+    for (let j = 0; j < ny; j++)
+      for (let i = 0; i < nx; i++)
+        pre[j * nx + i] = inv([mx(i * cell), my(j * cell)]);
+    return { nx, ny, cell, pre };
+  }
+  function contour(L, F, color, width, alpha = 1, maxSpread = Infinity) {
+    const { nx, ny, cell, pre } = L;
+    // Where one pixel cell spans more than maxSpread in the original plane,
+    // lines spaced 1 apart would be closer than a pixel: they are skipped
+    // rather than drawn as noise.
+    const spread = (i, j) => {
+      const p = pre[j * nx + i],
+        q = pre[(j + 1) * nx + i + 1];
+      return Math.hypot(q[0] - p[0], q[1] - p[1]);
+    };
+    const v = pre.map((p) =>
+      p && isFinite(p[0]) && isFinite(p[1]) ? F(p) : NaN
+    );
+    ctx.beginPath();
+    const edge = (a, b, ax, ay, bx, by) => {
+      const s = a / (a - b);
+      return [ax + (bx - ax) * s, ay + (by - ay) * s];
+    };
+    for (let j = 0; j + 1 < ny; j++)
+      for (let i = 0; i + 1 < nx; i++) {
+        const a = v[j * nx + i],
+          b = v[j * nx + i + 1],
+          c = v[(j + 1) * nx + i + 1],
+          d = v[(j + 1) * nx + i];
+        if (!(isFinite(a) && isFinite(b) && isFinite(c) && isFinite(d)))
+          continue;
+        // A sign change between huge values is a pole, not a crossing.
+        // A real crossing has a value near zero at some corner; a pole's
+        // sign change happens between two huge ones.
+        if (Math.min(Math.abs(a), Math.abs(b), Math.abs(c), Math.abs(d)) > 50)
+          continue;
+        if (maxSpread !== Infinity && !(spread(i, j) <= maxSpread)) continue;
+        const x0 = i * cell,
+          y0 = j * cell,
+          x1 = x0 + cell,
+          y1 = y0 + cell;
+        const pts = [];
+        if (a < 0 !== b < 0) pts.push(edge(a, b, x0, y0, x1, y0));
+        if (b < 0 !== c < 0) pts.push(edge(b, c, x1, y0, x1, y1));
+        if (c < 0 !== d < 0) pts.push(edge(c, d, x1, y1, x0, y1));
+        if (d < 0 !== a < 0) pts.push(edge(d, a, x0, y1, x0, y0));
+        for (let k = 0; k + 1 < pts.length; k += 2) {
+          ctx.moveTo(pts[k][0], pts[k][1]);
+          ctx.lineTo(pts[k + 1][0], pts[k + 1][1]);
+        }
+      }
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineCap = "round";
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  function drawExact(inv) {
+    const L = lattice(inv, 3);
+    if (state.show.grid) {
+      // The grid lines are where T⁻¹(q) has a whole-number coordinate.
+      contour(L, (p) => Math.sin(Math.PI * p[0]), css("--d-blue"), 1, 0.5, 0.6);
+      contour(L, (p) => Math.sin(Math.PI * p[1]), css("--d-blue"), 1, 0.5, 0.6);
+    }
+    if (state.exprs.region) {
+      const { nx, ny, cell, pre } = L;
+      ctx.fillStyle = css("--d-red");
+      ctx.globalAlpha = 0.18;
+      for (let j = 0; j + 1 < ny; j++)
+        for (let i = 0; i + 1 < nx; i++) {
+          const p = pre[j * nx + i];
+          if (p && isFinite(p[0]) && isFinite(p[1]) && IMPLICIT.region(p) < 0)
+            ctx.fillRect(i * cell, j * cell, cell, cell);
+        }
+      ctx.globalAlpha = 1;
+      contour(L, IMPLICIT.region, css("--d-red"), 1.5, 0.8);
+    }
+    if (state.exprs.sin) contour(L, IMPLICIT.sin, css("--d-blue"), 2.5);
+    if (state.exprs.parab) contour(L, IMPLICIT.parab, css("--d-orange"), 2.5);
+    if (state.exprs.circle) contour(L, IMPLICIT.circle, css("--d-green"), 2.5);
+    if (state.exprs.point) drawPoint(map, 1);
+  }
+  function drawPoint(f, alpha) {
+    const p = f([1, 2]);
+    if (!isFinite(p[0]) || !isFinite(p[1])) return;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = css("--d-purple");
+    ctx.beginPath();
+    ctx.arc(sx(p[0]), sy(p[1]), 5.5, 0, 2 * Math.PI);
+    ctx.fill();
+    if (alpha === 1) {
+      ctx.font = "13px " + css("--font-ui");
+      ctx.fillText(
+        state.on ? `(${fmt(p[0])}, ${fmt(p[1])})` : "(1, 2)",
+        sx(p[0]) + 8,
+        sy(p[1]) + 16
+      );
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---- the redraw route: what Desmos drew, sent through T ---------------------
+  // Desmos samples only the visible window, so the originals are cut to it
+  // here too, and a map that pulls points inward leaves an empty band.
+  function windowed(pts, box) {
+    return pts.map((p) =>
+      Math.abs(p[0]) <= box[0] && Math.abs(p[1]) <= box[1] ? p : [NaN, NaN]
+    );
+  }
+  function clipRegion(box) {
+    // y < x − 1 inside the window: the convex polygon below the line.
+    const [X, Y] = box,
+      out = [];
+    const corners = [
+      [-X, -Y],
+      [X, -Y],
+      [X, Y],
+      [-X, Y],
+    ];
+    for (let k = 0; k < 4; k++) {
+      const p = corners[k],
+        q = corners[(k + 1) % 4];
+      const fp = IMPLICIT.region(p),
+        fq = IMPLICIT.region(q);
+      if (fp < 0) out.push(p);
+      if (fp < 0 !== fq < 0) {
+        const s = fp / (fp - fq);
+        out.push([p[0] + (q[0] - p[0]) * s, p[1] + (q[1] - p[1]) * s]);
+      }
+    }
+    return out;
+  }
+
+  function drawGraph(f, alpha) {
+    ctx.globalAlpha = alpha;
+    const box = [view.w / 2 / view.unit, view.h / 2 / view.unit];
+    const S = (key) => windowed(SAMPLES[key], box);
+    const poly = clipRegion(box);
+    // Before the first layout the window has no size, and so no region.
+    if (state.exprs.region && poly.length >= 3) {
+      tracePath(mappedPath(poly.concat([poly[0]]), f, 0.1), true);
+      ctx.fillStyle = css("--d-red");
+      const a = ctx.globalAlpha;
+      ctx.globalAlpha = a * 0.18;
+      ctx.fill();
+      ctx.globalAlpha = a;
+      stroke(mappedPath(S("regionEdge"), f, 0.05), css("--d-red"), 2, [7, 5]);
+    }
+    if (state.exprs.sin)
+      stroke(mappedPath(S("sin"), f, 0.05), css("--d-blue"), 2.5);
+    if (state.exprs.parab)
+      stroke(mappedPath(S("parab"), f, 0.05), css("--d-orange"), 2.5);
+    if (state.exprs.circle)
+      stroke(mappedPath(S("circle"), f, 0.05), css("--d-green"), 2.5);
+    ctx.globalAlpha = 1;
+    if (state.exprs.point) drawPoint(f, alpha);
+  }
+
+  function draw() {
+    const W = view.w,
+      H = view.h;
+    ctx.fillStyle = css("--paper");
+    ctx.fillRect(0, 0, W, H);
+    const xr = Math.ceil(W / 2 / view.unit) + 1;
+    const yr = Math.ceil(H / 2 / view.unit) + 1;
+    const plain = (p, q, color, width) => stroke([p, q], color, width);
+    // Graph paper stays put: it is the reference the map is measured against.
+    for (let i = -xr; i <= xr; i++)
+      plain([i, -yr], [i, yr], css("--grid-major"), 1);
+    for (let j = -yr; j <= yr; j++)
+      plain([-xr, j], [xr, j], css("--grid-major"), 1);
+    plain([-xr, 0], [xr, 0], css("--axis"), 1.5);
+    plain([0, -yr], [0, yr], css("--axis"), 1.5);
+    ctx.font = "12px " + css("--font-ui");
+    ctx.fillStyle = css("--ink-2");
+    for (let i = -xr; i <= xr; i += 2)
+      if (i) ctx.fillText(i, sx(i) - 4, sy(0) + 14);
+    for (let j = -yr; j <= yr; j += 2)
+      if (j) ctx.fillText(j, sx(0) + 5, sy(j) + 4);
+
+    const blue = css("--d-blue"),
+      red = css("--d-red"),
+      green = css("--d-green");
+    const purple = css("--d-purple"),
+      orange = css("--d-orange"),
+      gray = css("--d-gray");
+    const linear = state.kind === "linear";
+    const ident = (p) => p;
+
+    if (state.show.field && state.on) {
+      const pts = [];
+      let maxLen = 0;
+      for (let i = -xr; i <= xr; i++)
+        for (let j = -yr; j <= yr; j++) {
+          const v = map([i, j]);
+          const l = Math.hypot(v[0], v[1]);
+          if (isFinite(l))
+            (maxLen = Math.max(maxLen, l)), pts.push([[i, j], v, l]);
+        }
+      for (const [p, v, l] of pts) {
+        if (l < 1e-9) continue;
+        const k = 0.8 / (maxLen || 1);
+        const hue = 220 - 200 * Math.min(1, l / (maxLen || 1));
+        const color = `hsl(${hue} 65% 50% / 0.75)`;
+        const tip = [p[0] + v[0] * k, p[1] + v[1] * k];
+        stroke([p, tip], color, 1.5);
+        head(p, tip, color);
+      }
+    }
+
+    const inUse = routeInUse();
+    const inv = inUse.route === "exact" ? inverseMap() : null;
+    if (state.show.grid && state.on && !inv) {
+      ctx.globalAlpha = 0.5;
+      for (let i = -R; i <= R; i++) {
+        stroke(
+          mappedPath(
+            [
+              [i, -R],
+              [i, R],
+            ],
+            map,
+            0.08
+          ),
+          blue,
+          1
+        );
+        stroke(
+          mappedPath(
+            [
+              [-R, i],
+              [R, i],
+            ],
+            map,
+            0.08
+          ),
+          blue,
+          1
+        );
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // The expression list's own graph: faint as typed, solid as mapped.
+    if (state.on && state.show.ghost) drawGraph(ident, 0.22);
+    if (inv) drawExact(inv);
+    else drawGraph(map, 1);
+
+    const J0 = curM();
+    const det0 = J0[0] * J0[3] - J0[1] * J0[2];
+    if (state.show.square) {
+      const sq = mappedPath(
+        [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+          [0, 1],
+          [0, 0],
+        ],
+        map,
+        0.02
+      );
+      // Signed area by the shoelace formula, so a curved image is measured too.
+      let area = 0;
+      for (let k = 0; k + 1 < sq.length; k++)
+        area += sq[k][0] * sq[k + 1][1] - sq[k + 1][0] * sq[k][1];
+      area /= 2;
+      const tint = area < 0 ? orange : green;
+      tracePath(sq, true);
+      ctx.fillStyle = tint;
+      ctx.globalAlpha = 0.22;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      stroke(sq, tint, 2, null, true);
+      const c = map([0.5, 0.5]);
+      ctx.font = "13px " + css("--font-ui");
+      ctx.fillStyle = tint;
+      if (isFinite(c[0]))
+        ctx.fillText(
+          "area " + fmt(Math.abs(area)),
+          sx(c[0]) - 22,
+          sy(c[1]) + 4
+        );
+    }
+    if (state.show.circle) {
+      const ring = range(0, 2 * Math.PI, Math.PI / 60).map((a) => [
+        Math.cos(a),
+        Math.sin(a),
+      ]);
+      stroke(mappedPath(ring, map, 0.04), css("--ink"), 1.5, [5, 4], true);
+    }
+    if (state.show.eigen && linear && state.on) {
+      const e = eigen(J0);
+      if (e.real && !e.everyVector)
+        for (const { l, v } of e.real) {
+          const n = Math.hypot(...v);
+          const u = [v[0] / n, v[1] / n];
+          stroke(
+            [
+              [-u[0] * 40, -u[1] * 40],
+              [u[0] * 40, u[1] * 40],
+            ],
+            purple,
+            2,
+            [8, 6]
+          );
+          label("λ = " + fmt(l), [u[0] * 4.6, u[1] * 4.6], purple, 6, -6);
+        }
+    }
+
+    // The probe: a small square at p under T (curved) and under J(p), dashed.
+    if (!linear && state.on) {
+      const p = state.probe,
+        s = 0.6;
+      const box = [
+        [p[0], p[1]],
+        [p[0] + s, p[1]],
+        [p[0] + s, p[1] + s],
+        [p[0], p[1] + s],
+        [p[0], p[1]],
+      ];
+      const J = jacobian(p);
+      const Tp = map(p);
+      const lin = box.map((q) => {
+        const d = apply(J, [q[0] - p[0], q[1] - p[1]]);
+        return [Tp[0] + d[0], Tp[1] + d[1]];
+      });
+      if (state.show.ghost) stroke(box, purple, 1.2, null, true);
+      tracePath(mappedPath(box, map, 0.01), true);
+      ctx.fillStyle = purple;
+      ctx.globalAlpha = 0.25;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      stroke(mappedPath(box, map, 0.01), purple, 2, null, true);
+      stroke(lin, purple, 1.5, [4, 3], true);
+      ctx.beginPath();
+      ctx.moveTo(sx(p[0]), sy(p[1]) - 7);
+      ctx.lineTo(sx(p[0]) + 7, sy(p[1]));
+      ctx.lineTo(sx(p[0]), sy(p[1]) + 7);
+      ctx.lineTo(sx(p[0]) - 7, sy(p[1]));
+      ctx.closePath();
+      ctx.fillStyle = purple;
+      ctx.fill();
+      label("p", p, purple, -18, -8);
+    }
+
+    state.vecs.forEach((v, k) => {
+      if (state.on) {
+        if (state.show.ghost) mappedArrow(v, gray, 2.5, ident);
+        mappedArrow(v, red, 3, map);
+        label(
+          (linear ? "Av" : "T(v") + sub(k + 1) + (linear ? "" : ")"),
+          map(v),
+          red
+        );
+      } else mappedArrow(v, gray, 2.5, ident);
+      label("v" + sub(k + 1), v, gray, 8, 16);
+      ctx.beginPath();
+      ctx.arc(sx(v[0]), sy(v[1]), 6, 0, 2 * Math.PI);
+      ctx.strokeStyle = gray;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    });
+  }
+
+  // ---- panel --------------------------------------------------------------------
+  function renderFacts() {
+    const linear = state.kind === "linear";
+    $("factsTitle").textContent = linear ? "What A does" : "What T does near p";
+    const rows = [];
+    let plain;
+    if (linear) {
+      const M = state.m;
+      const e = eigen(M);
+      rows.push(["det A", fmt(e.det)], ["trace", fmt(e.tr)]);
+      const eigText = e.complex
+        ? `${fmt(e.complex[0])} ± ${fmt(e.complex[1])}i`
+        : [...new Set(e.real.map((r) => fmt(r.l)))].join(", ");
+      rows.push(["eigenvalues", eigText]);
+      if (state.level === "full") {
+        const [s1, s2] = singular(M);
+        const term = (k, x) =>
+          Math.abs(k) < 1e-12
+            ? ""
+            : `${k < 0 ? " + " : " − "}${Math.abs(k) === 1 && x ? "" : fmt(Math.abs(k))}${x}`;
+        rows.push([
+          "char. polynomial",
+          "λ²" + term(e.tr, "λ") + term(-e.det, ""),
+        ]);
+        rows.push(["singular values", `${fmt(s1)}, ${fmt(s2)}`]);
+        rows.push([
+          "inverse",
+          Math.abs(e.det) < 1e-12
+            ? "none (det = 0)"
+            : `exists; det A⁻¹ = ${fmt(1 / e.det)}`,
+        ]);
+        if (e.complex)
+          rows.push([
+            "rotation per step",
+            fmt((Math.atan2(e.complex[1], e.complex[0]) * 180) / Math.PI) +
+              "°, |λ| = " +
+              fmt(Math.hypot(...e.complex)),
+          ]);
+      }
+      if (Math.abs(e.det) < 1e-12)
+        plain =
+          "A squashes the plane onto a line or a point, so areas become 0 and A cannot be undone.";
+      else if (e.complex)
+        plain =
+          "No direction survives. A turns every vector, and scales areas by " +
+          fmt(Math.abs(e.det)) +
+          ".";
+      else if (e.everyVector)
+        plain =
+          "A scales every vector by the same amount, " +
+          fmt(M[0]) +
+          ", in every direction.";
+      else
+        plain = `Areas are scaled by ${fmt(Math.abs(e.det))}${e.det < 0 ? ", and the plane is flipped over" : ""}. Along the purple lines A only stretches, by its eigenvalues.`;
+    } else {
+      const p = state.probe;
+      const J = jacobian(p, (q) => baseMap(q));
+      const det = J[0] * J[3] - J[1] * J[2];
+      const Tp = baseMap(p);
+      rows.push(
+        ["p", `(${fmt(p[0])}, ${fmt(p[1])})`],
+        ["T(p)", `(${fmt(Tp[0])}, ${fmt(Tp[1])})`]
+      );
+      rows.push([
+        "J(p)",
+        `[${fmt(J[0])}, ${fmt(J[1])}; ${fmt(J[2])}, ${fmt(J[3])}]`,
+      ]);
+      rows.push(["det J(p)", fmt(det)]);
+      if (state.level === "full") {
+        const e = eigen(J);
+        rows.push([
+          "eigenvalues of J",
+          e.complex
+            ? `${fmt(e.complex[0])} ± ${fmt(e.complex[1])}i`
+            : [...new Set(e.real.map((r) => fmt(r.l)))].join(", "),
+        ]);
+        const [s1, s2] = singular(J);
+        rows.push(["stretch range", `${fmt(s2)} to ${fmt(s1)}`]);
+        rows.push([
+          "locally invertible",
+          Math.abs(det) < 1e-9 ? "no (det J = 0)" : "yes",
+        ]);
+      }
+      plain =
+        Math.abs(det) < 1e-9
+          ? "At p, T crushes small shapes flat (det J = 0). The dashed square collapses."
+          : `Near p, T acts like the matrix J(p). It scales small areas by ${fmt(Math.abs(det))}${det < 0 ? " and flips them over" : ""}. The dashed shape is J's guess, the solid one is T, and they agree as the square shrinks.`;
+    }
+    $("facts").innerHTML = rows
+      .map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`)
+      .join("");
+    $("plain").textContent = state.on
+      ? plain
+      : "The map is off, so the graph is drawn exactly as typed.";
+  }
+
+  function renderLatex() {
+    const linear = state.kind === "linear";
+    const lines = [];
+    if (linear) {
+      const [a, b, c, d] = state.m;
+      lines.push(
+        String.raw`A=\begin{bmatrix}${tex(a)}&${tex(b)}\\${tex(c)}&${tex(d)}\end{bmatrix}`
+      );
+    } else
+      lines.push(
+        state.formulaTex ?? "(typed formula, in Desmos LaTeX from MathQuill)"
+      );
+    state.vecs.forEach((v, k) => {
+      lines.push(
+        String.raw`v_{${k + 1}}=\left(${tex(v[0])},${tex(v[1])}\right)`
+      );
+      lines.push(
+        linear
+          ? String.raw`A\cdot v_{${k + 1}}`
+          : String.raw`T\left(v_{${k + 1}}\right)`
+      );
+    });
+    $("latex").textContent = lines.join("\n");
+    $("latexNote").textContent = linear
+      ? "Desmos multiplies a matrix by a point and draws the point it gets; a column matrix it multiplies but does not draw. So the tab writes each v as a point, and draws the arrows itself."
+      : "A function that returns a point is ordinary Desmos, so T(v₁) is drawn as a point there too. The curved arrows and the mapped graph are drawn by the tab.";
+  }
+
+  function renderVecs() {
+    $("vecs").innerHTML = state.vecs
+      .map(
+        (v, k) => `<div class="vec">
+          <span class="swatch">v${sub(k + 1)}</span>
+          <input id="vx${k}" aria-label="x of v${k + 1}" value="${tex(v[0])}" />
+          <input id="vy${k}" aria-label="y of v${k + 1}" value="${tex(v[1])}" />
+          <span class="img"></span>
+          <button type="button" aria-label="Remove v${k + 1}" data-rm="${k}">×</button>
+        </div>`
+      )
+      .join("");
+    syncImages();
+  }
+  function syncImages() {
+    const spans = $("vecs").querySelectorAll(".img");
+    const name = state.kind === "linear" ? "Av" : "T(v)";
+    state.vecs.forEach(
+      (v, k) =>
+        spans[k] &&
+        (spans[k].textContent = `${name} = (${baseMap(v).map(fmt).join(", ")})`)
+    );
+  }
+
+  function renderLegend() {
+    const linear = state.kind === "linear";
+    const items = [
+      ["--d-gray", "v (drag the tip)"],
+      ["--d-red", linear ? "Av" : "T(v), the image of the arrow"],
+      ["--d-blue", "grid under the map"],
+      ["--d-green", "unit square"],
+      linear
+        ? ["--d-purple", "eigenvector lines"]
+        : ["--d-purple", "probe p (drag it): T solid, J(p) dashed"],
+    ];
+    $("legend").innerHTML = items
+      .map(([c, t]) => `<span><i style="background: var(${c})"></i>${t}</span>`)
+      .join("");
+  }
+
+  function refresh({ vecs = false } = {}) {
+    renderRoute();
+    if (vecs) renderVecs();
+    else syncImages();
+    renderFacts();
+    renderLatex();
+    draw();
+  }
+
+  // ---- controls ------------------------------------------------------------------
+  function chipRow(container, items, isOn, onClick) {
+    container.querySelectorAll(".chip").forEach((c) => c.remove());
+    items.forEach((item) => {
+      const b = document.createElement("button");
+      b.className = "chip";
+      b.type = "button";
+      b.textContent = item.name;
+      b.setAttribute("aria-pressed", String(isOn(item)));
+      b.onclick = () => {
+        onClick(item, b);
+        container
+          .querySelectorAll(".chip")
+          .forEach((c) => c.setAttribute("aria-pressed", String(c === b)));
+      };
+      container.append(b);
+    });
+  }
+  let presetName = "Shear";
+  function renderPresets() {
+    const list = state.kind === "linear" ? LINEAR : FORMULAS;
+    chipRow(
+      $("presets"),
+      list,
+      (p) => p.name === presetName,
+      (p) => {
+        presetName = p.name;
+        $("takeaway").textContent = p.take;
+        if (state.kind === "linear") setMatrix(p.m.slice());
+        else setFormula(p.fx, p.fy, p.tex, p.gx, p.gy);
+        animateIn();
+      }
+    );
+    const current = list.find((p) => p.name === presetName);
+    if (current) $("takeaway").textContent = current.take;
+  }
+
+  function setMatrix(m) {
+    state.m = m;
+    ["a", "b", "c", "d"].forEach((id, i) => ($(id).value = String(m[i])));
+  }
+  function setFormula(fx, fy, texStr, gx = "", gy = "") {
+    $("fx").value = fx;
+    $("fy").value = fy;
+    $("gx").value = gx;
+    $("gy").value = gy;
+    state.formulaTex = texStr;
+    readFormula();
+    readInverse();
+  }
+  function readInverse() {
+    const gx = $("gx").value.trim(),
+      gy = $("gy").value.trim();
+    $("gErr").hidden = true;
+    if (!gx || !gy) {
+      state.inv = null;
+      return;
+    }
+    try {
+      state.inv = [compile(gx), compile(gy)];
+    } catch (err) {
+      state.inv = null;
+      $("gErr").textContent = err.message;
+      $("gErr").hidden = false;
+    }
+  }
+  function readFormula() {
+    try {
+      state.f = [compile($("fx").value), compile($("fy").value)];
+      $("fErr").hidden = true;
+      $("fx").removeAttribute("aria-invalid");
+      $("fy").removeAttribute("aria-invalid");
+    } catch (err) {
+      $("fErr").textContent = err.message;
+      $("fErr").hidden = false;
+      $("fx").setAttribute("aria-invalid", "true");
+    }
+  }
+
+  function setKind(kind) {
+    state.kind = kind;
+    $("kindLinear").setAttribute("aria-pressed", String(kind === "linear"));
+    $("kindFormula").setAttribute("aria-pressed", String(kind === "formula"));
+    $("linearBox").hidden = kind !== "linear";
+    $("formulaBox").hidden = kind === "linear";
+    $("tLabel").textContent = kind === "linear" ? "I → A" : "I → T";
+    presetName = kind === "linear" ? "Shear" : "Wave";
+    if (kind === "linear") setMatrix(LINEAR[0].m.slice());
+    else
+      setFormula(
+        FORMULAS[0].fx,
+        FORMULAS[0].fy,
+        FORMULAS[0].tex,
+        FORMULAS[0].gx,
+        FORMULAS[0].gy
+      );
+    // Eigenvectors are a linear idea; the toggle hides itself for formulas.
+    [...$("shows").children].forEach((c) => {
+      if (c.dataset.key === "eigen") c.hidden = kind !== "linear";
+    });
+    renderPresets();
+    renderLegend();
+    refresh({ vecs: true });
+    animateIn();
+  }
+  $("kindLinear").onclick = () => setKind("linear");
+  $("kindFormula").onclick = () => setKind("formula");
+
+  function setOn(on) {
+    state.on = on;
+    $("onOff").setAttribute("aria-checked", String(on));
+    $("onLabel").textContent = on ? "Transforming the graph" : "Graph as typed";
+    $("onNote").textContent = on
+      ? "Everything on the graph is drawn through the map."
+      : "The map is off; turn it on to send the whole graph through it.";
+    $("work").classList.toggle("off", !on);
+    refresh();
+  }
+  $("onOff").onclick = () => setOn(!state.on);
+
+  function renderRoute() {
+    const exactAsked = state.route === "exact";
+    $("routeExact").setAttribute("aria-pressed", String(exactAsked));
+    $("routeRedraw").setAttribute("aria-pressed", String(!exactAsked));
+    const r = routeInUse();
+    let note;
+    if (!exactAsked)
+      note =
+        "Works for any map, and scrubs smoothly. Desmos only drew what is on screen, so a map that pulls points inward leaves an empty band at the edge.";
+    else if (r.route === "redraw") note = r.why;
+    else if (state.kind === "linear")
+      note =
+        "Each expression is rewritten with (x, y) → A⁻¹(x, y), and Desmos draws it, shading included, sharp to the edge.";
+    else
+      note =
+        "Each expression is rewritten with (x, y) → T⁻¹(x, y). With a formula this draws the finished map only: the in-between maps have no formula for their inverse.";
+    $("routeNote").textContent = note;
+    // Scrubbing a formula on the exact route would need those missing inverses.
+    const frozen = r.route === "exact" && state.kind === "formula";
+    $("t").disabled = frozen;
+    $("play").disabled = frozen;
+    if (frozen && state.t !== 1) {
+      cancelAnimationFrame(raf);
+      state.t = 1;
+      $("t").value = 1;
+      $("tOut").textContent = "t = 1.00";
+    }
+  }
+  const setRoute = (route) => {
+    state.route = route;
+    refresh();
+  };
+  $("routeExact").onclick = () => setRoute("exact");
+  $("routeRedraw").onclick = () => setRoute("redraw");
+
+  SHOWS.forEach(([key, name]) => {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.type = "button";
+    b.dataset.key = key;
+    b.textContent = name;
+    b.setAttribute("aria-pressed", String(state.show[key]));
+    b.onclick = () => {
+      state.show[key] = !state.show[key];
+      b.setAttribute("aria-pressed", String(state.show[key]));
+      draw();
+    };
+    $("shows").append(b);
+  });
+  EXPRS.forEach((e) => {
+    const b = document.createElement("button");
+    b.className = "expr";
+    b.type = "button";
+    b.style.color = `var(${e.color})`;
+    b.setAttribute("aria-pressed", "true");
+    b.setAttribute("aria-label", `Show ${e.text}`);
+    b.innerHTML = `<span class="dot"></span><i style="color: var(--ink)">${e.text}</i>`;
+    b.onclick = () => {
+      state.exprs[e.key] = !state.exprs[e.key];
+      b.setAttribute("aria-pressed", String(state.exprs[e.key]));
+      draw();
+    };
+    $("exprs").append(b);
+  });
+
+  ["a", "b", "c", "d"].forEach((id, i) =>
+    $(id).addEventListener("input", (ev) => {
+      const v = parseFloat(ev.target.value);
+      if (!isFinite(v)) return;
+      state.m[i] = v;
+      presetName = "";
+      $("presets")
+        .querySelectorAll(".chip")
+        .forEach((c) => c.setAttribute("aria-pressed", "false"));
+      $("takeaway").textContent =
+        "Your own matrix. Watch the square's area and the purple lines as you change it.";
+      refresh();
+    })
+  );
+  ["gx", "gy"].forEach((id) =>
+    $(id).addEventListener("input", () => {
+      readInverse();
+      refresh();
+    })
+  );
+  ["fx", "fy"].forEach((id) =>
+    $(id).addEventListener("input", () => {
+      readFormula();
+      state.formulaTex = null;
+      presetName = "";
+      $("presets")
+        .querySelectorAll(".chip")
+        .forEach((c) => c.setAttribute("aria-pressed", "false"));
+      $("takeaway").textContent =
+        "Your own map. Drag the probe to see where it stretches, squeezes or folds.";
+      refresh();
+    })
+  );
+
+  $("vecs").addEventListener("input", (ev) => {
+    const m = /^v([xy])(\d+)$/.exec(ev.target.id);
+    if (!m) return;
+    const v = parseFloat(ev.target.value);
+    if (!isFinite(v)) return;
+    state.vecs[+m[2]][m[1] === "x" ? 0 : 1] = v;
+    refresh();
+  });
+  $("vecs").addEventListener("click", (ev) => {
+    const k = ev.target.dataset?.rm;
+    if (k === undefined) return;
+    state.vecs.splice(+k, 1);
+    refresh({ vecs: true });
+  });
+  $("addVec").onclick = () => {
+    state.vecs.push([-1, 1 + (state.vecs.length % 3)]);
+    refresh({ vecs: true });
+  };
+
+  const setLevel = (lvl) => {
+    state.level = lvl;
+    $("lvlSimple").setAttribute("aria-pressed", String(lvl === "simple"));
+    $("lvlFull").setAttribute("aria-pressed", String(lvl === "full"));
+    renderFacts();
+  };
+  $("lvlSimple").onclick = () => setLevel("simple");
+  $("lvlFull").onclick = () => setLevel("full");
+
+  const NOTE_TYPED =
+    "With “Expression A”, the tab reads any <code>\\begin{bmatrix}</code> defined in the list instead, sliders included.";
+  const NOTE_EXPR =
+    "Reading <code>A</code> from the expression list. Its value is the matrix Desmos computed (value type 42), so a rotation matrix with a slider animates the whole graph.";
+  const setSrc = (expr) => {
+    $("srcTyped").setAttribute("aria-pressed", String(!expr));
+    $("srcExpr").setAttribute("aria-pressed", String(expr));
+    $("srcNote").innerHTML = expr ? NOTE_EXPR : NOTE_TYPED;
+  };
+  $("srcTyped").onclick = () => setSrc(false);
+  $("srcExpr").onclick = () => setSrc(true);
+  setSrc(false);
+
+  const setT = (t) => {
+    state.t = t;
+    $("t").value = t;
+    $("tOut").textContent = "t = " + t.toFixed(2);
+    renderFacts();
+    draw();
+  };
+  $("t").addEventListener("input", (ev) => setT(parseFloat(ev.target.value)));
+  let raf = 0;
+  function animateIn() {
+    cancelAnimationFrame(raf);
+    refresh({ vecs: true });
+    const frozen = routeInUse().route === "exact" && state.kind === "formula";
+    if (
+      !state.on ||
+      frozen ||
+      matchMedia("(prefers-reduced-motion: reduce)").matches
+    )
+      return setT(1);
+    const start = performance.now();
+    const step = (now) => {
+      const s = Math.min(1, (now - start) / 1400);
+      setT(s < 0.5 ? 2 * s * s : 1 - (-2 * s + 2) ** 2 / 2);
+      if (s < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+  }
+  $("play").onclick = () => {
+    if (!state.on) setOn(true);
+    animateIn();
+  };
+
+  // Drag the gray tips, and the probe; positions snap to tenths.
+  const pos = (ev) => {
+    const r = canvas.getBoundingClientRect();
+    return [ev.clientX - r.left, ev.clientY - r.top];
+  };
+  function grab(px, py) {
+    let best = null,
+      bestD = 16;
+    state.vecs.forEach((v, k) => {
+      const d = Math.hypot(sx(v[0]) - px, sy(v[1]) - py);
+      if (d < bestD) (best = k), (bestD = d);
+    });
+    if (state.kind === "formula" && state.on) {
+      const p = state.probe;
+      if (Math.hypot(sx(p[0]) - px, sy(p[1]) - py) < bestD) best = "probe";
+    }
+    return best;
+  }
+  canvas.addEventListener("pointerdown", (ev) => {
+    const [px, py] = pos(ev);
+    state.drag = grab(px, py);
+    if (state.drag !== null) canvas.setPointerCapture(ev.pointerId);
+  });
+  canvas.addEventListener("pointermove", (ev) => {
+    const [px, py] = pos(ev);
+    if (state.drag === null) {
+      canvas.style.cursor = grab(px, py) !== null ? "grab" : "crosshair";
+      return;
+    }
+    const snap = (x) => Math.round(x * 10) / 10;
+    const at = [snap(mx(px)), snap(my(py))];
+    if (state.drag === "probe") {
+      state.probe = at;
+    } else {
+      const k = state.drag;
+      state.vecs[k] = at;
+      $("vx" + k).value = at[0];
+      $("vy" + k).value = at[1];
+    }
+    refresh();
+  });
+  const endDrag = () => (state.drag = null);
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+
+  new ResizeObserver(resize).observe(canvas);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+  new MutationObserver(draw).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+  renderPresets();
+  renderLegend();
+  refresh({ vecs: true });
+  resize();
+</script>
