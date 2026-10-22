@@ -147,6 +147,8 @@ function closeOf(latex: string, from: number) {
  * components, or undefined if it is one expression.
  */
 export function splitVector(latex: string): string[] | undefined {
+  const entries = matrixVector(latex);
+  if (entries !== undefined) return entries;
   let inner = latex.trim();
   const opener = tokenAt(inner, 0, [
     "\\left\\langle",
@@ -171,6 +173,64 @@ export function splitVector(latex: string): string[] | undefined {
     start = comma + 1;
   }
   return parts.every((part) => part !== "") ? parts : undefined;
+}
+
+/**
+ * A column or row matrix of two or three entries, as those entries.
+ *
+ * Desmos's 2D calculator has matrices now (measured 2026-10-22) and writes a
+ * column vector as `\begin{bmatrix}P\\Q\end{bmatrix}`, the way a linear-algebra
+ * course does; its own MathQuill types that too. It does not draw one as an
+ * arrow, so the vector has to be split here like any other. CASes spell the
+ * same thing differently: sympy writes `\left[\begin{matrix}…\end{matrix}
+ * \right]`, Mathematica `\left(\begin{array}{c}…\end{array}\right)`, and
+ * papers use pmatrix. All of them are read, if they are the whole input.
+ */
+function matrixVector(latex: string): string[] | undefined {
+  let inner = latex.trim();
+  // An outer \left[ … \right] or \left( … \right) around a bare environment.
+  const [, enclosed] =
+    /^\\left[[(]\s*([\s\S]*?)\s*\\right[\])]$/.exec(inner) ?? [];
+  if (enclosed !== undefined && /^\\begin\{(?:matrix|array)\}/.test(enclosed))
+    inner = enclosed;
+  const head = /^\\begin\{([bp]?matrix|array)\}(\{[^}]*\})?/.exec(inner);
+  if (head === null) return undefined;
+  const end = `\\end{${head[1]}}`;
+  if (!inner.endsWith(end)) return undefined;
+  const body = inner.slice(head[0].length, inner.length - end.length);
+  // A nested environment would put its own & and \\ at our depth; refuse it
+  // rather than misread it.
+  if (body.includes("\\begin{")) return undefined;
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let start = 0;
+  walk(body, 0, (at) => {
+    if (body[at] === "&") {
+      row.push(body.slice(start, at).trim());
+      start = at + 1;
+    } else if (body.startsWith("\\\\", at)) {
+      row.push(body.slice(start, at).trim());
+      rows.push(row);
+      row = [];
+      start = at + 2;
+    }
+  });
+  row.push(body.slice(start).trim());
+  rows.push(row);
+  // A trailing \\ leaves one empty row behind.
+  if (rows.length > 1 && rows.at(-1)!.every((entry) => entry === ""))
+    rows.pop();
+  const entries =
+    rows.length === 1
+      ? rows[0]
+      : rows.every((r) => r.length === 1)
+        ? rows.flat()
+        : [];
+  return entries.length >= 2 &&
+    entries.length <= 3 &&
+    entries.every((entry) => entry !== "")
+    ? entries
+    : undefined;
 }
 
 // ---- the rewrites ----------------------------------------------------------

@@ -228,6 +228,19 @@ export interface Range extends Expression {
   isHalfEmpty: () => boolean;
 }
 
+export interface Matrix extends Expression {
+  // "\begin{bmatrix}1&2\\3&4\end{bmatrix}": the 2D calculator's matrices
+  // (live as of 2026-10-22). bmatrix is the only spelling it accepts.
+  type: "Matrix";
+  args: MatrixRow[];
+}
+
+export interface MatrixRow extends Expression {
+  // One row of a Matrix; it only ever appears as a Matrix's child.
+  type: "MatrixRow";
+  args: ChildExprNode[];
+}
+
 export interface ListAccess extends Expression {
   // "L[1]"
   type: "ListAccess";
@@ -662,6 +675,8 @@ export type ChildExprNode =
   | Prime
   | List
   | Range
+  | Matrix
+  | MatrixRow
   | ListAccess
   | BareSeq
   | ParenSeq

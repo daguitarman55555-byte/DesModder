@@ -600,11 +600,30 @@ export function childExprToAug(
         start: expr.startValues.map(childExprToAug),
         end: expr.endValues.map(childExprToAug),
       };
-    case "ListExpression":
+    case "ListExpression": {
+      // Desmos has no list of lists, so a list of equally long list literals
+      // is free to mean the matrix with those rows, as it does in NumPy.
+      const rows = expr.values;
+      if (
+        rows.length > 0 &&
+        rows.every(
+          (row) =>
+            row.type === "ListExpression" &&
+            row.values.length > 0 &&
+            row.values.length === (rows[0] as typeof row).values.length
+        )
+      )
+        return {
+          type: "Matrix",
+          rows: rows.map((row) =>
+            (row as typeof expr).values.map(childExprToAug)
+          ),
+        };
       return {
         type: "List",
         args: expr.values.map(childExprToAug),
       };
+    }
     case "ListComprehension":
       return {
         type: "ListComprehension",

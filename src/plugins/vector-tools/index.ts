@@ -741,6 +741,8 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   private presetWindowMount?: HTMLElement;
   private presetWindowView?: MountedComponent;
   private componentLinkNote = "";
+  /** How many pasted vectors have been split; the slot inputs remount on it. */
+  vectorSplits = 0;
   /** What the expression list defines, as of the last scan. */
   private environment: FieldEnvironment = EMPTY_ENVIRONMENT;
   /**
@@ -2673,6 +2675,15 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     const [latex, ...rest] = imported.components;
     if (rest.length > 0 && slot !== "f") {
       this.setVector(imported.components);
+      // The field the vector was pasted into still shows all of it; see
+      // vectorSplits. Later, because this runs inside that field's own change
+      // handler, and letting go of its focus dispatches.
+      setTimeout(() => {
+        const active = document.activeElement;
+        if (active instanceof HTMLElement) active.blur();
+        this.vectorSplits++;
+        this.util.tick();
+      });
       return;
     }
     const config = this.getConfig();

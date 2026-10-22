@@ -2382,3 +2382,78 @@ testWithPage(
   },
   90000
 );
+
+testWithPage(
+  "a column vector pasted in Desmos's matrix notation becomes P and Q",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await resetLibrary(driver);
+    await driver.assertSelectorEventually(BUTTON);
+    await driver.click(BUTTON);
+    await driver.assertSelector(PANEL);
+    await openTab(driver, "field");
+
+    // Desmos's 2D calculator has matrices now and writes a column vector as
+    // a bmatrix, so that is what gets copied out of it into P.
+    await driver.evaluate(
+      (latex: string) => {
+        const textarea = document.querySelector<HTMLTextAreaElement>(
+          ".dsm-vector-tools-math-input textarea"
+        )!;
+        textarea.focus();
+        const clipboardData = new DataTransfer();
+        clipboardData.setData("text/plain", latex);
+        textarea.value = latex;
+        textarea.dispatchEvent(
+          new ClipboardEvent("paste", { clipboardData, bubbles: true })
+        );
+      },
+      String.raw`\begin{bmatrix}-y\\sin\left(x\right)\end{bmatrix}`
+    );
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await driver.waitForSync();
+
+    const state = await driver.evaluate(() => {
+      const vt = DSM.enabledPlugins["vector-tools"] as any;
+      const config = vt.getConfig();
+      return {
+        source: config.source as string,
+        p: config.components.xLatex as string,
+        q: config.components.yLatex as string,
+        message: vt.message as string,
+        flow: vt.flowCompilation.ok as boolean,
+      };
+    });
+    expect(state).toMatchObject({
+      source: "components",
+      p: "-y",
+      q: String.raw`\sin\left(x\right)`,
+      flow: true,
+    });
+    expect(state.message).toContain("Split the pasted vector");
+
+    // P's own field shows P alone, without waiting for it to lose focus.
+    const shown = await driver.evaluate(() =>
+      [
+        ...document.querySelectorAll(
+          ".dsm-vector-tools-math-input .dcg-mq-root-block"
+        ),
+      ]
+        .slice(0, 2)
+        .map((block) => block.textContent)
+    );
+    expect(shown).toEqual(["−y", "sinx"]);
+
+    await driver.click(GENERATE);
+    await driver.waitForSync();
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    await driver.page.screenshot({
+      path: "docs/assets/vector-tools-pasted-matrix.png",
+    });
+
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);

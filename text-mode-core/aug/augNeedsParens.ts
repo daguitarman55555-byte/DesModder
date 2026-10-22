@@ -50,6 +50,7 @@ export default function augNeedsParens(
     case "Prime":
     case "Visualization":
     case "List":
+    case "Matrix":
     case "Piecewise":
     case "Restriction":
     case "Or": // Note "Or" can only show up as a direct child of restriction or Or.
@@ -152,6 +153,7 @@ function power(node: Aug.Latex.AnyChild): number {
       return node.value < 0 ? POWERS.prefix : POWERS.atom;
     case "Identifier":
     case "List":
+    case "Matrix":
     case "Range":
     case "Piecewise":
     case "Restriction":

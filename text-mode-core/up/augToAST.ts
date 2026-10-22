@@ -462,6 +462,14 @@ export function childLatexToAST(e: Aug.Latex.AnyChild): TextAST.Expression {
         type: "ListExpression",
         values: e.args.map(childLatexToAST),
       };
+    case "Matrix":
+      return {
+        type: "ListExpression",
+        values: e.rows.map((row) => ({
+          type: "ListExpression",
+          values: row.map(childLatexToAST),
+        })),
+      };
     case "Range":
       return {
         type: "RangeExpression",

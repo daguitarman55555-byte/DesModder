@@ -528,6 +528,13 @@ function childNodeToTree(node: AnyNode): Aug.Latex.AnyChild {
         type: "List",
         args: node.args.map(childNodeToTree),
       };
+    case "Matrix":
+      return {
+        type: "Matrix",
+        rows: node.args.map((row) => row.args.map(childNodeToTree)),
+      };
+    case "MatrixRow":
+      throw Error("Programming error: MatrixRow outside a Matrix");
     case "Range":
       return {
         type: "Range",

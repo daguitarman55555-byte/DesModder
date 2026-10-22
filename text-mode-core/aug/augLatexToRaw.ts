@@ -77,6 +77,18 @@ function childNodeToStringNoParen(
       );
     case "List":
       return wrapBracket(bareSeq(cfg, e.args, e));
+    case "Matrix":
+      // An entry is delimited by & and \\ already, so like a list's it never
+      // needs brackets of its own.
+      return (
+        "\\begin{bmatrix}" +
+        e.rows
+          .map((row) =>
+            row.map((entry) => childNodeToString(cfg, entry, e)).join("&")
+          )
+          .join("\\\\") +
+        "\\end{bmatrix}"
+      );
     case "Range":
       return wrapBracket(
         bareSeq(cfg, e.start, e, { alwaysBeforeComma: true }) +

@@ -28,6 +28,7 @@ export type AnyChild =
   | Derivative
   | Prime
   | List
+  | Matrix
   | Range
   | ListAccess
   | DotAccess
@@ -153,6 +154,13 @@ export interface List {
   // "[1,2,3]"
   type: "List";
   args: AnyChild[];
+}
+
+export interface Matrix {
+  // "\begin{bmatrix}1&2\\3&4\end{bmatrix}", written [[1,2],[3,4]] in text
+  // mode; rows[i][j] is row i, column j
+  type: "Matrix";
+  rows: AnyChild[][];
 }
 
 export interface Range {

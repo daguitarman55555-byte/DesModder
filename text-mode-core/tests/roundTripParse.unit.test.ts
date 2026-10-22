@@ -329,6 +329,34 @@ describe("Calls under a power or a factorial", () => {
   });
 });
 
+// The 2D calculator's matrices, which only parse spelled bmatrix. Before Aug
+// knew them, every expression holding one became a "Conversion error" note in
+// text mode, and editing the text wrote that note back over the matrix.
+describe("Matrices", () => {
+  const { raw } = String;
+  roundTrips([
+    raw`A=\begin{bmatrix}1&2\\3&4\end{bmatrix}`,
+    raw`\begin{bmatrix}x\\y+1\end{bmatrix}`,
+    raw`\begin{bmatrix}1&\frac{a}{2}&-3\end{bmatrix}`,
+    raw`A\cdot \begin{bmatrix}1\\2\end{bmatrix}`,
+  ]);
+
+  test("text mode writes a matrix as a list of its rows", () => {
+    const aug = parseRootLatex(raw`\begin{bmatrix}1&2\\3&4\end{bmatrix}`);
+    expect(astToText(rootLatexToAST(aug), { noOptionalSpaces: true })).toBe(
+      "[[1,2],[3,4]]"
+    );
+  });
+
+  test("rows of different lengths stay a list", () => {
+    const { children } = parse("[[1,2],[3]]").program;
+    const [item] = children;
+    if (item.type !== "ExprStatement")
+      throw new Error("Expected an expression.");
+    expect(childExprToAug(item.expr).type).toBe("List");
+  });
+});
+
 function roundTrips(cases: string[]) {
   describe("via Aug", () => cases.forEach(testRoundTripIdenticalViaAug));
   describe("via AST", () => cases.forEach(testRoundTripIdenticalViaAST));

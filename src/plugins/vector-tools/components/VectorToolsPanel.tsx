@@ -9,6 +9,7 @@ import {
   InlineMathInputViewGeneral,
   SegmentedControl,
   StaticMathQuillView,
+  Switch,
   SwitchUnion,
 } from "#components";
 import { format } from "#i18n";
@@ -2485,24 +2486,33 @@ function componentInput(
       <label class="dsm-vector-tools-label">
         {() => (vectorTools.is3d ? SLOT_LABELS_3D : SLOT_LABELS)[which]}
       </label>
-      <InlineMathInputViewGeneral
-        containerClass={() => ({ "dsm-vector-tools-math-input": true })}
-        placeholder={SLOT_PLACEHOLDERS[which]}
-        ariaLabel={`${which === "f" ? "f" : which.toUpperCase()} of x and y`}
-        latex={() => vectorTools.slotLatex(which)}
-        handleLatexChanged={(latex) => vectorTools.setSlot(which, latex)}
-        hasError={() => hasIssue(validation().issues, SLOT_ISSUE_NAMES[which])}
-        manageFocus={mathquillFocusHelper({
-          controller: vectorTools.cc,
-          location: {
-            type: "dsm-focus",
-            plugin: "vector-tools",
-            kind: which,
-          },
-        })}
-        controller={vectorTools.cc}
-        readonly={false}
-      />
+      {/* Remade when a pasted vector is split, because the input only
+          rewrites itself when its latex changes, and P can split out equal
+          to what it was while the field still shows the whole vector. */}
+      <Switch key={() => vectorTools.vectorSplits}>
+        {() => (
+          <InlineMathInputViewGeneral
+            containerClass={() => ({ "dsm-vector-tools-math-input": true })}
+            placeholder={SLOT_PLACEHOLDERS[which]}
+            ariaLabel={`${which === "f" ? "f" : which.toUpperCase()} of x and y`}
+            latex={() => vectorTools.slotLatex(which)}
+            handleLatexChanged={(latex) => vectorTools.setSlot(which, latex)}
+            hasError={() =>
+              hasIssue(validation().issues, SLOT_ISSUE_NAMES[which])
+            }
+            manageFocus={mathquillFocusHelper({
+              controller: vectorTools.cc,
+              location: {
+                type: "dsm-focus",
+                plugin: "vector-tools",
+                kind: which,
+              },
+            })}
+            controller={vectorTools.cc}
+            readonly={false}
+          />
+        )}
+      </Switch>
     </div>
   );
 }

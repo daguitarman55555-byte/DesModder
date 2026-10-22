@@ -80,6 +80,10 @@ export enum ValueType {
   ListOfDirectedAngleMarker = 31,
   Transformation = 32,
   ListOfTransformation = 33,
+  // The 2D calculator's matrices, measured 2026-10-22. A matrix times a point
+  // is a Point; a matrix times a column is still a Matrix.
+  Matrix = 42,
+  ListOfMatrix = 43,
   Segment3D = 102,
   ListOfSegment3D = 103,
   Triangle3D = 104,

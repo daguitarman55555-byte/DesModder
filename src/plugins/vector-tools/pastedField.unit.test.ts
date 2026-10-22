@@ -12,6 +12,20 @@ describe("splitting a pasted vector", () => {
     [String.raw`\langle -y, x \rangle`, ["-y", "x"]],
     [String.raw`\left(-y,x\right)`, ["-y", "x"]],
     [String.raw`-y, x, 1`, ["-y", "x", "1"]],
+    // Desmos's own column vector, since its 2D calculator gained matrices.
+    [String.raw`\begin{bmatrix}-y\\x\end{bmatrix}`, ["-y", "x"]],
+    [String.raw`\begin{bmatrix}-y&x&1\end{bmatrix}`, ["-y", "x", "1"]],
+    [
+      String.raw`\begin{bmatrix}\frac{x}{2}\\\left(y-1\right)^{2}\end{bmatrix}`,
+      [String.raw`\frac{x}{2}`, String.raw`\left(y-1\right)^{2}`],
+    ],
+    // sympy, Mathematica and a paper's spellings of the same column.
+    [String.raw`\left[\begin{matrix}- y\\x\end{matrix}\right]`, ["- y", "x"]],
+    [
+      String.raw`\left(\begin{array}{c} -y \\ x \\ \end{array}\right)`,
+      ["-y", "x"],
+    ],
+    [String.raw`\begin{pmatrix}-y\\x\\z\end{pmatrix}`, ["-y", "x", "z"]],
   ])("%s", (latex, parts) => {
     expect(splitVector(latex)).toEqual(parts);
   });
@@ -22,6 +36,15 @@ describe("splitting a pasted vector", () => {
     String.raw`\frac{x}{y}`,
     String.raw`\left\{x>0:1,2\right\}`,
   ])("a comma inside a bracket is not a component: %s", (latex) => {
+    expect(splitVector(latex)).toBeUndefined();
+  });
+
+  test.each([
+    String.raw`\begin{bmatrix}1&2\\3&4\end{bmatrix}`,
+    String.raw`\begin{bmatrix}x\end{bmatrix}`,
+    String.raw`\begin{bmatrix}1&0\\0&1\end{bmatrix}\begin{bmatrix}x\\y\end{bmatrix}`,
+    String.raw`\begin{bmatrix}1\\2\\3\\4\end{bmatrix}`,
+  ])("a matrix that is not a 2- or 3-vector is left alone: %s", (latex) => {
     expect(splitVector(latex)).toBeUndefined();
   });
 });
