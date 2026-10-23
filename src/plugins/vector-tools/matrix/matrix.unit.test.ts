@@ -15,11 +15,13 @@ import {
 } from "./matrixModel";
 import {
   MATRIX_FOLDER_ID,
+  NO_INVERSE_REASON,
   copyId,
   decodeId,
   encodeId,
   ghostId,
   isOwned,
+  polygonArguments,
   rewrite,
   sourceOfCopy,
   sourceOfGhost,
@@ -29,7 +31,11 @@ import {
 } from "./exactRoute";
 import { mapPolyline, sketchPrimitives, type PlaneMap } from "./redraw";
 import { jacobian, niceStep } from "./MatrixLayer";
-import { gridPositions } from "./grid";
+import { gridPositions, keptRuns } from "./grid";
+import { compileNode } from "./compile";
+import { evaluate } from "../../../symbolic/evaluate";
+import type { Node } from "../../../symbolic/tree";
+import { AugBuilders } from "../../../../text-mode-core";
 
 describe("Matrix tab configuration", () => {
   test("the default normalizes back to exactly itself", () => {
@@ -170,6 +176,7 @@ describe("the exact route's rewrite", () => {
         String.raw`H_{vtmx0n1}\left(x,y\right)=\sin x`,
       ],
       copy: String.raw`H_{vtmx0n0}\left(${pre}\right)=H_{vtmx0n1}\left(${pre}\right)`,
+      inverse: true,
     });
   });
 
@@ -198,6 +205,7 @@ describe("the exact route's rewrite", () => {
       ok: true,
       helpers: [],
       copy: String.raw`Y_{vtmx}\left(x,y\right)-f\left(X_{vtmx}\left(x,y\right)\right)=0`,
+      inverse: true,
     });
     const sideways = rewrite(
       source({
@@ -577,5 +585,156 @@ describe("explicit curves drawn forwards", () => {
       );
       expect(result.ok && result.parametric).toBeUndefined();
     }
+  });
+});
+
+describe("a compiled T means what the evaluator means", () => {
+  const { binop, functionCall, id, negative, number } = AugBuilders;
+  const fn = (name: string, arg: Node) => functionCall(id(name), [arg]);
+  // The fisheye's x′ = x / (1 + √(x² + y²)/4), and a wave with π and a minus.
+  const fisheye = binop(
+    "Divide",
+    id("x"),
+    binop(
+      "Add",
+      number(1),
+      binop(
+        "Divide",
+        fn(
+          "sqrt",
+          binop(
+            "Add",
+            binop("Exponent", id("x"), number(2)),
+            binop("Exponent", id("y"), number(2))
+          )
+        ),
+        number(4)
+      )
+    )
+  );
+  const wave = binop(
+    "Subtract",
+    negative(id("y")),
+    binop("Multiply", id("a"), fn("sin", binop("Multiply", id("pi"), id("x"))))
+  );
+
+  test.each([
+    ["the fisheye", fisheye],
+    ["a wave reading a slider", wave],
+    ["an unknown function", fn("nope", id("x"))],
+  ])("%s", (_, tree) => {
+    const compiled = compileNode(tree);
+    for (const [x, y] of [
+      [0, 0],
+      [1.5, -2],
+      [-7, 3.25],
+      [1e6, 1e-6],
+    ]) {
+      const bindings = { x, y, a: 0.4 };
+      const want = evaluate(tree, bindings);
+      const got = compiled(bindings);
+      if (Number.isNaN(want)) expect(got).toBeNaN();
+      else expect(got).toBe(want);
+    }
+  });
+});
+
+describe("the exact route without an inverse", () => {
+  const source = (partial: Partial<ExactSource>): ExactSource => ({
+    id: "1",
+    latex: "",
+    type: "X_OR_Y",
+    inequality: false,
+    ...partial,
+  });
+
+  test("what goes forwards is still copied", () => {
+    for (const s of [
+      source({ latex: String.raw`y=\sin x` }),
+      source({ type: "SINGLE_POINT", latex: String.raw`\left(1,2\right)` }),
+      source({ type: "POLAR", latex: String.raw`r=1+\cos\theta` }),
+    ]) {
+      const result = rewrite(s, "0", undefined, false, 64, false);
+      expect(result.ok).toBe(true);
+      expect(result.ok && result.inverse).toBeFalsy();
+    }
+  });
+
+  test("what needs T⁻¹ says so, and what has it is marked", () => {
+    const region = source({ latex: "y<x-1", inequality: true });
+    expect(rewrite(region, "0", undefined, false, 64, false)).toEqual({
+      ok: false,
+      reason: NO_INVERSE_REASON,
+    });
+    expect(rewrite(region, "0", undefined, false, 64, true)).toMatchObject({
+      ok: true,
+      inverse: true,
+    });
+  });
+});
+
+describe("a polygon under a matrix", () => {
+  test("its vertices are split at its own commas only", () => {
+    expect(
+      polygonArguments(
+        String.raw`\operatorname{polygon}\left(\left(0,0\right),\left(1,0\right),P\right)`
+      )
+    ).toEqual([
+      String.raw`\left(0,0\right)`,
+      String.raw`\left(1,0\right)`,
+      "P",
+    ]);
+    expect(
+      polygonArguments(String.raw`\operatorname{polygon}\left(L\right)`)
+    ).toEqual(["L"]);
+    expect(polygonArguments("y=x")).toBeUndefined();
+  });
+
+  test("is carried vertex by vertex, but only by a linear map", () => {
+    const polygon: ExactSource = {
+      id: "1",
+      type: "POLYGON",
+      inequality: false,
+      latex: String.raw`\operatorname{polygon}\left(\left(0,0\right),L\right)`,
+    };
+    expect(
+      rewrite(polygon, "0", undefined, false, 64, true, true)
+    ).toMatchObject({
+      ok: true,
+      copy: String.raw`\operatorname{polygon}\left(T_{vtmx}\left(\left(0,0\right)\right),T_{vtmx}\left(L\right)\right)`,
+    });
+    expect(rewrite(polygon, "0", undefined, false, 64, true, false).ok).toBe(
+      false
+    );
+  });
+});
+
+describe("thinning a crowded grid", () => {
+  const xs = [-4, -3, -2, -1, 0, 1, 2, 3, 4];
+
+  test("a grid with room to breathe keeps every line whole", () => {
+    const runs = keptRuns(xs, 5, (i, k) => [xs[i], k], 1, [40, 40]);
+    expect(runs).toHaveLength(9);
+    for (const run of runs) expect([run.from, run.to]).toEqual([0, 4]);
+  });
+
+  test("lines a pixel apart keep only every second or fourth", () => {
+    // One step is 1 px across: to be 3 px apart, every fourth line.
+    const runs = keptRuns(xs, 5, (i, k) => [xs[i], k], 1, [1, 40], 3);
+    expect(runs.map((run) => xs[run.line])).toEqual([-4, 0, 4]);
+  });
+
+  test("an undefined crossing breaks the line there", () => {
+    const runs = keptRuns(
+      [0],
+      5,
+      (_, k) => (k === 2 ? [NaN, NaN] : [0, k]),
+      1,
+      [40, 40]
+    );
+    expect(runs).toEqual([
+      { line: 0, from: 0, to: 1 },
+      { line: 0, from: 3, to: 4 },
+    ]);
   });
 });

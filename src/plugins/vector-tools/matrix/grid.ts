@@ -153,3 +153,124 @@ export function gridPositions(walk: GridWalk, axis: 0 | 1): number[] {
   }
   return out.sort((a, b) => a - b);
 }
+
+/** A stretch of one grid line to draw: line `line`, crossings `from`..`to`. */
+export interface GridRun {
+  line: number;
+  from: number;
+  to: number;
+}
+
+/** How many times 2 divides n: how coarse a grid line n steps out is. */
+function coarseness(n: number) {
+  if (n === 0) return Infinity;
+  let level = 0;
+  let m = Math.abs(n);
+  while (m % 2 === 0) {
+    m /= 2;
+    level++;
+  }
+  return level;
+}
+
+/**
+ * Which stretches of each line to draw, so lines that crowd together on
+ * screen are thinned rather than stacked into a solid band.
+ *
+ * At each crossing the lines are visited coarsest first — the axis, then
+ * every line a multiple of a high power of two steps out — and a line is
+ * kept there only if its image is at least `minGap` pixels from the curves
+ * of the nearest lines already kept on either side. The distance is to the
+ * neighbour's curve, not to the neighbour's point at the same crossing:
+ * towards the fisheye's rim, far lines lie along one another, each arc the
+ * last one slid along itself, and measured point to point they looked eight
+ * pixels apart while drawing the same pixels. So a crowded region keeps the
+ * grid's own coarser lines and drops the rest, and the grid thins out evenly
+ * towards a rim instead of piling into a ring.
+ *
+ * `at(i, k)` is the image of line i's crossing with line k of the other axis.
+ */
+export function keptRuns(
+  positions: readonly number[],
+  crossings: number,
+  at: (i: number, k: number) => Vec2,
+  step: number,
+  scale: Vec2,
+  minGap = 8
+): GridRun[] {
+  const finite = (p: Vec2 | undefined): p is Vec2 =>
+    p !== undefined && Number.isFinite(p[0]) && Number.isFinite(p[1]);
+  const toPixels = (p: Vec2): Vec2 => [p[0] * scale[0], p[1] * scale[1]];
+  /** Distance in pixels from p to the segment a–b. */
+  const toSegment = (p: Vec2, a: Vec2, b: Vec2) => {
+    const [px, py] = toPixels(p);
+    const [ax, ay] = toPixels(a);
+    const [bx, by] = toPixels(b);
+    const dx = bx - ax;
+    const dy = by - ay;
+    const l = dx * dx + dy * dy;
+    const t =
+      l === 0
+        ? 0
+        : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l));
+    return Math.hypot(ax + t * dx - px, ay + t * dy - py);
+  };
+  /**
+   * Distance from p to line j's curve near crossing k: its segments six
+   * crossings either side. Six, because the arcs that pile up at a rim are
+   * each the last slid along itself by a factor of a few in the other
+   * coordinate, which the doubled spacing of far lines puts a couple of
+   * crossings away; looking further costs time on every frame and finds
+   * nothing nearer.
+   */
+  const toLine = (p: Vec2, j: number, k: number) => {
+    let best = Infinity;
+    const from = Math.max(0, k - 6);
+    const to = Math.min(crossings - 1, k + 6);
+    let previous = at(j, from);
+    if (finite(previous))
+      best = Math.hypot(...toPixels([previous[0] - p[0], previous[1] - p[1]]));
+    for (let other = from + 1; other <= to; other++) {
+      const there = at(j, other);
+      if (finite(previous) && finite(there))
+        best = Math.min(best, toSegment(p, previous, there));
+      previous = there;
+    }
+    return best;
+  };
+  const order = positions
+    .map((position, i) => ({ i, n: Math.round(position / step) }))
+    .sort(
+      (a, b) =>
+        coarseness(b.n) - coarseness(a.n) || Math.abs(a.n) - Math.abs(b.n)
+    )
+    .map(({ i }) => i);
+  const kept = positions.map(() => new Array<boolean>(crossings).fill(false));
+  for (let k = 0; k < crossings; k++) {
+    for (const i of order) {
+      const p = at(i, k);
+      if (!finite(p)) continue;
+      let room = true;
+      for (const direction of [-1, 1]) {
+        let j = i + direction;
+        while (j >= 0 && j < positions.length && !kept[j][k]) j += direction;
+        if (j < 0 || j >= positions.length) continue;
+        if (toLine(p, j, k) < minGap) room = false;
+      }
+      kept[i][k] = room;
+    }
+  }
+  const runs: GridRun[] = [];
+  kept.forEach((row, line) => {
+    let from = -1;
+    for (let k = 0; k <= crossings; k++) {
+      if (k < crossings && row[k]) {
+        if (from < 0) from = k;
+        continue;
+      }
+      if (from >= 0 && k - 1 > from) runs.push({ line, from, to: k - 1 });
+      from = -1;
+    }
+  });
+  return runs;
+}

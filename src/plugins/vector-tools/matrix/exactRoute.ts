@@ -79,8 +79,23 @@ export interface ExactSource {
 }
 
 export type Rewrite =
-  | { ok: true; helpers: string[]; copy: string; parametric?: [number, number] }
+  | {
+      ok: true;
+      helpers: string[];
+      copy: string;
+      parametric?: [number, number];
+      /**
+       * Whether the copy calls T⁻¹. Those copies are right only for the map
+       * whose inverse is written, which for a formula is the finished map,
+       * so they are what holds a formula's scrubber at t = 1.
+       */
+      inverse?: boolean;
+    }
   | { ok: false; reason: string };
+
+/** Why a copy that needs T⁻¹ cannot have one. */
+export const NO_INVERSE_REASON =
+  "it needs T⁻¹, which this map has no formula for";
 
 // ---- ids ---------------------------------------------------------------------
 
@@ -213,6 +228,41 @@ export function definitionParameter(latex: string): "x" | "y" | undefined {
   return match === null ? undefined : (match[1] as "x" | "y");
 }
 
+/**
+ * The arguments of `\operatorname{polygon}\left(…\right)`, split at its own
+ * commas only (a vertex `\left(1,2\right)` has commas of its own), or
+ * undefined if the expression is anything more than that one call.
+ */
+export function polygonArguments(latex: string): string[] | undefined {
+  const head = String.raw`\operatorname{polygon}\left(`;
+  const tail = String.raw`\right)`;
+  if (!latex.startsWith(head) || !latex.endsWith(tail)) return undefined;
+  const inner = latex.slice(head.length, latex.length - tail.length);
+  const out: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < inner.length; i++) {
+    if (inner.startsWith("\\left", i)) {
+      depth++;
+      i += 4;
+    } else if (inner.startsWith("\\right", i)) {
+      depth--;
+      i += 5;
+    } else if (inner[i] === "{") depth++;
+    else if (inner[i] === "}") depth--;
+    else if (inner[i] === "," && depth === 0) {
+      out.push(inner.slice(start, i));
+      start = i + 1;
+    }
+    // The call's own closing bracket would take depth below zero: then the
+    // whole was not one call, like polygon(A)+polygon(B).
+    if (depth < 0) return undefined;
+  }
+  if (depth !== 0) return undefined;
+  out.push(inner.slice(start));
+  return out.some((arg) => arg.trim() === "") ? undefined : out;
+}
+
 const pair = (a: string, b: string) => String.raw`\left(${a},${b}\right)`;
 
 const call = (name: string, args: string) =>
@@ -224,13 +274,21 @@ const call = (name: string, args: string) =>
  * `token` makes the helpers' names unique to this expression. `reservedT`
  * says the graph defines a global t, which would turn a parametric copy into
  * a single point (brief §5.1), so a polar curve cannot be carried that way.
+ *
+ * `inverse` says whether T⁻¹ is written at all. Without it only what goes
+ * forwards can be copied — points, parametrics, polar and explicit curves,
+ * which is most of a graph — and the rest is left to the redraw route, each
+ * with its reason. `linear` says straight lines stay straight, which is what
+ * lets a polygon be carried vertex by vertex.
  */
 export function rewrite(
   source: ExactSource,
   token: string,
   names: MapNames = MAP_NAMES,
   reservedT = false,
-  reach?: number
+  reach?: number,
+  inverse = true,
+  linear = false
 ): Rewrite {
   const latex = source.latex.trim();
   const pre = `${call(names.inverseX, "x,y")},${call(names.inverseY, "x,y")}`;
@@ -314,6 +372,7 @@ export function rewrite(
           };
         const f = identifierLatex(source.functionName);
         if (forward) return along(variable, call(f, "t"));
+        if (!inverse) return { ok: false, reason: NO_INVERSE_REASON };
         // Written as a difference set to 0: `Y(x,y)=f(…)` with a call on the
         // left is how Desmos spells a definition, and it read as a second
         // definition of the inverse.
@@ -322,11 +381,13 @@ export function rewrite(
               ok: true,
               helpers: [],
               copy: `${call(names.inverseY, "x,y")}-${call(f, call(names.inverseX, "x,y"))}=0`,
+              inverse: true,
             }
           : {
               ok: true,
               helpers: [],
               copy: `${call(names.inverseX, "x,y")}-${call(f, call(names.inverseY, "x,y"))}=0`,
+              inverse: true,
             };
       }
       const split = splitComparison(latex);
@@ -354,6 +415,7 @@ export function rewrite(
           };
         }
       }
+      if (!inverse) return { ok: false, reason: NO_INVERSE_REASON };
       const helpers = split.parts.map(
         (part, i) => `${call(`H_{vtmx${token}n${i}}`, "x,y")}=${part}`
       );
@@ -364,13 +426,25 @@ export function rewrite(
       split.ops.forEach((op, i) => {
         copy += op + sides[i + 1];
       });
-      return { ok: true, helpers, copy };
+      return { ok: true, helpers, copy, inverse: true };
     }
-    case "POLYGON":
+    case "POLYGON": {
+      // Desmos keeps a polygon's edges straight, so only a map that keeps
+      // straight lines straight can carry one; a matrix does, vertex by
+      // vertex, and T applied to a list of points is applied to each.
+      if (!linear)
+        return { ok: false, reason: "Desmos keeps a polygon's edges straight" };
+      const vertices = polygonArguments(latex);
+      if (vertices === undefined)
+        return { ok: false, reason: "its vertices could not be read" };
       return {
-        ok: false,
-        reason: "Desmos keeps a polygon's edges straight",
+        ok: true,
+        helpers: [],
+        copy: String.raw`\operatorname{polygon}\left(${vertices
+          .map((vertex) => call(names.forward, vertex))
+          .join(",")}\right)`,
       };
+    }
     default:
       return {
         ok: false,

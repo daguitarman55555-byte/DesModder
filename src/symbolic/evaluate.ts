@@ -22,7 +22,7 @@ import type { Node } from "./tree";
 
 export type Bindings = Readonly<Record<string, number>>;
 
-const FUNCTIONS: Record<string, (x: number) => number> = {
+export const FUNCTIONS: Record<string, (x: number) => number> = {
   sin: Math.sin,
   cos: Math.cos,
   tan: Math.tan,

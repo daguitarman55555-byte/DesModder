@@ -284,7 +284,13 @@ the graph behind a chip:
   and the parametric sampler kept it within 0.86 px everywhere; t runs as far
   as the grid reaches, rounded to a power of two so a pan seldom rewrites it.
   Desmos has no `inv`, so A⁻¹'s entries are written as numbers, and on a scrub
-  only the map's own definitions are rewritten.
+  only the map's own definitions are rewritten. **Without an inverse** (det
+  A = 0, or a formula with no T⁻¹ typed) the route still copies everything
+  that goes forwards — points, parametrics, polar and explicit curves, and
+  under a matrix polygons, carried vertex by vertex — and hands only regions
+  and implicit curves to the redraw route, each named in the status. A
+  formula part way along is p + t(T(p) − p), which needs no inverse, so it
+  scrubs on this route unless some copy calls T⁻¹ (known only at t = 1).
 - **Redraw** leaves the list alone. Desmos draws every sketch through
   `grapher2d.graphsLayer.redrawToCtx(ctx, sketches, images, drawOrder, …)`;
   the tab wraps that call on the live instance (an own property, deleted on
@@ -293,13 +299,19 @@ the graph behind a chip:
   its boundary and an operator (y < f(x) fills to the screen's bottom edge),
   so the region is rebuilt from the viewport. Desmos samples only what is on
   screen, so a map that pulls points inward shows an empty rim — said in the
-  panel. Used automatically, with the reason stated, when there is no inverse.
+  panel. On the exact route it draws whatever has no copy.
 
 The grid's image is found by walking outward from the preimage of the screen's
 middle and doubling the spacing where neighbouring lines crowd within 5 px, so
 the fisheye's grid reaches its rim within a pixel in about a hundred lines
 (`grid.ts`); Detail (Fine/Balanced/Fast) sets the redraw tolerance and how far
-the walk may go. Vectors are written as points, `v_{1}=\left(1,2\right)` and
+the walk may go. Lines that still crowd are thinned coarsest-first: at each
+crossing a line is kept only if it is 8 px from the _curves_ of the nearest
+kept lines, because the fisheye's far lines lie along one another at the rim
+(each arc the last slid along itself) and measured point to point they looked
+apart while drawing the same pixels — eighteen passes round the rim, now two.
+T itself is compiled once into JavaScript closures (`compile.ts`, held equal to
+the shared evaluator by a test) rather than walked as a tree per point. Vectors are written as points, `v_{1}=\left(1,2\right)` and
 `A\cdot v_{1}` (or `T\left(v_{1}\right)`), drawn as arrows curved by a
 nonlinear T, and dragged on the graph like any point. Field T(x) hands T to
 the live arrows; the Jacobian probe compares T and J(p) on a small square.

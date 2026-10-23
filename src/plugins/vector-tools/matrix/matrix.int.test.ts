@@ -330,7 +330,7 @@ matrixTest(
 );
 
 matrixTest(
-  "Matrix tab: a formula with no inverse is redrawn, says why, and probes J",
+  "Matrix tab: a formula with no inverse is drawn where it can be, says why, and probes J",
   async (driver) => {
     await prepare(driver, { left: -7, right: 7, bottom: -4.5, top: 4.5 });
     await openMatrixTab(driver);
@@ -360,19 +360,48 @@ matrixTest(
           ?.formula?.typed_constant_value?.value,
       };
     });
+    // No T⁻¹, and still the exact route: everything that goes forwards (the
+    // sine, the point, the ellipse, the parabola) is drawn by Desmos, and only
+    // the circle and the half-plane, which need T⁻¹, are redrawn.
     expect(wave.route).toEqual({
-      route: "redraw",
-      why: "This formula has no T⁻¹ typed in, so the graph is redrawn instead.",
+      route: "exact",
+      why: "This formula has no T⁻¹ typed in: points, parametric and y = f(x) curves are still drawn exactly by Desmos, and regions and implicit curves are redrawn.",
     });
     expect(wave.note).toBe(wave.route.why);
-    // Not frozen: the redraw route scrubs a formula too.
+    // Not frozen: nothing drawn needs the inverse, so the formula scrubs.
     expect(wave.frozen).toBe(false);
     expect(wave.takeaway).toContain("Jacobian");
     expect(wave.facts).toEqual(["p", "T(p)", "J(p)", "det J(p)"]);
-    expect(wave.copies).toBe(0);
+    expect(wave.copies).toBe(4);
+    expect(
+      await driver.evaluate(
+        () => (DSM.enabledPlugins["vector-tools"] as any).matrix.status
+      )
+    ).toEqual([
+      "2 expressions are redrawn rather than rewritten: it needs T⁻¹, which this map has no formula for.",
+    ]);
     // T(v₁) for v₁ = (1, 2): (1 + 0.4 sin 2, 2 + 0.4 sin 1), by Desmos.
     expect(wave.image[0]).toBeCloseTo(1 + 0.4 * Math.sin(2), 9);
     expect(wave.image[1]).toBeCloseTo(2 + 0.4 * Math.sin(1), 9);
+    await shotOfGraph(driver, "docs/assets/matrix-wave-exact.png");
+
+    // Half way along, Desmos's own copy of (1, 2) is half way to T(1, 2).
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).matrix.setT(0.5)
+    );
+    await settle(driver);
+    const half = await driver.evaluate(
+      () =>
+        (Calc.controller.getItemModel("vector_tools_mx_c_apoint") as any)
+          ?.formula?.typed_constant_value?.value
+    );
+    expect(half[0]).toBeCloseTo(1 + 0.2 * Math.sin(2), 9);
+    expect(half[1]).toBeCloseTo(2 + 0.2 * Math.sin(1), 9);
+    await shotOfGraph(driver, "docs/assets/matrix-wave-half.png");
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).matrix.setT(1)
+    );
+    await settle(driver);
 
     // The Field toggle hands T to the live arrows, whatever they were set
     // to, and hands it back when it is turned off.
@@ -614,6 +643,80 @@ matrixTest(
     );
     expect(result.worst).toBeLessThan(1);
     await shotOfGraph(driver, "docs/assets/matrix-fisheye-follows.png");
+  },
+  120_000
+);
+
+matrixTest(
+  "Matrix tab: a polygon goes through a matrix, and a projection still draws",
+  async (driver) => {
+    await prepare(driver, { left: -7, right: 7, bottom: -4.5, top: 4.5 });
+    await driver.evaluate(() => {
+      Calc.setExpression({
+        id: "triangle",
+        latex: String.raw`\operatorname{polygon}\left(\left(0,0\right),\left(2,0\right),\left(0,2\right)\right)`,
+        color: "#6042a6",
+      });
+    });
+    await settle(driver);
+    await openMatrixTab(driver);
+    await driver.evaluate(() => {
+      const { matrix } = DSM.enabledPlugins["vector-tools"] as any;
+      matrix.loadPreset("shear");
+      matrix.setRoute("exact");
+      matrix.setOn(true);
+    });
+    await settle(driver);
+    // The shear carries the triangle vertex by vertex: its copy is Desmos's
+    // own polygon, filled and outlined, and the original is hidden.
+    const sheared = await driver.evaluate(() => ({
+      hidden: (Calc.controller.getItemModel("triangle") as any).hidden,
+      modes: (
+        Calc as any
+      ).controller.grapher2d.graphSketches.vector_tools_mx_c_atriangle?.branches.map(
+        (branch: any) => branch.branchMode
+      ),
+      error: (Calc as any).expressionAnalysis.vector_tools_mx_c_atriangle
+        ?.isError,
+    }));
+    expect(sheared).toEqual({ hidden: true, modes: [7, 5], error: false });
+    await shotOfGraph(driver, "docs/assets/matrix-shear-polygon.png");
+
+    // A projection has no inverse. Points, parametrics and explicit curves
+    // are still Desmos's own copies; only the regions and implicit curves
+    // that need A⁻¹ are redrawn, and the panel says which and why.
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).matrix.loadPreset("project")
+    );
+    await settle(driver);
+    const projected = await driver.evaluate(() => {
+      const { matrix } = DSM.enabledPlugins["vector-tools"] as any;
+      const copies = (Calc.controller.getAllItemModels() as any[])
+        .filter((m) => m.id.startsWith("vector_tools_mx_c_"))
+        .map((m) => m.id.slice("vector_tools_mx_c_a".length))
+        .sort((a: string, b: string) => a.localeCompare(b));
+      return {
+        route: matrix.routeInUse.route,
+        copies,
+        point: (Calc.controller.getItemModel("vector_tools_mx_c_apoint") as any)
+          ?.formula?.typed_constant_value?.value,
+        status: matrix.status,
+      };
+    });
+    expect(projected.route).toBe("exact");
+    expect(projected.copies).toEqual([
+      "ellipse",
+      "parabola",
+      "point",
+      "sine",
+      "triangle",
+    ]);
+    // (1, 2) projected onto the x-axis.
+    expect(projected.point).toEqual([1, 0]);
+    expect(projected.status).toEqual([
+      "2 expressions are redrawn rather than rewritten: it needs T⁻¹, which this map has no formula for.",
+    ]);
+    await shotOfGraph(driver, "docs/assets/matrix-project-exact.png");
   },
   120_000
 );

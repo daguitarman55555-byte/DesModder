@@ -32,7 +32,7 @@ import {
   type RedrawDetail,
   type Vec2,
 } from "./matrixModel";
-import { gridPositions } from "./grid";
+import { gridPositions, keptRuns } from "./grid";
 import {
   mapPolyline,
   sketchPrimitives,
@@ -321,20 +321,36 @@ export class MatrixLayer {
     const walk = { ...scene.grid!, map: scene.map, view, scale };
     const xs = gridPositions(walk, 0);
     const ys = gridPositions(walk, 1);
+    // The crossings, mapped once: both families of lines pass through them,
+    // and the thinning reads them to see where lines crowd.
+    const lattice = xs.map((x) => ys.map((y) => scene.map(x, y)));
     const runs: number[][] = [];
-    // Each line runs through every crossing, so the halving starts from
-    // points the other lines already pass through.
-    for (const x of xs)
+    const { step } = scene.grid!;
+    // Each line runs through the crossings it keeps, so the halving starts
+    // from points the other lines already pass through.
+    for (const run of keptRuns(
+      xs,
+      ys.length,
+      (i, k) => lattice[i][k],
+      step,
+      scale
+    ))
       runs.push(
         ...mapped(
-          ys.flatMap((y) => [x, y]),
+          ys.slice(run.from, run.to + 1).flatMap((y) => [xs[run.line], y]),
           scene.map
         )
       );
-    for (const y of ys)
+    for (const run of keptRuns(
+      ys,
+      xs.length,
+      (i, k) => lattice[k][i],
+      step,
+      scale
+    ))
       runs.push(
         ...mapped(
-          xs.flatMap((x) => [x, y]),
+          xs.slice(run.from, run.to + 1).flatMap((x) => [x, ys[run.line]]),
           scene.map
         )
       );

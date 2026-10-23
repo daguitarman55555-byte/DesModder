@@ -20,7 +20,7 @@
  */
 import type { ExpressionState, GraphState, ItemState } from "graph-state/state";
 import type { Node } from "../../../symbolic/tree";
-import { evaluate } from "../../../symbolic/evaluate";
+import { compileNode, type Compiled as CompiledNode } from "./compile";
 import {
   canonicalIdentifier,
   identifierLatex,
@@ -85,6 +85,7 @@ export interface MatrixItem {
   hidden?: boolean;
   folderId?: string;
   color?: string;
+  parametricDomain?: { min?: string; max?: string };
   formula?: {
     expression_type?: string;
     is_graphable?: boolean;
@@ -101,7 +102,12 @@ export interface MatrixHost {
   getState: () => GraphState;
   setState: (state: GraphState) => void;
   setExpressions: (
-    expressions: { id: string; latex?: string; color?: string }[]
+    expressions: {
+      id: string;
+      latex?: string;
+      color?: string;
+      parametricDomain?: { min: string; max: string };
+    }[]
   ) => void;
   grapher: () => unknown;
   items: () => readonly MatrixItem[];
@@ -147,12 +153,17 @@ interface Desired {
   skipped: { id: string; reason: string }[];
   /** The lines the panel shows as written to the list. */
   shown: string[];
+  /** How many copies call T⁻¹ (see `Rewrite.inverse`). */
+  inverseCopies: number;
 }
 
 const GRAY = "#8a9099";
 const RED = "#c74440";
 const PURPLE = "#6042a6";
 const KNOWN_NAMES = new Set(["x", "y", "e", "pi", "tau", "theta"]);
+/** The name a definition `a_{1}=…` or `f\left(x\right)=…` defines. */
+const DEFINED_NAME =
+  /^\s*([A-Za-z](?:_\{[A-Za-z0-9]*\}|_[A-Za-z0-9])?)\s*(?:\\left\(|=)/;
 const POINT_LATEX =
   /^[^=]*=\\left\((-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?),(-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)\\right\)$/;
 
@@ -342,8 +353,15 @@ export class MatrixSession {
    * drawing something that is not the homotopy.
    */
   get frozen() {
-    return this.config.kind === "formula" && this.routeInUse.route === "exact";
+    return (
+      this.config.kind === "formula" &&
+      this.routeInUse.route === "exact" &&
+      this.inverseCopies > 0
+    );
   }
+
+  /** Copies calling T⁻¹ at the last sync; see `frozen`. */
+  private inverseCopies = 0;
 
   setT(t: number) {
     this.stopPlaying();
@@ -355,10 +373,9 @@ export class MatrixSession {
     if (next === this.t) return;
     this.t = next;
     this.layer.requestRedraw();
-    // Only the exact route on a matrix has anything in the list that moves
-    // with t; the redraw route is this tab's own drawing.
-    if (this.config.kind === "linear" && this.routeInUse.route === "exact")
-      this.syncNow();
+    // On the exact route the map's own definitions move with t, and every
+    // copy follows them; the redraw route is this tab's own drawing.
+    if (this.routeInUse.route === "exact") this.syncNow();
     this.syncField();
     this.host.changed();
   }
@@ -399,16 +416,25 @@ export class MatrixSession {
     for (const item of this.host.items()) {
       if (isOwned(item.id)) continue;
       const f = item.formula;
+      // While Desmos re-evaluates (every frame of a scrub on the exact
+      // route), the analysis is missing; the name on the left of the LaTeX
+      // still says what is defined, so the tab never briefly thinks a name
+      // is free and writes over it.
+      const written = DEFINED_NAME.exec(item.latex ?? "")?.[1];
       for (const name of [
         f?.defined_name,
         f?.function_definition,
         f?.assignment,
+        written,
       ])
         if (name !== undefined && name !== "x" && name !== "y")
           names.set(canonicalIdentifier(name), item);
     }
     return names;
   }
+
+  /** The matrix last read from the list, kept while Desmos re-evaluates it. */
+  private lastMatrix?: { id: string; latex: string; m: Mat2 };
 
   /** The matrix, typed or read from the list, or why there is none. */
   get baseMatrix(): { ok: true; m: Mat2 } | { ok: false; error: string } {
@@ -423,6 +449,13 @@ export class MatrixSession {
       };
     const value = item.formula?.typed_constant_value;
     const rows = value?.value;
+    const cached = this.lastMatrix;
+    if (
+      value === undefined &&
+      cached?.id === item.id &&
+      cached.latex === item.latex
+    )
+      return { ok: true, m: cached.m };
     if (
       value?.valueType !== 42 ||
       !Array.isArray(rows) ||
@@ -439,6 +472,11 @@ export class MatrixSession {
         ok: false,
         error: `${config.expressionName} has an undefined entry.`,
       };
+    this.lastMatrix = {
+      id: item.id,
+      latex: item.latex ?? "",
+      m: m as unknown as Mat2,
+    };
     return { ok: true, m: m as unknown as Mat2 };
   }
 
@@ -490,13 +528,27 @@ export class MatrixSession {
     return compiled.names.filter((n) => !sliders.has(n));
   }
 
+  /** Each parsed formula, compiled once (see `compile.ts`). */
+  private readonly closures = new WeakMap<Node, CompiledNode>();
+
+  private closure(node: Node): CompiledNode {
+    let compiled = this.closures.get(node);
+    if (compiled === undefined) {
+      compiled = compileNode(node);
+      this.closures.set(node, compiled);
+    }
+    return compiled;
+  }
+
   private evaluator(fx: Node, fy: Node): PlaneMap {
     const bindings: Record<string, number> = {};
     for (const [name, value] of this.host.sliders()) bindings[name] = value;
+    const X = this.closure(fx);
+    const Y = this.closure(fy);
     return (x, y) => {
       bindings.x = x;
       bindings.y = y;
-      return [evaluate(fx, bindings), evaluate(fy, bindings)];
+      return [X(bindings), Y(bindings)];
     };
   }
 
@@ -546,28 +598,48 @@ export class MatrixSession {
     return this.evaluator(compiled.gx, compiled.gy);
   }
 
+  /**
+   * Whether T⁻¹ can be written: a matrix with det ≠ 0, or a formula with a
+   * T⁻¹ typed in that reads.
+   */
+  get hasInverse(): boolean {
+    if (this.config.kind === "linear") {
+      // Invertible unless known not to be: a matrix that cannot be read at
+      // all has no map to draw, and saying "no inverse" for it would rebuild
+      // the folder every time Desmos re-evaluates it.
+      const base = this.baseMatrix;
+      return !(base.ok && isSingular(base.m));
+    }
+    const compiled = this.compile();
+    return compiled.ok && compiled.gx !== undefined;
+  }
+
+  /**
+   * The route drawing, and why part of the graph is redrawn on the exact
+   * route when there is no inverse. Without T⁻¹ the exact route still
+   * carries everything that goes forwards — points, parametrics, polar and
+   * explicit curves, usually most of a graph — and only regions and implicit
+   * curves fall to the redraw route, each named in the status.
+   */
   get routeInUse(): RouteInUse {
     const { config } = this;
     if (config.route === "redraw") return { route: "redraw" };
-    if (config.kind === "linear") {
-      const base = this.baseMatrix;
-      if (base.ok && isSingular(base.m))
-        return {
-          route: "redraw",
-          why: "A has no inverse (det A = 0), so the graph is redrawn instead.",
-        };
-      return { route: "exact" };
-    }
-    const compiled = this.compile();
-    if (!compiled.ok || compiled.gx === undefined)
+    if (this.hasInverse) return { route: "exact" };
+    const rest =
+      "points, parametric and y = f(x) curves are still drawn exactly by Desmos, and regions and implicit curves are redrawn.";
+    if (config.kind === "linear")
       return {
-        route: "redraw",
-        why:
-          compiled.ok && compiled.inverseError !== undefined
-            ? `T⁻¹ could not be read (${compiled.inverseError}), so the graph is redrawn instead.`
-            : "This formula has no T⁻¹ typed in, so the graph is redrawn instead.",
+        route: "exact",
+        why: `A has no inverse (det A = 0): ${rest}`,
       };
-    return { route: "exact" };
+    const compiled = this.compile();
+    return {
+      route: "exact",
+      why:
+        compiled.ok && compiled.inverseError !== undefined
+          ? `T⁻¹ could not be read (${compiled.inverseError}): ${rest}`
+          : `This formula has no T⁻¹ typed in: ${rest}`,
+    };
   }
 
   // ---- what the list holds ------------------------------------------------------
@@ -627,7 +699,7 @@ export class MatrixSession {
     // route a matrix is written at the scrubber's t, which is what moves the
     // copies; everywhere else it is the finished map.
     const linear = config.kind === "linear";
-    const movesWithT = linear && route.route === "exact";
+    const movesWithT = route.route === "exact" && (linear || !this.frozen);
     let fx: string;
     let fy: string;
     if (linear) {
@@ -642,6 +714,13 @@ export class MatrixSession {
     } else {
       fx = config.formula.xLatex.trim() || "x";
       fy = config.formula.yLatex.trim() || "y";
+      // Part way along, a formula is the straight path p + t(T(p) − p),
+      // which needs no inverse, so everything drawn forwards scrubs with it.
+      if (movesWithT && this.t !== 1) {
+        const t = latexNumber(this.t);
+        fx = String.raw`x+${t}\left(${fx}-x\right)`;
+        fy = String.raw`y+${t}\left(${fy}-y\right)`;
+      }
     }
     const pt = String.raw`p.x,p.y`;
     expression("fx", String.raw`${names.tx}\left(x,y\right)=${fx}`, {
@@ -688,14 +767,18 @@ export class MatrixSession {
     const hide = new Set<string>();
     const skipped: { id: string; reason: string }[] = [];
     const sources = this.sources();
+    let inverseCopies = 0;
     if (route.route === "exact") {
-      const inv = this.inverseLatex(movesWithT);
-      expression("ix", String.raw`X_{vtmx}\left(x,y\right)=${inv[0]}`, {
-        hidden: true,
-      });
-      expression("iy", String.raw`Y_{vtmx}\left(x,y\right)=${inv[1]}`, {
-        hidden: true,
-      });
+      const { hasInverse } = this;
+      if (hasInverse) {
+        const inv = this.inverseLatex(movesWithT);
+        expression("ix", String.raw`X_{vtmx}\left(x,y\right)=${inv[0]}`, {
+          hidden: true,
+        });
+        expression("iy", String.raw`Y_{vtmx}\left(x,y\right)=${inv[1]}`, {
+          hidden: true,
+        });
+      }
       const map: MapNames = {
         inverseX: "X_{vtmx}",
         inverseY: "Y_{vtmx}",
@@ -716,11 +799,20 @@ export class MatrixSession {
         });
       }
       sources.forEach((source, k) => {
-        const result = rewrite(source, String(k), map, reservedT, reach);
+        const result = rewrite(
+          source,
+          String(k),
+          map,
+          reservedT,
+          reach,
+          hasInverse,
+          linear
+        );
         if (!result.ok) {
           skipped.push({ id: source.id, reason: result.reason });
           return;
         }
+        if (result.inverse === true) inverseCopies++;
         result.helpers.forEach((latex, i) =>
           items.push(helperState(helperId(source.id, i), latex))
         );
@@ -750,13 +842,15 @@ export class MatrixSession {
           String(k),
           IDENTITY_NAMES,
           reservedT,
-          reach
+          reach,
+          true,
+          linear
         );
         if (faint.ok)
           items.push({ ...copy, id: ghostId(source.id), latex: faint.copy });
       });
     }
-    return { items, hide, skipped, shown };
+    return { items, hide, skipped, shown, inverseCopies };
   }
 
   /**
@@ -932,6 +1026,16 @@ export class MatrixSession {
     this.readBack();
     this.pendingAnalysis = false;
     const desired = this.desired();
+    const wasFrozen = this.frozen;
+    this.inverseCopies = desired.inverseCopies;
+    // A copy that needs T⁻¹ has just appeared while a formula was part way
+    // along: those copies are right only at t = 1, so the scrubber goes
+    // there rather than show two different maps at once.
+    if (!wasFrozen && this.frozen && this.t !== 1) {
+      this.stopPlaying();
+      this.t = 1;
+      this.schedule();
+    }
     this.skipped = desired.skipped;
     this.skippedIds = new Set(desired.skipped.map((s) => s.id));
     this.shownLines = desired.shown;
@@ -971,8 +1075,22 @@ export class MatrixSession {
           item.color !== undefined &&
           now.color !== undefined &&
           now.color !== item.color;
-        if (!latexChanged && !colorChanged) return [];
-        return [{ id: item.id, latex: item.latex, color: item.color }];
+        // A forward copy's range of t follows the grid's reach, which moves
+        // with the view and with the scrubber.
+        const domain = item.parametricDomain;
+        const domainChanged =
+          domain !== undefined &&
+          (now.parametricDomain?.min !== domain.min ||
+            now.parametricDomain?.max !== domain.max);
+        if (!latexChanged && !colorChanged && !domainChanged) return [];
+        return [
+          {
+            id: item.id,
+            latex: item.latex,
+            color: item.color,
+            ...(domainChanged ? { parametricDomain: domain } : {}),
+          },
+        ];
       });
       if (changes.length > 0) {
         this.writes++;
@@ -1194,10 +1312,12 @@ export class MatrixSession {
     const route = this.routeInUse;
     if (config.route === "redraw")
       return "Works for any map, and scrubs smoothly. Desmos only drew what is on screen, so a map that pulls points inward leaves an empty band at the edge.";
-    if (route.route === "redraw") return route.why ?? "";
-    return config.kind === "linear"
-      ? "Each expression is rewritten with (x, y) → A⁻¹(x, y), and Desmos draws it, shading included, sharp to the edge."
-      : "Each expression is rewritten with (x, y) → T⁻¹(x, y). With a formula this draws the finished map only: the in-between maps have no formula for their inverse.";
+    if (route.why !== undefined) return route.why;
+    if (config.kind === "linear")
+      return "Desmos draws every expression through the map itself, shading included, sharp to the edge: curves along T, regions through A⁻¹.";
+    return this.frozen
+      ? "Desmos draws every expression through the map itself. Regions and implicit curves go through T⁻¹, which is known only for the finished map, so the scrubber waits at t = 1."
+      : "Desmos draws every expression through the map itself, sharp to the edge, and scrubs with it.";
   }
 
   /** The image of each vector, for the vector rows. */
