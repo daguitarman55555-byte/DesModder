@@ -1,13 +1,5 @@
 import { AP_NEXT } from "./ap-next";
-import {
-  ampereCirculation,
-  chargeInside,
-  enclosedCurrent,
-  electricField,
-  gaussFlux,
-  inclineForces,
-  magneticField,
-} from "./ap-next-physics";
+import { chargeInside, electricField, gaussFlux } from "./ap-next-physics";
 import { canonicalIdentifier } from "../identifiers";
 import { parseStrictExpression } from "../sim/strictParse";
 import { compileExpression } from "../sim/strictEvaluate";
@@ -74,68 +66,6 @@ test("Gauss preset vector is the correct 3D Coulomb field section", () => {
   }
 });
 
-test("Ampere midpoint circulation obeys the algebraic enclosed current for tilted and translated loops", () => {
-  const wires = [
-    { current: 1, x: -1.7 },
-    { current: -0.6, x: 1.7 },
-  ];
-  for (const angle of [0, 0.3, 0.9]) {
-    for (const center of [
-      [-1.7, 0, 0] as const,
-      [1.7, 0, 0] as const,
-      [0, 0, 0] as const,
-    ]) {
-      const target = enclosedCurrent(center, 1, angle, wires);
-      const value = ampereCirculation(center, 1, angle, wires, 160);
-      expect(value).toBeCloseTo(target, 3);
-    }
-  }
-  expect(enclosedCurrent([0, 0, 0], 2.5, 0.3, wires)).toBeCloseTo(0.4, 10);
-});
-
-test("Ampere preset evaluates the exact long-wire B field", () => {
-  const f = compile("ap-ampere-loop");
-  for (const [x, y] of [
-    [0, 1],
-    [-2.4, 1],
-    [3, -1],
-  ]) {
-    const B = magneticField(
-      [x, y, 0],
-      [
-        { current: 1, x: -1.7 },
-        { current: -0.6, x: 1.7 },
-      ]
-    );
-    expect(f.x(x, y)).toBeCloseTo(B[0], 8);
-    expect(f.y(x, y)).toBeCloseTo(B[1], 8);
-    expect(f.tint(x, y)).toBeCloseTo(Math.hypot(B[0], B[1]), 8);
-  }
-});
-
-test("Incline friction balances only what is needed until breakaway, then equals kinetic friction", () => {
-  for (const theta of [0.1, 0.3, 0.49]) {
-    const q = inclineForces(theta, 0.55, 0.3, 2, 2);
-    expect(q.static).toBe(true);
-    expect(q.netDownhill).toBeCloseTo(0, 10);
-    expect(q.friction).toBeCloseTo(4 * Math.sin(theta), 10);
-  }
-  for (const theta of [0.6, 0.8]) {
-    const q = inclineForces(theta, 0.55, 0.3, 2, 2);
-    expect(q.static).toBe(false);
-    expect(q.friction).toBeCloseTo(0.3 * 4 * Math.cos(theta), 10);
-    expect(q.acceleration).toBeCloseTo(
-      2 * (Math.sin(theta) - 0.3 * Math.cos(theta)),
-      10
-    );
-  }
-  expect(inclineForces(Math.atan(0.55), 0.55, 0.3, 2, 2).static).toBe(true);
-  expect(inclineForces(0.6, 0.55, 0.3, 2, 2).threshold).toBeCloseTo(
-    Math.atan(0.55),
-    9
-  );
-});
-
 test("new AP presets provide 2D and 3D scenes, correct shelf and hidden explanatory apparatus", () => {
   for (const p of AP_NEXT) {
     expect(p.variables?.every((v) => v.name !== "u" && v.name !== "v")).toBe(
@@ -144,7 +74,7 @@ test("new AP presets provide 2D and 3D scenes, correct shelf and hidden explanat
     expect(
       p.space.variables?.every((v) => v.name !== "u" && v.name !== "v")
     ).toBe(true);
-    expect(p.category === "ap1" || p.category === "ap2").toBe(true);
+    expect(p.category).toBe("ap2");
     expect(p.apUnit).toBeDefined();
     expect(p.meaning?.quantity).toBeTruthy();
     expect(p.scene?.some((s) => s.explains)).toBe(true);

@@ -3,19 +3,28 @@ import { sceneParts } from "./parts";
 
 describe("a preset's parts, to show and hide", () => {
   test("an arrow is one part, named by its vector", () => {
-    const parts = sceneParts(galleryPreset("ap-incline-forces")!.scene!);
-    const net = parts.find((p) => p.name === "F_{net}")!;
-    expect(net.label).toBe("Arrow");
-    expect(net.keys).toEqual(
-      expect.arrayContaining(["netForceshaft", "netForcehead", "netForcename"])
+    const parts = sceneParts(galleryPreset("charges")!.scene!);
+    const field = parts.find((p) => p.id === "arrow:E")!;
+    expect(field.label).toBe("Arrow");
+    expect(field.name).toBe("E");
+    expect(field.keys).toEqual(
+      expect.arrayContaining(["Eshaft", "Ehead", "Ename"])
     );
   });
 
   test("a value the graph only computes is not a part", () => {
-    const parts = sceneParts(galleryPreset("ap-incline-forces")!.scene!);
+    const parts = sceneParts(galleryPreset("charges")!.scene!);
     const keys = parts.flatMap((p) => p.keys);
-    expect(keys).not.toContain("fric");
-    expect(keys).not.toContain("net");
+    for (const helper of ["qlist", "xlist", "color1", "Enet", "Epart1"])
+      expect(keys).not.toContain(helper);
+  });
+
+  test("ten charges are one part, and so are their handles", () => {
+    const parts = sceneParts(galleryPreset("charges")!.scene!);
+    const charges = parts.find((p) => p.label === "Charges")!;
+    expect(charges.keys).toHaveLength(10);
+    const handles = parts.find((p) => p.label === "Drag handles")!;
+    expect(handles.keys).toHaveLength(10);
   });
 
   test("on Desmos 3D, an arrow's name goes with its arrow", () => {

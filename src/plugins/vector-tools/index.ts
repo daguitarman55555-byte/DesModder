@@ -1943,8 +1943,11 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     const names = scene.flatMap((item) => {
       if (item.name3d === undefined || this.hiddenNames3d.has(item.key))
         return [];
-      // The point's own definition, `N_{…}=…`, read coordinate by coordinate.
-      const N = item.latex.slice(0, item.latex.indexOf("="));
+      // The point's own definition, `N_{…}=…`, read coordinate by coordinate;
+      // or the point itself, `\left(a,b,c\right).x` being as good.
+      const N = item.latex.includes("=")
+        ? item.latex.slice(0, item.latex.indexOf("="))
+        : item.latex;
       const helper = this.calc.HelperExpression({
         latex: String.raw`\left[${N}.x,${N}.y,${N}.z\right]`,
       }) as unknown as ListHelper;
@@ -1960,32 +1963,42 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
         },
       ];
     });
-    const drag = scene.find((item) => item.drag3d !== undefined)?.drag3d;
-    const probe =
-      drag === undefined
-        ? undefined
-        : {
-            at: () => {
-              const values = sliderValues(this.cc.getAllItemModels());
-              const at = drag.map((name) =>
-                values.get(canonicalIdentifier(name))
-              );
-              return at.every((v) => v !== undefined)
-                ? ([at[0], at[1], at[2]] as const)
-                : undefined;
-            },
-            move: (to: readonly [number, number, number]) => {
-              // One update for all three: three made Desmos recompute the
-              // graph three times a move.
-              this.calc.setExpressions(
-                drag.map((name, i) => ({
-                  id: presetVariableID(name),
-                  latex: `${name}=${Math.round(to[i] * 100) / 100}`,
-                }))
-              );
-            },
-          };
-    this.scene3d.set(names, probe);
+    // Every point that drags, not just the first: Gauss's second charge and
+    // its sphere's centre were drawn with handles that never took hold.
+    const probes = scene.flatMap((item) => {
+      const drag = item.drag3d;
+      if (drag === undefined) return [];
+      const when = item.drag3dWhen;
+      return [
+        {
+          at: () => {
+            const values = sliderValues(this.cc.getAllItemModels());
+            if (
+              when !== undefined &&
+              (values.get(canonicalIdentifier(when.name)) ?? 0) < when.atLeast
+            )
+              return undefined;
+            const at = drag.map((name) =>
+              values.get(canonicalIdentifier(name))
+            );
+            return at.every((v) => v !== undefined)
+              ? ([at[0], at[1], at[2]] as const)
+              : undefined;
+          },
+          move: (to: readonly [number, number, number]) => {
+            // One update for all three: three made Desmos recompute the
+            // graph three times a move.
+            this.calc.setExpressions(
+              drag.map((name, i) => ({
+                id: presetVariableID(name),
+                latex: `${name}=${Math.round(to[i] * 100) / 100}`,
+              }))
+            );
+          },
+        },
+      ];
+    });
+    this.scene3d.set(names, probes);
   }
 
   // ---- the Fluid tab -------------------------------------------------------
@@ -2470,6 +2483,20 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     });
   }
 
+  /**
+   * The preset variables the presets window lists: those whose `shownWhen`
+   * holds, so a charge the count leaves out takes no rows.
+   */
+  get shownPresetVariables() {
+    const all = this.presetVariables;
+    const current = new Map(all.map((v) => [v.name, v.current]));
+    return all.filter(
+      ({ shownWhen }) =>
+        shownWhen === undefined ||
+        (current.get(shownWhen.name) ?? 0) >= shownWhen.atLeast
+    );
+  }
+
   /** Sets a preset variable's slider in the graph, which redraws the field. */
   setPresetVariable(id: string, value: number) {
     const variable = this.presetVariables.find((v) => v.id === id);
@@ -2525,8 +2552,15 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       .filter((v) => v.toggle !== undefined)
       .map((v) => `${v.name}=1`);
     const latex = new Map(scene.map((item) => [item.key, item.latex]));
-    const switched = (key: string) =>
-      switches.some((s) => (latex.get(key) ?? "").includes(s));
+    // An arrow's shaft and head draw its damped vector; the switch is in its
+    // hidden `R` helper (see probe.ts), so look there too. Missing it listed
+    // every arrow twice, and with ten charges, ten rows of "Arrow E_i".
+    const switched = (key: string) => {
+      const arrow = /^(.*?)(shaft|head|name|arrow)$/.exec(key);
+      const own = latex.get(key) ?? "";
+      const helper = arrow === null ? "" : (latex.get(`${arrow[1]}R`) ?? "");
+      return switches.some((s) => own.includes(s) || helper.includes(s));
+    };
     return sceneParts(scene).flatMap((part) => {
       if (part.keys.length > 0 && part.keys.every(switched)) return [];
       const drawn = part.keys.filter(

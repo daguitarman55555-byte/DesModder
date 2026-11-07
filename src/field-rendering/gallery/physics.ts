@@ -9,164 +9,139 @@
  */
 import { toggle } from "./kit";
 import { TEACHING_PHYSICS } from "./physics-teaching";
+import {
+  chargeScene,
+  chargeVariables,
+  colorName,
+  fieldComponent,
+  listField,
+  listOffsets,
+  listOutside,
+  listPotential,
+  LISTS,
+  MAX_CHARGES,
+  outsideAll,
+  potential,
+  ringLayout,
+  COUNT,
+} from "./point-charges";
 import { probeArrows2D, probeArrows3D, type ProbeSetup } from "./probe";
 import type { GalleryPreset, GalleryVariable, SceneItem } from "./types";
 
-type Axis = "x" | "y" | "z";
-
-/** Point sources: s·(r − p)/(|r − p|² + soft)^(power/2), summed. */
-function sources(
-  list: readonly { offset: Partial<Record<Axis, string>>; strength: string }[],
-  axes: readonly Axis[],
-  power: number,
-  soft = 0.05
-): Record<Axis, string> {
-  const out: Record<Axis, string> = { x: "0", y: "0", z: "0" };
-  for (const axis of axes) {
-    out[axis] = list
-      .map(({ offset, strength }) => {
-        const d = (a: Axis) => offset[a] ?? a;
-        const r2 = axes.map((a) => `${d(a)}^{2}`).join("+");
-        return String.raw`\frac{${strength}${d(axis)}}{\left(${r2}+${soft}\right)^{${power / 2}}}`;
-      })
-      .join("+");
-  }
-  return out;
-}
-
-/** x shifted by c, bracketed: `\left(x+\frac{d}{2}\right)`. */
-const shifted = (a: Axis, by: string) => String.raw`\left(${a}${by}\right)`;
-
-/**
- * Two point charges, q₁ at x = −d/2 and q₂ at x = d/2: Coulomb's law,
- * E = Σ q(r − rᵢ)/|r − rᵢ|³, exactly, outside two small balls of radius
- * `radius` that Desmos draws as the charges; inside them, nothing. In the
- * plane, the slice through them of the charges' own field, so the lines
- * bend as they do in the textbook figure.
- *
- * Unsoftened: the softening a field without solid sources needs, to keep a
- * pole finite, bends every line near a charge. Here the ball covers the
- * pole, and the field is exact everywhere it is drawn.
- */
-function charges(axes: readonly Axis[], radius: string) {
-  const field = sources(
-    [
-      {
-        offset: { x: shifted("x", String.raw`+\frac{d}{2}`) },
-        strength: "q_{1}",
-      },
-      {
-        offset: { x: shifted("x", String.raw`-\frac{d}{2}`) },
-        strength: "q_{2}",
-      },
-    ],
-    axes,
-    3,
-    0
-  );
-  const outside = chargesOutside(axes, radius);
-  const out: Record<Axis, string> = { x: "0", y: "0", z: "0" };
-  for (const a of axes)
-    out[a] = String.raw`\left\{${outside}:${field[a]},0\right\}`;
-  return { ...out, seed: String.raw`\left\{${outside}:1,0\right\}` };
-}
-
-/** Outside both charges' balls: Desmos LaTeX, true or false. */
-function chargesOutside(axes: readonly Axis[], radius: string) {
-  const rest = axes
-    .filter((a) => a !== "x")
-    .map((a) => `+${a}^{2}`)
-    .join("");
-  const d2 = (by: string) =>
-    String.raw`\left(x${by}\frac{d}{2}\right)^{2}${rest}`;
-  return String.raw`\min\left(${d2("+")},${d2("-")}\right)>${radius}^{2}`;
-}
+const R = String.raw;
 
 /** The charges' radius, in the 2D view (about ±10) and the 3D box (±5). */
 const CHARGE_RADIUS_2D = "0.4";
 const CHARGE_RADIUS_3D = "0.3";
-const CHARGES_2D = charges(["x", "y"], CHARGE_RADIUS_2D);
-const CHARGES_3D = charges(["x", "y", "z"], CHARGE_RADIUS_3D);
 
 /**
- * Red for positive, blue for negative, grey for none, as textbooks colour
- * them: a named colour per charge, so its ball and its arrow follow its sign
- * as the slider crosses zero.
+ * Where the ten charges start: the textbook pair, +1 and −1 five apart on
+ * the x-axis, then the rest round a ring to be brought in with the count.
  */
-const signColor = (q: string) =>
-  String.raw`\left\{${q}>0:\operatorname{rgb}\left(189,75,50\right),${q}<0:\operatorname{rgb}\left(36,106,163\right),\operatorname{rgb}\left(119,119,119\right)\right\}`;
+const LAYOUT_2D = ringLayout(
+  [
+    { q: 1, at: [-2.5, 0, 0] },
+    { q: -1, at: [2.5, 0, 0] },
+  ],
+  6,
+  "1",
+  9
+);
+const LAYOUT_3D = ringLayout(
+  [
+    { q: 1, at: [-1.5, 0, 0] },
+    { q: -1, at: [1.5, 0, 0] },
+  ],
+  3.2,
+  "1",
+  5
+);
 
-/** The two charges' colours and the probe's arrows, the same in 2D and 3D. */
-function chargeProbe(
-  at: string,
-  outside: string,
-  dimensions: 2 | 3,
-  reach: number
-): { colors: SceneItem[]; setup: ProbeSetup } {
-  const r = (by: string) =>
-    String.raw`\left(\left(p_{x}${by}\frac{d}{2}\right)^{2}+p_{y}^{2}${at.includes("p_{z}") ? "+p_{z}^{2}" : ""}\right)^{1.5}`;
-  const rest = at.includes("p_{z}") ? ",p_{y},p_{z}" : ",p_{y}";
-  const part = (i: 1 | 2, by: string) =>
-    String.raw`\frac{q_{${i}}}{${r(by)}}\left(p_{x}${by}\frac{d}{2}${rest}\right)`;
+/**
+ * The field, exactly, outside the balls Desmos draws as the charges, and
+ * nothing inside them: E = Σ q(r − rᵢ)/|r − rᵢ|³, unsoftened, since the
+ * ball covers each pole. In the plane, the slice z = 0 of the charges' own
+ * 3D field, so the lines bend as they do in the textbook figure.
+ */
+function gpuField(coords: readonly string[], radius: string, dim: 2 | 3) {
+  const layout = dim === 2 ? LAYOUT_2D : LAYOUT_3D;
+  // In the plane the charges lie in it: no Z sliders there.
+  const outside = outsideAll(coords, radius);
+  const guard = (s: string) => R`\left\{${outside}:${s},0\right\}`;
   return {
-    colors: [
-      {
-        key: "C1",
-        latex: String.raw`C_{1vt}=${signColor("q_{1}")}`,
-        hidden: true,
-      },
-      {
-        key: "C2",
-        latex: String.raw`C_{2vt}=${signColor("q_{2}")}`,
-        hidden: true,
-      },
-      { key: "E1", latex: String.raw`E_{1vt}=${part(1, "+")}`, hidden: true },
-      { key: "E2", latex: String.raw`E_{2vt}=${part(2, "-")}`, hidden: true },
-    ],
-    setup: {
-      at,
-      gain: "s_{arrow}",
-      names: "s_{names}",
-      damp: "s_{damp}",
-      reach,
-      dimensions,
-      valid: outside,
-      arrows: [
-        {
-          key: "E",
-          vector: String.raw`\left(E_{1vt}+E_{2vt}\right)`,
-          toggle: "s_{net}",
-          color: "#243b7a",
-          nameColor: "#243b7a",
-          name: String.raw`\vec{E}`,
-        },
-        {
-          key: "Ea",
-          vector: "E_{1vt}",
-          toggle: "s_{parts}",
-          colorLatex: "C_{1vt}",
-          nameColor: "#9a3a24",
-          name: String.raw`\vec{E}_{1}`,
-        },
-        {
-          key: "Eb",
-          vector: "E_{2vt}",
-          toggle: "s_{parts}",
-          colorLatex: "C_{2vt}",
-          nameColor: "#1d5687",
-          name: String.raw`\vec{E}_{2}`,
-        },
-        {
-          key: "F",
-          vector: String.raw`q_{0}\left(E_{1vt}+E_{2vt}\right)`,
-          toggle: "s_{force}",
-          color: "#7547a8",
-          nameColor: "#7547a8",
-          name: String.raw`\vec{F}`,
-        },
-      ],
-    },
+    field: [0, 1, 2].map((a) =>
+      a < dim ? guard(fieldComponent(layout, a, coords)) : "0"
+    ),
+    seed: guard("1"),
+    tint: potential(layout, coords),
   };
+}
+const GPU_2D = gpuField(["x", "y"], CHARGE_RADIUS_2D, 2);
+const GPU_3D = gpuField(["x", "y", "z"], CHARGE_RADIUS_3D, 3);
+
+/**
+ * The probe's arrows: the field, each charge's part of it while there is
+ * that charge, and the force on a test charge q₀.
+ */
+function chargeProbe(dim: 2 | 3, reach: number) {
+  const probe = ["p_{x}", "p_{y}", "p_{z}"].slice(0, dim);
+  const at = R`\left(${probe.join(",")}\right)`;
+  const radius = dim === 2 ? CHARGE_RADIUS_2D : CHARGE_RADIUS_3D;
+  const helpers: SceneItem[] = [
+    { key: "Enet", latex: R`E_{qvt}=${listField("1", probe)}`, hidden: true },
+  ];
+  const parts = Array.from({ length: MAX_CHARGES }, (_, n) => n + 1);
+  for (const i of parts) {
+    const d = probe.map(
+      (p, a) => R`\left(${p}-${["X", "Y", "Z"][a]}_{q${i}}\right)`
+    );
+    const r3 = R`\left(${d.map((s) => `${s}^{2}`).join("+")}\right)^{1.5}`;
+    // Undefined while the count leaves the charge out, so its arrow draws
+    // nothing; switched by s_{parts} itself, so the presets window's "Show"
+    // list knows that switch already governs it and adds no row per charge.
+    helpers.push({
+      key: `Epart${i}`,
+      latex: R`E_{q${i}vt}=\left\{${COUNT}\ge${i}:\left(${d.map((s) => R`\frac{q_{${i}}${s}}{${r3}}`).join(",")}\right)\right\}`,
+      hidden: true,
+    });
+  }
+  const setup: ProbeSetup = {
+    at,
+    gain: "s_{arrow}",
+    names: "s_{names}",
+    damp: "s_{damp}",
+    reach,
+    dimensions: dim,
+    valid: listOutside(probe, radius),
+    arrows: [
+      {
+        key: "E",
+        vector: "E_{qvt}",
+        toggle: "s_{net}",
+        color: "#243b7a",
+        nameColor: "#243b7a",
+        name: R`\vec{E}`,
+      },
+      ...parts.map((i) => ({
+        key: `E${i}`,
+        vector: `E_{q${i}vt}`,
+        toggle: "s_{parts}",
+        colorLatex: colorName(i),
+        nameColor: "#555555",
+        name: R`\vec{E}_{${i}}`,
+      })),
+      {
+        key: "F",
+        vector: R`q_{0}E_{qvt}`,
+        toggle: "s_{force}",
+        color: "#7547a8",
+        nameColor: "#7547a8",
+        name: R`\vec{F}`,
+      },
+    ],
+  };
+  const arrows = dim === 2 ? probeArrows2D(setup) : probeArrows3D(setup);
+  return { helpers, at, arrows };
 }
 
 /** What a probe needs, as variables: where it is, its gain, its switches. */
@@ -181,75 +156,45 @@ const probeSwitches = (gain: number, max: number): GalleryVariable[] => [
 ];
 
 /**
- * The charges in the plane, as a textbook draws them: two discs, red with a
- * plus and blue with a minus; a probe point to drag, with its field arrow;
- * and, switchable, the exact field lines and equipotentials.
+ * The charges in the plane, as a textbook draws them: discs, red with a
+ * plus and blue with a minus, each with a handle to drag anywhere; a probe
+ * point with its field arrow; and, switchable, exact field lines and
+ * equipotentials.
  *
- * The field lines are the contours of the flux function of two point charges
- * on an axis, S = q₁cos θ₁ + q₂cos θ₂: each is exactly a line of the charges'
- * field, in a plane through them, and between any two neighbours the same
- * flux, so their spacing is the textbook's, denser where the field is
- * stronger. Each charge sends out 2|q|/0.25 of them.
+ * The field lines are contours of the flux function of point charges on
+ * one line, S = Σ qᵢ cos θᵢ: exactly lines of the field, in a plane through
+ * the charges, with the textbook's spacing (each charge sends out 2|q|/0.25
+ * of them). That function exists only while the charges share a line, so
+ * the lines are drawn while every charge in use sits at charge 1's height,
+ * and the flow alone shows the field once one is dragged off it. Drawn as
+ * one implicit curve, sin(4πS) = 0, not a list of levels: on a change of a
+ * charge that took 400 ms as a list of 81 levels; this, 100.
+ *
+ * Equipotentials need no such line, and are drawn for any arrangement.
  */
 const CHARGES_SCENE_2D: SceneItem[] = (() => {
-  const outsideProbe = String.raw`\min\left(\left(p_{x}+\frac{d}{2}\right)^{2}+p_{y}^{2},\left(p_{x}-\frac{d}{2}\right)^{2}+p_{y}^{2}\right)>${CHARGE_RADIUS_2D}^{2}`;
-  const { colors, setup } = chargeProbe(
-    String.raw`\left(p_{x},p_{y}\right)`,
-    outsideProbe,
-    2,
-    // At home view, ±10: a long arrow reaches a quarter of the way across.
-    5
-  );
-  const R = CHARGE_RADIUS_2D;
-  const r = (by: string) =>
-    String.raw`\sqrt{\left(x${by}\frac{d}{2}\right)^{2}+y^{2}}`;
-  const outside = chargesOutside(["x", "y"], R);
-  const charge = (i: 1 | 2, by: string, cx: string): SceneItem[] => [
-    {
-      key: `ball${i}`,
-      latex: String.raw`${r(by)}\le${R}`,
-      colorLatex: `C_{${i}vt}`,
-      fill: true,
-      fillOpacity: 1,
-      lineWidth: 1.5,
-    },
-    {
-      // A plus or a minus on it, in white: the sign without a word.
-      key: `minus${i}`,
-      latex: String.raw`\left(${cx}+0.55\cdot${R}t,0\right)\left\{\left|q_{${i}}\right|>0\right\}`,
-      domain: ["-1", "1"],
-      color: "#ffffff",
-      lineWidth: 3,
-    },
-    {
-      key: `plus${i}`,
-      latex: String.raw`\left(${cx},0.55\cdot${R}t\right)\left\{q_{${i}}>0\right\}`,
-      domain: ["-1", "1"],
-      color: "#ffffff",
-      lineWidth: 3,
-    },
-  ];
+  const { helpers, at, arrows } = chargeProbe(2, 5);
+  const radius = CHARGE_RADIUS_2D;
+  const { d, r2 } = listOffsets(["x", "y"]);
+  const outside = listOutside(["x", "y"], radius);
+  const flux = R`\operatorname{total}\left(\frac{${LISTS.q}${d[0]}}{\sqrt{${r2}}}\right)`;
+  const onLine = R`\operatorname{total}\left(\left(${LISTS.y}-Y_{q1}\right)^{2}\right)<10^{-9}`;
   return [
-    ...colors,
-    ...charge(1, "+", String.raw`-\frac{d}{2}`),
-    ...charge(2, "-", String.raw`\frac{d}{2}`),
+    ...chargeScene(2, radius),
+    ...helpers,
     {
-      // Every line at once, where sin(4πS) is zero, at S = k/4: one implicit
-      // curve for Desmos to trace rather than a list of them, each traced over
-      // the whole graph. On a change of a charge or the distance that took
-      // 400 ms as a list of 81 levels and 320 as the 17 that exist; this, 100.
       key: "lines",
       explains: true,
-      latex: String.raw`\sin\left(4\pi\left(\frac{q_{1}\left(x+\frac{d}{2}\right)}{${r("+")}}+\frac{q_{2}\left(x-\frac{d}{2}\right)}{${r("-")}}\right)\right)=0\left\{s_{lines}=1\right\}\left\{${outside}\right\}\left\{\left|y\right|>0.02\right\}`,
+      latex: R`\sin\left(4\pi${flux}\right)=0\left\{s_{lines}=1\right\}\left\{${onLine}\right\}\left\{${outside}\right\}\left\{\left|y-Y_{q1}\right|>0.02\right\}`,
       color: "#2c3646",
       lineWidth: 2,
       lineOpacity: 0.85,
     },
     {
-      // The axis through them, which every contour above meets edge-on.
+      // The line through them, which every contour above meets edge-on.
       key: "axis",
       explains: true,
-      latex: String.raw`y=0\left\{s_{lines}=1\right\}\left\{${outside}\right\}`,
+      latex: R`y=Y_{q1}\left\{s_{lines}=1\right\}\left\{${onLine}\right\}\left\{${outside}\right\}`,
       color: "#2c3646",
       lineWidth: 2,
       lineOpacity: 0.85,
@@ -257,7 +202,7 @@ const CHARGES_SCENE_2D: SceneItem[] = (() => {
     {
       key: "equipotentials",
       explains: true,
-      latex: String.raw`\frac{q_{1}}{${r("+")}}+\frac{q_{2}}{${r("-")}}=\left[-1,-0.5,-0.25,-0.1,0,0.1,0.25,0.5,1\right]\left\{s_{equi}=1\right\}\left\{${outside}\right\}`,
+      latex: R`${listPotential("", ["x", "y"])}=\left[-1,-0.5,-0.25,-0.1,0,0.1,0.25,0.5,1\right]\left\{s_{equi}=1\right\}\left\{${outside}\right\}`,
       color: "#303030",
       lineStyle: "DASHED",
       lineWidth: 2,
@@ -265,69 +210,41 @@ const CHARGES_SCENE_2D: SceneItem[] = (() => {
     {
       key: "probe",
       explains: true,
-      latex: String.raw`\left(p_{x},p_{y}\right)`,
+      latex: at,
       color: "#222222",
       points: true,
       pointSize: 12,
     },
-    ...probeArrows2D(setup),
+    ...arrows,
   ];
 })();
 
 /**
- * The charges in space: two shaded balls, coloured by sign, drawn as
- * surfaces in u and v so the particles behind them are hidden behind them
- * (the depth pass redraws surfaces of that kind, not implicit ones); a probe
- * point, with Desmos's own 3D vectors.
+ * The charges in space: shaded balls coloured by sign, drawn as surfaces in
+ * u and v so the particles behind them are hidden (the depth pass redraws
+ * surfaces of that kind, not implicit ones), each with the plugin's own
+ * handle to drag in three dimensions; a probe point with Desmos's own 3D
+ * vectors.
  */
 const CHARGES_SCENE_3D: SceneItem[] = (() => {
-  const outsideProbe = String.raw`\min\left(\left(p_{x}+\frac{d}{2}\right)^{2}+p_{y}^{2}+p_{z}^{2},\left(p_{x}-\frac{d}{2}\right)^{2}+p_{y}^{2}+p_{z}^{2}\right)>${CHARGE_RADIUS_3D}^{2}`;
-  const { colors, setup } = chargeProbe(
-    String.raw`\left(p_{x},p_{y},p_{z}\right)`,
-    outsideProbe,
-    3,
-    2.5
-  );
-  const R = CHARGE_RADIUS_3D;
-  const ball = (i: 1 | 2, cx: string): SceneItem => ({
-    key: `ball${i}`,
-    latex: String.raw`\left(${cx}+${R}\cos\left(u\right)\sin\left(v\right),${R}\sin\left(u\right)\sin\left(v\right),${R}\cos\left(v\right)\right)`,
-    colorLatex: `C_{${i}vt}`,
-    domainU: ["0", String.raw`2\pi`],
-    domainV: ["0", String.raw`\pi`],
-  });
+  const { helpers, at, arrows } = chargeProbe(3, 2.5);
   return [
-    ...colors,
-    ball(1, String.raw`-\frac{d}{2}`),
-    ball(2, String.raw`\frac{d}{2}`),
+    ...chargeScene(3, CHARGE_RADIUS_3D),
+    ...helpers,
     {
       key: "probe",
       explains: true,
-      latex: String.raw`\left(p_{x},p_{y},p_{z}\right)`,
+      latex: at,
       color: "#222222",
       points: true,
       // In 3D a point is a ball, and 12 hid the arrows' tails inside it.
       pointSize: 4,
       drag3d: ["p_{x}", "p_{y}", "p_{z}"],
     },
-    ...probeArrows3D(setup),
+    ...arrows,
   ];
 })();
-/**
- * The charges' particles coloured by the electric potential where they are,
- * V = q₁/r₁ + q₂/r₂ (k = 1): red where it is positive, near a positive
- * charge; blue where negative; slate where it is zero, which between equal
- * and opposite charges is the plane half-way. So the colours mean something
- * a class learns, and they cross over exactly where the equipotential V = 0
- * is drawn.
- */
-const CHARGE_TINT = {
-  latex: String.raw`\frac{q_{1}}{\sqrt{\left(x+\frac{d}{2}\right)^{2}+y^{2}}}+\frac{q_{2}}{\sqrt{\left(x-\frac{d}{2}\right)^{2}+y^{2}}}`,
-  latex3d: String.raw`\frac{q_{1}}{\sqrt{\left(x+\frac{d}{2}\right)^{2}+y^{2}+z^{2}}}+\frac{q_{2}}{\sqrt{\left(x-\frac{d}{2}\right)^{2}+y^{2}+z^{2}}}`,
-  // A unit charge's potential 1 from it is 1: three quarters red at 0.3,
-  // so the colour reaches well out from each charge before it fades.
-  scale: 0.3,
-};
+
 /**
  * The flow on paper, for a preset whose Desmos objects carry the picture: a
  * faint, even current of one dark colour, the field's direction everywhere
@@ -347,13 +264,15 @@ const CHARGE_FLOW = {
 };
 
 /** A slider, at Desmos's own step unless given one. */
-const v = (
+function v(
   name: string,
   value: number,
   min: number,
   max: number,
   step?: number
-): GalleryVariable => ({ name, value, min, max, step });
+): GalleryVariable {
+  return { name, value, min, max, step };
+}
 
 /** The charges: the preset the others were built after. */
 const CHARGES_PRESET: GalleryPreset = {
@@ -362,14 +281,12 @@ const CHARGES_PRESET: GalleryPreset = {
   category: "ap2",
   apUnit: 10,
   blurb:
-    "Two point charges, q₁ and q₂, a distance d apart: Coulomb's law. Opposite charges, and lines run from one to the other; like charges, and they push apart, with a neutral point between. Drag the probe to see the field there, each charge's part of it, and the force on a test charge q₀.",
-  xLatex: CHARGES_2D.x,
-  yLatex: CHARGES_2D.y,
-  seedLatex: CHARGES_2D.seed,
+    "Up to ten point charges, anywhere: drag each by its handle, set how many with N_q. Coulomb's law and superposition. Field lines are exact while the charges share a line; equipotentials always. Drag the probe to see the field there, each charge's part of it, and the force on a test charge q₀.",
+  xLatex: GPU_2D.field[0],
+  yLatex: GPU_2D.field[1],
+  seedLatex: GPU_2D.seed,
   variables: [
-    v("q_{1}", 1, -5, 5, 0.1),
-    v("q_{2}", -1, -5, 5, 0.1),
-    v("d", 5, 1, 12, 0.1),
+    ...chargeVariables(LAYOUT_2D, 2, [-5, 5, 0.1]),
     v("p_{x}", 0, -9, 9, 0.05),
     v("p_{y}", 3, -9, 9, 0.05),
     ...probeSwitches(30, 100),
@@ -379,20 +296,27 @@ const CHARGES_PRESET: GalleryPreset = {
   scene: CHARGES_SCENE_2D,
   onPaper: true,
   palette: "charge",
-  tint: CHARGE_TINT,
+  // The particles coloured by the potential where they are, V = Σ q/r
+  // (k = 1): red near positive charge, blue near negative, slate where it
+  // is zero, so they cross over where the equipotential V = 0 is drawn.
+  tint: {
+    latex: GPU_2D.tint,
+    latex3d: GPU_3D.tint,
+    // A unit charge's potential 1 from it is 1: three quarters red at 0.3,
+    // so the colour reaches well out from each charge before it fades.
+    scale: 0.3,
+  },
   flow: CHARGE_FLOW,
   extent: 10,
   space: {
     blurb:
-      "Two point charges on the x-axis, q₁ and q₂, a distance d apart: Coulomb's law in space. Move the probe to see the field there, each charge's part of it, and the force on a test charge q₀.",
-    xLatex: CHARGES_3D.x,
-    yLatex: CHARGES_3D.y,
-    zLatex: CHARGES_3D.z,
-    seedLatex: CHARGES_3D.seed,
+      "Up to ten point charges in space: drag each by its handle, set how many with N_q. Coulomb's law in 3D. Move the probe to see the field there, each charge's part of it, and the force on a test charge q₀.",
+    xLatex: GPU_3D.field[0],
+    yLatex: GPU_3D.field[1],
+    zLatex: GPU_3D.field[2],
+    seedLatex: GPU_3D.seed,
     variables: [
-      v("q_{1}", 1, -5, 5, 0.1),
-      v("q_{2}", -1, -5, 5, 0.1),
-      v("d", 3, 1, 8, 0.1),
+      ...chargeVariables(LAYOUT_3D, 3, [-5, 5, 0.1]),
       v("p_{x}", 0, -5, 5, 0.05),
       v("p_{y}", 1.5, -5, 5, 0.05),
       v("p_{z}", 1, -5, 5, 0.05),

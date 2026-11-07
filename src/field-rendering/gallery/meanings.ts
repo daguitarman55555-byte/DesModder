@@ -47,24 +47,6 @@ export const COLOR_MEANINGS: Readonly<Record<string, ColorMeaning>> = {
     zero: "V = 0",
     high: "positive, near +",
   },
-  wires: {
-    quantity: "Magnetic field strength |B|",
-    low: "weak",
-    high: "strong, near a wire",
-    half: "upper",
-  },
-  "earth-moon": {
-    quantity: "Gravitational potential",
-    low: "deepest, near the masses",
-    high: "zero, far away",
-    half: "lower",
-  },
-  cylinder: {
-    quantity: "Pressure (Bernoulli)",
-    low: "lower than the stream's",
-    zero: "the stream's own",
-    high: "higher than the stream's",
-  },
   capacitor: {
     quantity: "Electric potential V",
     low: "negative, at the − plate",
@@ -82,17 +64,5 @@ export const COLOR_MEANINGS: Readonly<Record<string, ColorMeaning>> = {
     low: "negative, south of the dipole",
     zero: "zero, across its middle",
     high: "positive, north of it",
-  },
-  "shell-theorem": {
-    quantity: "Gravitational potential",
-    low: "deepest, inside and at the shell",
-    high: "zero, far away",
-    half: "lower",
-  },
-  "uniform-field": {
-    quantity: "Electric potential V",
-    low: "lower, towards the − plate",
-    zero: "V = 0, at the middle",
-    high: "higher, towards the + plate",
   },
 };

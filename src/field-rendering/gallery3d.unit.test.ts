@@ -7,7 +7,7 @@ const FIELD_GALLERY = SHARED.map(withVariablesInlined);
 /**
  * The physics presets: fields written in a problem's variables, still in
  * time — what moves them is their sliders — and lying flat in the box where
- * the problem does (a long wire, a long cylinder, long plates).
+ * the problem does (long plates).
  */
 const PHYSICS = new Set(
   SHARED.filter((preset) => preset.variables !== undefined).map((p) => p.id)
@@ -18,20 +18,7 @@ const CLOCKED = new Set(
     (p) => p.id
   )
 );
-const FLAT = new Set([
-  "cellular",
-  "karman",
-  "wires",
-  "cylinder",
-  "capacitor",
-  "uniform-field",
-  // Planar by what they show: a 1D motion, a phase plane, a Kepler orbit.
-  "ap-motion-graphs",
-  "ap-pendulum-phase",
-  "ap-kepler-areas",
-  // Straight currents along z: B has no z-component anywhere.
-  "ap-ampere-loop",
-]);
+const FLAT = new Set(["cellular", "karman", "capacitor"]);
 
 describe("every gallery preset has a 3D form", () => {
   const space = { ...EMPTY_ENVIRONMENT, dimensions: 3 as const };

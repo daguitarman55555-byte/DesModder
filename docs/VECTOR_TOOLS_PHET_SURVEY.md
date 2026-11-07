@@ -1,5 +1,7 @@
 # PhET against AP Physics 1, 2 and C: what to take, what to beat
 
+> **Removed 2026-11-07:** every AP Physics 1 demo built from this survey (projectile, oscillator, circular motion, continuity and Bernoulli, motion graphs, pendulum, Kepler's areas, incline, energy bars), plus Earth and Moon, the shell theorem, the spinning cylinder, the uniform field, parallel wires and Ampère's law. Rafael judged them not as good as they should be. The presets window keeps an AP Physics 2 shelf only. Rows below that name those demos describe what was built then, not what ships.
+>
 > **Corrected by GPT's audit:** `docs/research/vector-tools-phet/answers.md`. It covers current screens, which ideas have no PhET counterpart, and Physics C exam boundaries. Where the two disagree, the audit is right.
 
 October 2026. All 112 simulations on PhET's physics shelf were checked (73 HTML5, 39 Java or Flash), from the live catalogue at phet.colorado.edu. Each was placed against the AP Physics 1 and 2 CEDs (units 1–15) and AP Physics C (Mechanics and E&M). There is no AP Physics 3; "C" is the calculus-based pair.

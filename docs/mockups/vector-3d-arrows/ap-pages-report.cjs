@@ -64,18 +64,13 @@ if (fs.existsSync(screenshots)) {
       fs.copyFileSync(path.join(screenshots, file), path.join(siteShots, file));
 }
 const expected = [
-  "ap-projectile",
-  "ap-shm",
-  "ap-circular",
-  "ap-nozzle",
+  "charges",
+  "ap-gauss-flux",
+  "capacitor",
   "ap-conductor",
   "ap-induction",
-  "ap-motion-graphs",
-  "ap-pendulum-phase",
-  "ap-kepler-areas",
-  "ap-gauss-flux",
-  "ap-ampere-loop",
-  "ap-incline-forces",
+  "bar-magnet",
+  "dipole",
 ].flatMap((preset) =>
   ["2d", "3d"].flatMap((dimension) =>
     ["explanatory", "majestic"].map((mode) => `${dimension}|${preset}|${mode}`)

@@ -33,57 +33,20 @@ const dx = (f: (x: number, y: number) => number, x: number, y: number) =>
 const dy = (f: (x: number, y: number) => number, x: number, y: number) =>
   (f(x, y + 1e-5) - f(x, y - 1e-5)) / 2e-5;
 
-test.each([
-  "earth-moon",
-  "capacitor",
-  "dipole",
-  "shell-theorem",
-  "uniform-field",
-])("%s field is minus the gradient of its stated potential", (id) => {
-  const f = field(id);
-  for (const [x, y] of [
-    [2, 2],
-    [1, -2.5],
-    [-2, 3],
-  ]) {
-    expect(f.x(x, y)).toBeCloseTo(-dx(f.potential, x, y), 5);
-    expect(f.y(x, y)).toBeCloseTo(-dy(f.potential, x, y), 5);
+test.each(["capacitor", "dipole"])(
+  "%s field is minus the gradient of its stated potential",
+  (id) => {
+    const f = field(id);
+    for (const [x, y] of [
+      [2, 2],
+      [1, -2.5],
+      [-2, 3],
+    ]) {
+      expect(f.x(x, y)).toBeCloseTo(-dx(f.potential, x, y), 5);
+      expect(f.y(x, y)).toBeCloseTo(-dy(f.potential, x, y), 5);
+    }
   }
-});
-test("wire superposition cancels between equal currents and reverses with current", () => {
-  const f = field("wires");
-  const r = field("wires", { "I_{1}": -1, "I_{2}": -1 });
-  expect(f.x(0, 0)).toBeCloseTo(0, 10);
-  expect(f.y(0, 0)).toBeCloseTo(0, 10);
-  expect(r.x(1, 2)).toBeCloseTo(-f.x(1, 2), 10);
-  expect(r.y(1, 2)).toBeCloseTo(-f.y(1, 2), 10);
-  expect(f.x(-2.5, 0)).toBe(0);
-  expect(f.y(-2.5, 0)).toBe(0);
-});
-test("shell has zero interior gravity and constant interior potential", () => {
-  const f = field("shell-theorem");
-  for (const [x, y] of [
-    [0, 0],
-    [1, 1],
-    [-2, 0],
-  ]) {
-    expect(f.x(x, y)).toBe(0);
-    expect(f.y(x, y)).toBe(0);
-    expect(f.potential(x, y)).toBeCloseTo(-8 / 2.5, 10);
-  }
-  expect(f.x(5, 0)).toBeCloseTo(-8 / 25, 10);
-});
-test("cylinder satisfies impermeability at the rim and Bernoulli pressure", () => {
-  const f = field("cylinder");
-  for (const t of [0.2, 1, 2, 4]) {
-    const x = 2.000001 * Math.cos(t);
-    const y = 2.000001 * Math.sin(t);
-    const u = f.x(x, y);
-    const v = f.y(x, y);
-    expect(u * Math.cos(t) + v * Math.sin(t)).toBeCloseTo(0, 5);
-    expect(f.potential(x, y)).toBeCloseTo((1 - u * u - v * v) / 2, 10);
-  }
-});
+);
 test("prism exterior field agrees with independent face quadrature, including face-plane extensions", () => {
   const f = field("bar-magnet");
   for (const [x, y] of [
@@ -126,28 +89,26 @@ test("prism exterior field agrees with independent face quadrature, including fa
   }
 });
 
-test.each([
-  "wires",
-  "earth-moon",
-  "cylinder",
-  "capacitor",
-  "dipole",
-  "shell-theorem",
-  "uniform-field",
-])("%s implicit lines are tangent to the field", (id) => {
-  const f = field(id);
-  const line = f.p.scene!.find((s) => s.key === "fieldlines")!.latex;
-  const start =
-    line.indexOf(
-      String.raw`\cdot\left(`,
-      line.indexOf(String.raw`\cdot\left(`) + 1
-    ) + String.raw`\cdot\left(`.length;
-  const end = line.indexOf(String.raw`\right)\right)=0`);
-  const s = f.compile(line.slice(start, end));
-  for (const [x, y] of [
-    [2, 2],
-    [1, -2.5],
-    [-2, 3],
-  ])
-    expect(dx(s, x, y) * f.x(x, y) + dy(s, x, y) * f.y(x, y)).toBeCloseTo(0, 5);
-});
+test.each(["capacitor", "dipole"])(
+  "%s implicit lines are tangent to the field",
+  (id) => {
+    const f = field(id);
+    const line = f.p.scene!.find((s) => s.key === "fieldlines")!.latex;
+    const start =
+      line.indexOf(
+        String.raw`\cdot\left(`,
+        line.indexOf(String.raw`\cdot\left(`) + 1
+      ) + String.raw`\cdot\left(`.length;
+    const end = line.indexOf(String.raw`\right)\right)=0`);
+    const s = f.compile(line.slice(start, end));
+    for (const [x, y] of [
+      [2, 2],
+      [1, -2.5],
+      [-2, 3],
+    ])
+      expect(dx(s, x, y) * f.x(x, y) + dy(s, x, y) * f.y(x, y)).toBeCloseTo(
+        0,
+        5
+      );
+  }
+);

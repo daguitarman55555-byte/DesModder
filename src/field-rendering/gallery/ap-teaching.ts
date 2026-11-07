@@ -1,8 +1,8 @@
 /**
- * Six demonstrations for AP Physics 1 and 2, each aimed at one reasoning
- * error students make: a projectile's velocity against its acceleration, an
- * oscillator's state, circular motion's two vectors, continuity and
- * Bernoulli, a conductor in a field, and an induced electric field.
+ * Two demonstrations for AP Physics 2, each aimed at one reasoning error
+ * students make: a conductor in a field, and an induced electric field.
+ * (The AP Physics 1 demonstrations that once lived here were removed on
+ * 2026-11-07: they were not as good as they should be.)
  *
  * Researched by GPT against the College Board CEDs
  * (docs/VECTOR_TOOLS_AP_CURRICULUM_RESEARCH.md and its answer in
@@ -12,22 +12,17 @@
  * names a quantity.
  *
  * Every model is exact for what it claims, and the unit tests check the
- * physics at points: the projectile's particles each obey a = g, the
- * oscillator's flow keeps energy, the streamtube is incompressible and
- * Bernoulli holds along it, the conductor's E is −∇V and normal to its
- * surface, and the induced field satisfies Faraday's law.
+ * physics at points: the conductor's E is -grad V and normal to its surface,
+ * and the induced field satisfies Faraday's law.
  */
 import { renameIdentifier } from "../identifiers";
-import { energyBars } from "./energy-bars";
 import {
   cos,
   flow2D,
   flow3D,
-  abs,
   frac,
   guard,
   inked,
-  mod,
   mul,
   only,
   par,
@@ -37,7 +32,7 @@ import {
   toggle,
   variable,
 } from "./kit";
-import { probeArrows2D, probeArrows3D, type ProbeArrow } from "./probe";
+import { probeArrows2D, probeArrows3D } from "./probe";
 import type {
   ColorMeaning,
   GalleryPreset,
@@ -49,14 +44,10 @@ const { raw } = String;
 
 /** Ink for paper, and the lighter one the same object needs on the dark. */
 const INK = "#394555";
-const BODY = "#c37229";
 const ARROW = "#244779";
 const SECOND_ARROW = "#a55222";
 
-const { obj, path, surface, ball } = inked(INK);
-/** A moving body, in the body's orange. */
-const body = (key: string, at: readonly string[], dim: 2 | 3) =>
-  ball(key, at, dim, { extra: { color: BODY } });
+const { obj, path, surface } = inked(INK);
 const atProbe = (s: string) =>
   ["x", "y", "z"].reduce((v, a) => renameIdentifier(v, a, `p_{${a}}`), s);
 
@@ -89,8 +80,6 @@ interface Demo {
   valid: string;
   seed: string;
   clock?: boolean;
-  /** Arrows drawn on the moving body rather than at the probe. */
-  body?: { at: string; valid: string; arrows: ProbeArrow[]; label: string };
   /** 2D only: a function constant along the field, drawn as its curves. */
   stream?: {
     latex: string;
@@ -122,277 +111,6 @@ interface Demo {
   density: number;
   probe: readonly number[];
   extent: number;
-}
-
-/**
- * The projectile. Gravity alone is a uniform rain that says nothing, so the
- * flow is a family of projectiles instead: v = (u, v − g(x + 6)/u) is the
- * velocity of every projectile thrown from x = −6 with the body's launch
- * velocity, at any height. Each particle then really moves as a projectile
- * (dv_y/dt = −(g/u)·u = −g), the body rides one of the arcs, and the colour
- * is v_y: rising, zero at the top while a is still g, then falling.
- */
-function projectile(m: Demo, dim: 2 | 3) {
-  // Not u and v for the launch velocity: those are Desmos 3D's surface
-  // parameters, and as sliders they turned the ground into a point.
-  const ground = "-3";
-  const up = dim === 2 ? "y" : "z";
-  m.vars = [
-    variable("g", 2, 0.5, 4),
-    variable("v_{0x}", 3, 1, 5),
-    variable("v_{0y}", 4, 1, 6),
-    variable("h", 0, 0, 3),
-    ...(dim === 3 ? [variable("w", 0.5, -1, 1)] : []),
-    toggle("s_{body}", 1, "Projectile's v and g"),
-  ];
-  const vy = raw`v_{0y}-\frac{g\left(x+6\right)}{v_{0x}}`;
-  m.field = dim === 2 ? ["v_{0x}", vy, "0"] : ["v_{0x}", "w", vy];
-  m.tint = vy;
-  m.scale = 3;
-  m.speed = 0.12;
-  m.label = "v";
-  m.valid = `${up}>${ground}`;
-  m.clock = true;
-  m.extent = 7;
-  m.probe = dim === 2 ? [-3, 0] : [-3, 0, 0];
-  // Lands, rests a second, and is thrown again.
-  const flight = frac(raw`v_{0y}+\sqrt{v_{0y}^{2}+2gh}`, "g");
-  const phase = mod("T_{scene}", `${flight}+1`);
-  const time = raw`\min${par(`${phase},${flight}`)}`;
-  const height = (t: string) =>
-    `${ground}+h+${mul("v_{0y}", t)}-${mul(frac("g", "2"), sq(t))}`;
-  const position = (t: string) =>
-    dim === 2
-      ? [`-6+${mul("v_{0x}", t)}`, height(t)]
-      : [`-6+${mul("v_{0x}", t)}`, mul("w", t), height(t)];
-  m.scene.push(
-    path("trajectory", position("t"), ["0", flight], {
-      explains: true,
-      lineStyle: "DASHED",
-    }),
-    body("projectile", position(time), dim)
-  );
-  if (dim === 2)
-    m.scene.push(
-      obj("ground", `y\\le${ground}`, {
-        color: "#6b5d4a",
-        majesticColor: "#4a5568",
-        fill: true,
-        fillOpacity: 0.3,
-        lineWidth: 3,
-      })
-    );
-  else
-    m.scene.push(
-      // A ball's radius below where its centre lands, so it rests on it.
-      surface("ground", ["u", "v", "-3.3"], ["-7", "7"], ["-4", "4"], {
-        color: "#8a8f86",
-        majesticColor: "#3a4658",
-      })
-    );
-  const g3 = dim === 2 ? ["0", "-g"] : ["0", "0", "-g"];
-  m.body = {
-    at: point(...position(time)),
-    valid: `${phase}<${flight}`,
-    label: "Projectile's v and g",
-    arrows: [
-      {
-        key: "bodyv",
-        vector: point(
-          ...(dim === 2
-            ? ["v_{0x}", `v_{0y}-${mul("g", time)}`]
-            : ["v_{0x}", "w", `v_{0y}-${mul("g", time)}`])
-        ),
-        toggle: "s_{body}",
-        name: raw`\vec{v}`,
-        color: ARROW,
-        nameColor: ARROW,
-      },
-      {
-        key: "bodyg",
-        vector: point(...g3),
-        toggle: "s_{body}",
-        name: raw`\vec{g}`,
-        color: SECOND_ARROW,
-        nameColor: SECOND_ARROW,
-      },
-    ],
-  };
-  // Constant along every arc: the height it peaks at, (gy + v_y²/2)/g.
-  m.stream = {
-    latex: `y+${frac(sq(vy), "2g")}`,
-    perUnit: "1",
-    label: "Trajectories",
-    // As explicit curves, y = S − v_y²/2g for each whole peak height S.
-    explicit: `y=${raw`\left[-2,0,...,8\right]`}-${frac(sq(vy), "2g")}${only(`y>${ground}`)}`,
-  };
-}
-
-function oscillator(m: Demo, dim: 2 | 3) {
-  m.vars = [
-    variable("k", 1, 0.25, 3),
-    variable("m", 1, 0.5, 3),
-    variable("A", 2, 0.5, 3),
-  ];
-  m.clock = true;
-  m.extent = 6;
-  m.probe = dim === 2 ? [1, 1] : [1, 1, 0];
-  const omega = raw`\sqrt{\frac{k}{m}}`;
-  m.scene.push(
-    body(
-      "oscillator",
-      [
-        mul("A", cos(mul(omega, "T_{scene}"))),
-        mul("-A", omega, sin(mul(omega, "T_{scene}"))),
-        ...(dim === 3 ? ["0"] : []),
-      ],
-      dim
-    )
-  );
-  // x is displacement and y velocity. In 3D the same plane is drawn at
-  // z = 0: z is a display thickness, not a third physical state.
-  m.field = ["y", `-${frac("kx", "m")}`, "0"];
-  m.tint = frac("my^{2}+kx^{2}", "2");
-  m.scale = 4;
-  m.seed = dim === 3 ? "e^{-30z^{2}}" : "1";
-  // Contours of energy, drawn at whole amplitudes, √(2E/k) = 1, 2, 3…:
-  // at whole energies they crowd together going out.
-  m.stream = {
-    latex: raw`\sqrt{\frac{2}{k}${par(m.tint)}}`,
-    perUnit: "1",
-    label: "Energy contours",
-    // Parametric ellipses, x = n cos t and v = n√(k/m) sin t, for n = 1…8:
-    // Desmos draws those far faster than the implicit curves of √(2E/k).
-    explicit: point(
-      mul(WHOLE, cos("t")),
-      mul(WHOLE, raw`\sqrt{\frac{k}{m}}`, sin("t"))
-    ),
-    domain: ["0", raw`2\pi`],
-  };
-  // No surface for the phase plane in 3D: a translucent one drew as an
-  // opaque slab over the flow, and Desmos's own grid already marks z = 0.
-  m.label = "s";
-}
-
-function circular(m: Demo, dim: 2 | 3) {
-  m.vars = [
-    variable("w", 0.7, -1.5, 1.5),
-    variable("R", 2.5, 1, 4),
-    toggle("s_{body}", 1, "Body's v and a"),
-  ];
-  const rho = "x^{2}+y^{2}";
-  m.field = ["-wy", "wx", "0"];
-  m.tint = frac(`w^{2}${par(rho)}`, "2");
-  m.scale = 3;
-  m.clock = true;
-  m.extent = 6;
-  m.probe = dim === 2 ? [1.5, 0] : [1.5, 0, 0];
-  m.seed = mul(
-    `e^{-0.4${sq(raw`\sqrt{${rho}}-R`)}}`,
-    dim === 3 ? "e^{-6z^{2}}" : "1"
-  );
-  // Circles of radius 1, 2, 3…: evenly spaced, unlike circles of ρ.
-  m.stream = CIRCLES(rho);
-  const flat = (s: string[]) => (dim === 3 ? [...s, "0"] : s);
-  const angle = mul("w", "T_{scene}");
-  m.scene.push(
-    path(
-      "orbit",
-      flat([mul("R", cos("t")), mul("R", sin("t"))]),
-      ["0", raw`2\pi`],
-      { explains: true }
-    ),
-    body("marker", flat([mul("R", cos(angle)), mul("R", sin(angle))]), dim)
-  );
-  m.body = {
-    at: point(...flat([mul("R", cos(angle)), mul("R", sin(angle))])),
-    valid: "1>0",
-    label: "Body's v and a",
-    arrows: [
-      {
-        key: "bodyv",
-        vector: point(...flat([mul("-wR", sin(angle)), mul("wR", cos(angle))])),
-        toggle: "s_{body}",
-        name: raw`\vec{v}`,
-        color: ARROW,
-        nameColor: ARROW,
-      },
-      {
-        key: "bodya",
-        vector: point(
-          ...flat([mul("-w^{2}R", cos(angle)), mul("-w^{2}R", sin(angle))])
-        ),
-        toggle: "s_{body}",
-        name: raw`\vec{a}`,
-        color: SECOND_ARROW,
-        nameColor: SECOND_ARROW,
-      },
-    ],
-  };
-}
-
-function streamtube(m: Demo, dim: 2 | 3) {
-  m.vars = [
-    variable("U", 1, 0.3, 2),
-    variable("a", 0.12, 0.03, 0.2, 0.01),
-    variable("H", dim === 2 ? 1.7 : 1.4, 1, 2),
-    variable("d", 1, 0.5, 2),
-  ];
-  m.extent = 5;
-  m.probe = dim === 2 ? [1, 0.3] : [1, 0.3, 0.3];
-  const z = dim === 3 ? "z" : "0";
-  const f = "1+ax";
-  m.field = [
-    mul("U", f),
-    dim === 2 ? "-Uay" : `-${frac("Uay", "2")}`,
-    dim === 3 ? `-${frac("Uaz", "2")}` : "0",
-  ];
-  const width = dim === 2 ? frac("H", f) : frac("H", raw`\sqrt{${f}}`);
-  m.valid = raw`\max${par(`${frac(abs("x"), "4")},${frac(raw`\sqrt{y^{2}+${sq(z)}}`, width)}`)}<1`;
-  // Pressure against the pressure where the speed is U: higher where the
-  // tube is wide and the flow slow, lower where it narrows and speeds up.
-  m.tint = mul("\\frac{d}{2}", `U^{2}-${par(m.field.map(sq).join("+"))}`);
-  m.scale = 0.5;
-  m.speed = 0.4;
-  m.density = 0.4;
-  m.stream = {
-    latex: mul("U", f, "y"),
-    perUnit: "4",
-    label: "Streamlines",
-    mask: only(raw`\left|x\right|<4`) + only(raw`\left|y\right|<${width}`),
-    // Explicitly, y = c/(U(1 + ax)) for c = n/4: cheaper than the implicit
-    // curve, and it never trips the implicit plotter's restrictions.
-    explicit:
-      `y=${frac(raw`\left[-14,...,14\right]`, mul("4U", f))}` +
-      only(raw`\left|x\right|<4`) +
-      only(raw`\left|y\right|<${width}`),
-  };
-  const wall = "#6a7980";
-  const majesticWall = "#9fb0bd";
-  if (dim === 2)
-    for (const s of [-1, 1])
-      m.scene.push(
-        path(
-          "wall" + (s > 0 ? "p" : "m"),
-          ["t", mul(String(s), frac("H", "1+at"))],
-          ["-4", "4"],
-          { lineWidth: 5, color: wall, majesticColor: majesticWall }
-        )
-      );
-  else
-    m.scene.push(
-      surface(
-        "wall",
-        [
-          "u",
-          mul(frac("H", raw`\sqrt{1+au}`), cos("v")),
-          mul(frac("H", raw`\sqrt{1+au}`), sin("v")),
-        ],
-        ["-4", "4"],
-        [raw`\pi`, raw`2\pi`],
-        { color: wall, majesticColor: majesticWall }
-      )
-    );
 }
 
 function conductor(m: Demo, dim: 2 | 3) {
@@ -562,10 +280,6 @@ function induction(m: Demo, dim: 2 | 3) {
 }
 
 const MODELS: Record<string, (m: Demo, dim: 2 | 3) => void> = {
-  "ap-projectile": projectile,
-  "ap-shm": oscillator,
-  "ap-circular": circular,
-  "ap-nozzle": streamtube,
   "ap-conductor": conductor,
   "ap-induction": induction,
 };
@@ -595,62 +309,9 @@ const DESCRIPTIONS: Record<
     name: string;
     blurb: string;
     meaning: ColorMeaning;
-    course: 1 | 2;
     unit: number;
   }
 > = {
-  "ap-projectile": {
-    name: "Projectile",
-    blurb:
-      "Every particle is a projectile thrown from the same place with the body's velocity, so each moves on a parabola with a = g. Colour is vertical velocity: zero at the top, where acceleration is still g. Reset or wait to throw again.",
-    meaning: {
-      quantity: "Vertical velocity vᵧ",
-      low: "falling",
-      zero: "top of the arc",
-      high: "rising",
-    },
-    course: 1,
-    unit: 1,
-  },
-  "ap-shm": {
-    name: "Oscillator phase portrait",
-    blurb:
-      "x is displacement, y is velocity: the flow is the state's rate of change (v, −kx/m), not motion in space. The marker is the exact oscillator; colour is its energy. In 3D the same plane sits at z = 0.",
-    meaning: {
-      quantity: "Energy (mv² + kx²)/2",
-      low: "at rest",
-      high: "more energy",
-      half: "upper",
-    },
-    course: 1,
-    unit: 7,
-  },
-  "ap-circular": {
-    name: "Circular motion",
-    blurb:
-      "Rigid rotation: velocity is tangent, acceleration points inward, even at constant speed. Colour is kinetic energy per mass, which grows with radius. Negative ω turns it the other way; a still points inward.",
-    meaning: {
-      quantity: "Kinetic energy per mass ω²r²/2",
-      low: "at the axis",
-      high: "farther out",
-      half: "upper",
-    },
-    course: 1,
-    unit: 2,
-  },
-  "ap-nozzle": {
-    name: "Continuity and Bernoulli",
-    blurb:
-      "Exact ideal incompressible flow in a narrowing tube: where it narrows it speeds up and the pressure drops. Colour is pressure. The 3D wall is a cutaway. Inviscid, not the Fluid tab's viscous flow.",
-    meaning: {
-      quantity: "Pressure (Bernoulli)",
-      low: "lower: fast",
-      zero: "where speed is U",
-      high: "higher: slow",
-    },
-    course: 1,
-    unit: 8,
-  },
   "ap-conductor": {
     name: "Conductor in a field",
     blurb:
@@ -661,7 +322,6 @@ const DESCRIPTIONS: Record<
       zero: "the conductor's potential",
       high: "positive",
     },
-    course: 2,
     unit: 10,
   },
   "ap-induction": {
@@ -674,7 +334,6 @@ const DESCRIPTIONS: Record<
       zero: "none",
       high: "counterclockwise",
     },
-    course: 2,
     unit: 12,
   },
 };
@@ -685,11 +344,9 @@ export const AP_STREAMS: Record<string, string> = {};
 function preset(id: string): GalleryPreset {
   const create = (dim: 2 | 3) => {
     const m = model(id, dim);
-    const bars = energyBars(id, dim);
     const coords = dim === 2 ? ["x", "y"] : ["x", "y", "z"];
     const vars = [
       ...m.vars,
-      ...bars.variables,
       ...(m.clock ? [variable("T_{scene}", 0, 0, 1000, 0.01)] : []),
       ...coords.map((c, i) => variable(`p_{${c}}`, m.probe[i], -6, 6, 0.05)),
       variable("s_{gain}", 1, 0, 5),
@@ -727,19 +384,6 @@ function preset(id: string): GalleryPreset {
         ],
       })
     );
-    if (m.body !== undefined)
-      m.scene.push(
-        ...arrows({
-          at: m.body.at,
-          gain: "s_{gain}",
-          names: "s_{names}",
-          damp: "s_{damp}",
-          reach,
-          valid: m.body.valid,
-          dimensions: dim,
-          arrows: m.body.arrows,
-        })
-      );
     if (dim === 2 && m.stream !== undefined) {
       AP_STREAMS[id] = m.stream.latex;
       vars.push(toggle("s_{lines}", 1, m.stream.label));
@@ -759,9 +403,6 @@ function preset(id: string): GalleryPreset {
         )
       );
     }
-    // Last, so the card under the bars covers the guide curves too: Desmos
-    // draws later expressions on top.
-    m.scene.push(...bars.scene);
     const gpu = (s: string) => renameIdentifier(s, "T_{scene}", "t");
     return {
       m,
@@ -773,13 +414,13 @@ function preset(id: string): GalleryPreset {
   };
   const a = create(2);
   const b = create(3);
-  const { name, blurb, meaning, course, unit } = DESCRIPTIONS[id];
+  const { name, blurb, meaning, unit } = DESCRIPTIONS[id];
   return {
     id,
     name,
     blurb,
     meaning,
-    category: course === 1 ? "ap1" : "ap2",
+    category: "ap2",
     apUnit: unit,
     onPaper: true,
     palette: "charge",

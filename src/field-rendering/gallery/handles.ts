@@ -22,36 +22,10 @@ const D = "0.7071";
 const HANDLES: Readonly<
   Record<string, readonly (readonly [string, string])[]>
 > = {
-  charges: [
-    [R`-\frac{d}{2}`, "0"],
-    [R`\frac{d}{2}`, "0"],
-  ],
-  wires: [
-    [R`-\frac{d}{2}`, "0"],
-    [R`\frac{d}{2}`, "0"],
-  ],
-  "earth-moon": [[R`\frac{M_{1}}{M_{1}+M_{2}}d`, "0"]],
-  cylinder: [["0", "R"]],
   capacitor: [["L", R`\frac{d}{2}`]],
   "bar-magnet": [["a", "b"]],
-  "shell-theorem": [[`${D}R`, `${D}R`]],
-  "ap-projectile": [
-    ["-6", "-3+h"],
-    [R`-6+0.5v_{0x}`, R`-3+h+0.5v_{0y}`],
-  ],
-  "ap-shm": [["A", "0"]],
-  "ap-circular": [["0", "R"]],
-  "ap-nozzle": [["0", "H"]],
   "ap-conductor": [[`${D}R`, `${D}R`]],
   "ap-induction": [[`${D}R`, `${D}R`]],
-  "ap-motion-graphs": [[R`0.8x_{ini}`, "4.4"]],
-  "ap-pendulum-phase": [["5.6", "2.4-L"]],
-  "ap-kepler-areas": [[R`a_{orb}\left(1-e_{orb}\right)`, "0"]],
-  "ap-ampere-loop": [
-    ["X_{a1}", "0"],
-    ["X_{a2}", "0"],
-    ["C_{ax}", "C_{ay}"],
-  ],
 };
 
 /** A preset's handles, as scene items, for the calculator. */

@@ -201,7 +201,7 @@ export class PresetWindow extends Component<{
                         </span>
                       </div>
                       <For
-                        each={() => vectorTools.presetVariables}
+                        each={() => vectorTools.shownPresetVariables}
                         key={(v: { id: string }) => v.id}
                       >
                         {(v: () => (typeof vectorTools.presetVariables)[0]) => (

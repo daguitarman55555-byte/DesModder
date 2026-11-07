@@ -18,7 +18,7 @@ const root = join(__dirname, "..", "..", "..");
 const list = (name, fallback) => (process.env[name] ?? fallback).split(",");
 const ids = list(
   "IDS",
-  "ap-projectile,ap-shm,ap-circular,ap-nozzle,ap-conductor,ap-induction,ap-motion-graphs,ap-pendulum-phase,ap-kepler-areas,ap-gauss-flux,ap-ampere-loop,ap-incline-forces"
+  "charges,ap-gauss-flux,capacitor,ap-conductor,ap-induction,bar-magnet,dipole"
 );
 const dims = list("DIMS", "2d,3d");
 const modes = list("MODES", "explanatory");

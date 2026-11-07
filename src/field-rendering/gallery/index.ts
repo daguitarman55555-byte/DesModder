@@ -40,7 +40,6 @@
 import { CHAOS } from "./chaos";
 import { COLOR_MEANINGS } from "./meanings";
 import { AP_TEACHING } from "./ap-teaching";
-import { AP_EXTENSIONS } from "./ap-extensions";
 import { AP_NEXT } from "./ap-next";
 import { FLUIDS } from "./fluids";
 import { PHYSICS } from "./physics";
@@ -65,7 +64,6 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   ...CHAOS,
   ...PHYSICS,
   ...AP_TEACHING,
-  ...AP_EXTENSIONS,
   ...AP_NEXT,
 ].map((preset) => {
   const handles = handlesFor(preset.id);

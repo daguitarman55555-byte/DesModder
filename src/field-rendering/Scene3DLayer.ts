@@ -48,10 +48,19 @@ export class Scene3DLayer {
   private pendingMove?: Vec3;
   private moveFrame?: number;
   private names: readonly SceneName3D[] = [];
-  private probe?: SceneProbe3D;
+  /** Every point that can be dragged: the probe, charges, a sphere's centre. */
+  private probes: readonly SceneProbe3D[] = [];
   private frame?: number;
-  /** The drag in progress: the plane it moves in, through the probe. */
-  private drag?: { pointer: number; normal: Vec3; origin: Vec3 };
+  /**
+   * The drag in progress: the point held, and the plane it moves in,
+   * through where it was taken.
+   */
+  private drag?: {
+    pointer: number;
+    target: SceneProbe3D;
+    normal: Vec3;
+    origin: Vec3;
+  };
 
   constructor(private readonly calc: Calc) {}
 
@@ -60,10 +69,10 @@ export class Scene3DLayer {
   }
 
   /** What to draw and drag; mounts or unmounts to match. */
-  set(names: readonly SceneName3D[], probe: SceneProbe3D | undefined) {
+  set(names: readonly SceneName3D[], probes: readonly SceneProbe3D[]) {
     this.names = names;
-    this.probe = probe;
-    if (names.length === 0 && probe === undefined) this.stop();
+    this.probes = probes;
+    if (names.length === 0 && probes.length === 0) this.stop();
     else this.start();
     this.requestDraw();
   }
@@ -183,24 +192,35 @@ export class Scene3DLayer {
   }
 
   private readonly onPointerDown = (event: PointerEvent) => {
-    const probe = this.probe?.at();
     const camera = this.currentCamera();
     const canvas = webglCanvasOf(this.grapher);
-    if (probe === undefined || camera === undefined || canvas == null) return;
+    if (camera === undefined || canvas == null) return;
     const rect = canvas.getBoundingClientRect();
-    const screen = projectToScreen(camera, ...probe);
-    if (screen === undefined) return;
-    const dx = event.clientX - rect.left - screen.x;
-    const dy = event.clientY - rect.top - screen.y;
-    if (dx * dx + dy * dy > GRAB_RADIUS_PX * GRAB_RADIUS_PX) return;
+    // The nearest point within reach of the cursor, if any is.
+    let best:
+      | { target: SceneProbe3D; at: Vec3; x: number; y: number; d2: number }
+      | undefined;
+    for (const target of this.probes) {
+      const at = target.at();
+      if (at === undefined) continue;
+      const screen = projectToScreen(camera, ...at);
+      if (screen === undefined) continue;
+      const dx = event.clientX - rect.left - screen.x;
+      const dy = event.clientY - rect.top - screen.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 <= GRAB_RADIUS_PX * GRAB_RADIUS_PX && d2 < (best?.d2 ?? Infinity))
+        best = { target, at, x: screen.x, y: screen.y, d2 };
+    }
+    if (best === undefined) return;
     event.stopPropagation();
     event.preventDefault();
-    const ray = rayThrough(camera, screen.x, screen.y);
+    const ray = rayThrough(camera, best.x, best.y);
     if (ray === undefined) return;
     this.drag = {
       pointer: event.pointerId,
+      target: best.target,
       normal: ray.direction,
-      origin: probe,
+      origin: best.at,
     };
     window.addEventListener("pointermove", this.onPointerMove, true);
     window.addEventListener("pointerup", this.onPointerUp, true);
@@ -246,7 +266,7 @@ export class Scene3DLayer {
       this.moveFrame = undefined;
       const to = this.pendingMove;
       this.pendingMove = undefined;
-      if (to !== undefined) this.probe?.move(to);
+      if (to !== undefined) drag.target.move(to);
     });
   };
 
@@ -259,6 +279,7 @@ export class Scene3DLayer {
 
   /** Lets go, also when the layer stops mid-drag: no listener left behind. */
   private endDrag() {
+    const target = this.drag?.target;
     this.drag = undefined;
     window.removeEventListener("pointermove", this.onPointerMove, true);
     window.removeEventListener("pointerup", this.onPointerUp, true);
@@ -268,7 +289,7 @@ export class Scene3DLayer {
     this.moveFrame = undefined;
     const to = this.pendingMove;
     this.pendingMove = undefined;
-    if (to !== undefined) this.probe?.move(to);
+    if (to !== undefined) target?.move(to);
   }
 }
 

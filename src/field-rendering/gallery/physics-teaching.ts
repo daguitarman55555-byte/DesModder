@@ -4,7 +4,6 @@ import { renameIdentifier } from "../identifiers";
 import {
   abs,
   atan,
-  cos,
   flow2D,
   flow3D,
   frac,
@@ -28,54 +27,6 @@ const { raw } = String;
 const { obj, curve, surface } = inked("#2c3646");
 const ALONG = frac("1", `1+e^{3${par(`${abs("z")}-2.5`)}}`);
 
-function ball(
-  key: string,
-  cx: string,
-  R: string,
-  dim: number,
-  color: string,
-  colorLatex?: string
-): SceneItem {
-  return dim === 2
-    ? obj(key, `${sq(`x-${par(cx)}`)}+y^{2}\\le ${sq(R)}`, {
-        fill: true,
-        fillOpacity: 1,
-        color,
-        colorLatex,
-      })
-    : surface(
-        key,
-        [
-          `${cx}+${mul(R, cos("u"), sin("v"))}`,
-          mul(R, sin("u"), sin("v")),
-          mul(R, cos("v")),
-        ],
-        ["0", raw`2\pi`],
-        ["0", raw`\pi`],
-        { color, colorLatex }
-      );
-}
-function rod(key: string, cx: string, R: string, dim: number): SceneItem[] {
-  if (dim === 2) return [ball(key, cx, R, 2, "#59666f")];
-  return [
-    surface(
-      key,
-      [`${cx}+${mul(R, cos("u"))}`, mul(R, sin("u")), "v"],
-      ["0", raw`2\pi`],
-      ["-2.5", "2.5"],
-      { color: "#59666f" }
-    ),
-    ...[-2.5, 2.5].map((z, i) =>
-      surface(
-        key + "cap" + i,
-        [`${cx}+${mul("v", cos("u"))}`, mul("v", sin("u")), String(z)],
-        ["0", raw`2\pi`],
-        ["0", R],
-        { color: "#59666f" }
-      )
-    ),
-  ];
-}
 function box(
   key: string,
   lo: string[],
@@ -121,17 +72,14 @@ interface Model {
   scene: SceneItem[];
   vars: GalleryVariable[];
   stream?: string;
-  parts?: string[][];
   label: string;
   tintScale: number;
   gain: number;
-  extras?: ProbeArrow[];
 }
 
 function model(id: string, dim: 2 | 3): Model {
   const z = dim === 3 ? "z" : "0";
   const r2 = `x^{2}+y^{2}+${sq(z)}`;
-  const r = root(r2);
   const m: Model = {
     field: ["0", "0", "0"],
     valid: "1>0",
@@ -143,215 +91,7 @@ function model(id: string, dim: 2 | 3): Model {
     tintScale: 1,
     gain: 1,
   };
-  if (id === "wires" || id === "earth-moon") {
-    const grav = id === "earth-moon";
-    m.vars = grav
-      ? [
-          variable("M_{1}", 81, 1, 100, 1),
-          variable("M_{2}", 1, 0.1, 20),
-          variable("d", dim === 2 ? 6 : 3, 2, dim === 2 ? 12 : 7),
-        ]
-      : [
-          variable("I_{1}", 1, -3, 3),
-          variable("I_{2}", 1, -3, 3),
-          variable("d", dim === 2 ? 5 : 3, 1, 8),
-        ];
-    const centers = grav
-      ? [`-${frac("dM_{2}", "M_{1}+M_{2}")}`, frac("dM_{1}", "M_{1}+M_{2}")]
-      : ["-\\frac{d}{2}", "\\frac{d}{2}"];
-    const radii = grav ? ["0.75", "0.20475"] : ["0.22", "0.22"];
-    const ds = centers.map((c) => `x-${par(c)}`);
-    const rs = ds.map((dx) => `${sq(dx)}+y^{2}${grav ? `+${sq(z)}` : ""}`);
-    m.valid = raw`\min${par(rs.map((s, i) => frac(s, sq(radii[i]))).join(","))}>1`;
-    m.parts = rs.map((s, i) =>
-      grav
-        ? [ds[i], "y", z].map(
-            (c) => `-${frac(mul(`M_{${i + 1}}`, c), `${par(s)}^{1.5}`)}`
-          )
-        : [frac(`-I_{${i + 1}}y`, s), frac(mul(`I_{${i + 1}}`, ds[i]), s), "0"]
-    );
-    m.field = [0, 1, 2].map((a) => m.parts!.map((p) => p[a]).join("+"));
-    m.potential = rs
-      .map((s, i) =>
-        grav
-          ? `-${frac(`M_{${i + 1}}`, root(s))}`
-          : `-${mul(frac(`I_{${i + 1}}`, "2"), ln(s))}`
-      )
-      .join("+");
-    m.stream = grav
-      ? ds
-          .map((dx, i) => `-${frac(mul(`M_{${i + 1}}`, dx), root(rs[i]))}`)
-          .join("+")
-      : m.potential;
-    m.label = grav ? "g" : "B";
-    if (!grav) m.potential = root(m.field.map(sq).join("+"));
-    m.tintScale = grav ? 15 : 0.5;
-    m.gain = grav ? 0.4 : 5;
-    m.seed = grav
-      ? "1"
-      : mul(
-          par(rs.map((s) => `e^{-4${sq(`${root(s)}-0.9`)}}`).join("+")),
-          dim === 3 ? ALONG : "1"
-        );
-    centers.forEach((cx, i) => {
-      if (!grav) {
-        m.scene.push(...rod(`wire${i}`, cx, radii[i], dim));
-        if (dim === 2) {
-          m.scene.push(
-            obj(`dot${i}`, point(cx, "0") + only(`I_{${i + 1}}>0`), {
-              points: true,
-              pointSize: 5,
-              color: "#ffffff",
-            })
-          );
-          for (const sign of [1, -1])
-            m.scene.push(
-              curve(
-                `cross${i}${sign === 1 ? "a" : "b"}`,
-                point(`${cx}+0.12t`, `${sign * 0.12}t`) +
-                  only(`I_{${i + 1}}<0`),
-                ["-1", "1"],
-                { color: "#ffffff", lineWidth: 3 }
-              )
-            );
-        } else
-          m.scene.push(
-            obj(
-              `current${i}`,
-              raw`\operatorname{vector}${par(point(`${cx}+0.4`, "0", "0") + "," + point(`${cx}+0.4`, "0", raw`\left\{I_{${i + 1}}>0:1,I_{${i + 1}}<0:-1,0\right\}`))}`,
-              { color: "#a23c26", lineWidth: 1.5 }
-            )
-          );
-      } else {
-        const X = frac(`x-${par(cx)}`, radii[i]);
-        const Y = frac("y", radii[i]);
-        const Z = frac("z", radii[i]);
-        const light = `0.4+0.6\\max${par(`0,0.6${par(X)}+0.3${par(Y)}+0.74161985${par(Z)}`)}`;
-        const terrain = `${sin(`4${par(X)}+2${par(Y)}`)}+0.5${sin(`7${par(Y)}-3${par(Z)}`)}`;
-        const channels =
-          i === 0
-            ? [
-                [205, 75, 25],
-                [215, 95, 65],
-                [220, 58, 100],
-              ].map((c) =>
-                mul(
-                  light,
-                  raw`\left\{${abs(Y)}>0.88:${c[0]},${terrain}>0.6:${c[1]},${c[2]}\right\}`
-                )
-              )
-            : [0, 1, 2].map(() =>
-                mul(
-                  light,
-                  `150-38e^{-80${sq(`1-${par(X)}`)}}+20e^{-500${sq(`0.88-${par(X)}`)}}`
-                )
-              );
-        if (dim === 3)
-          m.scene.push(
-            obj(
-              `color${i}`,
-              `C_{planet${i}vt}=\\operatorname{rgb}${par(channels.join(","))}`,
-              { hidden: true }
-            )
-          );
-        m.scene.push(
-          ball(
-            `planet${i}`,
-            cx,
-            radii[i],
-            dim,
-            i === 0 ? "#246aa3" : "#999999",
-            dim === 3 ? `C_{planet${i}vt}` : undefined
-          )
-        );
-        if (dim === 2 && i === 0) {
-          const disk = only(`${sq(`x-${par(cx)}`)}+y^{2}<${sq(radii[i])}`);
-          m.scene.push(
-            obj(
-              "land",
-              `${sin(`4${par(X)}+2${par(Y)}`)}+0.5${sin(`7${par(Y)}`)}>0.6${disk}`,
-              { fill: true, fillOpacity: 1, color: "#4b733a", lineOpacity: 0 }
-            ),
-            obj("ice", `${abs(Y)}>0.88${disk}`, {
-              fill: true,
-              fillOpacity: 1,
-              color: "#dce4e4",
-              lineOpacity: 0,
-            })
-          );
-        }
-        if (dim === 2 && i === 1)
-          m.scene.push(ball("crater", `${cx}-0.06`, "0.065", 2, "#707070"));
-      }
-    });
-    if (!grav) {
-      m.vars.push(toggle("s_{force}", 0, "Force per length on right wire"));
-      m.extras = [
-        {
-          key: "wireForce",
-          vector: point(
-            frac("-I_{1}I_{2}", "d"),
-            "0",
-            ...(dim === 3 ? ["0"] : [])
-          ),
-          toggle: "s_{force}",
-          name: raw`\vec{f}_{L}`,
-          color: "#7547a8",
-          nameColor: "#7547a8",
-        },
-      ];
-    }
-  } else if (id === "cylinder") {
-    m.vars = [
-      variable("U", 1, 0.2, 3),
-      variable("R", dim === 2 ? 2 : 1.2, 0.4, dim === 2 ? 3 : 2),
-      variable("w", 0.4, -2, 2),
-      variable("T_{scene}", 0, 0, 1000, 0.01),
-      toggle("s_{force}", 0, "Pressure traction at rim"),
-    ];
-    const rho = "x^{2}+y^{2}";
-    m.valid = `${rho}>R^{2}`;
-    m.field = [
-      `U${par(`1-${frac(mul("R^{2}", "x^{2}-y^{2}"), sq(rho))}`)}-${frac("R^{2}wy", rho)}`,
-      `-${frac("2UR^{2}xy", sq(rho))}+${frac("R^{2}wx", rho)}`,
-      "0",
-    ];
-    m.potential = frac(`U^{2}-${sq(m.field[0])}-${sq(m.field[1])}`, "2");
-    m.stream = `Uy${par(`1-${frac("R^{2}", rho)}`)}-${mul(frac("R^{2}w", "2"), ln(frac(rho, "R^{2}")))}`;
-    m.seed = mul(
-      `e^{-${frac(sq(`${root(rho)}-1.25R`), "0.08R^{2}")}}`,
-      dim === 3 ? ALONG : "1"
-    );
-    m.label = "v";
-    m.gain = 1;
-    m.tintScale = 2;
-    m.scene.push(...rod("cylinder", "0", "R", dim));
-    const theta = "wT_{scene}";
-    m.scene.push(
-      curve(
-        "spin",
-        point(
-          mul("1.005R", cos(theta)),
-          mul("1.005R", sin(theta)),
-          ...(dim === 3 ? ["t"] : [])
-        ),
-        dim === 3 ? ["-2.5", "2.5"] : ["0", "1"],
-        { color: "#ffffff", lineWidth: 4, points: dim === 2, pointSize: 8 }
-      )
-    );
-    // Gauge-pressure traction at the upper rim: -Δp n, density normalized to one.
-    const pressure = frac(`U^{2}-${sq("-2U+Rw")}`, "2");
-    m.extras = [
-      {
-        key: "pressure",
-        vector: point("0", `-${par(pressure)}`, ...(dim === 3 ? ["0"] : [])),
-        toggle: "s_{force}",
-        name: raw`\vec{f}_{p}`,
-        color: "#7547a8",
-        nameColor: "#7547a8",
-      },
-    ];
-  } else if (id === "capacitor") {
+  if (id === "capacitor") {
     m.vars = [
       variable("s", 1, -2, 2),
       variable("L", dim === 2 ? 4 : 2.5, 1, 5),
@@ -507,81 +247,6 @@ function model(id: string, dim: 2 | 3): Model {
     // Axisymmetric flux; in the meridional plane the contours are the exact dipole lines.
     m.stream = frac("mx^{2}", `${par("x^{2}+y^{2}")}^{1.5}`);
     m.seed = `e^{-0.1${par(r2)}}`;
-  } else if (id === "shell-theorem") {
-    m.vars = [
-      variable("M", 8, 1, 20),
-      variable("R", dim === 2 ? 2.5 : 1.5, 0.5, 3),
-      toggle("s_{cut}", 1, "Cutaway view (field unchanged)"),
-    ];
-    m.field = ["x", "y", z].map((a) =>
-      guard(`${r}>R`, `-${frac(mul("M", a), `${par(r2)}^{1.5}`)}`)
-    );
-    m.potential = `-${frac("M", raw`\max${par(`${r},R`)}`)}`;
-    m.label = "g";
-    m.gain = 2;
-    m.tintScale = 3;
-    if (dim === 2)
-      m.scene.push(
-        curve(
-          "shell",
-          point(mul("R", cos("t")), mul("R", sin("t"))),
-          ["0", raw`2\pi`],
-          { color: "#8e7856", lineWidth: 5 }
-        )
-      );
-    else
-      m.scene.push(
-        surface(
-          "shell",
-          [
-            mul("R", cos("u"), sin("v")),
-            mul("R", sin("u"), sin("v")),
-            mul("R", cos("v")),
-          ],
-          ["0", raw`\pi\left(2-s_{cut}\right)`],
-          ["0", raw`\pi`],
-          { color: "#8e7856" }
-        )
-      );
-    m.stream = frac("y", r);
-  } else if (id === "uniform-field") {
-    m.vars = [
-      variable("E_{0}", 1, -3, 3),
-      variable("q_{0}", -1, -3, 3),
-      toggle("s_{force}", 0, "Force on test charge"),
-    ];
-    m.valid = `${abs("x")}<3`;
-    m.field = ["E_{0}", "0", "0"];
-    m.potential = "-E_{0}x";
-    m.stream = "y";
-    m.gain = 1;
-    m.tintScale = 2;
-    for (let i = 0; i < 2; i++) {
-      const cl = `C_{uniform${i}vt}`;
-      m.scene.push(
-        obj(`color${i}`, `${cl}=${signColor(i === 0 ? "E_{0}" : "-E_{0}")}`, {
-          hidden: true,
-        }),
-        ...box(
-          `plate${i}`,
-          [i === 0 ? "-3.08" : "3", "-5", "-3"],
-          [i === 0 ? "-3" : "3.08", "5", "3"],
-          dim,
-          "#999999",
-          cl
-        )
-      );
-    }
-    m.extras = [
-      {
-        key: "uniformForce",
-        vector: point("q_{0}E_{0}", "0", ...(dim === 3 ? ["0"] : [])),
-        toggle: "s_{force}",
-        name: raw`\vec{F}`,
-        color: "#7547a8",
-        nameColor: "#7547a8",
-      },
-    ];
   }
   return m;
 }
@@ -594,13 +259,7 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
     const vars = [
       ...m.vars,
       variable("p_{x}", id === "bar-magnet" ? 2.5 : 0, -9, 9, 0.05),
-      variable(
-        "p_{y}",
-        id === "cylinder" ? 3.2 : id === "capacitor" ? 0 : 1.5,
-        -9,
-        9,
-        0.05
-      ),
+      variable("p_{y}", id === "capacitor" ? 0 : 1.5, -9, 9, 0.05),
       ...(dim === 3 ? [variable("p_{z}", 0.6, -5, 5, 0.05)] : []),
       variable("s_{arrow}", m.gain, 0, 20),
       toggle("s_{net}", 1, "Field arrow"),
@@ -617,19 +276,6 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
         nameColor: "#243b7a",
       },
     ];
-    if (m.parts) {
-      vars.push(toggle("s_{parts}", 0, "Each source's field"));
-      m.parts.forEach((part, i) =>
-        arrows.push({
-          key: `part${i}${id.replace(/-/g, "")}`,
-          vector: point(...part.slice(0, dim).map(atProbe)),
-          toggle: "s_{parts}",
-          name: raw`\vec{${m.label}}_{${i + 1}}`,
-          color: i === 0 ? "#a4472f" : "#2474a0",
-          nameColor: i === 0 ? "#a4472f" : "#2474a0",
-        })
-      );
-    }
     const scene = [
       ...m.scene,
       obj("probe", probe, {
@@ -651,39 +297,15 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
       arrows,
     };
     scene.push(...(dim === 2 ? probeArrows2D(setup) : probeArrows3D(setup)));
-    if (m.extras) {
-      vars.push(variable("s_{forcegain}", 1, 0, 10));
-      const extra = {
-        ...setup,
-        gain: "s_{forcegain}",
-        valid: id === "uniform-field" ? setup.valid : "1>0",
-        at:
-          id === "wires"
-            ? point("\\frac{d}{2}", "0", ...(dim === 3 ? ["0"] : []))
-            : id === "cylinder"
-              ? point("0", "R", ...(dim === 3 ? ["0"] : []))
-              : probe,
-        arrows: m.extras,
-      };
-      scene.push(...(dim === 2 ? probeArrows2D(extra) : probeArrows3D(extra)));
-    }
     if (dim === 2 && m.stream) {
       vars.push(toggle("s_{lines}", 1, "Exact field lines"));
-      const mask =
-        id === "shell-theorem" ? `${root("x^{2}+y^{2}")}>R` : m.valid;
-      const extraMask = ["earth-moon", "dipole"].includes(id)
-        ? only(`${abs(id === "earth-moon" ? "y" : "x")}>0.02`)
-        : "";
-      const nonzero =
-        id === "wires"
-          ? `${abs("I_{1}")}+${abs("I_{2}")}>0`
-          : id === "dipole"
-            ? `${abs("m")}>0`
-            : "1>0";
+      const mask = m.valid;
+      const extraMask = id === "dipole" ? only(`${abs("x")}>0.02`) : "";
+      const nonzero = id === "dipole" ? `${abs("m")}>0` : "1>0";
       scene.push(
         obj(
           "fieldlines",
-          `${sin(mul(id === "earth-moon" ? "0.15" : id === "dipole" ? "3" : id === "capacitor" ? "0.25" : "1", raw`\pi`, m.stream))}=0${only("s_{lines}=1")}${only(mask)}${only(nonzero)}${extraMask}${id === "capacitor" ? only(`${abs("y-\\frac{d}{2}")}>0.04`) + only(`${abs("y+\\frac{d}{2}")}>0.04`) : ""}`,
+          `${sin(mul(id === "dipole" ? "3" : id === "capacitor" ? "0.25" : "1", raw`\pi`, m.stream))}=0${only("s_{lines}=1")}${only(mask)}${only(nonzero)}${extraMask}${id === "capacitor" ? only(`${abs("y-\\frac{d}{2}")}>0.04`) + only(`${abs("y+\\frac{d}{2}")}>0.04`) : ""}`,
           {
             explains: true,
             lineWidth: 1.5,
@@ -695,15 +317,12 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
         )
       );
     }
-    if (
-      dim === 2 &&
-      ["earth-moon", "capacitor", "uniform-field", "shell-theorem"].includes(id)
-    ) {
+    if (dim === 2 && id === "capacitor") {
       vars.push(toggle("s_{equi}", 0, "Equipotentials"));
       scene.push(
         obj(
           "equi",
-          `${sin(mul(raw`\pi`, frac(m.potential, String(m.tintScale * (id === "capacitor" ? 2 : 1)))))}=0${only("s_{equi}=1")}${only(id === "shell-theorem" ? `${root("x^{2}+y^{2}")}>R` : m.valid)}`,
+          `${sin(mul(raw`\pi`, frac(m.potential, String(m.tintScale * (id === "capacitor" ? 2 : 1)))))}=0${only("s_{equi}=1")}${only(m.valid)}`,
           {
             explains: true,
             lineStyle: "DASHED",
@@ -741,7 +360,6 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
       latex3d: guard(b.m.valid, b.m.potential),
       scale: a.m.tintScale,
     },
-    ...(id === "cylinder" ? { sceneTime: "T_{scene}" } : {}),
     flow: flow2D({ speed: 0.35, normalize: true }),
     space: {
       blurb,
@@ -762,36 +380,16 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
 
 /**
  * Each preset's AP course and unit (2024 CEDs, current for the 2026 and 2027
- * exams): gravity is AP Physics 1's unit 2 and fluids its unit 8; fields of
- * charges are AP Physics 2's unit 10 and magnetism its unit 12.
+ * exams): fields of charges are AP Physics 2's unit 10 and magnetism its
+ * unit 12.
  */
 const AP_PLACE: Record<string, Pick<GalleryPreset, "category" | "apUnit">> = {
-  "earth-moon": { category: "ap1", apUnit: 2 },
-  "shell-theorem": { category: "ap1", apUnit: 2 },
-  cylinder: { category: "ap1", apUnit: 8 },
-  "uniform-field": { category: "ap2", apUnit: 10 },
   capacitor: { category: "ap2", apUnit: 10 },
-  wires: { category: "ap2", apUnit: 12 },
   "bar-magnet": { category: "ap2", apUnit: 12 },
   dipole: { category: "ap2", apUnit: 12 },
 };
 
 export const TEACHING_PHYSICS: readonly GalleryPreset[] = [
-  teaching(
-    "wires",
-    "Parallel wires",
-    "Exact exterior magnetic field of two infinite wires. Color is magnetic field magnitude; dark curves are contours of Az and exact field lines. Wire ends are display cuts; purple arrow is force per length with a separate physical unit."
-  ),
-  teaching(
-    "earth-moon",
-    "Earth and Moon",
-    "Exact exterior gravity of spherical masses. Blue tint is negative gravitational potential. Radii ratio 1:0.273; separation compressed for teaching, not a common astronomical scale. Static field, not orbital trajectories or L1."
-  ),
-  teaching(
-    "cylinder",
-    "Spinning cylinder",
-    "Exact ideal incompressible flow with clockwise-negative circulation. Tint is gauge pressure from Bernoulli at density one; positive spin is CCW, lift downward. Purple rim arrow is pressure traction relative to ambient; not a calibrated no-slip rotating body."
-  ),
   teaching(
     "capacitor",
     "Capacitor",
@@ -806,15 +404,5 @@ export const TEACHING_PHYSICS: readonly GalleryPreset[] = [
     "dipole",
     "Magnetic dipole",
     "Ideal static point dipole along y in both dimensions; no finite core. Tint is exterior magnetic scalar potential m y/r cubed. Radially weighted particle births show direction, not quantitative field density. Origin excluded only."
-  ),
-  teaching(
-    "shell-theorem",
-    "Shell theorem",
-    "Exact gravity of a thin uniform spherical shell: zero inside, inverse-square outside. Color is gravitational potential, constant inside. The cutaway changes only the drawing, not the complete physical shell."
-  ),
-  teaching(
-    "uniform-field",
-    "Uniform electric field",
-    "Ideal infinite parallel plates at x=±3. E is uniform between them and zero outside. Tint is potential relative to the midplane. Optional test-charge force shares normalized reference units; displayed plate ends are cuts, not edges with omitted fringes."
   ),
 ];

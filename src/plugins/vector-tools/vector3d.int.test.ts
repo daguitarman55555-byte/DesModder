@@ -191,7 +191,7 @@ testWithPageAndOpts(
       vt.applyGalleryPreset("dipole", false);
       return vt.getConfig().components.zLatex as string;
     });
-    expect(loaded).toContain("x^{2}+y^{2}+z^{2}");
+    expect(loaded).toContain(String.raw`x^{2}+y^{2}+\left(z\right)^{2}`);
     // R is offered on 3D, beside P and Q.
     const fieldIndex = PANEL_TABS.findIndex((tab) => tab.id === "field");
     await driver.click(

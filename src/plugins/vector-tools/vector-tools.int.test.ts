@@ -2116,7 +2116,7 @@ testWithPage(
       "Space",
       "Fluids",
       "Chaos",
-      "Physics",
+      "AP Physics 2",
     ]);
     expect(shelves.reduce((sum, shelf) => sum + shelf.count, 0)).toBe(
       await driver.evaluate(() => DSM.vectorTools!.gallery.length)
@@ -2201,11 +2201,12 @@ testWithPage(
     // Defaults, in a folder of their own, and the field compiled against
     // them; then the objects the preset draws, the probe among them.
     const loaded = await variables();
-    expect(loaded.slice(0, 4)).toEqual([
+    expect(loaded.slice(0, 5)).toEqual([
       "folder",
+      "N_{q}=2",
       "q_{1}=1",
-      "q_{2}=-1",
-      "d=5",
+      "X_{q1}=-2.5",
+      "Y_{q1}=0",
     ]);
     expect(loaded).toContain("s_{net}=1");
     expect(loaded).toContain(String.raw`\left(p_{x},p_{y}\right)`);
@@ -2222,13 +2223,13 @@ testWithPage(
             ".dsm-preset-window-variable:not(.dsm-preset-window-switch)"
           ).length
       )
-    ).toBe(7);
+    ).toBe(11);
     // The switches are checkboxes, not sliders.
     expect(
       await driver.evaluate(
         () => document.querySelectorAll(".dsm-preset-window-switch").length
       )
-    ).toBe(7);
+    ).toBe(11);
 
     // Set from the window; reset to the preset's own.
     await driver.evaluate(() =>
@@ -2245,18 +2246,18 @@ testWithPage(
 
     // A name the graph already defines is the user's, and is left alone.
     await driver.evaluate(() => {
-      Calc.setExpression({ id: "mine", latex: "I_{1}=3" });
+      Calc.setExpression({ id: "mine", latex: "s=3" });
     });
     await driver.waitForSync();
     await driver.evaluate(() =>
       (window as any).DSM.enabledPlugins["vector-tools"].applyGalleryPreset(
-        "wires",
+        "capacitor",
         true
       )
     );
-    const wires = await variables();
-    expect(wires.slice(0, 3)).toEqual(["folder", "I_{2}=1", "d=5"]);
-    expect(wires.some((latex) => latex?.startsWith("I_{1}="))).toBe(false);
+    const plates = await variables();
+    expect(plates.slice(0, 3)).toEqual(["folder", "L=4", "d=3"]);
+    expect(plates.some((latex) => latex?.startsWith("s="))).toBe(false);
 
     // A preset with none takes the folder away.
     await driver.evaluate(() =>

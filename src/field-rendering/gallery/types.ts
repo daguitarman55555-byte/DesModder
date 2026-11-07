@@ -24,7 +24,7 @@ export interface GalleryLook {
  * is, which is how someone browsing for one thinks of it. The physics is
  * shelved by AP course, since that is how a physics teacher looks for it.
  */
-export type GalleryCategory = "space" | "fluids" | "chaos" | "ap1" | "ap2";
+export type GalleryCategory = "space" | "fluids" | "chaos" | "ap2";
 
 export const GALLERY_CATEGORIES: readonly {
   id: GalleryCategory;
@@ -33,7 +33,6 @@ export const GALLERY_CATEGORIES: readonly {
   { id: "space", label: "Space" },
   { id: "fluids", label: "Fluids" },
   { id: "chaos", label: "Chaos" },
-  { id: "ap1", label: "AP Physics 1" },
   { id: "ap2", label: "AP Physics 2" },
 ];
 
@@ -55,6 +54,12 @@ export interface GalleryVariable {
    * label, for what the preset's objects show — an arrow, the names.
    */
   toggle?: string;
+  /**
+   * Listed in the presets window only while another of the preset's
+   * variables is at least this: the sliders of a charge the count leaves
+   * out stay in the graph, where the field reads them, but out of the way.
+   */
+  shownWhen?: { name: string; atLeast: number };
 }
 
 /**
@@ -83,7 +88,8 @@ export interface SceneItem {
   lineOpacity?: number | string;
   lineStyle?: "SOLID" | "DASHED" | "DOTTED";
   pointSize?: number;
-  pointOpacity?: number;
+  /** A number, or Desmos LaTeX for one, e.g. a handle that hides itself. */
+  pointOpacity?: number | string;
   fill?: boolean;
   fillOpacity?: number;
   /** A label at the point, Desmos LaTeX between backticks for maths. */
@@ -104,6 +110,8 @@ export interface SceneItem {
    * point is made of, which dragging it moves.
    */
   drag3d?: readonly [string, string, string];
+  /** Draggable only while this variable is at least this, e.g. a count. */
+  drag3dWhen?: { name: string; atLeast: number };
   /**
    * The colour in Majestic, where the paper is dark: ink that reads on
    * paper (a grey ground, a dark wall) disappears there.
