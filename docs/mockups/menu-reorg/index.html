@@ -1,0 +1,832 @@
+<title>Vector Tools Menus</title>
+<meta name="claude:viewport-fit-sides" content="cover" />
+<style>
+  /* Layout: a working Vector Tools panel on the left, the change list on the right; stacks on phones. */
+  :root {
+    --bg: #f3f4f6;
+    --panel: #ffffff;
+    --ink: #2a2d33;
+    --muted: #6b7079;
+    --line: #d9dce1;
+    --blue: #2f72dc;
+    --blue-soft: #e5eefc;
+    --chip: #f0f1f3;
+    --cut: #b5462f;
+    --cut-soft: #fbece8;
+    --keep: #2f7d4f;
+    --keep-soft: #e6f3eb;
+    --font: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono: "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17191d;
+      --panel: #22252b;
+      --ink: #e6e8ec;
+      --muted: #9aa0aa;
+      --line: #3a3f47;
+      --blue: #6aa0f0;
+      --blue-soft: #263449;
+      --chip: #2d3138;
+      --cut: #ec8a73;
+      --cut-soft: #3a2621;
+      --keep: #7fcf9f;
+      --keep-soft: #1f3328;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17191d;
+    --panel: #22252b;
+    --ink: #e6e8ec;
+    --muted: #9aa0aa;
+    --line: #3a3f47;
+    --blue: #6aa0f0;
+    --blue-soft: #263449;
+    --chip: #2d3138;
+    --cut: #ec8a73;
+    --cut-soft: #3a2621;
+    --keep: #7fcf9f;
+    --keep-soft: #1f3328;
+    color-scheme: dark;
+  }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 14px;
+  }
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding-block: 24px 48px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 4px;
+    text-wrap: balance;
+  }
+  .lede {
+    color: var(--muted);
+    margin: 0 0 18px;
+    max-width: 70ch;
+    line-height: 1.45;
+  }
+  .switches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .seg {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--panel);
+  }
+  .seg button {
+    border: 0;
+    background: none;
+    color: var(--ink);
+    padding: 7px 14px;
+    font: inherit;
+    cursor: pointer;
+  }
+  .seg button + button {
+    border-left: 1px solid var(--line);
+  }
+  .seg button[aria-pressed="true"] {
+    background: var(--blue);
+    color: #fff;
+  }
+  .seg button:focus-visible,
+  .chip:focus-visible,
+  summary:focus-visible,
+  .tabs button:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 440px) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+  @media (max-width: 860px) {
+    .grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  /* The panel, as Desmos draws its popovers. */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    padding: 12px 14px;
+    min-width: 0;
+  }
+  .panel-title {
+    color: var(--blue);
+    font-size: 18px;
+    border-bottom: 2px solid var(--blue);
+    padding-bottom: 4px;
+    margin-bottom: 10px;
+  }
+  .fields {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .fieldchip {
+    background: var(--blue);
+    color: #fff;
+    border-radius: 12px;
+    padding: 3px 10px;
+    font-size: 12px;
+  }
+  .plus {
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .spacer {
+    flex: 1;
+  }
+  .small-btn {
+    border: 1px solid var(--line);
+    background: var(--chip);
+    color: var(--ink);
+    border-radius: 4px;
+    padding: 3px 9px;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .tabs {
+    display: flex;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .tabs button {
+    flex: 1;
+    border: 0;
+    background: var(--panel);
+    color: var(--ink);
+    padding: 7px 4px;
+    font: inherit;
+    font-size: 15px;
+    cursor: pointer;
+    min-width: 0;
+  }
+  .tabs button + button {
+    border-left: 1px solid var(--line);
+  }
+  .tabs button[aria-selected="true"] {
+    background: #575b62;
+    color: #fff;
+  }
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 360px;
+  }
+  .row {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .label {
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .chip {
+    border: 1px solid var(--line);
+    background: var(--chip);
+    color: var(--ink);
+    border-radius: 12px;
+    padding: 3px 10px;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .chip[aria-pressed="true"] {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: #fff;
+  }
+  .math {
+    font-family: "Times New Roman", serif;
+    font-style: italic;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 5px 8px;
+    background: var(--panel);
+  }
+  .check {
+    display: flex;
+    gap: 7px;
+    align-items: flex-start;
+    font-size: 13px;
+  }
+  .check input {
+    margin-top: 2px;
+  }
+  .slider {
+    display: grid;
+    grid-template-columns: 1fr 120px;
+    gap: 10px;
+    align-items: center;
+    font-size: 13px;
+  }
+  .slider input {
+    width: 100%;
+  }
+  select {
+    font: inherit;
+    font-size: 13px;
+    padding: 4px 6px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--panel);
+    color: var(--ink);
+    max-width: 100%;
+  }
+  details {
+    border-top: 1px solid var(--line);
+    padding-top: 8px;
+  }
+  summary {
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--blue);
+  }
+  details .row,
+  details .check,
+  details .slider {
+    margin-top: 8px;
+  }
+  .footer {
+    border-top: 1px solid var(--line);
+    margin-top: 12px;
+    padding-top: 10px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .primary {
+    background: var(--blue);
+    color: #fff;
+    border: 0;
+    border-radius: 4px;
+    padding: 7px 14px;
+    font: inherit;
+  }
+  .secondary {
+    background: var(--chip);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 7px 12px;
+    font: inherit;
+  }
+  .repeat {
+    outline: 2px dashed var(--cut);
+    outline-offset: 2px;
+  }
+  .note3d {
+    background: var(--blue-soft);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  /* The change list. */
+  .side {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+  }
+  .tally {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .tally div {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 14px;
+    min-width: 120px;
+  }
+  .tally b {
+    display: block;
+    font-size: 24px;
+    font-variant-numeric: tabular-nums;
+  }
+  .tally span {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 16px;
+    min-width: 0;
+  }
+  .card h2 {
+    font-size: 15px;
+    margin: 0 0 8px;
+  }
+  .card ul {
+    margin: 0;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    line-height: 1.4;
+  }
+  .cand {
+    list-style: none;
+    padding: 0 !important;
+  }
+  .cand li {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr);
+    gap: 4px 8px;
+    align-items: start;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .cand li:last-child {
+    border-bottom: 0;
+  }
+  .tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .cut {
+    color: var(--cut);
+  }
+</style>
+
+<div class="page">
+  <h1>Vector Tools menus, reorganised</h1>
+  <p class="lede">
+    Click through the panel. <strong>Before</strong> is today's panel, as read
+    live from Desmos on 7 November; <strong>After</strong> is the proposal.
+    Switch 2D and 3D to see what each calculator offers. Nothing here removes a
+    feature until you pick it from the candidates on the right.
+  </p>
+
+  <div class="switches">
+    <div class="seg" role="group" aria-label="Version">
+      <button id="v-before" aria-pressed="false">Before</button>
+      <button id="v-after" aria-pressed="true">After</button>
+    </div>
+    <div class="seg" role="group" aria-label="Calculator">
+      <button id="d-2" aria-pressed="true">2D calculator</button>
+      <button id="d-3" aria-pressed="false">3D calculator</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <section class="panel" aria-label="Vector Tools panel mock-up">
+      <div class="panel-title">Vector Tools</div>
+      <div class="fields">
+        <span class="fieldchip">Vector Field</span
+        ><span class="plus" aria-hidden="true">+</span>
+        <span class="spacer"></span>
+        <button class="small-btn" type="button">Presets</button>
+      </div>
+      <div class="tabs" role="tablist" id="tabs"></div>
+      <div class="body" id="body"></div>
+      <div class="footer" id="footer">
+        <button class="primary" type="button">Generate field</button>
+        <button class="secondary" type="button">Remove</button>
+        <button class="secondary" type="button">Reset</button>
+      </div>
+    </section>
+
+    <div class="side">
+      <div class="tally" id="tally"></div>
+      <div class="card">
+        <h2>What changes</h2>
+        <ul>
+          <li>
+            <b>Seven tabs become five</b> in 2D: Field, Draw, Colour, Fluid,
+            Matrix. Arrows and Flow merge into <b>Draw</b>, which starts with
+            one choice: arrows, particles, streamlines, or arrows with
+            particles. Curve was a whole tab for one checkbox; it moves into
+            Field.
+          </li>
+          <li>
+            <b>3D shows three tabs.</b> Fluid and Matrix only work on the 2D
+            calculator. Today they still appear in 3D with all their controls,
+            and do nothing.
+          </li>
+          <li>
+            <b>Said once, not seven times.</b> The field picker and Generate /
+            Remove / Reset sit outside the tabs. In Before they are outlined in
+            red: they are repeated on every tab.
+          </li>
+          <li>
+            <b>Fine-tuning folds away.</b> Each tab shows what most people
+            change. Everything else stays one click away under <b>More</b>,
+            still with the same defaults.
+          </li>
+          <li>
+            <b>31 palettes become one grouped list:</b> Scientific, Diverging,
+            Cyclic, Majestic. Today they are 31 buttons in a row.
+          </li>
+        </ul>
+      </div>
+      <div class="card">
+        <h2>
+          Removal candidates
+          <span class="tag">you decide; nothing is cut without your pick</span>
+        </h2>
+        <ul class="cand" id="cands"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const PALETTES = {
+      Scientific: [
+        "Viridis",
+        "Plasma",
+        "Magma",
+        "Cividis",
+        "Turbo",
+        "Spectral",
+        "Blackbody",
+      ],
+      Diverging: ["Blue to red", "Cool to warm", "Charge", "Charge glow"],
+      Cyclic: ["Hue wheel", "Twilight", "Phase"],
+      Majestic: [
+        "Galaxy",
+        "Nebula",
+        "Aurora",
+        "Auroral",
+        "Starfield",
+        "Magnetar",
+        "Worlds",
+        "Storm",
+        "Neon",
+        "Sunset",
+        "Ocean",
+        "Ember",
+      ],
+      Plain: ["Blue", "Grayscale", "Jet (classic)"],
+    };
+    const CANDIDATES = [
+      [
+        "Arrows “Drawn by: Desmos expressions”",
+        "The old way of drawing arrows as thousands of Desmos segments. The live arrows replaced it; it is slow on dense grids. Keep it if you share graphs with people who have no extension.",
+      ],
+      [
+        "“Thin very dense grids” checkbox",
+        "Always on in practice. Could become automatic.",
+      ],
+      [
+        "“Keep these colours in reverse contrast”",
+        "A setting for Desmos's reverse-contrast mode. Rarely touched.",
+      ],
+      [
+        "Jet (classic) and Grayscale palettes",
+        "Jet misleads the eye about magnitude; Grayscale duplicates Blue on paper.",
+      ],
+      [
+        "Aurora vs Auroral, Charge vs Charge glow",
+        "Near-duplicate palettes. Keep one of each pair, or keep both for Majestic.",
+      ],
+      [
+        "Flow “Render detail” slider",
+        "Auto already picks it from the frame rate.",
+      ],
+      [
+        "Fluid “Lattice speed” and “Precision”",
+        "Auto picks both. Keep under More, or remove and always use Auto.",
+      ],
+      [
+        "Fluid “Resizing a solid: Strict” and “Dragging above Re 200”",
+        "Safety switches for edge cases. Keep under More, or remove.",
+      ],
+      [
+        "3D “Smooth lines (multisampling)” and “Trail detail”",
+        "Performance knobs that Auto already handles.",
+      ],
+      [
+        "Arrowhead “Angle (rad)”",
+        "Head shape is fixed in every preset; size alone covers it.",
+      ],
+    ];
+
+    const TABS_BEFORE = [
+      "Field",
+      "Arrows",
+      "Color",
+      "Curve",
+      "Flow",
+      "Fluid",
+      "Matrix",
+    ];
+    // Counts read from the live panel on 2026-11-07, per tab, 2D then 3D.
+    const COUNT_BEFORE = {
+      2: [27, 27, 62, 7, 31, 41, 47],
+      3: [29, 52, 62, 7, 43, 41, 47],
+    };
+
+    let version = "after",
+      dim = "2",
+      tab = 0;
+    const $ = (id) => document.getElementById(id);
+    const el = (html) => {
+      const t = document.createElement("template");
+      t.innerHTML = html.trim();
+      return t.content;
+    };
+
+    const chips = (label, items, on = 0) =>
+      `<div class="row"><span class="label">${label}</span><div class="chips">${items.map((x, i) => `<button type="button" class="chip" aria-pressed="${i === on}">${x}</button>`).join("")}</div></div>`;
+    const check = (text, on) =>
+      `<label class="check"><input type="checkbox" ${on ? "checked" : ""}> <span>${text}</span></label>`;
+    const slider = (text, v = 50) =>
+      `<label class="slider"><span>${text}</span><input type="range" value="${v}"></label>`;
+    const math = (label, latex) =>
+      `<div class="row"><span class="label">${label}</span><div class="math">${latex}</div></div>`;
+    const more = (inner) =>
+      `<details><summary>More</summary>${inner}</details>`;
+    const palette = () =>
+      `<div class="row"><span class="label">Palette</span><select id="palette">${Object.entries(
+        PALETTES
+      )
+        .map(
+          ([g, xs]) =>
+            `<optgroup label="${g}">${xs.map((x) => `<option ${x === "Viridis" ? "selected" : ""}>${x}</option>`).join("")}</optgroup>`
+        )
+        .join("")}</select></div>`;
+
+    function afterTabs() {
+      return dim === "2"
+        ? ["Field", "Draw", "Colour", "Fluid", "Matrix"]
+        : ["Field", "Draw", "Colour"];
+    }
+
+    function afterBody(name) {
+      const is3 = dim === "3";
+      if (name === "Field")
+        return [
+          chips("Field from", ["Components", "Gradient of f"]),
+          math(is3 ? "P(x, y, z)" : "P(x, y)", "−y"),
+          math(is3 ? "Q(x, y, z)" : "Q(x, y)", "x"),
+          is3 ? math("R(x, y, z)", "0") : "",
+          check("Edit P and Q in the expression list", false),
+          check("Show divergence and curl", false),
+          check("Sample where the graph is looking", true),
+          dim === "2"
+            ? check(
+                "Draw a parametric curve over the field (was the Curve tab)",
+                false
+              )
+            : "",
+          more(
+            [
+              slider("Step"),
+              slider("Count"),
+              `<p class="hint">Minimum and maximum, when not following the view.</p>`,
+            ].join("")
+          ),
+        ].join("");
+      if (name === "Draw")
+        return [
+          chips(
+            "Draw as",
+            ["Arrows", "Particles", "Streamlines", "Arrows + particles"],
+            3
+          ),
+          `<div class="row"><span class="label">Arrows</span></div>`,
+          chips("Length", ["Actual", "Scaled", "Clamped", "Direction only"], 1),
+          check("Auto length from the spacing", true),
+          slider("Arrowhead size"),
+          is3
+            ? chips("Where arrows go", ["Whole box", "Slice", "On a surface"])
+            : "",
+          `<div class="row"><span class="label">Particles</span></div>`,
+          slider("Speed"),
+          check("Same speed everywhere", false),
+          math("Born where (empty: everywhere)", ""),
+          more(
+            [
+              chips("Zero vectors", ["Hide", "Show as points"]),
+              slider("Opacity"),
+              slider("Particle size"),
+              slider("Glow"),
+              slider("Respawn rate"),
+              is3
+                ? chips("Arrow shape", ["Auto", "Lines", "Flat", "Shaded 3D"])
+                : "",
+              is3
+                ? chips("Behind a surface", ["Hidden", "Faded", "X-ray"])
+                : "",
+              is3
+                ? chips("Cut away", ["Nothing", "Near half", "Cake slice"])
+                : "",
+              is3 ? slider("Trail (frames)") + slider("Lifetime (s)") : "",
+              check("Black hole at the origin", false),
+            ].join("")
+          ),
+        ].join("");
+      if (name === "Colour")
+        return [
+          chips(
+            "Colour by",
+            ["Fixed", "Magnitude", "Log magnitude", "Direction"],
+            1
+          ),
+          palette(),
+          chips("Range", ["Automatic", "Manual"]),
+          check("Particles use the arrows' colours", true),
+          chips("Draw the field", ["Under the graph", "Over the graph"]),
+          more(
+            [
+              slider("Saturation"),
+              slider("Contrast"),
+              check("Dark backdrop behind the field", false),
+              check("Keep these colours in reverse contrast", false),
+            ].join("")
+          ),
+        ].join("");
+      if (name === "Fluid")
+        return [
+          chips("Simulate", ["Off", "Wind tunnel", "Stirred box"], 1),
+          chips("Show", ["Vorticity", "Speed", "Pressure"]),
+          `<div class="row"><span class="label">Tank</span><span class="hint">−10 ≤ x ≤ 10, −4 ≤ y ≤ 4 · 300 × 120 cells</span><div class="chips"><button class="chip" type="button">Fit to view</button></div></div>`,
+          slider("Reynolds number"),
+          slider("Inflow speed"),
+          `<div class="chips"><button class="chip" type="button">Pause</button><button class="chip" type="button">Restart</button></div>`,
+          more(
+            [
+              slider("Cells across"),
+              chips("Lattice speed", ["Auto", "Accurate", "Lively"]),
+              chips("Precision", ["Full", "Fast"]),
+              check("Write measurements into the graph", false),
+            ].join("")
+          ),
+        ].join("");
+      if (name === "Matrix")
+        return [
+          chips("Map", ["Matrix A", "Formula T(x, y)"]),
+          chips("Presets", [
+            "Shear",
+            "Rotate 90°",
+            "Stretch",
+            "Reflect",
+            "Project",
+            "Spiral",
+          ]),
+          math("A", "[[1, 2], [3, 4]]"),
+          chips(
+            "Show",
+            ["Grid", "Unit square", "Unit circle", "Eigenvectors"],
+            0
+          ),
+          `<div class="chips"><button class="chip" type="button">Play I → A</button><button class="chip" type="button">Add vector</button></div>`,
+          more(
+            [
+              chips("Drawing the graph", ["Exact", "Redraw what Desmos drew"]),
+              chips("Redraw detail", ["Fine", "Balanced", "Fast"]),
+              chips("Explanation", ["Simple", "Full"]),
+            ].join("")
+          ),
+        ].join("");
+      return "";
+    }
+
+    function beforeBody(name) {
+      const n = COUNT_BEFORE[dim][TABS_BEFORE.indexOf(name)];
+      const dead = dim === "3" && (name === "Fluid" || name === "Matrix");
+      return `<div class="repeat"><div class="hint">Field picker, repeated on this tab</div></div>
+      <p class="hint">${n} controls on this tab, read from the live panel.</p>
+      ${dead ? `<div class="note3d">In 3D this tab shows all ${n} controls and does nothing: the ${name.toLowerCase()} only runs on the 2D calculator.</div>` : ""}
+      ${name === "Curve" ? `<div class="note3d">The whole tab is one checkbox: “Draw a parametric curve over the field”.</div>` : ""}
+      ${
+        name === "Color"
+          ? `<div class="row"><span class="label">Palette, as 31 buttons</span><div class="chips">${Object.values(
+              PALETTES
+            )
+              .flat()
+              .map((p) => `<span class="chip">${p}</span>`)
+              .join("")}</div></div>`
+          : ""
+      }
+      <div class="repeat"><div class="hint">Generate / Remove / Reset, repeated on this tab</div></div>`;
+    }
+
+    function render() {
+      $("v-before").setAttribute("aria-pressed", version === "before");
+      $("v-after").setAttribute("aria-pressed", version === "after");
+      $("d-2").setAttribute("aria-pressed", dim === "2");
+      $("d-3").setAttribute("aria-pressed", dim === "3");
+      const names = version === "before" ? TABS_BEFORE : afterTabs();
+      if (tab >= names.length) tab = 0;
+      const tabs = $("tabs");
+      tabs.textContent = "";
+      names.forEach((n, i) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.role = "tab";
+        b.textContent = n;
+        b.setAttribute("aria-selected", i === tab);
+        b.addEventListener("click", () => {
+          tab = i;
+          render();
+        });
+        tabs.appendChild(b);
+      });
+      const body = $("body");
+      body.textContent = "";
+      body.appendChild(
+        el(
+          version === "before" ? beforeBody(names[tab]) : afterBody(names[tab])
+        )
+      );
+      $("footer").hidden = version === "before";
+      // Tally: visible controls up front, per calculator.
+      const before = COUNT_BEFORE[dim].reduce((a, b) => a + b, 0);
+      const front =
+        afterTabs().reduce((sum, n) => {
+          const frag = el(afterBody(n));
+          frag.querySelectorAll("details").forEach((d) => d.remove());
+          return (
+            sum + frag.querySelectorAll("button, input, select, .math").length
+          );
+        }, 0) + 6;
+      $("tally").innerHTML =
+        `<div><b>${before}</b><span>controls today (${dim}D)</span></div><div><b>${front}</b><span>shown up front after</span></div><div><b>${version === "before" ? TABS_BEFORE.length : afterTabs().length}</b><span>tabs (${dim}D)</span></div>`;
+    }
+
+    $("v-before").onclick = () => {
+      version = "before";
+      render();
+    };
+    $("v-after").onclick = () => {
+      version = "after";
+      render();
+    };
+    $("d-2").onclick = () => {
+      dim = "2";
+      render();
+    };
+    $("d-3").onclick = () => {
+      dim = "3";
+      render();
+    };
+    document.addEventListener("click", (e) => {
+      const c = e.target.closest(".body .chips .chip");
+      if (!c || c.tagName !== "BUTTON") return;
+      const group = c.parentElement.querySelectorAll(".chip");
+      if (c.parentElement.previousElementSibling?.classList.contains("label"))
+        group.forEach((g) => g.setAttribute("aria-pressed", g === c));
+    });
+    $("cands").innerHTML = CANDIDATES.map(
+      ([t, d], i) =>
+        `<li><span class="tag">${i + 1}</span><div><b>${t}</b><div class="hint">${d}</div></div></li>`
+    ).join("");
+    render();
+  })();
+</script>

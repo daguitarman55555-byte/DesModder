@@ -228,7 +228,7 @@ describe("what is not a solid says why", () => {
     [String.raw`y=x^{2}`, /equation draws a curve/],
     [String.raw`x^{2}+y^{2}`, /not a region/],
     [String.raw`y<a`, /"a" is not defined/],
-    [String.raw`y<\operatorname{erf}(x)`, /"erf" is not supported/],
+    [String.raw`y<\operatorname{zeta}(x)`, /"zeta" is not supported/],
     [String.raw`y<x!`, /"!" is not supported/],
     [String.raw`\left\{x>0\right\}`, /needs an inequality in front/],
   ])("%s", (latex, message) => {

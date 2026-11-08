@@ -194,11 +194,13 @@ describe("LaTeX to GLSL field compiler", () => {
   test("explains what it cannot translate", () => {
     const cases: readonly [string, string][] = [
       ["a_{1}x", "is not defined"],
-      ["\\int_{0}^{1}x", "not supported"],
+      ["\\int_{0}^{1}x", "needs its d and variable"],
+      ["\\operatorname{random}\\left(\\right)", "could never hold still"],
       ["y=x", "not an equation"],
       ["z", "is not defined"],
       ["\\sin\\left(x", "closing parenthesis"],
-      ["\\operatorname{lcm}\\left(x,y\\right)", "not supported"],
+      ["\\operatorname{zeta}\\left(x\\right)", "not supported"],
+      ["\\operatorname{real}\\left(x\\right)", "complex numbers"],
       ["\\arctan\\left(x,y,1\\right)", "cannot take 3 arguments"],
     ];
     for (const [latex, fragment] of cases) {
@@ -319,7 +321,7 @@ describe("Vector Tools LaTeX referencing the expression list", () => {
     // graph is the one the shader cannot follow.
     const result = compileFieldComponentToGLSL(
       "f\\left(x\\right)",
-      environment([], { f: [["u"], "\\int_{0}^{u}tdt"] })
+      environment([], { f: [["u"], "\\operatorname{erfc}\\left(u\\right)"] })
     );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("not supported");

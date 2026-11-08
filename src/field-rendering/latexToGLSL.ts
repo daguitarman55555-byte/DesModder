@@ -162,14 +162,144 @@ float vtGamma(float z) {
   if (z < 0.5) return 3.1415926535897932 / (sin(3.1415926535897932 * z) * vtGammaShifted(1.0 - z));
   return vtGammaShifted(z);
 }
+// erf by Abramowitz and Stegun 7.1.26: within 1.5e-7, below float precision
+// for every value a field is drawn from.
+float vtErf(float x) {
+  float s = sign(x);
+  x = abs(x);
+  float t = 1.0 / (1.0 + 0.3275911 * x);
+  float poly = ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t;
+  return s * (1.0 - poly * exp(-x * x));
+}
+// gcd and lcm of whole numbers, as Desmos takes them: rounded, made positive.
+// Euclid needs at most about 46 steps below 2^32; 64 covers every float.
+float vtGcd(float a, float b) {
+  a = abs(floor(a + 0.5));
+  b = abs(floor(b + 0.5));
+  for (int i = 0; i < 64; i++) {
+    if (b < 0.5) break;
+    float r = mod(a, b);
+    a = b;
+    b = r;
+  }
+  return a;
+}
+float vtLcm(float a, float b) {
+  float g = vtGcd(a, b);
+  return g < 0.5 ? 0.0 : abs(floor(a + 0.5) * floor(b + 0.5)) / g;
+}
+// nCr and nPr: a running product for whole numbers, exact while the result
+// fits a float and with no gamma rounding; gamma between them, as Desmos does.
+float vtNCr(float n, float r) {
+  if (n == floor(n) && r == floor(r)) {
+    if (r < 0.0 || (n >= 0.0 && r > n)) return 0.0;
+    float k = n >= 0.0 ? min(r, n - r) : r;
+    float acc = 1.0;
+    for (int i = 0; i < 1024; i++) {
+      if (float(i) >= k) break;
+      acc *= (n - float(i)) / (float(i) + 1.0);
+    }
+    return floor(acc + 0.5);
+  }
+  return vtGamma(n + 1.0) / (vtGamma(r + 1.0) * vtGamma(n - r + 1.0));
+}
+float vtNPr(float n, float r) {
+  if (n == floor(n) && r == floor(r) && r >= 0.0) {
+    if (n >= 0.0 && r > n) return 0.0;
+    float acc = 1.0;
+    for (int i = 0; i < 1024; i++) {
+      if (float(i) >= r) break;
+      acc *= n - float(i);
+    }
+    return acc;
+  }
+  return vtGamma(n + 1.0) / vtGamma(n - r + 1.0);
+}
 `;
 
 const PI = "3.1415926535897932";
 
 interface FunctionSpec {
-  /** Accepted argument counts. */
-  arity: readonly number[];
+  /** Accepted argument counts, or "any" for one or more (a list's worth). */
+  arity: readonly number[] | "any";
   emit: (args: string[]) => string;
+}
+
+/** Desmos's inverse for `f^{-1}`: `\sin^{-1}x` is arcsin x (measured 2026-11-07). */
+const INVERSES: Record<string, string> = {
+  sin: "arcsin",
+  cos: "arccos",
+  tan: "arctan",
+  cot: "arccot",
+  sec: "arcsec",
+  csc: "arccsc",
+  sinh: "arcsinh",
+  cosh: "arccosh",
+  tanh: "arctanh",
+  coth: "arccoth",
+  sech: "arcsech",
+  csch: "arccsch",
+};
+
+/**
+ * Functions that read a list: given `\left[…\right]` or several arguments,
+ * they take every element. In a shader a list is its elements, written out.
+ */
+export const LIST_FUNCTIONS = new Set([
+  "total",
+  "mean",
+  "length",
+  "min",
+  "max",
+  "median",
+  "stdev",
+  "stddev",
+  "stdevp",
+  "stddevp",
+  "var",
+  "variance",
+  "varp",
+  "mad",
+  "gcd",
+  "lcm",
+]);
+
+/** The sum of GLSL terms, bracketed. */
+const sumOf = (args: readonly string[]) => `(${args.join(" + ")})`;
+const meanOf = (args: readonly string[]) =>
+  `(${sumOf(args)} / ${args.length}.0)`;
+/** Σ(a − mean)², each term against one shared mean. */
+const squaredDeviations = (args: readonly string[]) => {
+  const mean = meanOf(args);
+  return `(${args.map((a) => `vtPow((${a}) - ${mean}, 2.0)`).join(" + ")})`;
+};
+/**
+ * The median of a fixed number of values: a sorting network written out, so
+ * no array and no loop. Fine for the handful of elements a formula lists.
+ */
+function medianOf(args: readonly string[]): string {
+  if (args.length === 1) return args[0];
+  if (args.length === 2) return `((${args[0]} + ${args[1]}) / 2.0)`;
+  // The median is the value with as many below it as above: written as a
+  // sum of each value weighted by whether it is the middle one. Ties are
+  // broken by position, so equal values still give one median.
+  const n = args.length;
+  const rank = (i: number) =>
+    args
+      .map((b, j) =>
+        j === i
+          ? ""
+          : j < i
+            ? `step(${b}, ${args[i]})`
+            : `(1.0 - step(${args[i]}, ${b}))`
+      )
+      .filter((s) => s !== "")
+      .join(" + ");
+  const pick = (k: number) =>
+    `(${args.map((a, i) => `(${a}) * (1.0 - step(0.5, abs((${rank(i)}) - ${k}.0)))`).join(" + ")})`;
+  return n % 2 === 1
+    ? pick((n - 1) / 2)
+    : `((${pick(n / 2 - 1)} + ${pick(n / 2)}) / 2.0)`;
 }
 
 const FUNCTIONS: Record<string, FunctionSpec> = {
@@ -212,19 +342,110 @@ const FUNCTIONS: Record<string, FunctionSpec> = {
     arity: [1],
     emit: ([a]) => `atanh(clamp(${a}, -0.999999, 0.999999))`,
   },
+  arccsch: { arity: [1], emit: ([a]) => `asinh(vtDiv(1.0, ${a}))` },
+  arcsech: { arity: [1], emit: ([a]) => `acosh(max(vtDiv(1.0, ${a}), 1.0))` },
+  arccoth: {
+    arity: [1],
+    emit: ([a]) => `atanh(clamp(vtDiv(1.0, ${a}), -0.999999, 0.999999))`,
+  },
   exp: { arity: [1], emit: ([a]) => `exp(${a})` },
   ln: { arity: [1], emit: ([a]) => `log(max(${a}, 1e-12))` },
   log: { arity: [1], emit: ([a]) => `vtLog10(max(${a}, 1e-12))` },
+  /** `\log_{b}(a)`, rewritten by `rewriteLatexSugar` with the base first. */
+  logbase: {
+    arity: [2],
+    emit: ([b, a]) => `vtDiv(log(max(${a}, 1e-12)), log(max(${b}, 1e-12)))`,
+  },
   sqrt: { arity: [1], emit: ([a]) => `sqrt(max(${a}, 0.0))` },
   abs: { arity: [1], emit: ([a]) => `abs(${a})` },
   sign: { arity: [1], emit: ([a]) => `sign(${a})` },
+  sgn: { arity: [1], emit: ([a]) => `sign(${a})` },
   floor: { arity: [1], emit: ([a]) => `floor(${a})` },
   ceil: { arity: [1], emit: ([a]) => `ceil(${a})` },
-  round: { arity: [1], emit: ([a]) => `floor(${a} + 0.5)` },
+  // round(x, n) is x to n decimal places.
+  round: {
+    arity: [1, 2],
+    emit: ([a, n]) =>
+      n === undefined
+        ? `floor(${a} + 0.5)`
+        : `(floor(${a} * vtPow(10.0, floor(${n} + 0.5)) + 0.5) / vtPow(10.0, floor(${n} + 0.5)))`,
+  },
   mod: { arity: [2], emit: ([a, b]) => `vtMod(${a}, ${b})` },
-  min: { arity: [1, 2, 3, 4], emit: naryEmit("min") },
-  max: { arity: [1, 2, 3, 4], emit: naryEmit("max") },
+  erf: { arity: [1], emit: ([a]) => `vtErf(${a})` },
+  nCr: { arity: [2], emit: ([n, r]) => `vtNCr(${n}, ${r})` },
+  nPr: { arity: [2], emit: ([n, r]) => `vtNPr(${n}, ${r})` },
+  gcd: { arity: "any", emit: naryEmit("vtGcd") },
+  lcm: { arity: "any", emit: naryEmit("vtLcm") },
+  min: { arity: "any", emit: naryEmit("min") },
+  max: { arity: "any", emit: naryEmit("max") },
+  total: { arity: "any", emit: sumOf },
+  mean: { arity: "any", emit: meanOf },
+  length: { arity: "any", emit: (args) => `${args.length}.0` },
+  median: { arity: "any", emit: medianOf },
+  // Desmos's stdev and var are the sample's (n − 1); the p forms divide by n.
+  stdev: {
+    arity: "any",
+    emit: (args) =>
+      args.length < 2
+        ? "vtUndefined()"
+        : `sqrt(${squaredDeviations(args)} / ${args.length - 1}.0)`,
+  },
+  stdevp: {
+    arity: "any",
+    emit: (args) => `sqrt(${squaredDeviations(args)} / ${args.length}.0)`,
+  },
+  var: {
+    arity: "any",
+    emit: (args) =>
+      args.length < 2
+        ? "vtUndefined()"
+        : `(${squaredDeviations(args)} / ${args.length - 1}.0)`,
+  },
+  varp: {
+    arity: "any",
+    emit: (args) => `(${squaredDeviations(args)} / ${args.length}.0)`,
+  },
+  mad: {
+    arity: "any",
+    emit: (args) =>
+      `(${args.map((a) => `abs((${a}) - ${meanOf(args)})`).join(" + ")}) / ${args.length}.0`,
+  },
 };
+/**
+ * A builtin's GLSL from already-compiled arguments, for the strict compiler
+ * (`sim/strictGLSL.ts`), so the two cannot disagree about a list function or
+ * nCr. It needs `GLSL_PRELUDE`'s helpers, which the strict prelude includes.
+ */
+export function emitBuiltinGLSL(name: string, args: string[]): string {
+  return FUNCTIONS[name].emit(args);
+}
+
+// Desmos's other spellings of the same functions.
+FUNCTIONS.arsinh = FUNCTIONS.arcsinh;
+FUNCTIONS.arcosh = FUNCTIONS.arccosh;
+FUNCTIONS.artanh = FUNCTIONS.arctanh;
+FUNCTIONS.arcsch = FUNCTIONS.arccsch;
+FUNCTIONS.arsech = FUNCTIONS.arcsech;
+FUNCTIONS.arcoth = FUNCTIONS.arccoth;
+FUNCTIONS.stddev = FUNCTIONS.stdev;
+FUNCTIONS.stddevp = FUNCTIONS.stdevp;
+FUNCTIONS.variance = FUNCTIONS.var;
+
+/**
+ * Why a function Desmos knows cannot draw a field, where there is a reason
+ * better than "not supported": the field is real numbers at a point.
+ */
+export function unsupportedFunction(name: string): string {
+  if (["real", "imag", "conj", "arg"].includes(name))
+    return `"${name}" works on complex numbers, and a field's components are real. Write the real part out in x and y.`;
+  if (name === "random")
+    return `"random" gives a new value each time Desmos evaluates it, so a field drawn from it could never hold still.`;
+  if (["distance", "midpoint", "polygon", "area", "perimeter"].includes(name))
+    return `"${name}" works on points and shapes; a field component is one number. Write it from coordinates, e.g. \\sqrt{x^{2}+y^{2}}.`;
+  if (["sort", "shuffle", "join", "unique"].includes(name))
+    return `"${name}" makes a new list; a field component is one number. Use total, mean, min, max or median of the list instead.`;
+  return `The function "${name}" is not supported by the flow visualizer.`;
+}
 
 function naryEmit(name: string) {
   return (args: string[]) =>
@@ -356,6 +577,25 @@ class CompileContext {
   }
 }
 
+/**
+ * A helper for a derivative's or an integral's body, named after its own
+ * text for the same reason as a sum's: P's and Q's helpers merge by name.
+ */
+function declareBodyHelper(
+  context: CompileContext,
+  prefix: string,
+  params: string,
+  body: string
+): string {
+  const name = `${prefix}_${textHash(params + body)}`;
+  if (!context.helpers.some((helper) => helper.name === name))
+    context.helpers.push({ name, glsl: `float ${name}(${params}) ${body}` });
+  return name;
+}
+
+/** Simpson's rule over this many intervals: even, and plenty for a float. */
+const INTEGRAL_INTERVALS = 64;
+
 /** A short stable name for a piece of text (djb2, in base 36). */
 function textHash(text: string): string {
   let hash = 5381;
@@ -388,7 +628,11 @@ export type Token =
   | { kind: "repeated"; value: "sum" | "prod" }
   | { kind: "underscore" }
   /** A factorial's `!`. */
-  | { kind: "bang" };
+  | { kind: "bang" }
+  /** `f'`: a derivative of a function the graph defines. */
+  | { kind: "prime" }
+  /** `\int`, then `_{a}^{b}`, a body, and `d` with its variable. */
+  | { kind: "integral" };
 
 /** The comparison commands Desmos writes, as GLSL operators. */
 const COMPARISONS: Record<string, "<=" | ">="> = {
@@ -515,7 +759,57 @@ export function bareArgumentEnd(
   }
 }
 
-export function tokenize(latex: string): Token[] {
+/**
+ * Desmos notation that is shorthand for something the parser already reads,
+ * written out before tokenizing, so both compilers (this one and the strict
+ * one for fluid solids) learn it at once:
+ *
+ * - `\log_{b}(a)` becomes `\operatorname{logbase}{b}(a)`: the base as the
+ *   first braced group of a two-argument call. The tokenizer's own `_`
+ *   belongs to `\sum` and `\int`.
+ * - `50\%\operatorname{of}x` is 0.5·x. Desmos refuses a bare `50\%`, a
+ *   `30^{\circ}` and `\operatorname{gamma}` (measured 2026-11-07), so this
+ *   does too.
+ */
+export function rewriteLatexSugar(latex: string): string {
+  // The space after the last \cdot keeps it from running into a letter
+  // after it, which would read as one command, `\cdotx`.
+  let out = latex.replace(
+    /\\%\s*\\operatorname\{of\}/g,
+    String.raw`\cdot0.01\cdot `
+  );
+  let rewritten = "";
+  let i = 0;
+  for (;;) {
+    const at = out.indexOf("\\log_", i);
+    if (at < 0) {
+      rewritten += out.slice(i);
+      break;
+    }
+    rewritten += out.slice(i, at);
+    let j = at + "\\log_".length;
+    let base: string;
+    if (out[j] === "{") {
+      let depth = 0;
+      const start = j;
+      for (; j < out.length; j++) {
+        if (out[j] === "{") depth++;
+        else if (out[j] === "}" && --depth === 0) break;
+      }
+      if (depth !== 0) throw new CompileError("A log base is missing its }.");
+      base = out.slice(start + 1, j);
+    } else {
+      base = out[j] ?? "";
+    }
+    rewritten += `\\operatorname{logbase}{${base}}`;
+    i = j + 1;
+  }
+  out = rewritten;
+  return out;
+}
+
+export function tokenize(source: string): Token[] {
+  const latex = rewriteLatexSugar(source);
   const tokens: Token[] = [];
   let i = 0;
   const pushBar = () => tokens.push({ kind: "bar" });
@@ -556,6 +850,14 @@ export function tokenize(latex: string): Token[] {
         else if (delimiter === ")")
           tokens.push({ kind: name === "left" ? "open" : "close" });
         else if (delimiter === "|") pushBar();
+        else if (delimiter === "[")
+          tokens.push({
+            kind: name === "left" ? "openBracket" : "closeBracket",
+          });
+        else if (delimiter === "]")
+          tokens.push({
+            kind: name === "left" ? "openBracket" : "closeBracket",
+          });
         else if (delimiter === "\\" && latex[i] === "{") {
           i++;
           tokens.push({ kind: name === "left" ? "pieceOpen" : "pieceClose" });
@@ -606,6 +908,10 @@ export function tokenize(latex: string): Token[] {
       }
       if (name === "sum" || name === "prod") {
         tokens.push({ kind: "repeated", value: name });
+        continue;
+      }
+      if (name === "int") {
+        tokens.push({ kind: "integral" });
         continue;
       }
       // `\sum\limits_{…}` only moves where the bounds are typeset.
@@ -679,6 +985,9 @@ export function tokenize(latex: string): Token[] {
         continue;
       case "!":
         tokens.push({ kind: "bang" });
+        continue;
+      case "'":
+        tokens.push({ kind: "prime" });
         continue;
       default:
         throw new CompileError(`"${char}" is not supported.`);
@@ -813,6 +1122,9 @@ class Parser {
         // `f(...)` is a call when f is a definition and a multiplication when
         // it is a value, which is exactly how Desmos reads it too.
         const definition = this.context.env.functions.get(token.value);
+        if (definition !== undefined && this.peek()?.kind === "prime") {
+          return this.parsePrimedCall(token.value, definition);
+        }
         if (definition !== undefined && this.peek()?.kind === "open") {
           return this.parseDefinedCall(token.value, definition);
         }
@@ -839,6 +1151,8 @@ class Parser {
         return `abs(${inner})`;
       }
       case "frac": {
+        const variable = this.derivativeVariable();
+        if (variable !== undefined) return this.parseDerivative(variable);
         this.index++;
         const numerator = this.parseBracedGroup();
         const denominator = this.parseBracedGroup();
@@ -867,6 +1181,11 @@ class Parser {
         this.index++;
         return this.parseRepeated(token.value);
       }
+      case "openBracket":
+        return this.parseIndexedList();
+      case "integral":
+        this.index++;
+        return this.parseIntegral();
       default:
         throw new CompileError(
           "The expression has a bracket or symbol in an unexpected place."
@@ -933,31 +1252,142 @@ class Parser {
     return `${glslName}(p${args.map((arg) => `, ${arg}`).join("")})`;
   }
 
-  private parseFunctionCall(name: string): string {
+  private parseFunctionCall(called: string): string {
+    let name = called;
+    // `\sin^{2}x` is (sin x)², and `\sin^{-1}x` is arcsin x, as Desmos
+    // reads them (measured 2026-11-07).
+    let power: string | undefined;
+    if (
+      this.peek()?.kind === "op" &&
+      (this.peek() as { value: string }).value === "^"
+    ) {
+      this.index++;
+      if (this.isMinusOneGroup()) {
+        this.index += 4;
+        const inverse = INVERSES[name];
+        if (inverse === undefined)
+          throw new CompileError(`"${name}" has no inverse to write as ^{-1}.`);
+        name = inverse;
+      } else {
+        power = this.parseGroupOrAtom();
+      }
+    }
     const spec = FUNCTIONS[name];
     if (spec === undefined) {
-      throw new CompileError(
-        `The function "${name}" is not supported by the flow visualizer.`
-      );
+      throw new CompileError(unsupportedFunction(name));
     }
+    // A log's base comes first, as its own braced group.
+    const leading = name === "logbase" ? [this.parseBracedGroup()] : [];
     let args: string[];
     if (this.peek()?.kind === "open") {
       this.index++;
-      args = [this.parseExpression()];
-      while (this.peek()?.kind === "comma") {
-        this.index++;
-        args.push(this.parseExpression());
-      }
+      args = this.parseArguments(LIST_FUNCTIONS.has(name));
       this.expect("close", "a closing parenthesis");
+    } else if (
+      LIST_FUNCTIONS.has(name) &&
+      this.peek()?.kind === "openBracket"
+    ) {
+      args = this.parseListLiteral();
     } else {
       args = [this.parseBareArgument(name)];
     }
-    if (!spec.arity.includes(args.length)) {
+    args = [...leading, ...args];
+    if (
+      spec.arity === "any"
+        ? args.length === 0
+        : !spec.arity.includes(args.length)
+    ) {
       throw new CompileError(
         `"${name}" cannot take ${args.length} argument${args.length === 1 ? "" : "s"}.`
       );
     }
-    return spec.emit(args);
+    const value = spec.emit(args);
+    return power === undefined ? value : powerGLSL(value, power);
+  }
+
+  /** `{-1}` or `-1` after a `^`, the four or two tokens of an inverse. */
+  private isMinusOneGroup(): boolean {
+    const t = this.tokens.slice(this.index, this.index + 4);
+    return (
+      t[0]?.kind === "openBrace" &&
+      t[1]?.kind === "op" &&
+      t[1].value === "-" &&
+      t[2]?.kind === "number" &&
+      Number(t[2].value) === 1 &&
+      t[3]?.kind === "closeBrace"
+    );
+  }
+
+  /**
+   * A call's arguments up to its closing parenthesis. A function that reads
+   * lists takes the elements of a list literal among them as arguments of
+   * its own: `\operatorname{total}\left(\left[a,b\right],c\right)` is a+b+c.
+   */
+  private parseArguments(listsAllowed: boolean): string[] {
+    const args: string[] = [];
+    do {
+      if (args.length > 0) this.index++;
+      if (
+        listsAllowed &&
+        this.peek()?.kind === "openBracket" &&
+        this.isWholeArgumentList()
+      )
+        args.push(...this.parseListLiteral());
+      else args.push(this.parseExpression());
+    } while (this.peek()?.kind === "comma");
+    return args;
+  }
+
+  /** Whether the list opening here is the whole argument, not `[a,b][1]+c`. */
+  private isWholeArgumentList(): boolean {
+    let depth = 0;
+    for (let i = this.index; i < this.tokens.length; i++) {
+      const { kind } = this.tokens[i];
+      if (kind === "openBracket") depth++;
+      else if (kind === "closeBracket" && --depth === 0) {
+        const next = this.tokens[i + 1]?.kind;
+        return next === "comma" || next === "close" || next === undefined;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * `\left[a, b, c\right]`: its elements, each a GLSL expression. A shader
+   * has no lists, so one is only ever its elements written out, read by a
+   * function of lists or indexed with `[k]`.
+   */
+  private parseListLiteral(): string[] {
+    this.expect("openBracket", "a [");
+    if (this.peek()?.kind === "closeBracket")
+      throw new CompileError("An empty list has no value to draw.");
+    const elements = [this.parseExpression()];
+    while (this.peek()?.kind === "comma") {
+      this.index++;
+      elements.push(this.parseExpression());
+    }
+    this.expect("closeBracket", "a closing ]");
+    return elements;
+  }
+
+  /**
+   * A list standing on its own in a formula: only `[a, b, c][k]` has a
+   * single value, element k counting from 1, undefined outside the list.
+   */
+  private parseIndexedList(): string {
+    const elements = this.parseListLiteral();
+    if (this.peek()?.kind !== "openBracket")
+      throw new CompileError(
+        "A list draws many fields, not one. Use one element, [a,b][1], or a function of the list such as total or mean."
+      );
+    this.index++;
+    const k = this.parseExpression();
+    this.expect("closeBracket", "a closing ]");
+    return elements.reduceRight(
+      (rest, element, i) =>
+        `(abs(floor(${k} + 0.5) - ${i + 1}.0) < 0.5 ? ${element} : ${rest})`,
+      "vtUndefined()"
+    );
   }
 
   /**
@@ -994,6 +1424,194 @@ class Parser {
    * function. It is handed the point, every name the surrounding definition
    * binds, and the two bounds, and declares the index itself.
    */
+  /**
+   * The variable of a `\frac{d}{dx}` starting here, or undefined if this is
+   * an ordinary fraction. Desmos reads `\frac{d}{dx}` as a derivative always.
+   */
+  private derivativeVariable(): string | undefined {
+    const t = this.tokens.slice(this.index, this.index + 8);
+    const isD = (k: number) =>
+      t[k]?.kind === "variable" && (t[k] as { value: string }).value === "d";
+    if (
+      t[0]?.kind === "frac" &&
+      t[1]?.kind === "openBrace" &&
+      isD(2) &&
+      t[3]?.kind === "closeBrace" &&
+      t[4]?.kind === "openBrace" &&
+      isD(5) &&
+      t[6]?.kind === "variable" &&
+      t[7]?.kind === "closeBrace"
+    )
+      return (t[6] as { value: string }).value;
+    return undefined;
+  }
+
+  /**
+   * `\frac{d}{dx}f`: the derivative of the product that follows, as Desmos
+   * reads it (`\frac{d}{dx}x^{2}+1` is 2x + 1), by a central difference.
+   *
+   * A shader cannot differentiate a formula, but it can evaluate one twice.
+   * The body becomes a helper of the point and of every name the
+   * surrounding definition binds; the derivative is that helper a small step
+   * either side along the variable, the step scaled to the variable's size so
+   * single precision keeps about five digits.
+   */
+  private parseDerivative(variable: string): string {
+    this.index += 8;
+    const body = new Parser(this.tokens, this.context, this.scope);
+    body.index = this.index;
+    body.barDepth = this.barDepth;
+    const term = body.parseTerm();
+    this.index = body.index;
+
+    const outer = [...this.scope.values()];
+    const dims = this.context.env.dimensions === 3 ? 3 : 2;
+    const vec = dims === 3 ? "vec3" : "vec2";
+    const helper = declareBodyHelper(
+      this.context,
+      "vtD",
+      [`${vec} p`, ...outer.map((glsl) => `float ${glsl}`)].join(", "),
+      `{ return ${term}; }`
+    );
+    const call = (point: string, args: readonly string[]) =>
+      `${helper}(${point}${args.map((a) => `, ${a}`).join("")})`;
+
+    const axis = ["x", "y", "z"].slice(0, dims).indexOf(variable);
+    const local = this.scope.get(variable);
+    if (local !== undefined) {
+      const h = `(1e-3 * max(1.0, abs(${local})))`;
+      const shifted = (sign: string) =>
+        outer.map((glsl) => (glsl === local ? `${glsl} ${sign} ${h}` : glsl));
+      return `vtDiv(${call("p", shifted("+"))} - ${call("p", shifted("-"))}, 2.0 * ${h})`;
+    }
+    if (axis >= 0) {
+      const coordinate = ["p.x", "p.y", "p.z"][axis];
+      const h = `(1e-3 * max(1.0, abs(${coordinate})))`;
+      const step = Array.from({ length: dims }, (_, k) =>
+        k === axis ? h : "0.0"
+      ).join(", ");
+      return `vtDiv(${call(`p + ${vec}(${step})`, outer)} - ${call(`p - ${vec}(${step})`, outer)}, 2.0 * ${h})`;
+    }
+    if (variable === TIME_NAME)
+      throw new CompileError(
+        "A derivative in t cannot be drawn: the clock is one number for the whole picture. Differentiate in x or y."
+      );
+    throw new CompileError(
+      `A derivative in "${variable}" cannot be drawn: "${variable}" is a slider, the same everywhere in the field.`
+    );
+  }
+
+  /**
+   * `f'(a)` and `f''(a)` for a one-argument definition, by central
+   * differences of the compiled definition.
+   */
+  private parsePrimedCall(
+    name: string,
+    definition: FunctionDefinition
+  ): string {
+    let order = 0;
+    while (this.peek()?.kind === "prime") {
+      this.index++;
+      order++;
+    }
+    if (order > 2)
+      throw new CompileError(
+        `Only first and second derivatives, f' and f'', can be drawn.`
+      );
+    if (definition.params.length !== 1)
+      throw new CompileError(
+        `"${name}'" needs "${name}" to take one argument; it takes ${definition.params.length}.`
+      );
+    this.expect("open", `( after ${name}'`);
+    const a = this.parseExpression();
+    this.expect("close", "a closing parenthesis");
+    const glslName = this.context.declare(name, definition);
+    const at = (shift: string) => `${glslName}(p, ${a} ${shift})`;
+    if (order === 1) {
+      const h = `(1e-3 * max(1.0, abs(${a})))`;
+      return `vtDiv(${at(`+ ${h}`)} - ${at(`- ${h}`)}, 2.0 * ${h})`;
+    }
+    // A wider step for the second difference: its error is h² against
+    // rounding's ε/h², least near h = ε^¼, about 0.03 in single precision.
+    const h = `(3e-2 * max(1.0, abs(${a})))`;
+    return `vtDiv(${at(`+ ${h}`)} - 2.0 * ${at("+ 0.0")} + ${at(`- ${h}`)}, ${h} * ${h})`;
+  }
+
+  /**
+   * `\int_{a}^{b} body\,dt`, by Simpson's rule. The body runs up to the
+   * `d` and its variable that close it; the variable is bound inside it.
+   */
+  private parseIntegral(): string {
+    const example = String.raw`\int_{0}^{x}t\,dt`;
+    this.expect("underscore", `_{…} after \\int, as in ${example}`);
+    const lower = this.parseGroupOrAtom();
+    const caret = this.peek();
+    if (caret?.kind !== "op" || caret.value !== "^")
+      throw new CompileError(
+        `An integral needs an upper limit, as in ${example}.`
+      );
+    this.index++;
+    const upper = this.parseGroupOrAtom();
+
+    // Where the body ends: the first `d` then a letter at its own depth.
+    let depth = 0;
+    let end = -1;
+    for (let i = this.index; i < this.tokens.length - 1; i++) {
+      const { kind } = this.tokens[i];
+      if (["open", "openBrace", "openBracket", "pieceOpen"].includes(kind))
+        depth++;
+      else if (
+        ["close", "closeBrace", "closeBracket", "pieceClose"].includes(kind)
+      )
+        depth--;
+      const next = this.tokens[i + 1];
+      if (
+        depth === 0 &&
+        this.tokens[i].kind === "variable" &&
+        (this.tokens[i] as { value: string }).value === "d" &&
+        next.kind === "variable"
+      ) {
+        end = i;
+        break;
+      }
+    }
+    if (end < 0)
+      throw new CompileError(
+        `An integral needs its d and variable at the end, as in ${example}.`
+      );
+    const variable = (this.tokens[end + 1] as { value: string }).value;
+    const local = glslLocalName(variable);
+    const scope = new Map(this.scope);
+    scope.set(variable, local);
+    const outer = [...this.scope]
+      .filter(([name]) => name !== variable)
+      .map(([, glsl]) => glsl);
+    const body = new Parser(
+      this.tokens.slice(this.index, end),
+      this.context,
+      scope
+    ).parseExpression();
+    this.index = end + 2;
+
+    const vec = this.context.env.dimensions === 3 ? "vec3" : "vec2";
+    const n = INTEGRAL_INTERVALS;
+    const helper = declareBodyHelper(
+      this.context,
+      "vtInt",
+      [
+        `${vec} p`,
+        ...outer.map((glsl) => `float ${glsl}`),
+        "float vtLo",
+        "float vtHi",
+      ].join(", "),
+      `{ float vtH = (vtHi - vtLo) / ${n}.0; float vtAcc = 0.0; ` +
+        `for (int vtI = 0; vtI <= ${n}; vtI++) { float ${local} = vtLo + float(vtI) * vtH; ` +
+        `float vtW = (vtI == 0 || vtI == ${n}) ? 1.0 : ((vtI % 2) == 1 ? 4.0 : 2.0); ` +
+        `vtAcc += vtW * (${body}); } return vtAcc * vtH / 3.0; }`
+    );
+    return `${helper}(p${outer.map((glsl) => `, ${glsl}`).join("")}, ${lower}, ${upper})`;
+  }
+
   private parseRepeated(kind: "sum" | "prod"): string {
     const example = `\\${kind}_{n=1}^{10}`;
     this.expect("underscore", `_{n=…} after \\${kind}, as in ${example}`);

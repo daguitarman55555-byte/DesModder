@@ -85,6 +85,85 @@ function desmosMod(a: number, b: number): number {
   return a - b * Math.floor(a / b);
 }
 
+/** Γ(z) in double precision (Lanczos, g = 7, nine terms). */
+function gamma(z: number): number {
+  if (z <= 0 && z === Math.floor(z)) return NaN;
+  if (z < 0.5) return Math.PI / (Math.sin(Math.PI * z) * gamma(1 - z));
+  const c = [
+    0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+    771.32342877765313, -176.61502916214059, 12.507343278686905,
+    -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7,
+  ];
+  const x = z - 1;
+  const [first, ...rest] = c;
+  let sum = first;
+  rest.forEach((coefficient, i) => (sum += coefficient / (x + i + 1)));
+  const t = x + 7.5;
+  return Math.sqrt(2 * Math.PI) * t ** (x + 0.5) * Math.exp(-t) * sum;
+}
+
+/** erf in double precision: its Taylor series near 0, erfc's continued fraction beyond. */
+function erf(x: number): number {
+  const s = Math.sign(x);
+  const a = Math.abs(x);
+  if (a < 3) {
+    let term = a;
+    let sum = a;
+    for (let n = 1; n < 100; n++) {
+      term *= (-a * a) / n;
+      const next = term / (2 * n + 1);
+      sum += next;
+      if (Math.abs(next) < 1e-17 * Math.abs(sum)) break;
+    }
+    return (s * 2 * sum) / Math.sqrt(Math.PI);
+  }
+  // erfc(a) = e^{-a²}/√π · 1/(a + 1/2/(a + 1/(a + 3/2/(a + …)))).
+  let f = 0;
+  for (let n = 60; n >= 1; n--) f = n / 2 / (a + f);
+  return s * (1 - Math.exp(-a * a) / Math.sqrt(Math.PI) / (a + f));
+}
+
+function gcd(a: number, b: number): number {
+  a = Math.abs(Math.round(a));
+  b = Math.abs(Math.round(b));
+  while (b > 0) [a, b] = [b, a % b];
+  return a;
+}
+
+function nCr(n: number, r: number): number {
+  if (Number.isInteger(n) && Number.isInteger(r)) {
+    if (r < 0 || (n >= 0 && r > n)) return 0;
+    const k = n >= 0 ? Math.min(r, n - r) : r;
+    let acc = 1;
+    for (let i = 0; i < k; i++) acc = (acc * (n - i)) / (i + 1);
+    return Math.round(acc);
+  }
+  return gamma(n + 1) / (gamma(r + 1) * gamma(n - r + 1));
+}
+
+function nPr(n: number, r: number): number {
+  if (Number.isInteger(n) && Number.isInteger(r) && r >= 0) {
+    if (n >= 0 && r > n) return 0;
+    let acc = 1;
+    for (let i = 0; i < r; i++) acc *= n - i;
+    return acc;
+  }
+  return gamma(n + 1) / gamma(n - r + 1);
+}
+
+const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+const squaredDeviations = (xs: number[]) => {
+  const m = mean(xs);
+  return xs.reduce((acc, v) => acc + (v - m) ** 2, 0);
+};
+function median(xs: number[]): number {
+  const sorted = [...xs].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1
+    ? sorted[mid]
+    : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
 export function compileExpression(
   expr: Expr,
   program: StrictProgram,
@@ -315,8 +394,66 @@ function builtin(
     case "ceil":
       return (s, l) => Math.ceil(a(s, l));
     case "round":
-      // Half rounds up, as Math.round does: round(−2.5) = −2.
-      return (s, l) => Math.round(a(s, l));
+      // Half rounds up, as Math.round does: round(−2.5) = −2. With a second
+      // argument, to that many decimal places.
+      return args.length === 2
+        ? (s, l) => {
+            const scale = 10 ** Math.round(b(s, l));
+            return Math.round(a(s, l) * scale) / scale;
+          }
+        : (s, l) => Math.round(a(s, l));
+    case "erf":
+      return (s, l) => erf(a(s, l));
+    case "gcd":
+      return (s, l) => args.map((arg) => arg(s, l)).reduce(gcd);
+    case "lcm":
+      return (s, l) =>
+        args
+          .map((arg) => arg(s, l))
+          .reduce((x, y) => {
+            const g = gcd(x, y);
+            return g === 0 ? 0 : Math.abs(Math.round(x) * Math.round(y)) / g;
+          });
+    case "nCr":
+      return (s, l) => nCr(a(s, l), b(s, l));
+    case "nPr":
+      return (s, l) => nPr(a(s, l), b(s, l));
+    case "total":
+      return (s, l) => args.reduce((acc, arg) => acc + arg(s, l), 0);
+    case "mean":
+      return (s, l) => mean(args.map((arg) => arg(s, l)));
+    case "length":
+      return () => args.length;
+    case "median":
+      return (s, l) => median(args.map((arg) => arg(s, l)));
+    // Desmos's stdev and var are the sample's (n − 1); the p forms divide by n.
+    case "stdev":
+      return (s, l) =>
+        args.length < 2
+          ? NaN
+          : Math.sqrt(
+              squaredDeviations(args.map((arg) => arg(s, l))) /
+                (args.length - 1)
+            );
+    case "stdevp":
+      return (s, l) =>
+        Math.sqrt(
+          squaredDeviations(args.map((arg) => arg(s, l))) / args.length
+        );
+    case "var":
+      return (s, l) =>
+        args.length < 2
+          ? NaN
+          : squaredDeviations(args.map((arg) => arg(s, l))) / (args.length - 1);
+    case "varp":
+      return (s, l) =>
+        squaredDeviations(args.map((arg) => arg(s, l))) / args.length;
+    case "mad":
+      return (s, l) => {
+        const xs = args.map((arg) => arg(s, l));
+        const m = mean(xs);
+        return xs.reduce((acc, v) => acc + Math.abs(v - m), 0) / xs.length;
+      };
     case "mod":
       return (s, l) => desmosMod(a(s, l), b(s, l));
     case "min":

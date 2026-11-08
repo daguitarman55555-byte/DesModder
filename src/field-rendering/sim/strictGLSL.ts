@@ -23,7 +23,7 @@
 import type { BuiltinName, Chain, Expr, StrictProgram } from "./strictParse";
 import type { StrictOptions } from "./strictEvaluate";
 import { MAX_RATIONAL_DENOMINATOR } from "./strictEvaluate";
-import { glslParamName } from "../latexToGLSL";
+import { emitBuiltinGLSL, glslParamName, GLSL_PRELUDE } from "../latexToGLSL";
 
 /** Emitted once per shader that contains strict geometry. */
 export const STRICT_GLSL_PRELUDE = `
@@ -108,6 +108,9 @@ float vsLogBase(float base, float a, inout bool ok) {
   float den = vsLn(base, ok);
   return vsDiv(num, den, ok);
 }
+// The visual compiler's helpers, for the builtins both emit the same way
+// (erf, gcd, nCr, the list functions): see emitBuiltinGLSL.
+${GLSL_PRELUDE}
 `;
 
 export interface EmittedRelation {
@@ -497,7 +500,35 @@ class Body {
       case "ceil":
         return this.value([a], () => `ceil(${a.v})`);
       case "round":
-        return this.value([a], () => `floor(${a.v} + 0.5)`);
+        return this.value(args, () =>
+          emitBuiltinGLSL(
+            "round",
+            args.map((x) => x.v)
+          )
+        );
+      // Defined wherever every argument is: the shared emitters. A sample
+      // stdev or var of one value is undefined, which vtUndefined carries
+      // into the value as NaN; the strict sampler reads a NaN as outside.
+      case "erf":
+      case "gcd":
+      case "lcm":
+      case "nCr":
+      case "nPr":
+      case "total":
+      case "mean":
+      case "length":
+      case "median":
+      case "stdev":
+      case "stdevp":
+      case "var":
+      case "varp":
+      case "mad":
+        return this.value(args, () =>
+          emitBuiltinGLSL(
+            fn,
+            args.map((x) => x.v)
+          )
+        );
       case "mod":
         return this.guarded([a, b], (ok) => `vsMod(${a.v}, ${b.v}, ${ok})`);
       case "min":

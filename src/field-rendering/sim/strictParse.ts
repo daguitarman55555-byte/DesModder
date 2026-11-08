@@ -21,6 +21,7 @@ import {
   CompileError,
   bareArgumentEnd,
   tokenize,
+  unsupportedFunction,
   type FieldEnvironment,
   type FunctionDefinition,
   type Token,
@@ -109,7 +110,48 @@ export type BuiltinName =
   | "round"
   | "mod"
   | "min"
-  | "max";
+  | "max"
+  | "erf"
+  | "gcd"
+  | "lcm"
+  | "nCr"
+  | "nPr"
+  | "total"
+  | "mean"
+  | "length"
+  | "median"
+  | "stdev"
+  | "stdevp"
+  | "var"
+  | "varp"
+  | "mad";
+
+/** Desmos's other spellings, read as the builtin they mean. */
+const ALIASES: Record<string, BuiltinName> = {
+  sgn: "sign",
+  arsinh: "arcsinh",
+  arcosh: "arccosh",
+  artanh: "arctanh",
+  stddev: "stdev",
+  stddevp: "stdevp",
+  variance: "var",
+};
+
+/** `f^{-1}`, as in the visual compiler (`latexToGLSL`'s INVERSES). */
+const INVERSE_BUILTINS: Partial<Record<BuiltinName, BuiltinName>> = {
+  sin: "arcsin",
+  cos: "arccos",
+  tan: "arctan",
+  cot: "arccot",
+  sec: "arcsec",
+  csc: "arccsc",
+  sinh: "arcsinh",
+  cosh: "arccosh",
+  tanh: "arctanh",
+};
+
+/** Takes any number of arguments, or the elements of a list literal. */
+const ANY: readonly number[] = [];
 
 const BUILTIN_ARITY: Record<BuiltinName, readonly number[]> = {
   sin: [1],
@@ -143,10 +185,24 @@ const BUILTIN_ARITY: Record<BuiltinName, readonly number[]> = {
   sign: [1],
   floor: [1],
   ceil: [1],
-  round: [1],
+  round: [1, 2],
   mod: [2],
-  min: [1, 2, 3, 4, 5, 6, 7, 8],
-  max: [1, 2, 3, 4, 5, 6, 7, 8],
+  min: ANY,
+  max: ANY,
+  erf: [1],
+  gcd: ANY,
+  lcm: ANY,
+  nCr: [2],
+  nPr: [2],
+  total: ANY,
+  mean: ANY,
+  length: ANY,
+  median: ANY,
+  stdev: ANY,
+  stdevp: ANY,
+  var: ANY,
+  varp: ANY,
+  mad: ANY,
 };
 
 const isBuiltin = (name: string): name is BuiltinName => name in BUILTIN_ARITY;
@@ -330,7 +386,7 @@ function isConditionList(tokens: readonly Token[]): boolean {
  * input somewhere after them.
  */
 function strictTokens(latex: string): Token[] {
-  const tokens = tokenize(rewriteLogBases(latex));
+  const tokens = tokenize(latex);
   for (const token of tokens) {
     if (token.kind === "bang") throw new CompileError(`"!" is not supported.`);
     if (token.kind === "repeated")
@@ -339,39 +395,6 @@ function strictTokens(latex: string): Token[] {
       throw new CompileError(`"_" is not supported.`);
   }
   return tokens;
-}
-
-/**
- * `\log_{b}` as a two-argument call the shared tokenizer already reads.
- *
- * The tokenizer has no subscripts after a command (its `_` belongs to
- * `\sum`), and teaching it them would change what the visual compiler accepts. Spelling the base as the first
- * braced group of an operator name keeps that tokenizer as it is.
- */
-function rewriteLogBases(latex: string): string {
-  let out = "";
-  let i = 0;
-  for (;;) {
-    const at = latex.indexOf("\\log_", i);
-    if (at < 0) return out + latex.slice(i);
-    out += latex.slice(i, at);
-    let j = at + "\\log_".length;
-    let base: string;
-    if (latex[j] === "{") {
-      let depth = 0;
-      const start = j;
-      for (; j < latex.length; j++) {
-        if (latex[j] === "{") depth++;
-        else if (latex[j] === "}" && --depth === 0) break;
-      }
-      if (depth !== 0) throw new CompileError("A log base is missing its }.");
-      base = latex.slice(start + 1, j);
-    } else {
-      base = latex[j] ?? "";
-    }
-    out += `\\operatorname{logbase}{${base}}`;
-    i = j + 1;
-  }
 }
 
 class Context {
@@ -584,6 +607,19 @@ class Parser {
         return { kind: "call", fn: "abs", args: [inner] };
       }
       case "frac": {
+        const t = this.tokens.slice(this.index, this.index + 5);
+        if (
+          t[1]?.kind === "openBrace" &&
+          t[2]?.kind === "variable" &&
+          t[2].value === "d" &&
+          t[3]?.kind === "closeBrace" &&
+          t[4]?.kind === "openBrace" &&
+          this.tokens[this.index + 5]?.kind === "variable" &&
+          (this.tokens[this.index + 5] as { value: string }).value === "d"
+        )
+          throw new CompileError(
+            "Derivatives and integrals draw fields, but a solid's edge is found exactly, and these are approximations. Write the derivative out."
+          );
         this.index++;
         const a = this.parseBracedGroup();
         const b = this.parseBracedGroup();
@@ -608,6 +644,19 @@ class Parser {
         this.index++;
         return this.parsePiecewise();
       }
+      case "openBracket": {
+        const elements = this.parseListLiteral();
+        if (this.peek()?.kind !== "openBracket")
+          throw new CompileError(
+            "A list makes many regions, not one. Use one element, [a,b][1], or a function of the list such as total or mean."
+          );
+        return this.indexInto(elements);
+      }
+      case "prime":
+      case "integral":
+        throw new CompileError(
+          "Derivatives and integrals draw fields, but a solid's edge is found exactly, and these are approximations. Write the derivative out."
+        );
       default:
         throw new CompileError(
           "The expression has a bracket or symbol in an unexpected place."
@@ -657,26 +706,114 @@ class Parser {
     return { kind: "user", name, args };
   }
 
-  private parseBuiltinCall(name: string): Expr {
+  private parseBuiltinCall(called: string): Expr {
+    let name: string = ALIASES[called] ?? called;
+    // `\sin^{2}x` is (sin x)², and `\sin^{-1}x` is arcsin x.
+    let power: Expr | undefined;
+    const caret = this.peek();
+    if (caret?.kind === "op" && caret.value === "^") {
+      this.index++;
+      const t = this.tokens.slice(this.index, this.index + 4);
+      const minusOne =
+        t[0]?.kind === "openBrace" &&
+        t[1]?.kind === "op" &&
+        t[1].value === "-" &&
+        t[2]?.kind === "number" &&
+        Number(t[2].value) === 1 &&
+        t[3]?.kind === "closeBrace";
+      if (minusOne && isBuiltin(name) && INVERSE_BUILTINS[name]) {
+        this.index += 4;
+        name = INVERSE_BUILTINS[name]!;
+      } else {
+        power = this.parseGroupOrAtom();
+      }
+    }
     if (!isBuiltin(name)) {
       throw new CompileError(
-        `The function "${name}" is not supported in a solid.`
+        unsupportedFunction(name).replace(
+          "by the flow visualizer",
+          "in a solid"
+        )
       );
     }
+    let call: Expr;
     if (name === "logbase") {
       const base = this.parseBracedGroup();
       const argument = this.parseCallArguments(name);
       if (argument.length !== 1)
         throw new CompileError("A log with a base takes one argument.");
-      return { kind: "call", fn: name, args: [base, argument[0]] };
+      call = { kind: "call", fn: name, args: [base, argument[0]] };
+    } else {
+      const arity = BUILTIN_ARITY[name];
+      const args =
+        arity === ANY
+          ? this.parseListArguments()
+          : this.parseCallArguments(name);
+      if (arity === ANY ? args.length === 0 : !arity.includes(args.length)) {
+        throw new CompileError(
+          `"${name}" cannot take ${args.length} argument${args.length === 1 ? "" : "s"}.`
+        );
+      }
+      call = { kind: "call", fn: name, args };
     }
-    const args = this.parseCallArguments(name);
-    if (!BUILTIN_ARITY[name].includes(args.length)) {
-      throw new CompileError(
-        `"${name}" cannot take ${args.length} argument${args.length === 1 ? "" : "s"}.`
-      );
+    return power === undefined
+      ? call
+      : { kind: "pow", base: call, exponent: power };
+  }
+
+  /**
+   * The arguments of a function of lists: `(a, b)`, `(\left[a,b\right])`
+   * or `\left[a,b\right]`, each list literal giving its elements.
+   */
+  private parseListArguments(): Expr[] {
+    if (this.peek()?.kind === "openBracket") return this.parseListLiteral();
+    this.expect("open", "( after the function");
+    const args: Expr[] = [];
+    do {
+      if (args.length > 0) this.index++;
+      if (this.peek()?.kind === "openBracket") {
+        const elements = this.parseListLiteral();
+        if (this.peek()?.kind === "openBracket")
+          args.push(this.indexInto(elements));
+        else args.push(...elements);
+      } else args.push(this.parseExpression());
+    } while (this.peek()?.kind === "comma");
+    this.expect("close", "a closing parenthesis");
+    return args;
+  }
+
+  private parseListLiteral(): Expr[] {
+    this.expect("openBracket", "a [");
+    if (this.peek()?.kind === "closeBracket")
+      throw new CompileError("An empty list has no value to draw.");
+    const elements = [this.parseExpression()];
+    while (this.peek()?.kind === "comma") {
+      this.index++;
+      elements.push(this.parseExpression());
     }
-    return { kind: "call", fn: name, args };
+    this.expect("closeBracket", "a closing ]");
+    return elements;
+  }
+
+  /** `[a, b, c][k]`: element k from 1, undefined outside the list. */
+  private indexInto(elements: Expr[]): Expr {
+    this.expect("openBracket", "a [");
+    const k: Expr = {
+      kind: "call",
+      fn: "round",
+      args: [this.parseExpression()],
+    };
+    this.expect("closeBracket", "a closing ]");
+    return {
+      kind: "piecewise",
+      branches: elements.map((value, i) => ({
+        condition: {
+          terms: [k, { kind: "num", value: i + 1 }],
+          ops: ["="],
+        },
+        value,
+      })),
+    };
   }
 
   private parseCallArguments(name: string): Expr[] {
