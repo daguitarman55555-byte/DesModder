@@ -90,7 +90,15 @@ export interface Palette {
    * be zero.
    */
   cyclic?: boolean;
+  /**
+   * Kept for the presets and saved graphs that use it, but left out of the
+   * pickers: the near-twin of a palette that is listed (Rafael, 2026-11-07).
+   */
+  hidden?: boolean;
 }
+
+/** The palettes a picker lists: every one but the hidden twins. */
+export const pickablePalette = (id: PaletteID) => PALETTES[id].hidden !== true;
 
 export const PALETTES: Record<PaletteID, Palette> = {
   /**
@@ -188,16 +196,23 @@ export const PALETTES: Record<PaletteID, Palette> = {
    * The classic. It is perceptually poor — it invents edges where the field is
    * smooth — but it is what decades of fluid-dynamics figures used, and a plot
    * meant to sit beside one of those should be able to match it.
+   *
+   * Jet's own middle is pure cyan (255 green and blue) and pure yellow, and
+   * on Desmos's white paper those arrows all but vanished: the mid-strength
+   * half of the field went missing (seen 2026-11-07). The same hues in the
+   * same order, darkened until each reads against white, with the green Jet
+   * passes through made a stop of its own rather than a pale interpolation.
    */
   jet: {
     name: "Jet (classic)",
     group: "sequential",
     stops: [
       { at: 0, rgb: [0, 0, 131] },
-      { at: 0.125, rgb: [0, 60, 170] },
-      { at: 0.375, rgb: [5, 255, 255] },
-      { at: 0.625, rgb: [255, 255, 0] },
-      { at: 0.875, rgb: [250, 0, 0] },
+      { at: 0.125, rgb: [0, 60, 190] },
+      { at: 0.375, rgb: [0, 160, 200] },
+      { at: 0.5, rgb: [40, 170, 70] },
+      { at: 0.625, rgb: [215, 175, 0] },
+      { at: 0.875, rgb: [230, 30, 0] },
       { at: 1, rgb: [128, 0, 0] },
     ],
   },
@@ -247,6 +262,7 @@ export const PALETTES: Record<PaletteID, Palette> = {
   "charge-glow": {
     name: "Charge glow",
     group: "diverging",
+    hidden: true,
     stops: [
       { at: 0, rgb: [70, 150, 255] },
       { at: 0.25, rgb: [60, 95, 190] },
@@ -255,12 +271,15 @@ export const PALETTES: Record<PaletteID, Palette> = {
       { at: 1, rgb: [255, 170, 90] },
     ],
   },
+  // Ink on paper: a light grey for a weak vector to near-black for a strong
+  // one. It ran the other way, to 240, and on Desmos's white the strongest
+  // arrows were the ones that disappeared (seen 2026-11-07).
   grayscale: {
     name: "Grayscale",
     group: "sequential",
     stops: [
-      { at: 0, rgb: [30, 30, 30] },
-      { at: 1, rgb: [240, 240, 240] },
+      { at: 0, rgb: [190, 190, 190] },
+      { at: 1, rgb: [20, 20, 20] },
     ],
   },
   sunset: {
@@ -423,6 +442,7 @@ export const PALETTES: Record<PaletteID, Palette> = {
   aurora: {
     name: "Aurora",
     group: "expressive",
+    hidden: true,
     stops: [
       { at: 0, rgb: [30, 58, 68] },
       { at: 0.32, rgb: [52, 104, 106] },

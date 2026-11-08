@@ -937,7 +937,7 @@ function paletteOptions(): ReadonlyArray<readonly [PaletteID, string]> {
   const options: Array<readonly [PaletteID, string]> = [];
   for (const group of PALETTE_GROUPS)
     for (const [id, palette] of Object.entries(PALETTES))
-      if (palette.group === group.id)
+      if (palette.group === group.id && palette.hidden !== true)
         options.push([id as PaletteID, palette.name]);
   return options;
 }

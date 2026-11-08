@@ -60,6 +60,7 @@ import {
   NO_COLOR_ADJUST,
   PALETTES,
   PALETTE_GROUPS,
+  pickablePalette,
   PALETTE_IDS,
   paletteCSSGradient,
   type ColorAdjust,
@@ -3662,32 +3663,32 @@ function paletteChooser(
         <div class="dsm-vector-tools-palette-group">
           <div class="dsm-vector-tools-palette-group-label">{group.label}</div>
           <div class="dsm-vector-tools-palette-grid">
-            {PALETTE_IDS.filter((pid) => PALETTES[pid].group === group.id).map(
-              (pid) => (
+            {PALETTE_IDS.filter(
+              (pid) => PALETTES[pid].group === group.id && pickablePalette(pid)
+            ).map((pid) => (
+              <span
+                role="button"
+                tabIndex={0}
+                data-value={pid}
+                class={() => ({
+                  "dsm-vector-tools-chip": true,
+                  "dsm-vector-tools-palette": true,
+                  "dsm-vector-tools-chip-selected": value() === pid,
+                })}
+                aria-pressed={() => (value() === pid ? "true" : "false")}
+                onTap={() => onChange(pid)}
+              >
                 <span
-                  role="button"
-                  tabIndex={0}
-                  data-value={pid}
-                  class={() => ({
-                    "dsm-vector-tools-chip": true,
-                    "dsm-vector-tools-palette": true,
-                    "dsm-vector-tools-chip-selected": value() === pid,
+                  class="dsm-vector-tools-palette-swatch"
+                  style={() => ({
+                    background: paletteCSSGradient(pid, adjust()),
                   })}
-                  aria-pressed={() => (value() === pid ? "true" : "false")}
-                  onTap={() => onChange(pid)}
-                >
-                  <span
-                    class="dsm-vector-tools-palette-swatch"
-                    style={() => ({
-                      background: paletteCSSGradient(pid, adjust()),
-                    })}
-                  />
-                  <span class="dsm-vector-tools-palette-name">
-                    {PALETTES[pid].name}
-                  </span>
+                />
+                <span class="dsm-vector-tools-palette-name">
+                  {PALETTES[pid].name}
                 </span>
-              )
-            )}
+              </span>
+            ))}
           </div>
         </div>
       ))}
