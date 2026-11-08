@@ -627,21 +627,32 @@ export interface PresetWindowConfig {
   mode: DemoMode;
 }
 
-export type PanelTab =
-  | "field"
-  | "arrows"
-  | "color"
-  | "curve"
-  | "flow"
-  | "fluid"
-  | "matrix";
+/**
+ * The panel's tabs since the 2026-11-07 reorganisation: Arrows and Flow
+ * became one Draw tab (both are how the field is drawn), and the curve,
+ * one checkbox and its formula, moved onto Field. Fluid and Matrix exist
+ * only on the 2D calculator, so the 3D one does not offer them.
+ */
+export type PanelTab = "field" | "draw" | "color" | "fluid" | "matrix";
+
+/** Where a tab saved before the reorganisation now lives. */
+const MOVED_TABS: Readonly<Record<string, PanelTab>> = {
+  arrows: "draw",
+  flow: "draw",
+  curve: "field",
+};
+
+/** The tabs the 2D or the 3D calculator offers. */
+export function panelTabsFor(is3d: boolean) {
+  return PANEL_TABS.filter(
+    (tab) => !is3d || (tab.id !== "fluid" && tab.id !== "matrix")
+  );
+}
 
 export const PANEL_TABS: readonly { id: PanelTab; label: string }[] = [
   { id: "field", label: "Field" },
-  { id: "arrows", label: "Arrows" },
+  { id: "draw", label: "Draw" },
   { id: "color", label: "Color" },
-  { id: "curve", label: "Curve" },
-  { id: "flow", label: "Flow" },
   { id: "fluid", label: "Fluid" },
   { id: "matrix", label: "Matrix" },
 ];
@@ -1886,9 +1897,12 @@ function normalizePanel(value: unknown, fallback: PanelConfig): PanelConfig {
         PANEL_MAX_HEIGHT
       )
     ),
-    tab: PANEL_TABS.some((tab) => tab.id === panel?.tab)
-      ? (panel?.tab as PanelTab)
-      : fallback.tab,
+    tab:
+      typeof panel?.tab === "string" && panel.tab in MOVED_TABS
+        ? MOVED_TABS[panel.tab]
+        : PANEL_TABS.some((tab) => tab.id === panel?.tab)
+          ? (panel?.tab as PanelTab)
+          : fallback.tab,
     presets: normalizePresetWindow(panel?.presets, fallback.presets),
   };
 }
@@ -1982,12 +1996,11 @@ function normalizeFlow(value: unknown, fallback: FlowConfig): FlowConfig {
       typeof flow?.normalizeSpeed === "boolean"
         ? flow.normalizeSpeed
         : fallback.normalizeSpeed,
-    renderScale: clampNumber(
-      flow?.renderScale,
-      fallback.renderScale,
-      FLOW_RENDER_SCALE_MINIMUM,
-      1
-    ),
+    // Full detail always: the flow lowers it itself while frames are slow
+    // (FlowOverlay's adaptDetail). A saved value below 1 came from the
+    // slider that replaced, and would otherwise blur the flow for good with
+    // no control left to undo it.
+    renderScale: 1,
     seedLatex:
       typeof flow?.seedLatex === "string" ? flow.seedLatex : fallback.seedLatex,
     seedOn: typeof flow?.seedOn === "boolean" ? flow.seedOn : fallback.seedOn,

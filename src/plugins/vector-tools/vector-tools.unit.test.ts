@@ -18,7 +18,6 @@ import {
   DENSITY_PRESETS,
   effectiveFlowColor,
   FLOW_PARTICLE_MAXIMUM,
-  FLOW_RENDER_SCALE_MINIMUM,
   FLOW_PARTICLE_MINIMUM,
   isDevelopmentBuild,
   lengthInputsFor,
@@ -378,7 +377,8 @@ describe("Vector Tools field configuration", () => {
       dropRate: 0,
       opacity: 0.05,
       pointSize: 6,
-      renderScale: FLOW_RENDER_SCALE_MINIMUM,
+      // Always full detail: the flow lowers it itself while frames are slow.
+      renderScale: 1,
       colorMode: "speed",
       // Clamped like every other slider, so a hand-edited setting cannot ask
       // for a colour the shader would drive to a flat block.
@@ -439,7 +439,7 @@ describe("Vector Tools field configuration", () => {
     });
     expect(
       normalizeVectorFieldLibrary({ panel: { width: 460, tab: "flow" } }).panel
-    ).toMatchObject({ width: 460, tab: "flow" });
+    ).toMatchObject({ width: 460, tab: "draw" });
   });
 
   test("keeps the presets window where it was left, within reason", () => {
@@ -959,7 +959,7 @@ describe("the field library", () => {
     expect(library.fields[0].id).toBe("default");
     expect(library.fields[0].symbolToken).toBe("d");
     // The panel geometry comes out of the field and up to the library.
-    expect(library.panel).toMatchObject({ width: 500, tab: "flow" });
+    expect(library.panel).toMatchObject({ width: 500, tab: "draw" });
   });
 
   test("anything unreadable falls back rather than throwing", () => {

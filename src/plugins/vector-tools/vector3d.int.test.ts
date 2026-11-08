@@ -146,9 +146,14 @@ testWithPageAndOpts(
       ".dsm-action-menu .dsm-icon-compass2"
     );
     await driver.click(".dsm-action-menu .dsm-icon-compass2");
-    const index = PANEL_TABS.findIndex((tab) => tab.id === "arrows");
+    const index = PANEL_TABS.findIndex((tab) => tab.id === "draw");
     await driver.click(
       `.dsm-vector-tools-tabs .dcg-segmented-control-btn:nth-child(${index + 1})`
+    );
+    await driver.page.evaluate(() =>
+      document
+        .querySelectorAll<HTMLDetailsElement>(".dsm-vector-tools-body details")
+        .forEach((details) => (details.open = true))
     );
     // The 3D sections replace the 2D length and arrowhead ones, which mean
     // nothing in a rotatable box.
@@ -223,6 +228,11 @@ testWithPageAndOpts(
     await driver.enablePlugin("vector-tools");
     await driver.page.waitForFunction(
       () => DSM.enabledPlugins["vector-tools"] !== undefined
+    );
+    // From a reset field: a preset an earlier test loaded leaves its colour
+    // formula, which reads the preset's own sliders, in the saved settings.
+    await driver.page.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).resetConfig()
     );
 
     // A point charge, the field the colour scale was settled against.
@@ -560,6 +570,11 @@ testWithPageAndOpts(
     await driver.page.waitForFunction(
       () => DSM.enabledPlugins["vector-tools"] !== undefined
     );
+    // From a reset field: a preset an earlier test loaded leaves its colour
+    // formula, which reads the preset's own sliders, in the saved settings.
+    await driver.page.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).resetConfig()
+    );
     // f = xyz, whose gradient (yz, xz, xy) names every coordinate but the
     // one it is the partial with respect to: differentiated, not sampled.
     await configure(
@@ -604,6 +619,11 @@ testWithPageAndOpts(
     await driver.page.waitForFunction(
       () => DSM.enabledPlugins["vector-tools"] !== undefined
     );
+    // From a reset field: a preset an earlier test loaded leaves its colour
+    // formula, which reads the preset's own sliders, in the saved settings.
+    await driver.page.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).resetConfig()
+    );
     await driver.page.evaluate(() => {
       Calc.setExpression({
         id: "hill",
@@ -639,9 +659,14 @@ testWithPageAndOpts(
 
     // The panel offers it by its own equation.
     await driver.click(".dsm-action-menu .dsm-icon-compass2");
-    const index = PANEL_TABS.findIndex((tab) => tab.id === "arrows");
+    const index = PANEL_TABS.findIndex((tab) => tab.id === "draw");
     await driver.click(
       `.dsm-vector-tools-tabs .dcg-segmented-control-btn:nth-child(${index + 1})`
+    );
+    await driver.page.evaluate(() =>
+      document
+        .querySelectorAll<HTMLDetailsElement>(".dsm-vector-tools-body details")
+        .forEach((details) => (details.open = true))
     );
     await driver.assertSelectorEventually(
       '.dsm-vector-tools-surface-choice[data-surface="hill"]'

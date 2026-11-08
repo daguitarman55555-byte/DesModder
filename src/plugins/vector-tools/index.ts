@@ -1859,6 +1859,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     if (this.environmentTimer !== undefined)
       clearTimeout(this.environmentTimer);
     if (this.panelSizeTimer !== undefined) clearTimeout(this.panelSizeTimer);
+    clearTimeout(this.arrowRewriteTimer);
     if (this.pushFrame !== undefined) cancelAnimationFrame(this.pushFrame);
     this.scene3d.stop();
     this.scene3dKey = "";
@@ -2112,9 +2113,43 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   }
 
   updateConfig(update: (config: VectorFieldConfig) => void) {
+    const before = this.generatedPlanKey();
     this.updateLibrary((library) => {
       update(activeField(library));
     });
+    if (before !== undefined && before !== this.generatedPlanKey())
+      this.scheduleArrowRewrite();
+  }
+
+  /**
+   * What the Desmos-expression arrows in the graph would be written as now,
+   * or undefined while there are none to keep up to date: not in that mode,
+   * or never generated. Their colours used to stay as generated until
+   * Generate was pressed again, so changing the palette appeared to do
+   * nothing (Rafael, 2026-11-07: "make the colors actually work").
+   */
+  private generatedPlanKey(): string | undefined {
+    const config = this.getConfig();
+    if (config.arrowMode !== "desmos") return undefined;
+    const plan = createVectorFieldPlan(config, this.generationOptions);
+    if (this.cc.getItemModel(plan.folder.id) === undefined) return undefined;
+    return JSON.stringify(plan.expressions);
+  }
+
+  private arrowRewriteTimer?: ReturnType<typeof setTimeout>;
+
+  /**
+   * Rewrites the arrows once the settings stop moving: a slider drag is a
+   * burst of changes, and each rewrite is a whole recompute for Desmos.
+   */
+  private scheduleArrowRewrite() {
+    clearTimeout(this.arrowRewriteTimer);
+    this.arrowRewriteTimer = setTimeout(() => {
+      this.arrowRewriteTimer = undefined;
+      // Confirmed: the field was already generated at this size or near it,
+      // and a dialog per palette click would be worse than useless.
+      if (this.generatedPlanKey() !== undefined) this.generateProduction(true);
+    }, 200);
   }
 
   resetConfig() {
@@ -3561,6 +3596,29 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       result,
     };
     return result;
+  }
+
+  /**
+   * What the Draw tab's first choice says: arrows, the flow, or both, read
+   * from the arrow mode and whether the flow runs.
+   */
+  get drawingAs(): "arrows" | "flow" | "both" | "none" {
+    const arrows = this.arrowMode !== "off";
+    const flow = this.isFlowRunning;
+    return arrows && flow ? "both" : flow ? "flow" : arrows ? "arrows" : "none";
+  }
+
+  /**
+   * Draws the field as arrows, as the flow, or both. Arrows switched back on
+   * come back live; a graph that used Desmos-expression arrows keeps them.
+   */
+  setDrawAs(choice: "arrows" | "flow" | "both") {
+    const arrows = choice !== "flow";
+    const flow = choice !== "arrows";
+    if (arrows && this.arrowMode === "off") this.setArrowMode("live");
+    if (!arrows && this.arrowMode !== "off") this.setArrowMode("off");
+    if (flow !== this.isFlowRunning) this.toggleFlow();
+    this.util.tick();
   }
 
   toggleFlow() {

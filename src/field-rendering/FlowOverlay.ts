@@ -366,7 +366,7 @@ export class FlowOverlay {
     const changed = this.renderer.resize(
       rect.width,
       rect.height,
-      (window.devicePixelRatio || 1) * this.options.renderScale
+      (window.devicePixelRatio || 1) * this.options.renderScale * this.autoScale
     );
     if (changed) this.renderer.clearTrails();
   }
@@ -394,15 +394,60 @@ export class FlowOverlay {
     else this.renderer.setBounds(bounds);
   }
 
+  /**
+   * Render detail, chosen by the frame rate rather than by a slider (which
+   * Rafael removed on 2026-11-07): full detail whenever the machine keeps
+   * up, a quarter less at a time while it does not, never below half.
+   *
+   * Frame intervals, not work times: the GPU's work is asynchronous and
+   * the interval is what the user sees. A display caps the interval at its
+   * refresh, so "fast" cannot be measured below it; instead, once detail
+   * has dropped, full detail is tried again after a run of steady frames,
+   * and each try that turns out slow doubles the wait before the next, so
+   * a machine at its limit settles instead of flickering between sizes.
+   */
+  private autoScale = 1;
+  private frameEMA = 1000 / 60;
+  private lastFrameAt = 0;
+  private slowRun = 0;
+  private steadyRun = 0;
+  private retryAfter = 240;
+
+  private adaptDetail(now: number) {
+    const interval = now - this.lastFrameAt;
+    this.lastFrameAt = now;
+    // A pause, a hidden tab or a dragged window says nothing about drawing.
+    if (interval <= 0 || interval > 250) return;
+    this.frameEMA += 0.1 * (interval - this.frameEMA);
+    const slow = this.frameEMA > 26; // under about 38 frames a second
+    this.slowRun = slow ? this.slowRun + 1 : 0;
+    this.steadyRun = this.frameEMA < 19 ? this.steadyRun + 1 : 0;
+    if (this.slowRun > 45 && this.autoScale > 0.5) {
+      this.setAutoScale(this.autoScale - 0.25);
+      this.retryAfter = Math.min(this.retryAfter * 2, 3840);
+    } else if (this.steadyRun > this.retryAfter && this.autoScale < 1) {
+      this.setAutoScale(this.autoScale + 0.25);
+    }
+  }
+
+  private setAutoScale(scale: number) {
+    this.autoScale = scale;
+    this.slowRun = 0;
+    this.steadyRun = 0;
+    this.frameEMA = 1000 / 60;
+    this.resizeToBox();
+  }
+
   private scheduleFrame() {
     if (this.animationFrame !== undefined) return;
-    const step = () => {
+    const step = (now: number) => {
       this.animationFrame = undefined;
       if (this.renderer === undefined || this.renderer.isContextLost) return;
       try {
         if (this.onScreen) {
           this.callbacks.beforeFrame?.();
           this.renderer.frame();
+          this.adaptDetail(now);
         }
       } catch (error) {
         // A context lost mid-frame is not a failure to report and tear down;

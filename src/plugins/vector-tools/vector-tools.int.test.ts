@@ -45,7 +45,7 @@ testWithPage(
     });
     expect(
       items.filter((item) => item.id?.startsWith(`${NAMESPACE}_`)).length
-    ).toBe(20);
+    ).toBe(21);
     expect(
       items.find((item) => item.id === `${NAMESPACE}_shafts`)
     ).toMatchObject({
@@ -84,14 +84,14 @@ testWithPage(
           }),
       NAMESPACE
     );
-    expect(semanticSnapshot).toHaveLength(20);
+    expect(semanticSnapshot).toHaveLength(21);
     expect(semanticSnapshot.filter((item) => item.hasError)).toEqual([]);
     await driver.click(GENERATE);
     await driver.waitForSync();
     items = (await driver.getState()).expressions.list;
     expect(
       items.filter((item) => item.id?.startsWith(`${NAMESPACE}_`))
-    ).toHaveLength(20);
+    ).toHaveLength(21);
 
     await driver.evaluate(
       (id) => Calc.setExpression({ id, latex: "y=x^2" }),
@@ -166,6 +166,21 @@ async function openTab(driver: Driver, id: PanelTab) {
   await driver.click(
     `.dsm-vector-tools-tabs .dcg-segmented-control-btn:nth-child(${index + 1})`
   );
+  // Draw folds its arrows and flow, and their fine-tuning, since 2026-11-07;
+  // the other tabs' tests look at what is folded, so are left as they open.
+  if (id === "draw") await unfoldPanel(driver);
+}
+
+/**
+ * Opens every folded section of the panel, so a test can reach the controls
+ * the 2026-11-07 reorganisation put under More, Arrows, Flow or a palette.
+ */
+async function unfoldPanel(driver: Driver) {
+  await driver.page.evaluate(() =>
+    document
+      .querySelectorAll<HTMLDetailsElement>(".dsm-vector-tools-body details")
+      .forEach((details) => (details.open = true))
+  );
 }
 
 testWithPage(
@@ -174,6 +189,8 @@ testWithPage(
     await driver.enablePlugin("vector-tools");
     await driver.assertSelectorEventually(BUTTON);
     await driver.click(BUTTON);
+    // The sampling domain is folded under its own summary since 2026-11-07.
+    await unfoldPanel(driver);
 
     // The panel opens on Field, and its sampling chips reflect stored state.
     expect(await driver.evaluate(selectedChip, "Sampling x by")).toBe("step");
@@ -211,7 +228,7 @@ testWithPage(
     await driver.waitForSync();
     expect((await storedConfig(driver)).domain.x.min).toBe(-4);
 
-    await openTab(driver, "arrows");
+    await openTab(driver, "draw");
     expect(await driver.evaluate(selectedChip, "Length mode")).toBe(
       "normalized"
     );
@@ -408,7 +425,7 @@ testWithPage(
     });
     expect(
       items.filter((item) => item.id?.startsWith(`${NAMESPACE}_`))
-    ).toHaveLength(21);
+    ).toHaveLength(22);
 
     // Nothing errors, and the derivative is Desmos's own, so it is exact
     // rather than approximated: ∇(x²+y²) = (2x, 2y).
@@ -498,6 +515,8 @@ testWithPage(
     // The open tab is persisted, so this test cannot assume the panel opens on
     // the tab that holds the sampling domain.
     await openTab(driver, "field");
+    // The sampling domain is folded under its summary since 2026-11-07.
+    await unfoldPanel(driver);
 
     await driver.evaluate(() =>
       Calc.setMathBounds({ left: -3, right: 7, bottom: -2, top: 5 })
@@ -549,7 +568,7 @@ testWithPageAndOpts(
     await driver.enablePlugin("vector-tools");
     await driver.assertSelectorEventually(BUTTON);
     await driver.click(BUTTON);
-    await openTab(driver, "flow");
+    await openTab(driver, "draw");
 
     await driver.click(VISUALIZE);
     await driver.assertSelectorEventually(FLOW_CANVAS);
@@ -591,7 +610,7 @@ testWithPageAndOpts(
     await driver.enablePlugin("vector-tools");
     await driver.assertSelectorEventually(BUTTON);
     await driver.click(BUTTON);
-    await openTab(driver, "flow");
+    await openTab(driver, "draw");
 
     // The 2D flow maps math coordinates onto the graph paper's rect, which a
     // rotatable box does not have; on 3D the Flow tab runs the 3D flow
@@ -615,7 +634,7 @@ testWithPageAndOpts(
       (await driver.getState()).expressions.list.filter((item) =>
         item.id?.startsWith(`${NAMESPACE}_`)
       )
-    ).toHaveLength(20);
+    ).toHaveLength(21);
 
     await driver.click(REMOVE);
     await driver.waitForSync();
@@ -631,7 +650,7 @@ testWithPage(
     await driver.enablePlugin("vector-tools");
     await driver.assertSelectorEventually(BUTTON);
     await driver.click(BUTTON);
-    await openTab(driver, "flow");
+    await openTab(driver, "draw");
 
     await driver.assertSelectorNot(FLOW_CANVAS);
     await driver.click(VISUALIZE);
@@ -779,9 +798,10 @@ testWithPage(
     expect(await litPixels()).toBeGreaterThan(full.buffer * 4);
 
     // Half the render scale is a quarter of the pixels, with the element and
-    // its layout untouched.
+    // its layout untouched. The scale is the flow's own since 2026-11-07,
+    // lowered while frames are slow; this sets it as a slow machine would.
     await driver.evaluate(() => {
-      (DSM.enabledPlugins["vector-tools"] as any).setFlow("renderScale", 0.5);
+      (DSM.enabledPlugins["vector-tools"] as any).flowOverlay.setAutoScale(0.5);
     });
     await new Promise((resolve) => setTimeout(resolve, 400));
     const halved = await canvasSize();
@@ -1176,14 +1196,21 @@ testWithPage(
         return { colorMode, palette };
       });
 
-    // The arrows' half is open by default and the flow's is closed.
+    // The arrows' half is open by default and the flow's is closed. Only
+    // those two: the tab has other folds (More, a palette) since 2026-11-07.
     expect(
       await driver.evaluate(() =>
         [
           ...document.querySelectorAll<HTMLDetailsElement>(
             ".dsm-vector-tools-menu details"
           ),
-        ].map((section) => section.open)
+        ]
+          .filter((section) =>
+            ["Arrows", "Flow particles"].includes(
+              section.querySelector("summary")?.textContent?.trim() ?? ""
+            )
+          )
+          .map((section) => section.open)
       )
     ).toEqual([true, false]);
 
@@ -1391,6 +1418,11 @@ testWithPage(
   "Vector Tools can keep its colours through the graph's reverse contrast",
   async (driver) => {
     await driver.enablePlugin("vector-tools");
+    // Stated, not inherited: settings reach storage asynchronously, so the
+    // previous test's last change can land after its page has closed.
+    await driver.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).setArrowMode("live")
+    );
     await driver.assertSelectorEventually(BUTTON);
     await driver.click(BUTTON);
 
@@ -1641,7 +1673,7 @@ testWithPage(
     await driver.assertSelectorEventually(BUTTON);
     await driver.click(BUTTON);
     await driver.assertSelector(PANEL);
-    await openTab(driver, "flow");
+    await openTab(driver, "draw");
 
     await driver.click(VISUALIZE);
     await driver.waitForFunction(() => DSM.vectorTools!.isFlowRunning);
@@ -1745,7 +1777,7 @@ testWithPage(
     await driver.click(BUTTON);
     await driver.assertSelector(PANEL);
 
-    await openTab(driver, "flow");
+    await openTab(driver, "draw");
     await driver.click(VISUALIZE);
     await driver.assertSelectorEventually(FLOW_CANVAS);
     await driver.assertSelectorEventually(ARROW_CANVAS);
@@ -1782,7 +1814,7 @@ testWithPage(
     await driver.waitForSync();
     expect(await order()).toEqual(under);
 
-    await openTab(driver, "flow");
+    await openTab(driver, "draw");
     await driver.click(VISUALIZE);
     await driver.waitForFunction(() => !DSM.delaySetPluginSettings);
     await driver.disablePlugin("vector-tools");

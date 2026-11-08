@@ -155,6 +155,24 @@
     margin-top: 6px;
   }
 
+  // The palette in use, on the line that opens the grid of them.
+  .dsm-vector-tools-palette-current {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    gap: 8px;
+    margin-bottom: 6px;
+
+    .dsm-vector-tools-label {
+      margin: 0;
+    }
+
+    .dsm-vector-tools-palette-swatch {
+      height: 14px;
+      width: 72px;
+    }
+  }
+
   .dsm-vector-tools-palette-group + .dsm-vector-tools-palette-group {
     margin-top: 7px;
   }
@@ -747,6 +765,27 @@
   gap: 4px;
   grid-template-columns: repeat(2, 64px);
   padding: 3px 6px;
+}
+
+// A preset's matrix on its chip: two rows of two, between brackets.
+.dsm-vector-tools-matrix-preset {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.dsm-vector-tools-mini-matrix {
+  border-left: 1.5px solid currentColor;
+  border-radius: 2px;
+  border-right: 1.5px solid currentColor;
+  display: inline-grid;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  gap: 0 5px;
+  grid-template-columns: repeat(2, auto);
+  line-height: 1.15;
+  padding: 0 3px;
+  text-align: center;
 }
 
 .dsm-vector-tools-matrix-cell {

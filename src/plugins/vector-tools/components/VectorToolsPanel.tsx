@@ -17,8 +17,7 @@ import {
   FLOW_PARTICLE_HEAVY,
   FLOW_PARTICLE_MAXIMUM,
   FLOW_PARTICLE_MINIMUM,
-  FLOW_RENDER_SCALE_MINIMUM,
-  PANEL_TABS,
+  panelTabsFor,
   CURVE_LINE_WIDTH_MAXIMUM,
   CURVE_LINE_WIDTH_MINIMUM,
   FLUID_CELLS_MAXIMUM,
@@ -30,6 +29,7 @@ import {
   fluidLatticeSize,
   lengthInputsFor,
   type FluidGuardMode,
+  type PanelTab,
   type FluidMode,
   type FluidShow,
   type FluidPrecision,
@@ -174,6 +174,13 @@ export class VectorToolsPanel extends Component<{
     const vectorTools = this.props.vectorTools();
     const config: ConfigGetter = () => vectorTools.getConfig();
     const validation = () => vectorTools.validation;
+    // The 3D calculator has no Fluid or Matrix tab. A tab saved on 2D that 3D
+    // lacks shows Draw there, without overwriting the saved choice.
+    const tabs = () => panelTabsFor(vectorTools.is3d);
+    const shownTab = (): PanelTab => {
+      const saved = vectorTools.getLibrary().panel.tab;
+      return tabs().some((tab) => tab.id === saved) ? saved : "draw";
+    };
 
     return (
       <div
@@ -188,25 +195,21 @@ export class VectorToolsPanel extends Component<{
         <div class="dsm-vector-tools-tabs">
           <SegmentedControl
             ariaGroupLabel="Vector Tools section"
-            names={() => PANEL_TABS.map((tab) => tab.label)}
+            names={() => tabs().map((tab) => tab.label)}
             selectedIndex={() =>
-              PANEL_TABS.findIndex(
-                (tab) => tab.id === vectorTools.getLibrary().panel.tab
-              )
+              tabs().findIndex((tab) => tab.id === shownTab())
             }
             setSelectedIndex={(index: number) =>
-              vectorTools.setPanelTab(PANEL_TABS[index].id)
+              vectorTools.setPanelTab(tabs()[index].id)
             }
           />
         </div>
 
         <div class="dsm-vector-tools-body">
-          {SwitchUnion(() => vectorTools.getLibrary().panel.tab, {
+          {SwitchUnion(shownTab, {
             field: () => fieldTab(vectorTools, config, validation),
-            arrows: () => arrowsTab(vectorTools, config),
+            draw: () => drawTab(vectorTools, config),
             color: () => colorTab(vectorTools, config),
-            curve: () => curveTab(vectorTools, config),
-            flow: () => flowTab(vectorTools, config),
             fluid: () => fluidTab(vectorTools, config),
             matrix: () => matrixTab(vectorTools),
           })}
@@ -337,29 +340,40 @@ function fieldTab(
         {() => timeControls(vectorTools)}
       </If>
 
-      <section class="dsm-vector-tools-section">
-        <div class="dsm-vector-tools-section-head">
-          <h3>Sampling domain</h3>
-          <Button
-            color="light-gray"
-            class="dsm-vector-tools-match-viewport"
-            onTap={() => vectorTools.matchDomainToViewport()}
-          >
-            Match viewport
-          </Button>
-        </div>
-        {/* Side by side where the panel is wide enough, stacked where it is
-            not. Two identical cards down the page were taking most of the tab
-            to hold six numbers, and the tab did not fit at its default size. */}
-        <div class="dsm-vector-tools-axes">
-          {axisControls(vectorTools, "x", config)}
-          {axisControls(vectorTools, "y", config)}
-        </div>
-        <div class="dsm-vector-tools-count">
-          Estimated vectors:{" "}
-          {() => validation().estimatedVectorCount.toLocaleString()}
-        </div>
-      </section>
+      {/* Where the arrows are sampled: set once and rarely touched, so it
+          is folded away (the 2026-11-07 reorganisation), with the count of
+          vectors it makes on the summary line. */}
+      <details class="dsm-vector-tools-more dsm-vector-tools-domain">
+        <summary>
+          Sampling domain ·{" "}
+          {() => validation().estimatedVectorCount.toLocaleString()} vectors
+        </summary>
+        <section class="dsm-vector-tools-section">
+          <div class="dsm-vector-tools-section-head">
+            <Button
+              color="light-gray"
+              class="dsm-vector-tools-match-viewport"
+              onTap={() => vectorTools.matchDomainToViewport()}
+            >
+              Match viewport
+            </Button>
+          </div>
+          {/* Side by side where the panel is wide enough, stacked where it is
+              not. Two identical cards down the page were taking most of the
+              tab to hold six numbers. */}
+          <div class="dsm-vector-tools-axes">
+            {axisControls(vectorTools, "x", config)}
+            {axisControls(vectorTools, "y", config)}
+          </div>
+          <div class="dsm-vector-tools-count">
+            Estimated vectors:{" "}
+            {() => validation().estimatedVectorCount.toLocaleString()}
+          </div>
+        </section>
+      </details>
+
+      {/* The curve was a tab of its own for one checkbox and its formula. */}
+      {curveTab(vectorTools, config)}
     </div>
   );
 }
@@ -425,6 +439,63 @@ function analysisSection(vectorTools: VectorTools) {
       )}
     </If>
   );
+}
+
+const DRAW_AS: readonly Choice<"arrows" | "flow" | "both">[] = [
+  { value: "arrows", label: "Arrows" },
+  { value: "flow", label: "Flow" },
+  { value: "both", label: "Arrows and flow" },
+];
+
+/**
+ * How the field is drawn: the arrows and the flow, which were two tabs
+ * until 2026-11-07. One choice at the top says which of them are on; each
+ * then has its own section, open while it is drawing, with what is rarely
+ * changed folded under More.
+ */
+function drawTab(vectorTools: VectorTools, config: ConfigGetter) {
+  return (
+    <div>
+      <section class="dsm-vector-tools-section">
+        {chipGroup(
+          "Draw as",
+          () => vectorTools.drawingAs as "arrows" | "flow" | "both",
+          DRAW_AS,
+          (value) => vectorTools.setDrawAs(value),
+          "dsm-vector-tools-draw-as"
+        )}
+      </section>
+      <details
+        class="dsm-vector-tools-more dsm-vector-tools-draw-arrows"
+        didMount={openWhile(() => vectorTools.arrowMode !== "off")}
+        onUpdate={openWhile(() => vectorTools.arrowMode !== "off")}
+      >
+        <summary>Arrows</summary>
+        {arrowsTab(vectorTools, config)}
+      </details>
+      <details
+        class="dsm-vector-tools-more dsm-vector-tools-draw-flow"
+        didMount={openWhile(() => vectorTools.isFlowRunning)}
+        onUpdate={openWhile(() => vectorTools.isFlowRunning)}
+      >
+        <summary>Flow</summary>
+        {flowTab(vectorTools, config)}
+      </details>
+    </div>
+  );
+}
+
+/**
+ * Opens a disclosure when what it holds starts drawing, and otherwise leaves
+ * it as the user left it. A property, not an `open` prop: DCGView writes
+ * props as attributes, and open="false" is still an open disclosure.
+ */
+function openWhile(active: () => boolean) {
+  return (element: HTMLDetailsElement) => {
+    const now = active();
+    if (now && element.dataset.active !== "true") element.open = true;
+    element.dataset.active = String(now);
+  };
 }
 
 function arrowsTab(vectorTools: VectorTools, config: ConfigGetter) {
@@ -553,29 +624,25 @@ function arrowSections2D(vectorTools: VectorTools, config: ConfigGetter) {
         </If>
       </section>
 
-      <section class="dsm-vector-tools-section">
-        <h3>Arrowhead</h3>
-        {sliderControl(
-          "dsm-vector-tools-arrowhead-size",
-          "Size",
-          () => config().arrowhead.size,
-          { minimum: 0.02, maximum: 1, step: 0.01, decimals: 2 },
-          (value) => vectorTools.setArrowhead("size", value)
-        )}
-        {sliderControl(
-          "dsm-vector-tools-arrowhead-angle",
-          "Angle (rad)",
-          () => config().arrowhead.angleRadians,
-          { minimum: 0.05, maximum: 1.5, step: 0.01, decimals: 2 },
-          (value) => vectorTools.setArrowhead("angleRadians", value)
-        )}
-        {chipGroup(
-          "Zero vectors",
-          () => config().zeroVectorMode,
-          ZERO_MODES,
-          (value) => vectorTools.setZeroVectorMode(value)
-        )}
-      </section>
+      <details class="dsm-vector-tools-more">
+        <summary>More</summary>
+        <section class="dsm-vector-tools-section">
+          <h3>Arrowhead</h3>
+          {sliderControl(
+            "dsm-vector-tools-arrowhead-size",
+            "Size",
+            () => config().arrowhead.size,
+            { minimum: 0.02, maximum: 1, step: 0.01, decimals: 2 },
+            (value) => vectorTools.setArrowhead("size", value)
+          )}
+          {chipGroup(
+            "Zero vectors",
+            () => config().zeroVectorMode,
+            ZERO_MODES,
+            (value) => vectorTools.setZeroVectorMode(value)
+          )}
+        </section>
+      </details>
     </div>
   );
 }
@@ -817,123 +884,129 @@ function space3dSections(vectorTools: VectorTools, config: ConfigGetter) {
         )}
       </If>
 
-      <section class="dsm-vector-tools-section">
-        {chipGroup(
-          "Colour scale",
-          () => (s().scaleAuto ? s().scaleRule : "manual"),
-          SCALES_3D,
-          (v) => {
-            if (v === "manual") set("scaleAuto", false);
-            else {
-              set("scaleRule", v);
-              set("scaleAuto", true);
+      {/* Refinements of the picture above: folded so the choices that
+          change what is drawn are the ones on screen. */}
+      <details class="dsm-vector-tools-more">
+        <summary>More</summary>
+        <section class="dsm-vector-tools-section">
+          {chipGroup(
+            "Colour scale",
+            () => (s().scaleAuto ? s().scaleRule : "manual"),
+            SCALES_3D,
+            (v) => {
+              if (v === "manual") set("scaleAuto", false);
+              else {
+                set("scaleRule", v);
+                set("scaleAuto", true);
+              }
             }
-          }
-        )}
-        <div class="dsm-vector-tools-hint">
-          From the field puts the median strength mid-ramp, which a pole cannot
-          move. From the box is the 2D rule, which leaves an inverse-square
-          field almost one colour.
-        </div>
-        <div class="dsm-vector-tools-number-grid">
-          {numberControl(
-            "dsm-vector-tools-3d-scale",
-            "Scale",
-            () =>
-              s().scaleAuto
-                ? round3(
-                    arrows()?.speedScale ?? volume()?.speedScale ?? s().scale
-                  )
-                : s().scale,
-            (v) => set("scale", Math.max(1e-9, v)),
-            () => s().scaleAuto
           )}
-        </div>
-        {checkboxControl(
-          "Fade with distance",
-          () => s().fog,
-          (v) => set("fog", v)
-        )}
-      </section>
+          <div class="dsm-vector-tools-hint">
+            From the field puts the median strength mid-ramp, which a pole
+            cannot move. From the box is the 2D rule, which leaves an
+            inverse-square field almost one colour.
+          </div>
+          <div class="dsm-vector-tools-number-grid">
+            {numberControl(
+              "dsm-vector-tools-3d-scale",
+              "Scale",
+              () =>
+                s().scaleAuto
+                  ? round3(
+                      arrows()?.speedScale ?? volume()?.speedScale ?? s().scale
+                    )
+                  : s().scale,
+              (v) => set("scale", Math.max(1e-9, v)),
+              () => s().scaleAuto
+            )}
+          </div>
+          {checkboxControl(
+            "Fade with distance",
+            () => s().fog,
+            (v) => set("fog", v)
+          )}
+        </section>
 
-      <section class="dsm-vector-tools-section">
-        {chipGroup(
-          "Behind a surface",
-          () => s().occlusion,
-          OCCLUSIONS_3D,
-          (v) => set("occlusion", v),
-          "dsm-vector-tools-3d-occlusion"
-        )}
-        <div class="dsm-vector-tools-hint">
-          Hidden and Faded redraw the surfaces you graphed, which Desmos cannot
-          share. Implicit surfaces cannot hide the field yet.
-        </div>
-        {checkboxControl(
-          "Auto surface detail (128 cells a side)",
-          () => s().meshAuto,
-          (v) => set("meshAuto", v)
-        )}
-        <If predicate={() => !s().meshAuto}>
-          {() => (
-            <div class="dsm-vector-tools-number-grid">
-              {numberControl(
-                "dsm-vector-tools-3d-mesh",
-                "Cells a side",
-                () => s().mesh,
-                (v) => set("mesh", Math.max(4, Math.round(v)))
-              )}
-            </div>
+        <section class="dsm-vector-tools-section">
+          {chipGroup(
+            "Behind a surface",
+            () => s().occlusion,
+            OCCLUSIONS_3D,
+            (v) => set("occlusion", v),
+            "dsm-vector-tools-3d-occlusion"
           )}
-        </If>
-        {checkboxControl(
-          "Clip to the box",
-          () => s().clip,
-          (v) => set("clip", v)
-        )}
-      </section>
+          <div class="dsm-vector-tools-hint">
+            Hidden and Faded redraw the surfaces you graphed, which Desmos
+            cannot share. Implicit surfaces cannot hide the field yet.
+          </div>
+          {checkboxControl(
+            "Auto surface detail (128 cells a side)",
+            () => s().meshAuto,
+            (v) => set("meshAuto", v)
+          )}
+          <If predicate={() => !s().meshAuto}>
+            {() => (
+              <div class="dsm-vector-tools-number-grid">
+                {numberControl(
+                  "dsm-vector-tools-3d-mesh",
+                  "Cells a side",
+                  () => s().mesh,
+                  (v) => set("mesh", Math.max(4, Math.round(v)))
+                )}
+              </div>
+            )}
+          </If>
+          {checkboxControl(
+            "Clip to the box",
+            () => s().clip,
+            (v) => set("clip", v)
+          )}
+        </section>
 
-      <section class="dsm-vector-tools-section">
-        {chipGroup(
-          "Cut away",
-          () => s().cutaway,
-          CUTAWAYS_3D,
-          (v) => set("cutaway", v),
-          "dsm-vector-tools-3d-cutaway"
-        )}
-        <If predicate={() => s().cutaway === "wedge"}>
-          {() => (
-            <div>
-              {sliderControl(
-                "dsm-vector-tools-3d-cut-angle",
-                "Slice angle (°)",
-                () => s().cutAngle * DEGREES,
-                { minimum: 20, maximum: 180, step: 5, decimals: 0 },
-                (v) => set("cutAngle", v / DEGREES)
-              )}
-              {chipGroup(
-                "Slice",
-                () => (s().cutTurn === null ? "facing" : "fixed"),
-                [
-                  { value: "facing", label: "Faces you" },
-                  { value: "fixed", label: "Fixed in the box" },
-                ],
-                (v) => vectorTools.setCakeSliceFixed(v === "fixed")
-              )}
-              <If predicate={() => s().cutTurn !== null}>
-                {() =>
-                  sliderControl(
-                    "dsm-vector-tools-3d-cut-turn",
-                    "Points to (°)",
-                    () => ((((s().cutTurn ?? 0) * DEGREES) % 360) + 360) % 360,
-                    { minimum: 0, maximum: 360, step: 1, decimals: 0 },
-                    (v) => set("cutTurn", v / DEGREES)
-                  )
-                }
-              </If>
-            </div>
+        <section class="dsm-vector-tools-section">
+          {chipGroup(
+            "Cut away",
+            () => s().cutaway,
+            CUTAWAYS_3D,
+            (v) => set("cutaway", v),
+            "dsm-vector-tools-3d-cutaway"
           )}
-        </If>
-      </section>
+          <If predicate={() => s().cutaway === "wedge"}>
+            {() => (
+              <div>
+                {sliderControl(
+                  "dsm-vector-tools-3d-cut-angle",
+                  "Slice angle (°)",
+                  () => s().cutAngle * DEGREES,
+                  { minimum: 20, maximum: 180, step: 5, decimals: 0 },
+                  (v) => set("cutAngle", v / DEGREES)
+                )}
+                {chipGroup(
+                  "Slice",
+                  () => (s().cutTurn === null ? "facing" : "fixed"),
+                  [
+                    { value: "facing", label: "Faces you" },
+                    { value: "fixed", label: "Fixed in the box" },
+                  ],
+                  (v) => vectorTools.setCakeSliceFixed(v === "fixed")
+                )}
+                <If predicate={() => s().cutTurn !== null}>
+                  {() =>
+                    sliderControl(
+                      "dsm-vector-tools-3d-cut-turn",
+                      "Points to (°)",
+                      () =>
+                        ((((s().cutTurn ?? 0) * DEGREES) % 360) + 360) % 360,
+                      { minimum: 0, maximum: 360, step: 1, decimals: 0 },
+                      (v) => set("cutTurn", v / DEGREES)
+                    )
+                  }
+                </If>
+              </div>
+            )}
+          </If>
+        </section>
+      </details>
     </div>
   );
 }
@@ -1003,27 +1076,6 @@ function colorTab(vectorTools: VectorTools, config: ConfigGetter) {
         (checked) => vectorTools.setMatchFlowColor(checked),
         "dsm-vector-tools-match-colors"
       )}
-      {checkboxControl(
-        "Keep these colors when the graph is in reverse contrast",
-        () => vectorTools.keepColorsInReverseContrast,
-        (checked) => vectorTools.setKeepColorsInReverseContrast(checked),
-        "dsm-vector-tools-keep-colors"
-      )}
-      {/* Reverse contrast is `filter: invert(1)` on an ancestor of both overlay
-          canvases, so the field inverts with the page unless it is inverted a
-          second time. Says which of the two situations it is in, because a
-          checkbox that does nothing right now is worth explaining rather than
-          hiding — the graph setting it depends on lives somewhere else. */}
-      <div class="dsm-vector-tools-hint">
-        {() =>
-          vectorTools.graphReversesContrast
-            ? vectorTools.keepColorsInReverseContrast
-              ? "The graph is reversed and the field is keeping its own colors."
-              : "The graph is reversed, so the field is reversed with it."
-            : "Only applies while Desmos's reverse contrast is on. Ticked, a dark graph keeps a bright field."
-        }
-      </div>
-
       <details class="dsm-vector-tools-more" open>
         <summary>Arrows</summary>
         {chipGroup(
@@ -1031,20 +1083,6 @@ function colorTab(vectorTools: VectorTools, config: ConfigGetter) {
           () => color().mode,
           COLOR_MODES,
           (value) => vectorTools.setColor("mode", value)
-        )}
-        {sliderControl(
-          "dsm-vector-tools-arrow-saturation",
-          "Saturation",
-          () => color().saturation,
-          SATURATION_RANGE,
-          (value) => vectorTools.setColor("saturation", value)
-        )}
-        {sliderControl(
-          "dsm-vector-tools-arrow-contrast",
-          "Contrast",
-          () => color().contrast,
-          CONTRAST_RANGE,
-          (value) => vectorTools.setColor("contrast", value)
         )}
         <If predicate={usesPalette}>
           {() => (
@@ -1083,6 +1121,23 @@ function colorTab(vectorTools: VectorTools, config: ConfigGetter) {
             </div>
           )}
         </If>
+        <details class="dsm-vector-tools-more">
+          <summary>More</summary>
+          {sliderControl(
+            "dsm-vector-tools-arrow-saturation",
+            "Saturation",
+            () => color().saturation,
+            SATURATION_RANGE,
+            (value) => vectorTools.setColor("saturation", value)
+          )}
+          {sliderControl(
+            "dsm-vector-tools-arrow-contrast",
+            "Contrast",
+            () => color().contrast,
+            CONTRAST_RANGE,
+            (value) => vectorTools.setColor("contrast", value)
+          )}
+        </details>
       </details>
 
       <details class="dsm-vector-tools-more dsm-vector-tools-flow-colors">
@@ -1190,6 +1245,29 @@ function colorTab(vectorTools: VectorTools, config: ConfigGetter) {
           </section>
         )}
       </If>
+      <details class="dsm-vector-tools-more">
+        <summary>Reverse contrast</summary>
+        {checkboxControl(
+          "Keep these colors when the graph is in reverse contrast",
+          () => vectorTools.keepColorsInReverseContrast,
+          (checked) => vectorTools.setKeepColorsInReverseContrast(checked),
+          "dsm-vector-tools-keep-colors"
+        )}
+        {/* Reverse contrast is `filter: invert(1)` on an ancestor of both overlay
+          canvases, so the field inverts with the page unless it is inverted a
+          second time. Says which of the two situations it is in, because a
+          checkbox that does nothing right now is worth explaining rather than
+          hiding — the graph setting it depends on lives somewhere else. */}
+        <div class="dsm-vector-tools-hint">
+          {() =>
+            vectorTools.graphReversesContrast
+              ? vectorTools.keepColorsInReverseContrast
+                ? "The graph is reversed and the field is keeping its own colors."
+                : "The graph is reversed, so the field is reversed with it."
+              : "Only applies while Desmos's reverse contrast is on. Ticked, a dark graph keeps a bright field."
+          }
+        </div>
+      </details>
     </div>
   );
 }
@@ -1881,18 +1959,6 @@ function flowTab2D(vectorTools: VectorTools, config: ConfigGetter) {
             )
           }
         </If>
-        {sliderControl(
-          "dsm-vector-tools-flow-render-scale",
-          "Render detail (lower is faster)",
-          () => flow().renderScale,
-          {
-            minimum: FLOW_RENDER_SCALE_MINIMUM,
-            maximum: 1,
-            step: 0.05,
-            decimals: 2,
-          },
-          (value) => vectorTools.setFlow("renderScale", value)
-        )}
       </details>
     </div>
   );
@@ -2506,6 +2572,12 @@ function matrixTab(vectorTools: VectorTools) {
           (value) => m.setKind(value),
           "dsm-vector-tools-matrix-kind"
         )}
+      </section>
+
+      {/* How the graph is redrawn: the exact route is the default and
+          right for nearly everything, so the choice is folded away. */}
+      <details class="dsm-vector-tools-more">
+        <summary>More: how the graph is drawn</summary>
         {chipGroup(
           "Drawing the graph",
           () => c().route,
@@ -2526,7 +2598,7 @@ function matrixTab(vectorTools: VectorTools) {
           (value) => m.setDetail(value),
           "dsm-vector-tools-matrix-detail"
         )}
-      </section>
+      </details>
 
       <section class="dsm-vector-tools-section">
         {IfElse(linear, {
@@ -2560,10 +2632,16 @@ function matrixTab(vectorTools: VectorTools) {
                       (value) => m.setExpressionName(value)
                     )}
                     <div class="dsm-vector-tools-hint">
-                      Define it in the list as a 2×2 matrix, for example
-                      A=[[1,1],[0,1]] in text or with the matrix template. Its
-                      value is the one Desmos computed, so a slider inside it
-                      moves the whole graph.
+                      Define it in the list as a 2×2 matrix with Desmos's matrix
+                      template, for example A ={" "}
+                      <span class="dsm-vector-tools-mini-matrix">
+                        <span>1</span>
+                        <span>1</span>
+                        <span>0</span>
+                        <span>1</span>
+                      </span>
+                      . Its value is the one Desmos computed, so a slider inside
+                      it moves the whole graph.
                     </div>
                   </div>
                 ),
@@ -2600,14 +2678,49 @@ function matrixTab(vectorTools: VectorTools) {
 
       <section class="dsm-vector-tools-section">
         {IfElse(linear, {
-          true: () =>
-            chipGroup(
-              "Presets",
-              () => c().presetId,
-              LINEAR_PRESETS.map((p) => ({ value: p.id, label: p.name })),
-              (id) => m.loadPreset(id),
-              "dsm-vector-tools-matrix-presets"
-            ),
+          // Each with its matrix, drawn as a matrix: what the preset does is
+          // those four numbers, and [[1,2],[3,4]] written as nested lists
+          // was not how anyone reads one (Rafael, 2026-11-07).
+          true: () => (
+            <div
+              class="dsm-vector-tools-chips"
+              id="dsm-vector-tools-matrix-presets"
+              role="group"
+              aria-label="Presets"
+            >
+              <div class="dsm-vector-tools-label">Presets</div>
+              <div class="dsm-vector-tools-chip-row">
+                {LINEAR_PRESETS.map((preset) => (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    data-value={preset.id}
+                    class={() => ({
+                      "dsm-vector-tools-chip": true,
+                      "dsm-vector-tools-matrix-preset": true,
+                      "dsm-vector-tools-chip-selected":
+                        c().presetId === preset.id,
+                    })}
+                    aria-pressed={() =>
+                      c().presetId === preset.id ? "true" : "false"
+                    }
+                    aria-label={`${preset.name}: ${preset.entries.join(", ")}`}
+                    onTap={() => m.loadPreset(preset.id)}
+                  >
+                    {preset.name}
+                    <span
+                      class="dsm-vector-tools-mini-matrix"
+                      aria-hidden="true"
+                    >
+                      {preset.entries.map((entry) => (
+                        <span>{String(entry).replace("-", "−")}</span>
+                      ))}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ),
           false: () =>
             chipGroup(
               "Presets",
@@ -3651,14 +3764,26 @@ function paletteChooser(
   // swatch built once would stop tracking the sliders the moment they moved.
   adjust: () => ColorAdjust = () => NO_COLOR_ADJUST
 ) {
+  // Folded to the palette in use, swatch and name, since 2026-11-07: the
+  // full grid of every swatch is one click away, and the tab is no longer a
+  // wall of them while nobody is choosing.
   return (
-    <div
+    <details
       class="dsm-vector-tools-palettes"
       id={id}
       role="group"
       aria-label={label}
     >
-      <div class="dsm-vector-tools-label">{label}</div>
+      <summary class="dsm-vector-tools-palette-current">
+        <span class="dsm-vector-tools-label">{label}</span>
+        <span
+          class="dsm-vector-tools-palette-swatch"
+          style={() => ({ background: paletteCSSGradient(value(), adjust()) })}
+        />
+        <span class="dsm-vector-tools-palette-name">
+          {() => PALETTES[value()].name}
+        </span>
+      </summary>
       {PALETTE_GROUPS.map((group) => (
         <div class="dsm-vector-tools-palette-group">
           <div class="dsm-vector-tools-palette-group-label">{group.label}</div>
@@ -3692,7 +3817,7 @@ function paletteChooser(
           </div>
         </div>
       ))}
-    </div>
+    </details>
   );
 }
 

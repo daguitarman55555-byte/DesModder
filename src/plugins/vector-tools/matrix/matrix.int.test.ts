@@ -77,6 +77,12 @@ async function openMatrixTab(driver: Driver) {
     `.dsm-vector-tools-tabs .dcg-segmented-control-btn:nth-child(${index + 1})`
   );
   await driver.waitForSelector('[data-vector-tools="matrix"]');
+  // The drawing method is folded under More since 2026-11-07.
+  await driver.page.evaluate(() =>
+    document
+      .querySelectorAll<HTMLDetailsElement>(".dsm-vector-tools-body details")
+      .forEach((details) => (details.open = true))
+  );
 }
 
 /** Waits for Desmos to finish evaluating and for the tab to settle. */

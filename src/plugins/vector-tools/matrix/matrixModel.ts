@@ -161,7 +161,7 @@ export const LINEAR_PRESETS: readonly LinearPreset[] = [
   },
   {
     id: "general",
-    name: "[[1,2],[3,4]]",
+    name: "General",
     entries: [1, 2, 3, 4],
     takeaway:
       "A general matrix mixes all of these. Two real directions survive, one flipped (λ < 0), so det is negative.",

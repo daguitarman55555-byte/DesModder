@@ -37,9 +37,10 @@ type VectorFieldPurpose =
   | "arrow end x coordinates"
   | "arrow end y coordinates"
   | "color list"
+  | "arrow start points"
+  | "arrow end points"
   | "shafts"
-  | "first arrowhead wing"
-  | "second arrowhead wing"
+  | "arrowheads"
   | "zero vector markers"
   | "animation clock"
   | "parametric curve"
@@ -146,10 +147,15 @@ const GENERATED_SUFFIXES = [
   "end_x",
   "end_y",
   "colors",
+  "starts",
+  "ends",
   "shafts",
+  "heads",
+  "zero_points",
+  // The two wings each arrowhead was before 2026-11-07. No longer written,
+  // but still removed, so a graph generated before then cleans up whole.
   "head_1",
   "head_2",
-  "zero_points",
 ] as const;
 
 export function allGeneratedIDs(config: VectorFieldConfig): string[] {
@@ -380,6 +386,7 @@ export function createVectorFieldPlan(
     secret: opts.secret,
     color: opts.color,
     colorLatex: opts.colorLatex,
+    ...(opts.style === undefined ? {} : { style: opts.style }),
   });
 
   const xSamples = axisSamplesLatex(
@@ -403,35 +410,34 @@ export function createVectorFieldPlan(
     config.length.compression
   );
   const colorLatex = colorListLatex(config.color.mode, config, symbols);
-  const nonZeroRestriction = `\\left\\{${symbols.magnitude}>${numberLatex(
-    ZERO_VECTOR_TOLERANCE
-  )}\\right\\}`;
   const zeroRestriction = `\\left\\{${symbols.magnitude}\\le${numberLatex(
     ZERO_VECTOR_TOLERANCE
   )}\\right\\}`;
   const headSize = numberLatex(config.arrowhead.size);
   const headAngle = numberLatex(config.arrowhead.angleRadians);
-  const shaftLatex = parametricSegmentLatex(
-    symbols.gridX,
-    symbols.gridY,
-    symbols.endX,
-    symbols.endY,
-    nonZeroRestriction
-  );
-  const head1Latex = arrowheadWingLatex(
-    symbols,
-    headSize,
-    headAngle,
-    "-",
-    nonZeroRestriction
-  );
-  const head2Latex = arrowheadWingLatex(
-    symbols,
-    headSize,
-    headAngle,
-    "+",
-    nonZeroRestriction
-  );
+  // Desmos's own geometry, not parametrics. Each arrow was three curves in
+  // t ∈ [0, 1] (shaft and two wings), and Desmos samples every parametric
+  // adaptively: 273 arrows were 819 sampled curves. One list of two-vertex
+  // polygons (each drawn as its edge, a straight segment) and one of filled
+  // triangles are drawn exactly, and the heads now match the live arrows'
+  // filled ones (Rafael, 2026-11-07: "load faster"). Not `segment`: the
+  // graphing calculator refuses it ("does not support the 'segment'
+  // function", measured 2026-11-07); it belongs to the geometry tool.
+  //
+  // A zero vector's start and end are undefined rather than filtered out, so
+  // every list keeps one entry per arrow and the colour list, which Desmos
+  // only takes as it was written (see the int test on colorLatex), stays in
+  // step with them.
+  const pointsLatex = (symbol: string, x: string, y: string) =>
+    `${symbol}=\\left\\{${symbols.magnitude}>${numberLatex(
+      ZERO_VECTOR_TOLERANCE
+    )}:\\left(${x},${y}\\right)\\right\\}`;
+  const shaftLatex = `\\operatorname{polygon}\\left(${symbols.starts},${symbols.ends}\\right)`;
+  const wing = (sign: "+" | "-") => {
+    const angle = `\\left(${symbols.direction}${sign}${headAngle}\\right)`;
+    return `${symbols.ends}-${headSize}\\left(\\cos${angle},\\sin${angle}\\right)`;
+  };
+  const headsLatex = `\\operatorname{polygon}\\left(${symbols.ends},${wing("-")},${wing("+")}\\right)`;
   const zeroLatex = `\\left(${symbols.gridX},${symbols.gridY}\\right)${zeroRestriction}`;
 
   // Only gradient fields carry the scalar function; a component field would
@@ -561,20 +567,26 @@ export function createVectorFieldPlan(
         `${symbols.endY}=${symbols.gridY}+${symbols.displayV}`
       ),
       expression("colors", "color list", colorLatex),
+      expression(
+        "starts",
+        "arrow start points",
+        pointsLatex(symbols.starts, symbols.gridX, symbols.gridY)
+      ),
+      expression(
+        "ends",
+        "arrow end points",
+        pointsLatex(symbols.ends, symbols.endX, symbols.endY)
+      ),
       expression("shafts", "shafts", shaftLatex, {
         hidden: false,
         color: config.color.fixedColor,
         colorLatex: symbols.colors,
       }),
-      expression("head_1", "first arrowhead wing", head1Latex, {
+      expression("heads", "arrowheads", headsLatex, {
         hidden: false,
         color: config.color.fixedColor,
         colorLatex: symbols.colors,
-      }),
-      expression("head_2", "second arrowhead wing", head2Latex, {
-        hidden: false,
-        color: config.color.fixedColor,
-        colorLatex: symbols.colors,
+        style: { fill: true, fillOpacity: "1" },
       }),
       expression("zero_points", "zero vector markers", zeroLatex, {
         hidden: config.zeroVectorMode === "hide",
@@ -682,6 +694,8 @@ function createSymbols(config: Pick<VectorFieldConfig, "id" | "symbolToken">) {
     endX: symbol("ex"),
     endY: symbol("ey"),
     colors: symbol("c"),
+    starts: symbol("s"),
+    ends: symbol("e"),
     // The clock a time-varying field is rewritten onto. See `renameIdentifier`.
     time: symbol("t"),
   };
@@ -817,37 +831,6 @@ function paletteColorLatex(
  */
 function divergingColorLatex(t: string, adjust: ColorAdjust) {
   return paletteLatex("blue-red", t, numberLatex, adjust);
-}
-
-function parametricSegmentLatex(
-  startX: string,
-  startY: string,
-  endX: string,
-  endY: string,
-  restriction: string
-) {
-  return `\\left(${startX}+t\\left(${endX}-${startX}\\right),${startY}+t\\left(${endY}-${startY}\\right)\\right)\\left\\{0\\le t\\le1\\right\\}${restriction}`;
-}
-
-/**
- * A wing runs backwards from the arrow tip, rotated off the arrow direction by
- * ±the arrowhead angle. Emitting it directly (rather than as a generic segment
- * between two points) keeps the generated expression short enough to stay
- * readable when a user opens the folder.
- */
-function arrowheadWingLatex(
-  symbols: ReturnType<typeof createSymbols>,
-  headSize: string,
-  headAngle: string,
-  sign: "+" | "-",
-  restriction: string
-) {
-  const angle = `\\left(${symbols.direction}${sign}${headAngle}\\right)`;
-  return (
-    `\\left(${symbols.endX}-t\\cdot ${headSize}\\cos${angle},` +
-    `${symbols.endY}-t\\cdot ${headSize}\\sin${angle}\\right)` +
-    `\\left\\{0\\le t\\le1\\right\\}${restriction}`
-  );
 }
 
 function clamp01(value: string) {
