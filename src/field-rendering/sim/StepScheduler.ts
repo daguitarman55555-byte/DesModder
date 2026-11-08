@@ -26,7 +26,22 @@
  *   burst that would freeze the page. The frame still gets one ordinary
  *   frame's worth of steps, so a machine whose every frame is slow keeps
  *   moving, slower than real time, instead of stopping dead.
+ * - **A time budget** (docs/VECTOR_TOOLS_AIRFLOW_PLAN.md, step 1). The step
+ *   cap was a count, 64, whatever a step cost: a 1024-cell tank ran 183 ms
+ *   frames, 6 fps. The cap now follows the frames: while the smoothed frame
+ *   interval runs past 40 ms after frames of several steps, it is cut by
+ *   30%; while it is under 25 ms and steps are owed, it grows by one. A 30
+ *   Hz display (33 ms) or a jittery one averaging under 40 ms never moves
+ *   it, so at any ordinary frame rate the physics is exactly as before.
  */
+
+/**
+ * The time budget's thresholds, on the smoothed frame interval: past 40 ms
+ * (under 25 fps, slower than any display's own rhythm, 30 Hz included) the
+ * step cap is cut; under 25 ms it may grow.
+ */
+const SLOW_FRAME_MS = 40;
+const SMOOTH_FRAME_MS = 25;
 
 /** What a frame after a stall is credited with, in milliseconds. */
 const STALL_CREDIT_MS = 1000 / 30;
@@ -77,6 +92,11 @@ export class StepScheduler {
   /** Recent frames' times and simulated seconds, for the real-time factor. */
   private history: { at: number; simulated: number }[] = [];
   private stalls = 0;
+  /** The step cap the time budget has settled on; see the file comment. */
+  private cap: number;
+  /** The frame interval, smoothed: one long frame is jitter, many are load. */
+  private intervalEMA = 1000 / 60;
+  private lastSteps = 0;
 
   constructor(options: StepSchedulerOptions) {
     this.stepSeconds = positive(options.stepSeconds, "stepSeconds");
@@ -87,6 +107,28 @@ export class StepScheduler {
     );
     this.stallMs =
       positive(options.stallSeconds ?? 0.25, "stallSeconds") * 1000;
+    this.cap = this.maxStepsPerFrame;
+  }
+
+  /** The most steps a frame may run now, under the time budget. */
+  get stepCap() {
+    return this.cap;
+  }
+
+  /**
+   * Moves the cap by the last frame interval: cut when the frame after
+   * several steps ran long against the display's rhythm, grown by one when
+   * frames keep the rhythm while steps are owed.
+   */
+  private budget(interval: number, wasBehind: boolean) {
+    this.intervalEMA += 0.15 * (interval - this.intervalEMA);
+    if (this.intervalEMA > SLOW_FRAME_MS && this.lastSteps > 1) {
+      this.cap = Math.max(1, Math.floor(this.cap * 0.7));
+      // Judged afresh at the new cap, not against frames run at the old one.
+      this.intervalEMA = SMOOTH_FRAME_MS;
+    } else if (this.intervalEMA < SMOOTH_FRAME_MS && wasBehind) {
+      this.cap = Math.min(this.maxStepsPerFrame, this.cap + 1);
+    }
   }
 
   /** Starts or resumes. Time spent paused is never caught up. */
@@ -153,6 +195,8 @@ export class StepScheduler {
       this.stalls++;
       this.segmentStart = now - STALL_CREDIT_MS;
       this.segmentSteps = 0;
+    } else if (previous !== undefined && now > previous) {
+      this.budget(now - previous, this.wasBehind);
     }
     if (this.segmentStart === undefined) {
       this.segmentStart = now;
@@ -164,7 +208,8 @@ export class StepScheduler {
     // boundary, give or take a rounding, counts that step at every frame rate.
     const target = Math.floor((elapsed * this.speed) / this.stepSeconds + 1e-9);
     const owed = Math.max(0, target - this.segmentSteps);
-    const steps = Math.min(owed, this.maxStepsPerFrame);
+    const steps = Math.min(owed, this.cap);
+    this.lastSteps = steps;
     this.segmentSteps += steps;
     this.totalSteps += steps;
     this.simulatedSeconds += steps * this.stepSeconds;
@@ -188,8 +233,11 @@ export class StepScheduler {
     ) {
       this.history.shift();
     }
+    this.wasBehind = behind;
     return this.plan(steps, behind);
   }
+
+  private wasBehind = false;
 
   private plan(steps: number, behind: boolean): FramePlan {
     return {

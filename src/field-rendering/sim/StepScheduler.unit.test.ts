@@ -158,3 +158,37 @@ describe("a fixed-step schedule", () => {
     );
   });
 });
+
+describe("the time budget", () => {
+  test("a tank too big for the GPU settles at a usable frame rate, slower than real time", () => {
+    // Each frame takes 2 ms plus 2.5 ms a step: the 64-step cap made 162 ms
+    // frames, the 6 fps the 2026-10-13 stress run measured at 1024 cells.
+    const scheduler = new StepScheduler({ stepSeconds: 1 / 6000 });
+    scheduler.play();
+    let now = 0;
+    let plan = scheduler.frame(now);
+    const intervals: number[] = [];
+    while (now < 6000) {
+      const interval = 2 + 2.5 * plan.steps;
+      now += interval;
+      intervals.push(interval);
+      plan = scheduler.frame(now);
+    }
+    const recent = intervals.slice(-30);
+    const mean = recent.reduce((a, b) => a + b, 0) / recent.length;
+    expect(mean).toBeLessThan(45);
+    expect(scheduler.stepCap).toBeLessThan(64);
+    // Said, not hidden: the simulation is behind real time.
+    expect(plan.realTimeFactor).toBeLessThan(1);
+  });
+
+  test("a 30 Hz display with a fast GPU keeps every step", () => {
+    const scheduler = new StepScheduler({ stepSeconds: 1 / 600 });
+    scheduler.play();
+    let plan = scheduler.frame(0);
+    for (let now = 1000 / 30; now <= 3000; now += 1000 / 30)
+      plan = scheduler.frame(now);
+    expect(scheduler.stepCap).toBe(64);
+    expect(plan.realTimeFactor).toBeCloseTo(1, 1);
+  });
+});
