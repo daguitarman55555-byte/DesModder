@@ -10,6 +10,7 @@ import {
 } from "../../field-rendering/gallery";
 import {
   fieldLinesLatex,
+  frameOf,
   traceFieldLines,
   type PointCharge,
 } from "../../field-rendering/gallery/charge-lines";
@@ -212,6 +213,9 @@ function sceneItemHidden(item: SceneItem, mode: DemoMode) {
 function sceneItemColor(item: SceneItem, mode: DemoMode) {
   return mode === "majestic" ? (item.majesticColor ?? item.color) : item.color;
 }
+
+/** The observer of the view that retraces the field lines. */
+const LINES_VIEW_KEY = "graphpaperBounds.vectorToolsLines";
 
 /** The folder of a preset's hidden helpers, last and folded. */
 const HELPERS_GROUP = "helpers";
@@ -987,6 +991,15 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     });
     // Components live in the expression list once the field is generated, so
     // an edit there has to flow back into the panel and the visualizer.
+    // The field lines fill the view, so a zoom or a pan past what was
+    // traced traces again; writeChargeLines decides whether it has to.
+    this.calc.observe(LINES_VIEW_KEY, () => {
+      if (
+        this.cc.getItemModel(sceneItemID({ key: "linesx", latex: "" })) !==
+        undefined
+      )
+        this.scheduleChargeLines(this.graphParameterValues);
+    });
     this.dispatcherID = this.cc.dispatcher.register((event) => {
       // The presets window is mounted outside Desmos's views, so it redraws
       // on the same tick the panel does.
@@ -1459,6 +1472,35 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   private chargeLinesValues?: ReadonlyMap<string, number>;
   /** How long the last retrace took, tracing and writing, in ms. */
   private chargeLinesCost = 0;
+  /** The view the lines were last traced for. */
+  private chargeLinesView?: {
+    left: number;
+    right: number;
+    bottom: number;
+    top: number;
+  };
+
+  /**
+   * The view to trace the field lines for: the last one while what is on
+   * screen is still inside it and its margin, at much the same zoom, so a
+   * small pan does not retrace; else the view on screen now.
+   */
+  private chargeLinesViewFor(extent: number) {
+    const b = this.calc.graphpaperBounds.mathCoordinates;
+    const now = { left: b.left, right: b.right, bottom: b.bottom, top: b.top };
+    if (![now.left, now.right, now.bottom, now.top].every(Number.isFinite))
+      return this.chargeLinesView;
+    const last = this.chargeLinesView;
+    if (last === undefined) return now;
+    const ratio = (now.right - now.left) / (last.right - last.left);
+    const frame = frameOf({ extent, view: last });
+    const covered =
+      now.left >= frame.left &&
+      now.right <= frame.right &&
+      now.bottom >= frame.bottom &&
+      now.top <= frame.top;
+    return covered && ratio < 1.5 && ratio > 1 / 1.5 ? last : now;
+  }
 
   /**
    * Retraces the loaded preset's field lines (`chargeLines`) when its
@@ -1523,13 +1565,15 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       if (q === undefined || x === undefined || y === undefined) continue;
       charges.push({ q, x, y });
     }
-    const key = JSON.stringify([on, charges]);
+    const view = this.chargeLinesViewFor(spec.extent);
+    const key = JSON.stringify([on, charges, view]);
     if (key === this.chargeLinesKey) return false;
     this.chargeLinesKey = key;
+    this.chargeLinesView = view;
     // Off, the lists are emptied rather than kept: nothing reads them, and
     // a graph shared with them hidden should not carry thousands of points.
     const [xLatex, yLatex] = on
-      ? fieldLinesLatex(traceFieldLines(charges, spec))
+      ? fieldLinesLatex(traceFieldLines(charges, { ...spec, view }))
       : [String.raw`\left[\right]`, String.raw`\left[\right]`];
     this.calc.setExpressions([
       { id: xs, latex: `L_{xvt}=${xLatex}` },
@@ -2131,6 +2175,9 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   }
 
   afterDisable() {
+    this.calc.unobserve(LINES_VIEW_KEY);
+    if (this.chargeLinesTimer !== undefined)
+      clearTimeout(this.chargeLinesTimer);
     this.restoreDemoAxes();
     if (this.flowRefreshTimer !== undefined)
       clearTimeout(this.flowRefreshTimer);

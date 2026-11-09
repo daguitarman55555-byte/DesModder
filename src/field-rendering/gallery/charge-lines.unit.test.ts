@@ -99,16 +99,50 @@ describe("traceFieldLines", () => {
     for (let i = 0; i < lines.xs.length; i++)
       if (Math.abs(lines.xs[i]) < 7 && Math.abs(lines.ys[i]) < 7)
         points.push([lines.xs[i], lines.ys[i]]);
-    // Every visible point has a point near its mirror image, as far as a
-    // line's points are spaced.
+    // Every visible point's mirror image lies on a drawn line: near one of
+    // its segments, not merely near one of its points, which depends on
+    // where along the curve the points happen to have been kept.
+    const segs = segments(lines.xs, lines.ys);
+    const toSegment = (
+      px: number,
+      py: number,
+      [x0, y0, x1, y1]: [number, number, number, number]
+    ) => {
+      const dx = x1 - x0;
+      const dy = y1 - y0;
+      const t = Math.max(
+        0,
+        Math.min(1, ((px - x0) * dx + (py - y0) * dy) / (dx * dx + dy * dy))
+      );
+      return Math.hypot(px - x0 - t * dx, py - y0 - t * dy);
+    };
     let worst = 0;
     for (const [x, y] of points) {
       let best = Infinity;
-      for (const [u, v] of points)
-        best = Math.min(best, Math.hypot(u + x, v - y));
+      for (const seg of segs) best = Math.min(best, toSegment(-x, y, seg));
       worst = Math.max(worst, best);
     }
-    expect(worst).toBeLessThan(0.45);
+    // Within a twentieth of a unit, two pixels: the same curve.
+    expect(worst).toBeLessThan(0.05);
+  });
+
+  test("zoomed out, the lines reach the edges of the view", () => {
+    // Rafael's ten (2026-11-09): two of −5 inside eight of +5, seen from
+    // ±40 by ±23. The lines stopped at ±13, a square in the middle.
+    const x = [-2.5, 2.5, 5.5, 2.3, -2.3, -5.5, -5.5, -2.3, 2.3, 5.5];
+    const y = [0, 0, 2.3, 5.5, 5.5, 2.3, -2.3, -5.5, -5.5, -2.3];
+    const charges = x.map((cx, i) => ({ q: i < 2 ? -5 : 5, x: cx, y: y[i] }));
+    const view = { left: -40, right: 40, bottom: -23, top: 23 };
+    const lines = traceFieldLines(charges, { radius: 0.4, extent: 10, view });
+    const fx = lines.xs.filter(Number.isFinite);
+    const fy = lines.ys.filter(Number.isFinite);
+    expect(Math.min(...fx)).toBeLessThan(view.left);
+    expect(Math.max(...fx)).toBeGreaterThan(view.right);
+    expect(Math.min(...fy)).toBeLessThan(view.bottom);
+    expect(Math.max(...fy)).toBeGreaterThan(view.top);
+    // No dearer than the preset's own view: the spacing grows with it.
+    const near = traceFieldLines(charges, { radius: 0.4, extent: 10 });
+    expect(lines.xs.length).toBeLessThan(1.5 * near.xs.length);
   });
 
   test("a lone negative charge sends its lines back out", () => {

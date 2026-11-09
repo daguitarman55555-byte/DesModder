@@ -28,8 +28,15 @@ export interface PointCharge {
 export interface FieldLineOptions {
   /** A charge's drawn radius: lines start on it and end when they reach one. */
   radius: number;
-  /** Lines stop once they leave the square |x|, |y| ≤ this. */
+  /** The picture's half-width, when no `view` is given: |x|, |y| ≤ this. */
   extent: number;
+  /**
+   * What the graph shows: the lines fill it, and a margin round it so a
+   * small pan needs no retrace (Rafael, 2026-11-09: "field lines should
+   * fill up this entire region before cutting off"). Steps and the spacing
+   * of the points written scale with it, so zoomed out costs no more.
+   */
+  view?: { left: number; right: number; bottom: number; top: number };
   /** Lines per unit of charge. */
   perUnit?: number;
   /** The most lines in all, whatever the charges. */
@@ -93,14 +100,57 @@ function insideCharge(
  * its points and the charge it ended in, or −1 if it left the picture or
  * stalled where the field vanishes.
  */
+/** Where lines are drawn, and how finely, from the options. */
+interface Frame {
+  left: number;
+  right: number;
+  bottom: number;
+  top: number;
+  /** The picture's size against the preset's 20 units across. */
+  scale: number;
+  /** The frame's half-size: past it, steps lengthen with the distance. */
+  half: number;
+}
+
+/** The view, or ±extent, widened by half its size each way. */
+export function frameOf(options: FieldLineOptions): Frame {
+  const e = options.extent;
+  const v = options.view ?? { left: -e, right: e, bottom: -e, top: e };
+  const w = v.right - v.left;
+  const h = v.top - v.bottom;
+  // A quarter of the view each way: a pan that small keeps the lines as
+  // they are; at half, every retrace drew four times the view, and ten
+  // charges took 4,000 points and up to 90 ms (2026-11-09).
+  const margin = options.view === undefined ? 0.15 : 0.25;
+  const frame = {
+    left: v.left - margin * w,
+    right: v.right + margin * w,
+    bottom: v.bottom - margin * h,
+    top: v.top + margin * h,
+  };
+  return {
+    ...frame,
+    scale: Math.max(w, h) / 20,
+    half: Math.max(
+      Math.abs(frame.left),
+      Math.abs(frame.right),
+      Math.abs(frame.bottom),
+      Math.abs(frame.top)
+    ),
+  };
+}
+
 function trace(
   charges: readonly PointCharge[],
   start: readonly [number, number],
   from: number,
   sign: number,
-  options: Required<FieldLineOptions>
+  options: Required<Omit<FieldLineOptions, "view">>,
+  frame: Frame
 ) {
-  const { radius, extent, maxSteps } = options;
+  const { radius, maxSteps } = options;
+  const extent = frame.half;
+  const s = frame.scale;
   // Followed well past the picture, not cut at its edge: a dipole's outer
   // lines leave the view and come back round to the negative charge. Cut
   // at 1.25 × the extent, they never arrived, and the negative charge made
@@ -128,7 +178,15 @@ function trace(
   for (const c of charges)
     spread = Math.max(spread, Math.hypot(c.x - cx, c.y - cy));
   const escapes = sign * net > 0;
-  const far = Math.max(1.5 * extent, 3 * spread);
+  // Out past every corner of the frame, so an escaping line crosses all of
+  // what is drawn before it stops.
+  const far = Math.max(
+    Math.hypot(
+      Math.max(Math.abs(frame.left - cx), Math.abs(frame.right - cx)),
+      Math.max(Math.abs(frame.bottom - cy), Math.abs(frame.top - cy))
+    ),
+    3 * spread
+  );
   let [x, y] = start;
   const xs = [x];
   const ys = [y];
@@ -146,7 +204,7 @@ function trace(
       nearest = Math.min(nearest, Math.hypot(x - c.x, y - c.y));
     // Out past the picture, where nothing is drawn finely, the steps
     // lengthen with the distance, so a long loop costs few of them.
-    const cap = nearest > extent ? 0.1 * nearest : 0.25;
+    const cap = nearest > extent ? 0.1 * nearest : 0.25 * s;
     const h = Math.min(cap, Math.max(0.01, 0.15 * nearest));
     const k1 = direction(charges, x, y, sign);
     if (k1 === undefined) return { xs, ys, end: -1 };
@@ -210,7 +268,7 @@ function trace(
     // about forty pixels in the preset's view, so 0.12 is five: a chord
     // that short, bent by six degrees, is off the curve by under a pixel.
     const moved = Math.hypot(x - lastKept[0], y - lastKept[1]);
-    if (moved > 0.8 || (moved > 0.12 && turned(xs, ys, x, y))) {
+    if (moved > 0.8 * s || (moved > 0.12 * s && turned(xs, ys, x, y))) {
       xs.push(x);
       ys.push(y);
       lastKept = [x, y];
@@ -246,7 +304,7 @@ export function traceFieldLines(
   charges: readonly PointCharge[],
   options: FieldLineOptions
 ): FieldLines {
-  const o: Required<FieldLineOptions> = {
+  const o: Required<Omit<FieldLineOptions, "view">> = {
     // Ten a unit charge: eight looked sparse round a ±1 pair (Rafael,
     // 2026-11-09). Ten charges of ±1 are a hundred lines, 2 ms to trace.
     perUnit: 10,
@@ -268,12 +326,14 @@ export function traceFieldLines(
   // far outside it is followed (it decides where the line comes back) but
   // not drawn, so it is a gap in the list: Desmos parses every number
   // written, and parsing, not tracing, was most of a retrace (2026-11-09).
-  const box = o.extent * 1.3;
+  const frame = frameOf(options);
   const inside = (line: { xs: number[]; ys: number[] }, k: number) =>
     k >= 0 &&
     k < line.xs.length &&
-    Math.abs(line.xs[k]) <= box &&
-    Math.abs(line.ys[k]) <= box;
+    line.xs[k] >= frame.left &&
+    line.xs[k] <= frame.right &&
+    line.ys[k] >= frame.bottom &&
+    line.ys[k] <= frame.top;
   const add = (line: { xs: number[]; ys: number[] }) => {
     if (line.xs.length < 2) return;
     const vx: number[] = [];
@@ -313,7 +373,7 @@ export function traceFieldLines(
     // A start ring a whisker outside the disc, so the first step does not
     // count as arriving back in it.
     for (const s of starts(c, count(c), o.radius * 1.02, 0)) {
-      const line = trace(used, s, i, 1, o);
+      const line = trace(used, s, i, 1, o, frame);
       if (line.end >= 0) {
         const e = used[line.end];
         arrived[line.end].push(
@@ -340,7 +400,7 @@ export function traceFieldLines(
         c.x + o.radius * 1.02 * Math.cos(a),
         c.y + o.radius * 1.02 * Math.sin(a),
       ] as const;
-      const line = trace(used, s, i, -1, o);
+      const line = trace(used, s, i, -1, o, frame);
       // One that runs into a positive charge duplicates a line already
       // traced out of it.
       if (line.end >= 0 && used[line.end].q > 0) continue;

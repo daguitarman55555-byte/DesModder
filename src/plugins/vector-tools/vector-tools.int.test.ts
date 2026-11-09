@@ -2609,6 +2609,79 @@ testWithPage(
 );
 
 testWithPage(
+  "zoomed out, the charges' field lines fill the view",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await resetLibrary(driver);
+    await driver.evaluate(() =>
+      (window as any).DSM.enabledPlugins["vector-tools"].applyGalleryPreset(
+        "charges",
+        true
+      )
+    );
+    await driver.waitForSync();
+    // Rafael's arrangement and view (2026-11-09): q1, q2 = −5 and eight
+    // of +5 round them, seen from ±40 by ±23.
+    await driver.evaluate(() => {
+      Calc.setExpressions([
+        { id: "vector_tools_variables_Nq", latex: "N_{q}=10" },
+        ...Array.from({ length: 10 }, (_, i) => ({
+          id: `vector_tools_variables_q${i + 1}`,
+          latex: `q_{${i + 1}}=${i < 2 ? -5 : 5}`,
+        })),
+      ]);
+      Calc.setMathBounds({ left: -40, right: 40, bottom: -23, top: 23 });
+    });
+    await driver.waitForSync();
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    const reach = await driver.evaluate(() => {
+      const { list } = Calc.getState().expressions;
+      const nums = (id: string) => {
+        const { latex } = list.find((e) => e.id === id) as { latex: string };
+        return latex
+          .slice(latex.indexOf("=") + 1)
+          .replace(/\\left\[|\\right\]/g, "")
+          .split(",")
+          .map((t) => (t.includes("frac") ? NaN : Number(t)))
+          .filter(Number.isFinite);
+      };
+      const xs = nums("vector_tools_variables_object_linesx");
+      const ys = nums("vector_tools_variables_object_linesy");
+      return {
+        points: xs.length,
+        left: Math.min(...xs),
+        right: Math.max(...xs),
+        bottom: Math.min(...ys),
+        top: Math.max(...ys),
+        errors: [
+          "vector_tools_variables_object_linesx",
+          "vector_tools_variables_object_linesy",
+          "vector_tools_variables_object_lines",
+        ].filter(
+          (id) =>
+            (Calc.controller.getItemModel(id) as { error?: unknown })?.error !==
+            undefined
+        ),
+      };
+    });
+    expect(reach.errors).toEqual([]);
+    expect(reach.left).toBeLessThan(-40);
+    expect(reach.right).toBeGreaterThan(40);
+    expect(reach.bottom).toBeLessThan(-23);
+    expect(reach.top).toBeGreaterThan(23);
+    expect(reach.points).toBeLessThan(4000);
+    await driver.page.screenshot({
+      path: "docs/assets/vector-tools-charge-lines-zoomed-out.png",
+    });
+
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);
+
+testWithPage(
   "a preset's Desmos arrows wait in a hidden folder, N_arrows a side, and its field lines follow charges after it closes",
   async (driver) => {
     await driver.enablePlugin("vector-tools");
