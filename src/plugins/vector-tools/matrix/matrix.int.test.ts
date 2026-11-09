@@ -158,7 +158,7 @@ matrixTest(
       plugin.matrix.loadPreset("shear");
       plugin.matrix.setRoute("exact");
     });
-    await driver.click('[data-vector-tools="matrix-on"]');
+    await driver.click('#dsm-vector-tools-matrix-on [data-value="on"]');
     await settle(driver);
 
     // Exact: every original is hidden and a copy in the tab's folder stands
@@ -238,7 +238,7 @@ matrixTest(
     await shotOfGraph(driver, "docs/assets/matrix-shear-redraw.png");
 
     // Off: the list is exactly what it was before the tab was touched.
-    await driver.click('[data-vector-tools="matrix-on"]');
+    await driver.click('#dsm-vector-tools-matrix-on [data-value="off"]');
     await settle(driver);
     expect(await listOf(driver)).toBe(before);
     expect(

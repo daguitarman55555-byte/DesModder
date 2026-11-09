@@ -181,6 +181,12 @@ export interface GalleryPreset {
    * the flow faint and under Desmos's objects, which carry the picture.
    */
   onPaper?: boolean;
+  /**
+   * Field lines of the point charges (`point-charges.ts`), traced by the
+   * plugin as the charges move and written into the scene's `linesx` and
+   * `linesy` lists; see `charge-lines.ts`. 2D only.
+   */
+  chargeLines?: { radius: number; extent: number };
   /** Numbers that move with the clock, worked out each frame. */
   clockParameters?: ClockParameters;
   /** The speed the 2D colour ramp spans, where Auto's would not suit. */

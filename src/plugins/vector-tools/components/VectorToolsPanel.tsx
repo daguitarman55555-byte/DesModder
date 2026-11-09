@@ -441,10 +441,11 @@ function analysisSection(vectorTools: VectorTools) {
   );
 }
 
-const DRAW_AS: readonly Choice<"arrows" | "flow" | "both">[] = [
+const DRAW_AS: readonly Choice<"arrows" | "flow" | "both" | "none">[] = [
   { value: "arrows", label: "Arrows" },
   { value: "flow", label: "Flow" },
   { value: "both", label: "Arrows and flow" },
+  { value: "none", label: "Off" },
 ];
 
 /**
@@ -459,11 +460,23 @@ function drawTab(vectorTools: VectorTools, config: ConfigGetter) {
       <section class="dsm-vector-tools-section">
         {chipGroup(
           "Draw as",
-          () => vectorTools.drawingAs as "arrows" | "flow" | "both",
+          () => vectorTools.drawingAs,
           DRAW_AS,
           (value) => vectorTools.setDrawAs(value),
           "dsm-vector-tools-draw-as"
         )}
+        {/* A flow that could not start says why here, not inside the Flow
+            section, which stays folded while the flow is not running. */}
+        <If predicate={() => vectorTools.flowMessage !== ""}>
+          {() => (
+            <div
+              class="dsm-vector-tools-warning"
+              data-vector-tools="draw-as-error"
+            >
+              {() => vectorTools.flowMessage}
+            </div>
+          )}
+        </If>
       </section>
       <details
         class="dsm-vector-tools-more dsm-vector-tools-draw-arrows"
@@ -1964,10 +1977,12 @@ function flowTab2D(vectorTools: VectorTools, config: ConfigGetter) {
   );
 }
 
+// Off last, as in Draw as and the Matrix tab: every tab that draws is
+// switched off from the same place.
 const FLUID_MODES: readonly Choice<FluidMode>[] = [
-  { value: "off", label: "Off" },
   { value: "windTunnel", label: "Wind tunnel" },
   { value: "stirredBox", label: "Stirred box" },
+  { value: "off", label: "Off" },
 ];
 
 const FLUID_SPEED_MODES: readonly Choice<FluidSpeedMode>[] = [
@@ -2519,6 +2534,11 @@ const sub = (n: number) =>
  * because the course's language and the mathematics behind it have different
  * readers.
  */
+const MATRIX_ON_OFF: readonly Choice<"on" | "off">[] = [
+  { value: "on", label: "On" },
+  { value: "off", label: "Off" },
+];
+
 function matrixTab(vectorTools: VectorTools) {
   const m = vectorTools.matrix;
   const c = () => m.config;
@@ -2526,31 +2546,21 @@ function matrixTab(vectorTools: VectorTools) {
   return (
     <div class="dsm-vector-tools-matrix" data-vector-tools="matrix">
       <section class="dsm-vector-tools-section">
-        <div class="dsm-vector-tools-matrix-switch">
-          <div>
-            <div class="dsm-vector-tools-matrix-switch-title">
-              {() => (c().on ? "Transforming the graph" : "Graph as typed")}
-            </div>
-            <div class="dsm-vector-tools-hint">
-              {() =>
-                c().on
-                  ? "Everything on the graph is drawn through the map. Turn it off to see the graph exactly as typed."
-                  : "Turn it on to send every curve, point and shaded region through the map."
-              }
-            </div>
-          </div>
-          <span
-            role="switch"
-            tabIndex={0}
-            aria-label="Transform the graph"
-            class={() => ({
-              "dsm-vector-tools-toggle": true,
-              "dsm-vector-tools-toggle-on": c().on,
-            })}
-            aria-checked={() => (c().on ? "true" : "false")}
-            data-vector-tools="matrix-on"
-            onTap={() => m.setOn(!c().on)}
-          />
+        {/* On and Off as chips, the same as Draw as and Simulate, so every
+            tab that draws something is switched off the same way. */}
+        {chipGroup(
+          "Transform the graph",
+          () => (c().on ? "on" : "off"),
+          MATRIX_ON_OFF,
+          (value) => m.setOn(value === "on"),
+          "dsm-vector-tools-matrix-on"
+        )}
+        <div class="dsm-vector-tools-hint">
+          {() =>
+            c().on
+              ? "Everything on the graph is drawn through the map. Off shows the graph exactly as typed."
+              : "On sends every curve, point and shaded region through the map."
+          }
         </div>
         <For each={() => m.status} key={(note: string) => note}>
           {(note: () => string) => (

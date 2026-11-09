@@ -166,8 +166,18 @@ export class CalculatorExpressionAdapter implements DesmosExpressionAdapter {
     );
 
     const insertionIndex = firstOwnedIndex(state.expressions.list, namespace);
+    // A folder already in the graph keeps whatever the user left it as:
+    // a rewrite (a palette change rewrites the arrows) must not fold one
+    // they opened to read.
+    const existing = owned.find((item) => item.id === folder.id) as
+      | FolderState
+      | undefined;
     const generated: ItemState[] = [
-      folderState(folder),
+      folderState(
+        existing === undefined
+          ? folder
+          : { ...folder, collapsed: existing.collapsed }
+      ),
       ...expressions.map(expressionState),
     ];
     state.expressions.list =

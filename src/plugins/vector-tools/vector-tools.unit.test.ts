@@ -460,6 +460,7 @@ describe("Vector Tools field configuration", () => {
   test("rejects incomplete fields and unsafe sampling while requiring a warning confirmation", () => {
     const invalid = cloneDefaultConfig();
     invalid.components.xLatex = "x+";
+    invalid.domain.x.mode = "step";
     invalid.domain.x.step = 0;
     invalid.color.rangeMode = "manual";
     invalid.color.minimum = 1;

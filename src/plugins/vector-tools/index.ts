@@ -5,6 +5,17 @@ import { PresetWindow } from "./components/PresetWindow";
 import { mountToNode, unmountFromNode, type MountedComponent } from "#DCGView";
 import { GALLERY_CATEGORIES, sceneParts } from "../../field-rendering/gallery";
 import {
+  fieldLinesLatex,
+  traceFieldLines,
+  type PointCharge,
+} from "../../field-rendering/gallery/charge-lines";
+import {
+  chargeAt,
+  chargeName,
+  COUNT,
+  MAX_CHARGES,
+} from "../../field-rendering/gallery/point-charges";
+import {
   CalculatorExpressionAdapter,
   type GeneratedExpressionSpec,
   type GeneratedItemSnapshot,
@@ -714,7 +725,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   /** The graph's own values, before the clock parameters are added. */
   private graphParameterValues: ReadonlyMap<string, number> = new Map();
   private arrowMessage = "";
-  private flowMessage = "";
+  flowMessage = "";
   private flowRefreshTimer?: ReturnType<typeof setTimeout>;
   /** The field signature the running simulation was compiled from. */
   private lastFlowSignature?: string;
@@ -1262,12 +1273,71 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     this.setParameterValues(values);
   }
 
+  private chargeLinesKey = "";
+  private chargeLinesTimer?: ReturnType<typeof setTimeout>;
+  private chargeLinesValues?: ReadonlyMap<string, number>;
+
+  /**
+   * Retraces the loaded preset's field lines (`chargeLines`) when its
+   * charges have moved. Coalesced, not debounced, like the environment
+   * refresh: a charge being dragged reports every frame, and the lines
+   * should follow it, at most about twenty times a second.
+   */
+  private scheduleChargeLines(values: ReadonlyMap<string, number>) {
+    this.chargeLinesValues = values;
+    if (this.chargeLinesTimer !== undefined) return;
+    this.chargeLinesTimer = setTimeout(() => {
+      this.chargeLinesTimer = undefined;
+      if (this.dispatching()) {
+        this.scheduleChargeLines(this.chargeLinesValues ?? new Map());
+        return;
+      }
+      this.writeChargeLines();
+    }, 50);
+  }
+
+  private writeChargeLines() {
+    const values = this.chargeLinesValues;
+    if (values === undefined || this.cc.is3dProduct()) return;
+    const preset = galleryPreset(this.activePresetId ?? "");
+    const spec = preset?.chargeLines;
+    if (preset === undefined || spec === undefined) return;
+    const xs = sceneItemID({ key: "linesx", latex: "" });
+    const ys = sceneItemID({ key: "linesy", latex: "" });
+    if (this.cc.getItemModel(xs) === undefined) return;
+    const read = (name: string) => values.get(canonicalIdentifier(name));
+    const on = read("s_{lines}") !== 0;
+    const count = Math.round(read(COUNT) ?? 0);
+    const charges: PointCharge[] = [];
+    for (let i = 1; i <= Math.min(count, MAX_CHARGES); i++) {
+      const [X, Y] = chargeAt(i);
+      const q = read(chargeName(i));
+      const x = read(X);
+      const y = read(Y);
+      if (q === undefined || x === undefined || y === undefined) continue;
+      charges.push({ q, x, y });
+    }
+    const key = JSON.stringify([on, charges]);
+    if (key === this.chargeLinesKey) return;
+    this.chargeLinesKey = key;
+    // Off, the lists are emptied rather than kept: nothing reads them, and
+    // a graph shared with them hidden should not carry thousands of points.
+    const [xLatex, yLatex] = on
+      ? fieldLinesLatex(traceFieldLines(charges, spec))
+      : [String.raw`\left[\right]`, String.raw`\left[\right]`];
+    this.calc.setExpressions([
+      { id: xs, latex: `L_{xvt}=${xLatex}` },
+      { id: ys, latex: `L_{yvt}=${yLatex}` },
+    ]);
+  }
+
   /**
    * Hands the values to whatever is drawing: the graph's, with the clock
    * parameters' values at this instant.
    */
   private setParameterValues(values: ReadonlyMap<string, number>) {
     this.graphParameterValues = values;
+    this.scheduleChargeLines(values);
     const clock = this.clockParameterValues();
     if (clock.size > 0) values = new Map([...values, ...clock]);
     this.parameterValues = values;
@@ -2754,6 +2824,9 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   applyGalleryPreset(id: string, withLook: boolean) {
     const preset = galleryPreset(id);
     if (preset === undefined) return;
+    // The scene is written afresh with empty line lists, so trace again
+    // even if the charges are where they were.
+    this.chargeLinesKey = "";
     // Before the field: it is written in these names, and compiling it
     // before the graph defines them would fail.
     this.loadPresetVariables(
@@ -3612,12 +3685,15 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
    * Draws the field as arrows, as the flow, or both. Arrows switched back on
    * come back live; a graph that used Desmos-expression arrows keeps them.
    */
-  setDrawAs(choice: "arrows" | "flow" | "both") {
-    const arrows = choice !== "flow";
-    const flow = choice !== "arrows";
+  setDrawAs(choice: "arrows" | "flow" | "both" | "none") {
+    const arrows = choice === "arrows" || choice === "both";
+    const flow = choice === "flow" || choice === "both";
     if (arrows && this.arrowMode === "off") this.setArrowMode("live");
     if (!arrows && this.arrowMode !== "off") this.setArrowMode("off");
     if (flow !== this.isFlowRunning) this.toggleFlow();
+    // A flow that failed to start and is no longer asked for has nothing
+    // left to explain.
+    if (!flow) this.flowMessage = "";
     this.util.tick();
   }
 

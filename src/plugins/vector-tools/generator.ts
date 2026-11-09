@@ -39,6 +39,11 @@ type VectorFieldPurpose =
   | "color list"
   | "arrow start points"
   | "arrow end points"
+  | "color range"
+  | "color positions"
+  | "arrow lengths"
+  | "arrowhead lengths"
+  | "arrowhead half widths"
   | "shafts"
   | "arrowheads"
   | "zero vector markers"
@@ -147,8 +152,14 @@ const GENERATED_SUFFIXES = [
   "end_x",
   "end_y",
   "colors",
+  "color_low",
+  "color_high",
+  "color_t",
   "starts",
   "ends",
+  "lengths",
+  "head_lengths",
+  "head_halves",
   "shafts",
   "heads",
   "zero_points",
@@ -371,6 +382,9 @@ export function createVectorFieldPlan(
   const folder: GeneratedFolderSpec = {
     id: `${namespace}_folder`,
     title: `Vector Tools — ${config.name}`,
+    // Folded: open, the expression list drew every one of the twenty-odd
+    // rows, each with a preview of its thousand-element list.
+    collapsed: true,
   };
   const expression = (
     suffix: string,
@@ -414,7 +428,6 @@ export function createVectorFieldPlan(
     ZERO_VECTOR_TOLERANCE
   )}\\right\\}`;
   const headSize = numberLatex(config.arrowhead.size);
-  const headAngle = numberLatex(config.arrowhead.angleRadians);
   // Desmos's own geometry, not parametrics. Each arrow was three curves in
   // t ∈ [0, 1] (shaft and two wings), and Desmos samples every parametric
   // adaptively: 273 arrows were 819 sampled curves. One list of two-vertex
@@ -433,10 +446,20 @@ export function createVectorFieldPlan(
       ZERO_VECTOR_TOLERANCE
     )}:\\left(${x},${y}\\right)\\right\\}`;
   const shaftLatex = `\\operatorname{polygon}\\left(${symbols.starts},${symbols.ends}\\right)`;
-  const wing = (sign: "+" | "-") => {
-    const angle = `\\left(${symbols.direction}${sign}${headAngle}\\right)`;
-    return `${symbols.ends}-${headSize}\\left(\\cos${angle},\\sin${angle}\\right)`;
-  };
+  // Each head sized by its own arrow, as the live arrows' are (Rafael,
+  // 2026-11-08): as long as the arrowhead size, but never more than 0.45 of
+  // the arrow, and no wider than half of it, so a short vector keeps a shaft
+  // instead of becoming a triangle on a dot. ArrowRenderer's vertex shader
+  // is the same rule.
+  // Both as fractions of the arrow's own displayed vector (du, dv), so the
+  // wings are ends − hl·(du, dv) ± hw·(−dv, du): no angle, no trig, two
+  // multiplies a wing for each arrow.
+  const R = String.raw;
+  const lengthLatex = R`${symbols.lengths}=\sqrt{${symbols.displayU}^{2}+${symbols.displayV}^{2}}`;
+  const headLengthLatex = R`${symbols.headLengths}=\min\left(${headSize},0.45${symbols.lengths}\right)/${symbols.lengths}`;
+  const headHalfLatex = R`${symbols.headHalves}=\min\left(${symbols.headLengths}\cdot${numberLatex(Math.tan(config.arrowhead.angleRadians))},0.5\right)`;
+  const wing = (sign: "+" | "-") =>
+    R`${symbols.ends}-${symbols.headLengths}\left(${symbols.displayU},${symbols.displayV}\right)${sign}${symbols.headHalves}\left(-${symbols.displayV},${symbols.displayU}\right)`;
   const headsLatex = `\\operatorname{polygon}\\left(${symbols.ends},${wing("-")},${wing("+")}\\right)`;
   const zeroLatex = `\\left(${symbols.gridX},${symbols.gridY}\\right)${zeroRestriction}`;
 
@@ -566,7 +589,10 @@ export function createVectorFieldPlan(
         "arrow end y coordinates",
         `${symbols.endY}=${symbols.gridY}+${symbols.displayV}`
       ),
-      expression("colors", "color list", colorLatex),
+      ...colorLatex.helpers.map((h) =>
+        expression(h.suffix, h.purpose, h.latex)
+      ),
+      expression("colors", "color list", colorLatex.latex),
       expression(
         "starts",
         "arrow start points",
@@ -577,6 +603,9 @@ export function createVectorFieldPlan(
         "arrow end points",
         pointsLatex(symbols.ends, symbols.endX, symbols.endY)
       ),
+      expression("lengths", "arrow lengths", lengthLatex),
+      expression("head_lengths", "arrowhead lengths", headLengthLatex),
+      expression("head_halves", "arrowhead half widths", headHalfLatex),
       expression("shafts", "shafts", shaftLatex, {
         hidden: false,
         color: config.color.fixedColor,
@@ -696,6 +725,12 @@ function createSymbols(config: Pick<VectorFieldConfig, "id" | "symbolToken">) {
     colors: symbol("c"),
     starts: symbol("s"),
     ends: symbol("e"),
+    lengths: symbol("l"),
+    colorLow: symbol("cl"),
+    colorHigh: symbol("ch"),
+    colorT: symbol("ct"),
+    headLengths: symbol("hl"),
+    headHalves: symbol("hw"),
     // The clock a time-varying field is rewritten onto. See `renameIdentifier`.
     time: symbol("t"),
   };
@@ -755,21 +790,59 @@ function colorListLatex(
     mode === "log-magnitude"
       ? `\\ln\\left(1+\\max\\left(${symbols.magnitude},0\\right)\\right)`
       : symbols.magnitude;
-  const rangeMin =
-    config.color.rangeMode === "manual"
-      ? numberLatex(config.color.minimum)
-      : `\\min\\left(${actualMagnitude}\\right)`;
-  const rangeMax =
-    config.color.rangeMode === "manual"
-      ? numberLatex(config.color.maximum)
-      : `\\max\\left(${actualMagnitude}\\right)`;
-  const rangeT = clamp01(
-    `\\left(${actualMagnitude}-${rangeMin}\\right)/\\max\\left(${rangeMax}-${rangeMin},${numberLatex(ZERO_VECTOR_TOLERANCE)}\\right)`
-  );
-  const componentT = (component: string) =>
-    clamp01(
-      `\\left(${component}+\\max\\left(\\max\\left(${component}\\right),-\\min\\left(${component}\\right),${numberLatex(ZERO_VECTOR_TOLERANCE)}\\right)\\right)/\\left(2\\max\\left(\\max\\left(${component}\\right),-\\min\\left(${component}\\right),${numberLatex(ZERO_VECTOR_TOLERANCE)}\\right)\\right)`
+  // The ramp position is its own list, and the range it spans its own two
+  // numbers. Written inline, the palette's formula repeated the position
+  // once per stop and channel (about twenty times), each copy with its own
+  // min and max over every arrow: most of the colour list's cost.
+  const tol = numberLatex(ZERO_VECTOR_TOLERANCE);
+  const helpers: {
+    suffix: string;
+    purpose: VectorFieldPurpose;
+    latex: string;
+  }[] = [];
+  const auto = config.color.rangeMode !== "manual";
+  const rangeMin = auto ? symbols.colorLow : numberLatex(config.color.minimum);
+  const rangeMax = auto ? symbols.colorHigh : numberLatex(config.color.maximum);
+  const position = (latex: string) => {
+    helpers.push({
+      suffix: "color_t",
+      purpose: "color positions",
+      latex: `${symbols.colorT}=${clamp01(latex)}`,
+    });
+    return symbols.colorT;
+  };
+  const rangeT = () => {
+    if (auto)
+      helpers.push(
+        {
+          suffix: "color_low",
+          purpose: "color range",
+          // The 5th to the 95th percentile, not min to max: a field with a
+          // singularity (a charge, a vortex core) has a few arrows a hundred
+          // times the rest, and min to max put every other arrow at the
+          // bottom of the ramp, one colour (Rafael, 2026-11-08).
+          latex: `${symbols.colorLow}=\\operatorname{quantile}\\left(${actualMagnitude},0.05\\right)`,
+        },
+        {
+          suffix: "color_high",
+          purpose: "color range",
+          latex: `${symbols.colorHigh}=\\operatorname{quantile}\\left(${actualMagnitude},0.95\\right)`,
+        }
+      );
+    return position(
+      `\\left(${actualMagnitude}-${rangeMin}\\right)/\\max\\left(${rangeMax}-${rangeMin},${tol}\\right)`
     );
+  };
+  const componentT = (component: string) => {
+    helpers.push({
+      suffix: "color_high",
+      purpose: "color range",
+      latex: `${symbols.colorHigh}=\\max\\left(\\operatorname{quantile}\\left(\\left|${component}\\right|,0.95\\right),${tol}\\right)`,
+    });
+    return position(
+      `\\left(${component}+${symbols.colorHigh}\\right)/\\left(2${symbols.colorHigh}\\right)`
+    );
+  };
   // The generated arrows go through the same saturation and contrast the live
   // ones do. Two ways of drawing one field that disagree about its colours
   // would make switching between them look like changing the field.
@@ -803,10 +876,15 @@ function colorListLatex(
       break;
     case "magnitude":
     case "log-magnitude":
-      colorExpression = paletteColorLatex(config.color.palette, rangeT, adjust);
+      colorExpression = paletteColorLatex(
+        config.color.palette,
+        rangeT(),
+        adjust
+      );
       break;
   }
-  return `${symbols.colors}=${colorExpression}`;
+  // Fixed and direction read no range, and push none.
+  return { latex: `${symbols.colors}=${colorExpression}`, helpers };
 }
 
 /** The saturation and contrast this field's colours are drawn at. */

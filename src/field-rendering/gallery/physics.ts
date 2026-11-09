@@ -15,7 +15,6 @@ import {
   colorName,
   fieldComponent,
   listField,
-  listOffsets,
   listOutside,
   listPotential,
   LISTS,
@@ -161,41 +160,32 @@ const probeSwitches = (gain: number, max: number): GalleryVariable[] => [
  * point with its field arrow; and, switchable, exact field lines and
  * equipotentials.
  *
- * The field lines are contours of the flux function of point charges on
- * one line, S = Σ qᵢ cos θᵢ: exactly lines of the field, in a plane through
- * the charges, with the textbook's spacing (each charge sends out 2|q|/0.25
- * of them). That function exists only while the charges share a line, so
- * the lines are drawn while every charge in use sits at charge 1's height,
- * and the flow alone shows the field once one is dragged off it. Drawn as
- * one implicit curve, sin(4πS) = 0, not a list of levels: on a change of a
- * charge that took 400 ms as a list of 81 levels; this, 100.
+ * The field lines are traced, for any arrangement of the charges (see
+ * `charge-lines.ts`): the plugin writes them into two lists as the charges
+ * move, and one connected list of points draws them. Until 2026-11-08 they
+ * were contours of the flux function S = Σ qᵢ cos θᵢ, which exists only
+ * while the charges share a line, so with a third charge off that line
+ * there were none.
  *
- * Equipotentials need no such line, and are drawn for any arrangement.
+ * Equipotentials are contours of V, drawn by Desmos for any arrangement.
  */
 const CHARGES_SCENE_2D: SceneItem[] = (() => {
   const { helpers, at, arrows } = chargeProbe(2, 5);
   const radius = CHARGE_RADIUS_2D;
-  const { d, r2 } = listOffsets(["x", "y"]);
   const outside = listOutside(["x", "y"], radius);
-  const flux = R`\operatorname{total}\left(\frac{${LISTS.q}${d[0]}}{\sqrt{${r2}}}\right)`;
-  const onLine = R`\operatorname{total}\left(\left(${LISTS.y}-Y_{q1}\right)^{2}\right)<10^{-9}`;
   return [
     ...chargeScene(2, radius),
     ...helpers,
+    // Filled in by the plugin; empty until it has traced them.
+    { key: "linesx", latex: R`L_{xvt}=\left[\right]`, hidden: true },
+    { key: "linesy", latex: R`L_{yvt}=\left[\right]`, hidden: true },
     {
       key: "lines",
       explains: true,
-      latex: R`\sin\left(4\pi${flux}\right)=0\left\{s_{lines}=1\right\}\left\{${onLine}\right\}\left\{${outside}\right\}\left\{\left|y-Y_{q1}\right|>0.02\right\}`,
+      latex: R`\left(L_{xvt},L_{yvt}\right)\left\{s_{lines}=1\right\}`,
       color: "#2c3646",
-      lineWidth: 2,
-      lineOpacity: 0.85,
-    },
-    {
-      // The line through them, which every contour above meets edge-on.
-      key: "axis",
-      explains: true,
-      latex: R`y=Y_{q1}\left\{s_{lines}=1\right\}\left\{${onLine}\right\}\left\{${outside}\right\}`,
-      color: "#2c3646",
+      points: false,
+      lines: true,
       lineWidth: 2,
       lineOpacity: 0.85,
     },
@@ -281,7 +271,7 @@ const CHARGES_PRESET: GalleryPreset = {
   category: "ap2",
   apUnit: 10,
   blurb:
-    "Up to ten point charges, anywhere: drag each by its handle, set how many with N_q. Coulomb's law and superposition. Field lines are exact while the charges share a line; equipotentials always. Drag the probe to see the field there, each charge's part of it, and the force on a test charge q₀.",
+    "Up to ten point charges, anywhere: drag each by its handle, set how many with N_q. Coulomb's law and superposition. Field lines and equipotentials follow any arrangement. Drag the probe to see the field there, each charge's part of it, and the force on a test charge q₀.",
   xLatex: GPU_2D.field[0],
   yLatex: GPU_2D.field[1],
   seedLatex: GPU_2D.seed,
@@ -294,6 +284,7 @@ const CHARGES_PRESET: GalleryPreset = {
     toggle("s_{equi}", 0, "Equipotentials"),
   ],
   scene: CHARGES_SCENE_2D,
+  chargeLines: { radius: Number(CHARGE_RADIUS_2D), extent: 10 },
   onPaper: true,
   palette: "charge",
   // The particles coloured by the potential where they are, V = Σ q/r

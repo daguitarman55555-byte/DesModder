@@ -977,20 +977,23 @@ export interface VectorFieldPreset {
   probes: readonly ProbeDefinition[];
 }
 
+// 35 by 35 by count, Rafael's standard since 2026-11-08: dense enough to
+// read the field's shape at a glance, 1,225 arrows. The step is the same
+// spacing written as a step, for when the axis is switched to Step.
 const DEFAULT_AXIS_X: SamplingAxisConfig = {
   min: -10,
   max: 10,
-  mode: "step",
-  step: 1,
-  count: 21,
+  mode: "count",
+  step: 20 / 34,
+  count: 35,
 };
 
 const DEFAULT_AXIS_Y: SamplingAxisConfig = {
   min: -6,
   max: 6,
-  mode: "step",
-  step: 1,
-  count: 13,
+  mode: "count",
+  step: 12 / 34,
+  count: 35,
 };
 
 /**
