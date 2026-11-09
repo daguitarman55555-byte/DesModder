@@ -2277,12 +2277,13 @@ testWithPage(
           document.querySelectorAll(".dsm-preset-window-position-link").length
       )
     ).toBe(3);
-    // The switches are checkboxes, not sliders.
+    // The switches are checkboxes, not sliders: one more since the charges
+    // are named (2026-11-09), so their names can be hidden.
     expect(
       await driver.evaluate(
         () => document.querySelectorAll(".dsm-preset-window-switch").length
       )
-    ).toBe(11);
+    ).toBe(12);
 
     // Set from the window; reset to the preset's own.
     await driver.evaluate(() =>
@@ -2400,6 +2401,45 @@ testWithPage(
       "Y_{q2}",
     ]);
     expect(positions).toHaveLength(20);
+    // Everything drawn is named from the start: each charge, the probe,
+    // and the arrows, whose Names switch is on (2026-11-09).
+    const labels = await driver.evaluate(() =>
+      Calc.getState()
+        .expressions.list.filter(
+          (e) => (e as { showLabel?: boolean }).showLabel === true
+        )
+        .map((e) => (e as { label: string }).label)
+    );
+    expect(labels).toEqual(
+      expect.arrayContaining([
+        "`q_{1}`",
+        "`q_{10}`",
+        "`p`",
+        "`\\vec{E}`",
+        "`\\vec{F}`",
+      ])
+    );
+    expect(
+      await driver.evaluate(
+        () =>
+          (
+            Calc.getState().expressions.list.find(
+              (e) => e.id === "vector_tools_variables_snames"
+            ) as { latex: string }
+          ).latex
+      )
+    ).toBe("s_{names}=1");
+    const nameErrors = await driver.evaluate(() =>
+      Calc.controller
+        .getAllItemModels()
+        .filter(
+          (m) =>
+            m.id.startsWith("vector_tools_variables_") &&
+            (m as { error?: unknown }).error !== undefined
+        )
+        .map((m) => m.id)
+    );
+    expect(nameErrors).toEqual([]);
     // Every hidden helper and every switch is out of the way, and the
     // charges' folder is its sliders alone: what a student sets.
     const misplaced = await driver.evaluate(() =>

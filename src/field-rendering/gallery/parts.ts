@@ -39,6 +39,8 @@ const NAMES: Readonly<Record<string, string>> = {
   equipotentials: "Equipotentials",
   equi: "Equipotentials",
   probe: "Probe",
+  probeName: "Probe",
+  name: "Charge names",
   planet: "Planets",
   land: "Planets",
   ice: "Planets",

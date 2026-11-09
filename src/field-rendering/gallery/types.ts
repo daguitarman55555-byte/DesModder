@@ -117,6 +117,8 @@ export interface SceneItem {
   /** A label at the point, Desmos LaTeX between backticks for maths. */
   label?: string;
   labelSize?: number;
+  /** Where the label sits from its point; Desmos's own placement if absent. */
+  labelOrientation?: "above" | "above_right" | "right" | "below";
   /** The range of t, for a curve in t. */
   domain?: readonly [string, string];
   /** The ranges of u and v, for a surface in u and v on Desmos 3D. */

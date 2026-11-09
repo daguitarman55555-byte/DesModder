@@ -311,6 +311,7 @@ function sceneItemSpec(
     showLabel: item.label !== undefined ? true : undefined,
     label: item.label,
     labelSize: n(item.labelSize),
+    labelOrientation: item.labelOrientation,
     parametricDomain: range(item.domain),
     parametricDomain3Du: range(item.domainU),
     parametricDomain3Dv: range(item.domainV),

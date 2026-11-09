@@ -686,3 +686,46 @@ testWithPageAndOpts(
     await driver.setBlank();
   }
 );
+
+testWithPageAndOpts(
+  "the charges in the box are named, as Desmos 3D will not",
+  { path: "/3d", timeout: 120000 },
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await driver.page.evaluate(() =>
+      (DSM.enabledPlugins["vector-tools"] as any).applyGalleryPreset(
+        "charges",
+        true
+      )
+    );
+    await driver.waitForSync();
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    // Each charge in use has a name point just over its ball, and the
+    // probe has one; none of them, or of the preset's rows, errs.
+    const state = await driver.page.evaluate(() => ({
+      errors: Calc.controller
+        .getAllItemModels()
+        .filter(
+          (m) =>
+            m.id.startsWith("vector_tools_variables_") &&
+            (m as { error?: unknown }).error !== undefined
+        )
+        .map((m) => m.id),
+      names: Calc.getState()
+        .expressions.list.filter((e) =>
+          ((e as { latex?: string }).latex ?? "").startsWith("N_{")
+        )
+        .map((e) => (e as { latex: string }).latex.split("=")[0]),
+    }));
+    expect(state.errors).toEqual([]);
+    expect(state.names).toEqual(
+      expect.arrayContaining(["N_{q1vt}", "N_{q10vt}", "N_{pvt}"])
+    );
+    await driver.page.screenshot({
+      path: join(ASSETS, "plugin-charge-names.png"),
+    });
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  }
+);

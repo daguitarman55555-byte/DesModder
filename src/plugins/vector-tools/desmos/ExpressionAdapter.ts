@@ -44,6 +44,7 @@ export interface GeneratedExpressionSpec {
     | "showLabel"
     | "label"
     | "labelSize"
+    | "labelOrientation"
     | "parametricDomain"
     | "parametricDomain3Du"
     | "parametricDomain3Dv"

@@ -289,6 +289,21 @@ export function chargeScene(
           pointOpacity: R`\left\{${active(i)}:0.35,0\right\}`,
           colorLatex: colorName(i),
           explains: options.handlesExplain ?? false,
+        },
+        {
+          // Its name, just off its disc, so every charge drawn says which
+          // it is (Rafael, 2026-11-09). A point of its own, of size 0 as
+          // the arrows' names are: Desmos drew no label on the handle,
+          // whose opacity is worked out (measured 2026-11-09).
+          key: `name${i}`,
+          latex: R`\left(${X}+0.7\cdot${radius},${Y}+0.7\cdot${radius}\right)${on}`,
+          points: true,
+          lines: false,
+          pointSize: 0,
+          colorLatex: colorName(i),
+          label: `\`${chargeName(i)}\``,
+          labelSize: 1.3,
+          labelOrientation: "above_right",
         }
       );
     } else {
@@ -309,6 +324,14 @@ export function chargeScene(
           explains: options.handlesExplain ?? false,
           drag3d: [X, Y, Z],
           drag3dWhen: { name: COUNT, atLeast: i },
+        },
+        {
+          // Desmos 3D draws no labels: the plugin names the charge at this
+          // point, just over its ball, undefined while it is unused.
+          key: `name${i}`,
+          latex: R`N_{q${i}vt}=\left(${X},${Y},${Z}+2\cdot${radius}\right)${on}`,
+          hidden: true,
+          name3d: { label: chargeName(i), color: "#333333" },
         }
       );
     }

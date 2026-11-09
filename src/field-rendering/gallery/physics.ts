@@ -154,7 +154,9 @@ const probeSwitches = (gain: number, max: number): GalleryVariable[] => [
   { ...toggle("s_{net}", 1, "Field arrow"), group: "helpers" },
   { ...toggle("s_{parts}", 0, "Each charge's arrow"), group: "helpers" },
   { ...toggle("s_{force}", 0, "Force on a test charge"), group: "helpers" },
-  { ...toggle("s_{names}", 0, "Names"), group: "probe" },
+  // On from the start: everything drawn says what it is (Rafael,
+  // 2026-11-09).
+  { ...toggle("s_{names}", 1, "Names"), group: "probe" },
   { ...toggle("s_{damp}", 1, "Damped lengths"), group: "probe" },
 ];
 
@@ -198,7 +200,7 @@ function chargeGroup(item: SceneItem): SceneItem {
   const k = item.key;
   const group =
     // The charges as drawn: dragged on the graph, never set in the list.
-    /^(ball|minus|plus|handle)\d+$/.test(k)
+    /^(ball|minus|plus|handle|name)\d+$/.test(k)
       ? "helpers"
       : k === "probe"
         ? "probe"
@@ -266,6 +268,9 @@ const CHARGES_SCENE_2D: SceneItem[] = (() => {
       color: "#222222",
       points: true,
       pointSize: 12,
+      label: "`p`",
+      labelSize: 1.3,
+      labelOrientation: "below",
     },
     ...arrows,
   ];
@@ -292,6 +297,13 @@ const CHARGES_SCENE_3D: SceneItem[] = (() => {
       // In 3D a point is a ball, and 12 hid the arrows' tails inside it.
       pointSize: 4,
       drag3d: ["p_{x}", "p_{y}", "p_{z}"],
+    },
+    {
+      // Desmos 3D draws no labels: the plugin names the probe itself.
+      key: "probeName",
+      latex: R`N_{pvt}=\left(p_{x},p_{y},p_{z}-0.35\right)`,
+      hidden: true,
+      name3d: { label: "p", color: "#222222" },
     },
     ...arrows,
   ];
