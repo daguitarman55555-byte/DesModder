@@ -24,7 +24,12 @@ import {
   COUNT,
 } from "./point-charges";
 import { probeArrows2D, probeArrows3D, type ProbeSetup } from "./probe";
-import type { GalleryPreset, GalleryVariable, SceneItem } from "./types";
+import type {
+  GalleryPreset,
+  GalleryVariable,
+  SceneGroup,
+  SceneItem,
+} from "./types";
 
 const R = String.raw;
 
@@ -144,14 +149,62 @@ function chargeProbe(dim: 2 | 3, reach: number) {
 
 /** What a probe needs, as variables: where it is, its gain, its switches. */
 const probeSwitches = (gain: number, max: number): GalleryVariable[] => [
-  v("q_{0}", -1, -3, 3, 0.1),
-  v("s_{arrow}", gain, 0, max),
-  toggle("s_{net}", 1, "Field arrow"),
-  toggle("s_{parts}", 0, "Each charge's arrow"),
-  toggle("s_{force}", 0, "Force on a test charge"),
-  toggle("s_{names}", 0, "Names"),
-  toggle("s_{damp}", 1, "Damped lengths"),
+  { ...v("q_{0}", -1, -3, 3, 0.1), group: "force" },
+  { ...v("s_{arrow}", gain, 0, max), group: "probe" },
+  { ...toggle("s_{net}", 1, "Field arrow"), group: "helpers" },
+  { ...toggle("s_{parts}", 0, "Each charge's arrow"), group: "helpers" },
+  { ...toggle("s_{force}", 0, "Force on a test charge"), group: "helpers" },
+  { ...toggle("s_{names}", 0, "Names"), group: "probe" },
+  { ...toggle("s_{damp}", 1, "Damped lengths"), group: "probe" },
 ];
+
+/**
+ * The charges preset's parts, each a folder whose icon shows and hides it
+ * (Rafael, 2026-11-09), in the order a lesson meets them: the charges, the
+ * probe, the field there, its parts, the force, then the lines and the
+ * equipotentials. The hidden helpers fold away at the end.
+ */
+const CHARGE_GROUPS: SceneGroup[] = [
+  { id: "charges", title: "Charges: how many, their sizes and places" },
+  { id: "probe", title: "Probe p: drag it to measure the field" },
+  { id: "net", title: "Electric field E at the probe", toggle: "s_{net}" },
+  {
+    id: "parts",
+    title: "Each charge's field at the probe, E₁, E₂, …",
+    toggle: "s_{parts}",
+  },
+  {
+    id: "force",
+    title: "Force on a test charge q₀, F = q₀E",
+    toggle: "s_{force}",
+  },
+  { id: "lines", title: "Field lines", toggle: "s_{lines}" },
+  { id: "equi", title: "Equipotentials", toggle: "s_{equi}" },
+];
+
+/** Which part a shown object of the charges preset belongs to. */
+function chargeGroup(item: SceneItem): SceneItem {
+  if (item.hidden === true) return item;
+  const k = item.key;
+  const group =
+    // The charges as drawn: dragged on the graph, never set in the list.
+    /^(ball|minus|plus|handle)\d+$/.test(k)
+      ? "helpers"
+      : k === "probe"
+        ? "probe"
+        : k === "lines"
+          ? "lines"
+          : k === "equipotentials"
+            ? "equi"
+            : /^E\d+[a-z]+$/.test(k)
+              ? "parts"
+              : /^E[a-z]+$/.test(k)
+                ? "net"
+                : /^F[a-z]+$/.test(k)
+                  ? "force"
+                  : undefined;
+  return group === undefined ? item : { ...item, group };
+}
 
 /**
  * The charges in the plane, as a textbook draws them: discs, red with a
@@ -276,13 +329,14 @@ const CHARGES_PRESET: GalleryPreset = {
   seedLatex: GPU_2D.seed,
   variables: [
     ...chargeVariables(LAYOUT_2D, 2, [-5, 5, 0.1]),
-    v("p_{x}", 0, -9, 9, 0.05),
-    v("p_{y}", 3, -9, 9, 0.05),
+    { ...v("p_{x}", 0, -9, 9, 0.05), group: "probe" },
+    { ...v("p_{y}", 3, -9, 9, 0.05), group: "probe" },
     ...probeSwitches(30, 100),
-    toggle("s_{lines}", 1, "Field lines"),
-    toggle("s_{equi}", 0, "Equipotentials"),
+    { ...toggle("s_{lines}", 1, "Field lines"), group: "helpers" },
+    { ...toggle("s_{equi}", 0, "Equipotentials"), group: "helpers" },
   ],
-  scene: CHARGES_SCENE_2D,
+  scene: CHARGES_SCENE_2D.map(chargeGroup),
+  groups: CHARGE_GROUPS,
   chargeLines: { radius: Number(CHARGE_RADIUS_2D), extent: 10 },
   onPaper: true,
   palette: "charge",
@@ -307,12 +361,12 @@ const CHARGES_PRESET: GalleryPreset = {
     seedLatex: GPU_3D.seed,
     variables: [
       ...chargeVariables(LAYOUT_3D, 3, [-5, 5, 0.1]),
-      v("p_{x}", 0, -5, 5, 0.05),
-      v("p_{y}", 1.5, -5, 5, 0.05),
-      v("p_{z}", 1, -5, 5, 0.05),
+      { ...v("p_{x}", 0, -5, 5, 0.05), group: "probe" },
+      { ...v("p_{y}", 1.5, -5, 5, 0.05), group: "probe" },
+      { ...v("p_{z}", 1, -5, 5, 0.05), group: "probe" },
       ...probeSwitches(10, 40),
     ],
-    scene: CHARGES_SCENE_3D,
+    scene: CHARGES_SCENE_3D.map(chargeGroup),
     look: {
       particles: 36_000,
       speed: 0.18,

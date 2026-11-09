@@ -60,6 +60,11 @@ export interface GeneratedFolderSpec {
    * hidden on their own staying hidden.
    */
   hidden?: boolean;
+  /**
+   * Write `hidden` even over a folder already in the graph: for one whose
+   * icon follows a switch that the same write sets back to its default.
+   */
+  resetHidden?: boolean;
 }
 
 export interface GeneratedItemSnapshot {
@@ -81,7 +86,7 @@ export interface GeneratedTickerSpec {
 interface DesmosExpressionAdapter {
   applyGeneratedSet: (
     namespace: string,
-    folder: GeneratedFolderSpec,
+    folder: GeneratedFolderSpec | readonly GeneratedFolderSpec[],
     expressions: readonly GeneratedExpressionSpec[],
     options?: {
       ticker?: GeneratedTickerSpec | null;
@@ -134,7 +139,7 @@ export class CalculatorExpressionAdapter implements DesmosExpressionAdapter {
    */
   applyGeneratedSet(
     namespace: string,
-    folder: GeneratedFolderSpec,
+    folderOrFolders: GeneratedFolderSpec | readonly GeneratedFolderSpec[],
     expressions: readonly GeneratedExpressionSpec[],
     options: {
       ticker?: GeneratedTickerSpec | null;
@@ -142,22 +147,34 @@ export class CalculatorExpressionAdapter implements DesmosExpressionAdapter {
     } = {}
   ) {
     const { ticker, knownIDs } = options;
+    // Several for a preset whose parts each have a folder; each folder is
+    // written with its own expressions after it, in the order given.
+    const folders: readonly GeneratedFolderSpec[] = Array.isArray(
+      folderOrFolders
+    )
+      ? folderOrFolders
+      : [folderOrFolders as GeneratedFolderSpec];
+    if (folders.length === 0)
+      throw new Error("A generated set needs a folder.");
     assertValidID(namespace, "generated namespace");
-    assertFolderSpec(folder);
-    assertWithinNamespace(folder.id, namespace, "generated folder");
+    for (const folder of folders) {
+      assertFolderSpec(folder);
+      assertWithinNamespace(folder.id, namespace, "generated folder");
+    }
+    const folderIDs = new Set(folders.map((f) => f.id));
     for (const expression of expressions) {
       assertExpressionSpec(expression);
       assertWithinNamespace(expression.id, namespace, "generated expression");
       if (
         expression.folderId !== undefined &&
-        expression.folderId !== folder.id
+        !folderIDs.has(expression.folderId)
       )
         throw new Error(
           `Generated expression ${expression.id} must live in the generated folder.`
         );
     }
     const duplicate = firstDuplicate([
-      folder.id,
+      ...folders.map((f) => f.id),
       ...expressions.map((e) => e.id),
     ]);
     if (duplicate !== undefined)
@@ -171,7 +188,7 @@ export class CalculatorExpressionAdapter implements DesmosExpressionAdapter {
     }
     assertOwnedItemsAreReplaceable(
       owned,
-      folder,
+      folders,
       expressions,
       new Set(knownIDs ?? [])
     );
@@ -180,23 +197,33 @@ export class CalculatorExpressionAdapter implements DesmosExpressionAdapter {
     // A folder already in the graph keeps whatever the user left it as:
     // a rewrite (a palette change rewrites the arrows) must not fold one
     // they opened to read, or hide one they switched on.
-    const existing = owned.find((item) => item.id === folder.id) as
-      | FolderState
-      | undefined;
-    const generated: ItemState[] = [
-      folderState(
+    const folderItem = (folder: GeneratedFolderSpec) => {
+      const existing = owned.find((item) => item.id === folder.id) as
+        | FolderState
+        | undefined;
+      return folderState(
         existing === undefined
           ? folder
           : {
               ...folder,
               collapsed: existing.collapsed,
-              ...(folder.hidden === undefined
+              ...(folder.hidden === undefined || folder.resetHidden === true
                 ? {}
                 : { hidden: existing.hidden ?? false }),
             }
-      ),
-      ...expressions.map((spec) => expressionState(keptValue(spec, owned))),
-    ];
+      );
+    };
+    const write = (spec: GeneratedExpressionSpec) =>
+      expressionState(keptValue(spec, owned));
+    const generated: ItemState[] = folders.flatMap((folder, i) => [
+      folderItem(folder),
+      ...expressions
+        .filter((e) =>
+          // Those in no folder follow the first, as they always have.
+          e.folderId === undefined ? i === 0 : e.folderId === folder.id
+        )
+        .map(write),
+    ]);
     state.expressions.list =
       insertionIndex === undefined
         ? [...others, ...generated]
@@ -344,12 +371,12 @@ function expressionState(spec: GeneratedExpressionSpec): ExpressionState {
  */
 function assertOwnedItemsAreReplaceable(
   owned: readonly ItemState[],
-  folder: GeneratedFolderSpec,
+  folders: readonly GeneratedFolderSpec[],
   expressions: readonly GeneratedExpressionSpec[],
   known: ReadonlySet<string>
 ) {
   const expected = new Map<string, "folder" | "expression">([
-    [folder.id, "folder"],
+    ...folders.map((f) => [f.id, "folder"] as const),
     ...expressions.map((e) => [e.id, "expression"] as const),
   ]);
   for (const item of owned) {

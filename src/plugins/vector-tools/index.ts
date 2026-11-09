@@ -28,6 +28,7 @@ import {
 import {
   CalculatorExpressionAdapter,
   type GeneratedExpressionSpec,
+  type GeneratedFolderSpec,
   type GeneratedItemSnapshot,
 } from "./desmos/ExpressionAdapter";
 import {
@@ -146,6 +147,7 @@ import type {
   ClockParameters,
   DemoMode,
   GalleryVariable,
+  SceneGroup,
   SceneItem,
 } from "../../field-rendering/gallery/types";
 import type { FlowField } from "../../field-rendering/FlowRenderer";
@@ -210,6 +212,74 @@ function sceneItemHidden(item: SceneItem, mode: DemoMode) {
 function sceneItemColor(item: SceneItem, mode: DemoMode) {
   return mode === "majestic" ? (item.majesticColor ?? item.color) : item.color;
 }
+
+/** The folder of a preset's hidden helpers, last and folded. */
+const HELPERS_GROUP = "helpers";
+
+/**
+ * A preset group's folder. The underscore after `folder` keeps it from any
+ * variable's id, which has its name's letters and digits only.
+ */
+function groupFolderID(group: string) {
+  return `${PRESET_VARIABLES_NAMESPACE}_folder_${group}`;
+}
+
+/**
+ * A grouped preset's folders, and its variables and objects each given one:
+ * a variable or a shown object without a group goes in the first, a hidden
+ * helper in the helpers' folder. A folder with a switch starts shown or
+ * hidden as the switch does. Undefined for a preset without groups, which
+ * keeps its one folder.
+ */
+function groupedLayout(
+  title: string,
+  groups: readonly SceneGroup[],
+  variables: readonly GalleryVariable[],
+  scene: readonly SceneItem[]
+) {
+  if (groups.length === 0) return undefined;
+  const known = new Set([...groups.map((g) => g.id), HELPERS_GROUP]);
+  const first = groups[0].id;
+  const placed = <T extends { group?: string }>(x: T, fallback: string) => ({
+    ...x,
+    group: x.group !== undefined && known.has(x.group) ? x.group : fallback,
+  });
+  const vars = variables.map((v) => placed(v, first));
+  const items = scene.map((item) =>
+    placed(item, item.hidden === true ? HELPERS_GROUP : first)
+  );
+  const used = new Set([...vars, ...items].map((x) => x.group));
+  const value = new Map(variables.map((v) => [v.name, v.value]));
+  const folders: GeneratedFolderSpec[] = [
+    ...groups.map((g) => ({
+      id: groupFolderID(g.id),
+      title: g.title,
+      collapsed: g.collapsed ?? true,
+      ...(g.toggle === undefined
+        ? {}
+        : { hidden: (value.get(g.toggle) ?? 1) === 0, resetHidden: true }),
+    })),
+    {
+      id: groupFolderID(HELPERS_GROUP),
+      title: `${title}: how it is drawn (nothing to set here)`,
+      collapsed: true,
+    },
+  ].filter((f) => used.has(f.id.slice(groupFolderID("").length)));
+  return { folders, variables: vars, scene: items };
+}
+
+/**
+ * Every grouped preset's folders that follow a switch, by folder id, with
+ * the switch: what the folder sync keeps in step, whether the preset is
+ * open or was closed and left in the graph.
+ */
+const GROUP_TOGGLES: ReadonlyMap<string, string> = new Map(
+  FIELD_GALLERY.flatMap((preset) =>
+    [...(preset.groups ?? []), ...(preset.space.groups ?? [])].flatMap((g) =>
+      g.toggle === undefined ? [] : [[groupFolderID(g.id), g.toggle] as const]
+    )
+  )
+);
 
 /** A preset's scene item's id in the graph. */
 function sceneItemID(item: SceneItem) {
@@ -932,6 +1002,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
           undefined
       )
         this.scheduleChargeLines(this.graphParameterValues);
+      if (event.type !== "tick") this.scheduleGroupSync();
       if (
         event.type === "set-item-latex" ||
         event.type === "undo" ||
@@ -1316,6 +1387,65 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       values.set(name, sliders.get(name) ?? helper.numericValue);
     }
     this.setParameterValues(values);
+  }
+
+  /** Each switched folder's hidden state as last seen, by folder id. */
+  private readonly groupFoldersSeen = new Map<string, boolean>();
+  private groupSyncTimer?: ReturnType<typeof setTimeout>;
+
+  /**
+   * Keeps each preset folder's icon and its switch in step: a folder whose
+   * icon was pressed sets its switch, and a switch set elsewhere (the
+   * presets window, the slider) shows or hides its folder. Without this the
+   * two disagreed: an arrow switched off showed nothing from a folder shown.
+   */
+  private scheduleGroupSync() {
+    if (this.groupSyncTimer !== undefined) return;
+    this.groupSyncTimer = setTimeout(() => {
+      this.groupSyncTimer = undefined;
+      if (this.dispatching()) {
+        this.scheduleGroupSync();
+        return;
+      }
+      this.syncGroupFolders();
+    }, 0);
+  }
+
+  private syncGroupFolders() {
+    let sliders: Map<string, number> | undefined;
+    const switches: { id: string; latex: string }[] = [];
+    const flips: string[] = [];
+    for (const [folderID, toggle] of GROUP_TOGGLES) {
+      const folder = this.cc.getItemModel(folderID) as
+        | { type: string; hidden?: boolean }
+        | undefined;
+      if (folder?.type !== "folder") {
+        this.groupFoldersSeen.delete(folderID);
+        continue;
+      }
+      const hidden = folder.hidden === true;
+      sliders ??= sliderValues(this.cc.getAllItemModels());
+      const on = sliders.get(canonicalIdentifier(toggle));
+      const seen = this.groupFoldersSeen.get(folderID);
+      this.groupFoldersSeen.set(folderID, hidden);
+      if (seen !== undefined && seen !== hidden) {
+        // The icon was pressed: the switch follows it.
+        const id = presetVariableID(toggle);
+        if (
+          on !== undefined &&
+          (on !== 0) === hidden &&
+          this.cc.getItemModel(id)
+        )
+          switches.push({ id, latex: `${toggle}=${hidden ? 0 : 1}` });
+      } else if (on !== undefined && (on === 0) !== hidden) {
+        // The switch was set: the folder follows it.
+        flips.push(folderID);
+        this.groupFoldersSeen.set(folderID, !hidden);
+      }
+    }
+    if (switches.length > 0) this.calc.setExpressions(switches);
+    for (const id of flips)
+      this.cc.dispatch({ type: "toggle-item-hidden", id } as any);
   }
 
   private chargeLinesKey = "";
@@ -2608,7 +2738,8 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   private loadPresetVariables(
     title: string,
     variables: readonly GalleryVariable[],
-    scene: readonly SceneItem[] = []
+    scene: readonly SceneItem[] = [],
+    groups: readonly SceneGroup[] = []
   ) {
     const namespace = PRESET_VARIABLES_NAMESPACE;
     const existing = this.expressions
@@ -2625,15 +2756,24 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
         if (existing.length > 0)
           this.expressions.removeGeneratedSet(namespace, existing);
       } else {
-        const folder = `${namespace}_folder`;
+        const single = `${namespace}_folder`;
+        const layout = groupedLayout(title, groups, wanted, scene);
+        const folderOf = (group: string | undefined) =>
+          layout === undefined ? single : groupFolderID(group ?? "");
+        // Written in step with their switches, and taken as seen, so the
+        // sync that follows does not read the write as a click.
+        this.groupFoldersSeen.clear();
         this.expressions.applyGeneratedSet(
           namespace,
-          { id: folder, title: `${title}: the field's variables` },
+          layout?.folders ?? {
+            id: single,
+            title: `${title}: the field's variables`,
+          },
           [
-            ...wanted.map((v) => ({
+            ...(layout?.variables ?? wanted).map((v) => ({
               id: presetVariableID(v.name),
               latex: `${v.name}=${v.value}`,
-              folderId: folder,
+              folderId: folderOf(v.group),
               slider:
                 v.toggle !== undefined
                   ? { min: "0", max: "1", step: "1" }
@@ -2643,8 +2783,8 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
                       ...(v.step !== undefined ? { step: String(v.step) } : {}),
                     },
             })),
-            ...scene.map((item) =>
-              sceneItemSpec(item, folder, this.presetWindow.mode)
+            ...(layout?.scene ?? scene).map((item) =>
+              sceneItemSpec(item, folderOf(item.group), this.presetWindow.mode)
             ),
           ],
           { knownIDs: existing }
@@ -3128,7 +3268,8 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       (this.is3d ? preset.space.variables : undefined) ??
         preset.variables ??
         [],
-      (this.is3d ? preset.space.scene : preset.scene) ?? []
+      (this.is3d ? preset.space.scene : preset.scene) ?? [],
+      (this.is3d ? (preset.space.groups ?? preset.groups) : preset.groups) ?? []
     );
     this.applyPresetLook(preset, withLook);
     this.writePresetDesmosField();

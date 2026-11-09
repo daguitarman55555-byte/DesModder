@@ -2329,6 +2329,118 @@ testWithPage(
 );
 
 testWithPage(
+  "the charges preset puts each part in a folder whose icon is its switch",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await resetLibrary(driver);
+    await driver.evaluate(() =>
+      (window as any).DSM.enabledPlugins["vector-tools"].applyGalleryPreset(
+        "charges",
+        true
+      )
+    );
+    await driver.waitForSync();
+    const folders = async () =>
+      await driver.evaluate(() =>
+        Calc.getState()
+          .expressions.list.filter(
+            (e) =>
+              e.type === "folder" && e.id.startsWith("vector_tools_variables_")
+          )
+          .map((e) => [
+            e.id.replace("vector_tools_variables_folder_", ""),
+            (e as { hidden?: boolean }).hidden ?? false,
+          ])
+      );
+    expect(await folders()).toEqual([
+      ["charges", false],
+      ["probe", false],
+      ["net", false],
+      ["parts", true],
+      ["force", true],
+      ["lines", false],
+      ["equi", true],
+      ["helpers", false],
+    ]);
+    // Every hidden helper and every switch is out of the way, and the
+    // charges' folder is its sliders alone: what a student sets.
+    const misplaced = await driver.evaluate(() =>
+      Calc.getState()
+        .expressions.list.filter((e) => {
+          const folder = (e as { folderId?: string }).folderId ?? "";
+          const hidden = (e as { hidden?: boolean }).hidden ?? false;
+          const latex = (e as { latex?: string }).latex ?? "";
+          return (
+            e.type === "expression" &&
+            e.id.startsWith("vector_tools_variables_") &&
+            !folder.endsWith("_helpers") &&
+            (hidden ||
+              latex.startsWith("s_{net}") ||
+              latex.startsWith("s_{lines}") ||
+              (folder.endsWith("_charges") &&
+                !/^[A-Za-z]_\{[a-z0-9]+\}=-?[0-9.]+$/.test(latex)))
+          );
+        })
+        .map((e) => e.id)
+    );
+    expect(misplaced).toEqual([]);
+    const value = async (id: string) =>
+      await driver.evaluate(
+        (id) =>
+          (
+            Calc.getState().expressions.list.find((e) => e.id === id) as {
+              latex: string;
+            }
+          ).latex,
+        id
+      );
+
+    // The folder's icon sets the switch...
+    await driver.evaluate(() =>
+      Calc.controller.dispatch({
+        type: "toggle-item-hidden",
+        id: "vector_tools_variables_folder_parts",
+      } as any)
+    );
+    await driver.waitForSync();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(await value("vector_tools_variables_sparts")).toBe("s_{parts}=1");
+
+    // ...and the switch, set anywhere else, sets the folder.
+    await driver.evaluate(() =>
+      (window as any).DSM.enabledPlugins["vector-tools"].setPresetVariable(
+        "vector_tools_variables_slines",
+        0
+      )
+    );
+    await driver.waitForSync();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(Object.fromEntries(await folders())).toMatchObject({
+      parts: false,
+      lines: true,
+    });
+    if ((await driver.$$(".dsm-preset-window")).length > 0)
+      await driver.click('.dsm-preset-window-button[aria-label="Close"]');
+    await driver.evaluate(() =>
+      Calc.controller.dispatch({
+        type: "set-folder-collapsed",
+        id: "vector_tools_variables_folder_probe",
+        isCollapsed: false,
+      } as any)
+    );
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await driver.page.screenshot({
+      path: "docs/assets/vector-tools-charges-folders.png",
+    });
+
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);
+
+testWithPage(
   "a preset's Desmos arrows wait in a hidden folder, N_arrows a side, and its field lines follow charges after it closes",
   async (driver) => {
     await driver.enablePlugin("vector-tools");

@@ -60,6 +60,26 @@ export interface GalleryVariable {
    * out stay in the graph, where the field reads them, but out of the way.
    */
   shownWhen?: { name: string; atLeast: number };
+  /** The `SceneGroup` whose folder the slider goes in. */
+  group?: string;
+}
+
+/**
+ * One part of a preset's picture, as a folder of its own in the expression
+ * list: the charges, the probe, the field lines. Its folder's icon shows and
+ * hides that part, and is kept in step with `toggle`, the switch the presets
+ * window shows for it, so the two never disagree (Rafael, 2026-11-09: "so
+ * you can interact with individual parts better without having to look at
+ * the technical side"). A preset's hidden helpers go in a folded folder of
+ * their own at the end.
+ */
+export interface SceneGroup {
+  id: string;
+  title: string;
+  /** The 0/1 variable that switches this part on: its folder's icon. */
+  toggle?: string;
+  /** Folded when written: a long list of sliders. */
+  collapsed?: boolean;
 }
 
 /**
@@ -77,6 +97,8 @@ export interface SceneItem {
    * keeps the rest, the solids that make the field.
    */
   explains?: boolean;
+  /** The `SceneGroup` whose folder it goes in; a hidden helper's default. */
+  group?: string;
   latex: string;
   color?: string;
   /** A named colour the graph defines, e.g. one that follows a sign. */
@@ -177,6 +199,11 @@ export interface GalleryPreset {
   /** The Desmos objects drawn with the field, loaded beside its variables. */
   scene?: readonly SceneItem[];
   /**
+   * The folders the variables and the scene go in, in order. Absent, all
+   * go in one folder, the field's variables.
+   */
+  groups?: readonly SceneGroup[];
+  /**
    * Drawn on the graph paper, as a textbook figure is: no dark backdrop, and
    * the flow faint and under Desmos's objects, which carry the picture.
    */
@@ -243,6 +270,8 @@ export interface GalleryPreset {
     variables?: readonly GalleryVariable[];
     /** The Desmos 3D objects drawn with the field. */
     scene?: readonly SceneItem[];
+    /** Their folders on Desmos 3D, where they differ. */
+    groups?: readonly SceneGroup[];
     /** Numbers that move with the clock, for the 3D field. */
     clockParameters?: ClockParameters;
     /** How the 3D flow is drawn, over the caller's defaults. */
