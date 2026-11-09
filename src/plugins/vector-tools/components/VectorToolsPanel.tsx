@@ -273,7 +273,7 @@ function presetOpenSection(vectorTools: VectorTools, config: ConfigGetter) {
             kept === undefined
               ? "Your saves are kept as they were."
               : `Your field “${kept}” is kept as it was.`
-          } Its sliders and objects are in the expression list, and a Desmos vector field of it is in its folder, hidden: unhide the arrows' rows to show it.`;
+          } Its sliders and objects are in the expression list, and a Desmos vector field of it is in its folder, hidden: press the folder's icon to show it, and set how many arrows with its N_arrows slider.`;
         }}
       </div>
       <div class="dsm-vector-tools-inline">

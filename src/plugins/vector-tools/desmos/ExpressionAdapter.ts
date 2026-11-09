@@ -25,6 +25,11 @@ export interface GeneratedExpressionSpec {
   /** A slider for a definition `name=value`, between these bounds. */
   slider?: { min: string; max: string; step?: string };
   /**
+   * For a slider: a rewrite keeps the value already in the graph, if the row
+   * there still defines the same name, rather than putting the default back.
+   */
+  keepValue?: boolean;
+  /**
    * The rest of how Desmos draws it, written as the graph state has it: a
    * preset's objects need fills, labels and parameter ranges the field's own
    * expressions never did.
@@ -49,6 +54,12 @@ export interface GeneratedFolderSpec {
   id: string;
   title: string;
   collapsed?: boolean;
+  /**
+   * The folder's own switch, its icon in the expression list: hidden, it
+   * hides everything in it, and pressing the icon shows them, rows that are
+   * hidden on their own staying hidden.
+   */
+  hidden?: boolean;
 }
 
 export interface GeneratedItemSnapshot {
@@ -168,7 +179,7 @@ export class CalculatorExpressionAdapter implements DesmosExpressionAdapter {
     const insertionIndex = firstOwnedIndex(state.expressions.list, namespace);
     // A folder already in the graph keeps whatever the user left it as:
     // a rewrite (a palette change rewrites the arrows) must not fold one
-    // they opened to read.
+    // they opened to read, or hide one they switched on.
     const existing = owned.find((item) => item.id === folder.id) as
       | FolderState
       | undefined;
@@ -176,9 +187,15 @@ export class CalculatorExpressionAdapter implements DesmosExpressionAdapter {
       folderState(
         existing === undefined
           ? folder
-          : { ...folder, collapsed: existing.collapsed }
+          : {
+              ...folder,
+              collapsed: existing.collapsed,
+              ...(folder.hidden === undefined
+                ? {}
+                : { hidden: existing.hidden ?? false }),
+            }
       ),
-      ...expressions.map(expressionState),
+      ...expressions.map((spec) => expressionState(keptValue(spec, owned))),
     ];
     state.expressions.list =
       insertionIndex === undefined
@@ -266,6 +283,21 @@ export class CalculatorExpressionAdapter implements DesmosExpressionAdapter {
   }
 }
 
+/** `spec`, with the graph's own value if it asks to keep one. */
+function keptValue(
+  spec: GeneratedExpressionSpec,
+  owned: readonly ItemState[]
+): GeneratedExpressionSpec {
+  if (spec.keepValue !== true) return spec;
+  const current = owned.find((item) => item.id === spec.id);
+  if (current?.type !== "expression") return spec;
+  const latex = current.latex ?? "";
+  const name = spec.latex.slice(0, spec.latex.indexOf("=") + 1);
+  return name !== "" && latex.startsWith(name) && latex.length > name.length
+    ? { ...spec, latex }
+    : spec;
+}
+
 function folderState(spec: GeneratedFolderSpec): FolderState {
   const folder: FolderState = {
     type: "folder",
@@ -273,6 +305,7 @@ function folderState(spec: GeneratedFolderSpec): FolderState {
     title: spec.title,
   };
   if (spec.collapsed !== undefined) folder.collapsed = spec.collapsed;
+  if (spec.hidden !== undefined) folder.hidden = spec.hidden;
   return folder;
 }
 

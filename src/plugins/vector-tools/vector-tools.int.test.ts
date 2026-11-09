@@ -45,7 +45,7 @@ testWithPage(
     });
     expect(
       items.filter((item) => item.id?.startsWith(`${NAMESPACE}_`)).length
-    ).toBe(27);
+    ).toBe(28);
     expect(
       items.find((item) => item.id === `${NAMESPACE}_shafts`)
     ).toMatchObject({
@@ -84,14 +84,14 @@ testWithPage(
           }),
       NAMESPACE
     );
-    expect(semanticSnapshot).toHaveLength(27);
+    expect(semanticSnapshot).toHaveLength(28);
     expect(semanticSnapshot.filter((item) => item.hasError)).toEqual([]);
     await driver.click(GENERATE);
     await driver.waitForSync();
     items = (await driver.getState()).expressions.list;
     expect(
       items.filter((item) => item.id?.startsWith(`${NAMESPACE}_`))
-    ).toHaveLength(27);
+    ).toHaveLength(28);
 
     await driver.evaluate(
       (id) => Calc.setExpression({ id, latex: "y=x^2" }),
@@ -425,7 +425,7 @@ testWithPage(
     });
     expect(
       items.filter((item) => item.id?.startsWith(`${NAMESPACE}_`))
-    ).toHaveLength(28);
+    ).toHaveLength(29);
 
     // Nothing errors, and the derivative is Desmos's own, so it is exact
     // rather than approximated: ∇(x²+y²) = (2x, 2y).
@@ -634,7 +634,7 @@ testWithPageAndOpts(
       (await driver.getState()).expressions.list.filter((item) =>
         item.id?.startsWith(`${NAMESPACE}_`)
       )
-    ).toHaveLength(27);
+    ).toHaveLength(28);
 
     await driver.click(REMOVE);
     await driver.waitForSync();
@@ -2319,6 +2319,156 @@ testWithPage(
       )
     );
     expect(await variables()).toEqual([]);
+
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);
+
+testWithPage(
+  "a preset's Desmos arrows wait in a hidden folder, N_arrows a side, and its field lines follow charges after it closes",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await resetLibrary(driver);
+    await driver.evaluate(() =>
+      (window as any).DSM.enabledPlugins["vector-tools"].applyGalleryPreset(
+        "charges",
+        true
+      )
+    );
+    await driver.waitForSync();
+    const folderID = "vector_tools_vf_presetview_folder";
+    const item = async (id: string) =>
+      await driver.evaluate(
+        (id) =>
+          Calc.getState().expressions.list.find((e) => e.id === id) as
+            | { hidden?: boolean; latex?: string }
+            | undefined,
+        id
+      );
+    // The folder is what is hidden; the arrows inside are not, so its icon
+    // has something to switch on (2026-11-09).
+    expect((await item(folderID))?.hidden).toBe(true);
+    expect(
+      (await item("vector_tools_vf_presetview_shafts"))?.hidden ?? false
+    ).toBe(false);
+    expect((await item("vector_tools_vf_presetview_n_arrows"))?.latex).toBe(
+      "N_{arrows}=25"
+    );
+    const errors = await driver.evaluate(() =>
+      Calc.controller
+        .getAllItemModels()
+        .filter(
+          (m) =>
+            m.id.startsWith("vector_tools_vf_presetview_") &&
+            (m as { error?: unknown }).error !== undefined
+        )
+        .map((m) => m.id)
+    );
+    expect(errors).toEqual([]);
+
+    // N_arrows² arrows in all.
+    await driver.evaluate(() =>
+      Calc.setExpression({
+        id: "vector_tools_vf_presetview_n_arrows",
+        latex: "N_{arrows}=10",
+      })
+    );
+    await driver.waitForSync();
+    const arrows = await driver.evaluate(
+      async () =>
+        await new Promise<number>((resolve) => {
+          const helper = Calc.HelperExpression({
+            latex: String.raw`\operatorname{length}\left(v_{tfegx}\right)`,
+          });
+          helper.observe("numericValue", () => {
+            if (Number.isFinite(helper.numericValue))
+              resolve(helper.numericValue);
+          });
+        })
+    );
+    expect(arrows).toBe(100);
+
+    // The folder's icon shows them.
+    await driver.evaluate(() =>
+      Calc.controller.dispatch({
+        type: "toggle-item-hidden",
+        id: "vector_tools_vf_presetview_folder",
+      } as any)
+    );
+    await driver.waitForSync();
+    expect((await item(folderID))?.hidden ?? false).toBe(false);
+
+    // Re-opening the preset rewrites the arrows and keeps both choices.
+    await driver.evaluate(() =>
+      (window as any).DSM.enabledPlugins["vector-tools"].applyGalleryPreset(
+        "charges",
+        true
+      )
+    );
+    await driver.waitForSync();
+    expect((await item(folderID))?.hidden ?? false).toBe(false);
+    expect((await item("vector_tools_vf_presetview_n_arrows"))?.latex).toBe(
+      "N_{arrows}=10"
+    );
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    await driver.page.screenshot({
+      path: "docs/assets/vector-tools-preset-desmos-arrows.png",
+    });
+
+    // Closed, the charges' sliders stay, and moving one still retraces the
+    // lines: they froze before, ending on the paper where it had been.
+    await driver.evaluate(() =>
+      (window as any).DSM.enabledPlugins["vector-tools"].closePreset()
+    );
+    await driver.waitForSync();
+    await driver.evaluate(() =>
+      Calc.setExpressions([
+        { id: "vector_tools_variables_Xq2", latex: "X_{q2}=-4.4" },
+        { id: "vector_tools_variables_Yq2", latex: "Y_{q2}=-1.2" },
+      ])
+    );
+    await driver.waitForSync();
+    const rimDistances = await driver.evaluate(
+      async () =>
+        await new Promise<number[]>((resolve) => {
+          const read = () => {
+            const latex = (id: string) =>
+              (
+                Calc.getState().expressions.list.find((e) =>
+                  (e as { latex?: string }).latex?.startsWith(id)
+                ) as { latex: string }
+              ).latex;
+            const nums = (l: string) =>
+              l
+                .slice(l.indexOf("=") + 1)
+                .replace(/\\left\[|\\right\]/g, "")
+                .split(",")
+                .map((t) => (t.includes("frac") ? NaN : Number(t)));
+            const xs = nums(latex("L_{xvt}"));
+            const ys = nums(latex("L_{yvt}"));
+            // Where lines end: the point before each gap, and the last.
+            const ends: number[] = [];
+            for (let i = 0; i < xs.length; i++)
+              if (Number.isFinite(xs[i]) && !Number.isFinite(xs[i + 1]))
+                ends.push(i);
+            const near = (x: number, y: number) =>
+              ends.filter(
+                (i) => Math.abs(Math.hypot(xs[i] - x, ys[i] - y) - 0.4) < 0.02
+              ).length;
+            return [near(-4.4, -1.2), near(2.5, 0)];
+          };
+          setTimeout(() => resolve(read()), 600);
+        })
+    );
+    // Lines end on q₂'s rim where it is, and none where it was.
+    expect(rimDistances[0]).toBeGreaterThan(0);
+    expect(rimDistances[1]).toBe(0);
+    await driver.page.screenshot({
+      path: "docs/assets/vector-tools-charge-lines-after-close.png",
+    });
 
     await driver.disablePlugin("vector-tools");
     await driver.setBlank();

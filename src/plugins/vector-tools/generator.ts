@@ -1,6 +1,5 @@
 import {
   getAxisSampleCount,
-  getAxisSpacing,
   type VectorColorMode,
   type VectorFieldConfig,
   type VectorLengthMode,
@@ -21,6 +20,7 @@ import type {
 } from "./desmos/ExpressionAdapter";
 
 type VectorFieldPurpose =
+  | "arrow count"
   | "x samples"
   | "y samples"
   | "grid x coordinates"
@@ -84,7 +84,17 @@ export interface GenerationOptions {
    * graph defines `t` itself — which the generator has no view of.
    */
   animateTime?: boolean;
+  /**
+   * The id of the expression that defines `N_{arrows}` in the graph now, if
+   * any. A field whose own count row is not it names its count after its
+   * token instead, so two generated fields never both define `N_{arrows}`.
+   */
+  arrowCountOwner?: string;
 }
+
+/** The arrow count slider's bounds: N² arrows, at most 2,500 of them. */
+export const ARROW_COUNT_MIN = 2;
+export const ARROW_COUNT_MAX = 50;
 
 interface ExpressionAuditRow {
   id: string;
@@ -134,6 +144,7 @@ export function timeSymbolFor(config: VectorFieldConfig) {
  */
 const GENERATED_SUFFIXES = [
   "folder",
+  "n_arrows",
   "x_samples",
   "y_samples",
   "time",
@@ -370,17 +381,37 @@ function tickerFor(symbol: string, speed: number) {
 
 export function createVectorFieldPlan(
   config: VectorFieldConfig,
-  { animateTime = false }: GenerationOptions = {}
+  { animateTime = false, arrowCountOwner }: GenerationOptions = {}
 ): VectorFieldPlan {
   const namespace = namespaceForField(config);
   const symbols = createSymbols(config);
-  const xCount = getAxisSampleCount(config.domain.x);
-  const yCount = getAxisSampleCount(config.domain.y);
-  const xSpacing = getAxisSpacing(config.domain.x);
-  const ySpacing = getAxisSpacing(config.domain.y);
+  // N_{arrows} arrows a side, N² in all, on a slider in the folder (Rafael,
+  // 2026-11-09): the grid is the user's to thin or thicken in Desmos itself,
+  // without coming back to the panel. It starts at the panel's density.
+  const countID = `${namespace}_n_arrows`;
+  const count =
+    arrowCountOwner === undefined || arrowCountOwner === countID
+      ? "N_{arrows}"
+      : `N_{arrows${config.id === "test" ? "t" : config.symbolToken}}`;
+  const startCount = Math.round(
+    clampNumber(
+      Math.sqrt(
+        getAxisSampleCount(config.domain.x) *
+          getAxisSampleCount(config.domain.y)
+      ),
+      ARROW_COUNT_MIN,
+      ARROW_COUNT_MAX
+    )
+  );
+  const xSpan = config.domain.x.max - config.domain.x.min;
+  const ySpan = config.domain.y.max - config.domain.y.min;
+  // The arrows' length follows the grid's spacing as N_{arrows} moves, so
+  // more arrows are shorter ones rather than overlapping ones.
   const targetLength = config.length.autoLength
-    ? 0.7 * Math.min(Math.abs(xSpacing), Math.abs(ySpacing))
-    : config.length.targetLength;
+    ? String.raw`0.7\cdot${numberLatex(
+        Math.min(Math.abs(xSpan), Math.abs(ySpan))
+      )}/\left(${count}-1\right)`
+    : numberLatex(config.length.targetLength);
   const folder: GeneratedFolderSpec = {
     id: `${namespace}_folder`,
     title: `Vector Tools — ${config.name}`,
@@ -408,14 +439,14 @@ export function createVectorFieldPlan(
   const xSamples = axisSamplesLatex(
     symbols.xSamples,
     config.domain.x.min,
-    xSpacing,
-    xCount
+    xSpan,
+    count
   );
   const ySamples = axisSamplesLatex(
     symbols.ySamples,
     config.domain.y.min,
-    ySpacing,
-    yCount
+    ySpan,
+    count
   );
   const display = displayComponentsLatex(
     config.length.mode,
@@ -534,6 +565,17 @@ export function createVectorFieldPlan(
     folder,
     ticker: needsClock ? tickerFor(symbols.time, config.time.speed) : undefined,
     expressions: [
+      {
+        ...expression("n_arrows", "arrow count", `${count}=${startCount}`),
+        slider: {
+          min: String(ARROW_COUNT_MIN),
+          max: String(ARROW_COUNT_MAX),
+          step: "1",
+        },
+        // A rewrite (a palette change rewrites the arrows) keeps the count
+        // the user dragged it to.
+        keepValue: true,
+      },
       expression("x_samples", "x samples", xSamples),
       expression("y_samples", "y samples", ySamples),
       ...timeExpressions,
@@ -739,19 +781,24 @@ function createSymbols(config: Pick<VectorFieldConfig, "id" | "symbolToken">) {
   };
 }
 
+/** `count` samples from `min` across `span`, both ends included. */
 function axisSamplesLatex(
   symbol: string,
   min: number,
-  spacing: number,
-  count: number
+  span: number,
+  count: string
 ) {
-  return `${symbol}=${numberLatex(min)}+${numberLatex(spacing)}\\cdot\\left[0...${count - 1}\\right]`;
+  return `${symbol}=${numberLatex(min)}+\\frac{${numberLatex(span)}}{${count}-1}\\cdot\\left[0...${count}-1\\right]`;
+}
+
+function clampNumber(value: number, low: number, high: number) {
+  return Number.isFinite(value) ? Math.min(high, Math.max(low, value)) : low;
 }
 
 function displayComponentsLatex(
   mode: VectorLengthMode,
   symbols: ReturnType<typeof createSymbols>,
-  targetLength: number,
+  targetLength: string,
   scale: number,
   maximumLength: number,
   compression: number
@@ -766,7 +813,7 @@ function displayComponentsLatex(
       break;
     case "normalized":
     case "direction-only":
-      factor = `${numberLatex(targetLength)}/${denominator}`;
+      factor = `${targetLength}/${denominator}`;
       break;
     case "scaled":
       factor = numberLatex(scale);

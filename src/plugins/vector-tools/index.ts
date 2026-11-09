@@ -923,6 +923,15 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       // Anything else may have moved a slider: its number is in the list
       // already, so the field can have it on the next frame.
       else if (this.parameterHelpers.size > 0) this.schedulePush();
+      // A closed preset's charges still move their lines; see
+      // writeChargeLines. The trace is keyed, so an event that moved none
+      // costs a timer and a comparison.
+      if (
+        event.type !== "tick" &&
+        this.cc.getItemModel(sceneItemID({ key: "linesx", latex: "" })) !==
+          undefined
+      )
+        this.scheduleChargeLines(this.graphParameterValues);
       if (
         event.type === "set-item-latex" ||
         event.type === "undo" ||
@@ -1014,7 +1023,14 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
 
   /** Options every plan for the production field is built with. */
   private get generationOptions(): GenerationOptions {
-    return { animateTime: this.fieldAnimatesTime };
+    return {
+      animateTime: this.fieldAnimatesTime,
+      arrowCountOwner: this.cc
+        .getAllItemModels()
+        .find((model) =>
+          itemLatex(model).replace(/\s+/g, "").startsWith("N_{arrows}=")
+        )?.id,
+    };
   }
 
   /**
@@ -1325,16 +1341,30 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     }, 50);
   }
 
+  /**
+   * Traced for as long as the lines' lists are in the graph, not only while
+   * the preset is open. Its sliders and objects stay after Back to my field
+   * or Export, and the lines stayed with them, frozen where the charges had
+   * been: a charge moved afterwards left its lines ending on empty paper, a
+   * phantom charge (Rafael, 2026-11-09). The numbers are read from the
+   * sliders themselves, since a closed preset's are no longer the field's.
+   */
   private writeChargeLines() {
     const values = this.chargeLinesValues;
     if (values === undefined || this.cc.is3dProduct()) return;
-    const preset = galleryPreset(this.activePresetId ?? "");
-    const spec = preset?.chargeLines;
-    if (preset === undefined || spec === undefined) return;
+    const spec =
+      galleryPreset(this.activePresetId ?? "")?.chargeLines ??
+      FIELD_GALLERY.find((preset) => preset.chargeLines !== undefined)
+        ?.chargeLines;
+    if (spec === undefined) return;
     const xs = sceneItemID({ key: "linesx", latex: "" });
     const ys = sceneItemID({ key: "linesy", latex: "" });
     if (this.cc.getItemModel(xs) === undefined) return;
-    const read = (name: string) => values.get(canonicalIdentifier(name));
+    const sliders = sliderValues(this.cc.getAllItemModels());
+    const read = (name: string) => {
+      const id = canonicalIdentifier(name);
+      return sliders.get(id) ?? values.get(id);
+    };
     const on = read("s_{lines}") !== 0;
     const count = Math.round(read(COUNT) ?? 0);
     const charges: PointCharge[] = [];
@@ -3057,9 +3087,11 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   }
 
   /**
-   * The preset's field as Desmos expressions, written hidden: there for the
-   * graph to keep and share, shown by unhiding its rows (Rafael,
-   * 2026-11-08: "generate the standard desmos vector field, turned off").
+   * The preset's field as Desmos expressions, written in a hidden folder:
+   * there for the graph to keep and share, shown by pressing the folder's
+   * icon (Rafael, 2026-11-08: "generate the standard desmos vector field,
+   * turned off"). Every row used to be hidden instead, with the folder
+   * shown, and the icon then had nothing to switch on (2026-11-09).
    */
   private writePresetDesmosField() {
     const config = this.getConfig();
@@ -3068,8 +3100,8 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       const plan = createVectorFieldPlan(config, this.generationOptions);
       this.expressions.applyGeneratedSet(
         plan.namespace,
-        plan.folder,
-        plan.expressions.map((e) => ({ ...e, hidden: true })),
+        { ...plan.folder, hidden: true },
+        plan.expressions,
         {
           ticker: this.tickerToWrite(plan),
           knownIDs: allGeneratedIDs(config),
