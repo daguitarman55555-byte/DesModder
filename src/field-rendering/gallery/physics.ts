@@ -162,10 +162,13 @@ const probeSwitches = (gain: number, max: number): GalleryVariable[] => [
  * The charges preset's parts, each a folder whose icon shows and hides it
  * (Rafael, 2026-11-09), in the order a lesson meets them: the charges, the
  * probe, the field there, its parts, the force, then the lines and the
- * equipotentials. The hidden helpers fold away at the end.
+ * equipotentials. The hidden helpers fold away at the end. The titles are
+ * Rafael's, as he renamed them in the graph on 2026-11-09; the charges'
+ * places have a folder of their own, apart from their sizes.
  */
 const CHARGE_GROUPS: SceneGroup[] = [
-  { id: "charges", title: "Charges: how many, their sizes and places" },
+  { id: "charges", title: "Charges" },
+  { id: "positions", title: "Charge Positions" },
   { id: "probe", title: "Probe p: drag it to measure the field" },
   { id: "net", title: "Electric field E at the probe", toggle: "s_{net}" },
   {
@@ -179,8 +182,15 @@ const CHARGE_GROUPS: SceneGroup[] = [
     toggle: "s_{force}",
   },
   { id: "lines", title: "Field lines", toggle: "s_{lines}" },
-  { id: "equi", title: "Equipotentials", toggle: "s_{equi}" },
+  { id: "equi", title: "Equipotentials Drawing", toggle: "s_{equi}" },
+  { id: "helpers", title: "Electric Charge Drawing" },
 ];
+
+/** A charge's X, Y or Z slider goes in the positions' folder. */
+const placed = (variables: GalleryVariable[]) =>
+  variables.map((v) =>
+    /^[XYZ]_\{q\d+\}$/.test(v.name) ? { ...v, group: "positions" } : v
+  );
 
 /** Which part a shown object of the charges preset belongs to. */
 function chargeGroup(item: SceneItem): SceneItem {
@@ -328,7 +338,7 @@ const CHARGES_PRESET: GalleryPreset = {
   yLatex: GPU_2D.field[1],
   seedLatex: GPU_2D.seed,
   variables: [
-    ...chargeVariables(LAYOUT_2D, 2, [-5, 5, 0.1]),
+    ...placed(chargeVariables(LAYOUT_2D, 2, [-5, 5, 0.1])),
     { ...v("p_{x}", 0, -9, 9, 0.05), group: "probe" },
     { ...v("p_{y}", 3, -9, 9, 0.05), group: "probe" },
     ...probeSwitches(30, 100),
@@ -337,6 +347,7 @@ const CHARGES_PRESET: GalleryPreset = {
   ],
   scene: CHARGES_SCENE_2D.map(chargeGroup),
   groups: CHARGE_GROUPS,
+  arrowsTitle: "Electric Field Drawing",
   chargeLines: { radius: Number(CHARGE_RADIUS_2D), extent: 10 },
   onPaper: true,
   palette: "charge",
@@ -360,7 +371,7 @@ const CHARGES_PRESET: GalleryPreset = {
     zLatex: GPU_3D.field[2],
     seedLatex: GPU_3D.seed,
     variables: [
-      ...chargeVariables(LAYOUT_3D, 3, [-5, 5, 0.1]),
+      ...placed(chargeVariables(LAYOUT_3D, 3, [-5, 5, 0.1])),
       { ...v("p_{x}", 0, -5, 5, 0.05), group: "probe" },
       { ...v("p_{y}", 1.5, -5, 5, 0.05), group: "probe" },
       { ...v("p_{z}", 1, -5, 5, 0.05), group: "probe" },

@@ -203,6 +203,8 @@ export interface GalleryPreset {
    * go in one folder, the field's variables.
    */
   groups?: readonly SceneGroup[];
+  /** The title of the folder of its Desmos arrows, if not the usual. */
+  arrowsTitle?: string;
   /**
    * Drawn on the graph paper, as a textbook figure is: no dark backdrop, and
    * the flow faint and under Desmos's objects, which carry the picture.

@@ -101,7 +101,13 @@ function trace(
   options: Required<FieldLineOptions>
 ) {
   const { radius, extent, maxSteps } = options;
-  const limit = extent * 1.25;
+  // Followed well past the picture, not cut at its edge: a dipole's outer
+  // lines leave the view and come back round to the negative charge. Cut
+  // at 1.25 × the extent, they never arrived, and the negative charge made
+  // up the lines it was missing from the widest gaps, so the picture was
+  // lopsided: a line out of + on one side, none into − on the other
+  // (Rafael, 2026-11-09: "the field lines are wrong").
+  const limit = extent * 8;
   let [x, y] = start;
   const xs = [x];
   const ys = [y];
@@ -113,7 +119,10 @@ function trace(
     let nearest = Infinity;
     for (const c of charges)
       nearest = Math.min(nearest, Math.hypot(x - c.x, y - c.y));
-    const h = Math.min(0.25, Math.max(0.01, 0.15 * nearest));
+    // Out past the picture, where nothing is drawn finely, the steps
+    // lengthen with the distance, so a long loop costs few of them.
+    const cap = nearest > extent ? 0.1 * nearest : 0.25;
+    const h = Math.min(cap, Math.max(0.01, 0.15 * nearest));
     const k1 = direction(charges, x, y, sign);
     if (k1 === undefined) return { xs, ys, end: -1 };
     const k2 = direction(

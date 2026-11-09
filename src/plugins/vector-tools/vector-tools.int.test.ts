@@ -2248,8 +2248,9 @@ testWithPage(
       "folder",
       "N_{q}=2",
       "q_{1}=1",
-      "X_{q1}=-2.5",
-      "Y_{q1}=0",
+      // The places follow in a folder of their own (2026-11-09).
+      "q_{2}=-1",
+      "q_{3}=1",
     ]);
     expect(loaded).toContain("s_{net}=1");
     expect(loaded).toContain(String.raw`\left(p_{x},p_{y}\right)`);
@@ -2354,6 +2355,7 @@ testWithPage(
       );
     expect(await folders()).toEqual([
       ["charges", false],
+      ["positions", false],
       ["probe", false],
       ["net", false],
       ["parts", true],
@@ -2362,6 +2364,42 @@ testWithPage(
       ["equi", true],
       ["helpers", false],
     ]);
+    // Named as Rafael named them in the graph (2026-11-09), the Desmos
+    // arrows' folder among them.
+    const titles = await driver.evaluate(() =>
+      Calc.getState()
+        .expressions.list.filter((e) => e.type === "folder")
+        .map((e) => (e as { title?: string }).title)
+    );
+    expect(titles).toEqual([
+      "Charges",
+      "Charge Positions",
+      "Probe p: drag it to measure the field",
+      "Electric field E at the probe",
+      "Each charge's field at the probe, E₁, E₂, …",
+      "Force on a test charge q₀, F = q₀E",
+      "Field lines",
+      "Equipotentials Drawing",
+      "Electric Charge Drawing",
+      "Electric Field Drawing",
+    ]);
+    // The charges' places are apart from their sizes.
+    const positions = await driver.evaluate(() =>
+      Calc.getState()
+        .expressions.list.filter(
+          (e) =>
+            (e as { folderId?: string }).folderId ===
+            "vector_tools_variables_folder_positions"
+        )
+        .map((e) => (e as { latex: string }).latex.split("=")[0])
+    );
+    expect(positions.slice(0, 4)).toEqual([
+      "X_{q1}",
+      "Y_{q1}",
+      "X_{q2}",
+      "Y_{q2}",
+    ]);
+    expect(positions).toHaveLength(20);
     // Every hidden helper and every switch is out of the way, and the
     // charges' folder is its sliders alone: what a student sets.
     const misplaced = await driver.evaluate(() =>

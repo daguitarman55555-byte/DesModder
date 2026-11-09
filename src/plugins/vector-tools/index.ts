@@ -259,11 +259,16 @@ function groupedLayout(
         ? {}
         : { hidden: (value.get(g.toggle) ?? 1) === 0, resetHidden: true }),
     })),
-    {
-      id: groupFolderID(HELPERS_GROUP),
-      title: `${title}: how it is drawn (nothing to set here)`,
-      collapsed: true,
-    },
+    // Last, unless the preset places and names it itself.
+    ...(groups.some((g) => g.id === HELPERS_GROUP)
+      ? []
+      : [
+          {
+            id: groupFolderID(HELPERS_GROUP),
+            title: `${title}: how it is drawn (nothing to set here)`,
+            collapsed: true,
+          },
+        ]),
   ].filter((f) => used.has(f.id.slice(groupFolderID("").length)));
   return { folders, variables: vars, scene: items };
 }
@@ -3238,9 +3243,10 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
     if (config.id !== PRESET_FIELD_ID || this.is3d) return;
     try {
       const plan = createVectorFieldPlan(config, this.generationOptions);
+      const title = galleryPreset(this.activePresetId ?? "")?.arrowsTitle;
       this.expressions.applyGeneratedSet(
         plan.namespace,
-        { ...plan.folder, hidden: true },
+        { ...plan.folder, hidden: true, ...(title ? { title } : {}) },
         plan.expressions,
         {
           ticker: this.tickerToWrite(plan),

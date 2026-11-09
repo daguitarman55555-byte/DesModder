@@ -64,6 +64,31 @@ describe("traceFieldLines", () => {
     expect(lines.lines).toBeLessThanOrEqual(12);
   });
 
+  test("an equal dipole's lines are its mirror image", () => {
+    // The preset's own pair. Each line out of + is a line into −: the
+    // picture reflected left to right is itself, which the lines cut at
+    // the picture's edge were not.
+    const charges = [
+      { q: 1, x: -2.5, y: 0 },
+      { q: -1, x: 2.5, y: 0 },
+    ];
+    const lines = traceFieldLines(charges, { radius: 0.4, extent: 10 });
+    const points: [number, number][] = [];
+    for (let i = 0; i < lines.xs.length; i++)
+      if (Math.abs(lines.xs[i]) < 7 && Math.abs(lines.ys[i]) < 7)
+        points.push([lines.xs[i], lines.ys[i]]);
+    // Every visible point has a point near its mirror image, as far as a
+    // line's points are spaced.
+    let worst = 0;
+    for (const [x, y] of points) {
+      let best = Infinity;
+      for (const [u, v] of points)
+        best = Math.min(best, Math.hypot(u + x, v - y));
+      worst = Math.max(worst, best);
+    }
+    expect(worst).toBeLessThan(0.45);
+  });
+
   test("a lone negative charge sends its lines back out", () => {
     const lines = traceFieldLines([{ q: -1, x: 0, y: 0 }], opts);
     expect(lines.lines).toBe(8);
