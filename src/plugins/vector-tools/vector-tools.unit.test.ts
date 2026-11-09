@@ -379,6 +379,7 @@ describe("Vector Tools field configuration", () => {
       pointSize: 6,
       // Always full detail: the flow lowers it itself while frames are slow.
       renderScale: 1,
+      quality: "auto",
       colorMode: "speed",
       // Clamped like every other slider, so a hand-edited setting cannot ask
       // for a colour the shader would drive to a flat block.

@@ -1,18 +1,13 @@
-/** Space: black holes, galaxies, stars and the solar wind. */
+/** Space: a black hole, a pulsar, crashing stars and a double planet. */
 import { carriedWorlds, num, rho, separation } from "./latex";
-import {
-  EIGHT_PERIOD,
-  figureEight,
-  keplerPair,
-  type PlanarState,
-} from "./orbits";
+import { keplerPair, type PlanarState } from "./orbits";
 import {
   flashAt,
   integrateThreeBody,
   playbackScene,
-  recordMotion,
   stateAt,
   type ThreeBodyRun,
+  type ThreeBodyStart,
 } from "./three-body";
 import type { ClockParameters, GalleryPreset, SpaceLook } from "./types";
 
@@ -65,67 +60,8 @@ function movingBodies(
   return { bodies, clock, normal: [0, -s, c] as const };
 }
 
-/**
- * Three stars on the figure-eight orbit, each carrying a cluster of glowing
- * gas round with it, so their trails draw the eight as the well-known
- * animations of it do. Outside the clusters, the stars' gravity: with matter
- * everywhere, gas is seen falling in towards them. In the box the orbit's
- * plane is tilted half a radian, so the eight reads as an eight from
- * Desmos's default view.
- */
-const EIGHT_TILT = 0.5;
-const EIGHT_W = 0.6;
-function eight(axes: readonly Axis[], size: number) {
-  const three = axes.length === 3;
-  const moving = movingBodies(
-    3,
-    axes,
-    { position: "S", velocity: "V" },
-    three ? EIGHT_TILT : 0,
-    (t) => figureEight(t, EIGHT_W, size)
-  );
-  const field = carriedWorlds(
-    moving.bodies.map((b) => ({ ...b, reach: size * 0.2, swirl: size * 0.5 })),
-    axes,
-    moving.normal,
-    1
-  );
-  // Each star's cluster, bright and tight. Nothing else: with the seed on,
-  // the picture is the orbit, as the animations of it show it; switched off,
-  // the gravity drawing in the gas round it is the rest of the field.
-  const seed = moving.bodies
-    .map(
-      (b) =>
-        String.raw`e^{-\frac{${separation(b.position, axes).r2}}{${num((size * (three ? 0.1 : 0.07)) ** 2)}}}`
-    )
-    .join("+");
-  return { ...field, seed, clock: moving.clock };
-}
-const CLUSTER_2D = eight(["x", "y"], 6);
-const CLUSTER_3D = eight(["x", "y", "z"], 3.6);
-
 /** The stars' colours, and the white a crash flashes and leaves. */
 const STARS = ["#ffd27a", "#8ec9ff", "#ff9a7a", "#ffffff"] as const;
-
-/**
- * The eight as Desmos draws it in the plane: the three stars, a trail behind
- * each, and the orbit they share. One period recorded from the same table the
- * field reads, at the field's own rate, so each star sits in its cluster.
- */
-const EIGHT_SCENE = playbackScene(
-  recordMotion(
-    (tau) => figureEight(tau, (2 * Math.PI) / EIGHT_PERIOD, 1),
-    EIGHT_PERIOD,
-    240
-  ),
-  {
-    scale: 6,
-    rate: (EIGHT_W * EIGHT_PERIOD) / (2 * Math.PI),
-    colors: STARS,
-    trail: EIGHT_PERIOD / 3,
-    paths: 1,
-  }
-);
 
 /**
  * A three-body run that crashes, as a field and its clock: each star
@@ -212,60 +148,381 @@ function lagrangeRun() {
     dt: 0.02,
   });
 }
-const LAGRANGE = lagrangeRun();
-const LAGRANGE_2D = crashing(["x", "y"], LAGRANGE, {
-  scale: 1.9,
-  rate: 1,
-  tilt: 0,
-});
-const LAGRANGE_3D = crashing(["x", "y", "z"], LAGRANGE, {
-  scale: 1.15,
-  rate: 1,
-  tilt: 0.5,
-});
-const LAGRANGE_SCENE = playbackScene(LAGRANGE, {
-  scale: 1.9,
-  rate: 1,
-  colors: STARS,
-  trail: 2.5,
-  paths: 0,
-});
+/**
+ * Starts that end in a crash, found by searching random ones offline: three
+ * stars of masses between 0.6 and 1.6, let go near one another with a little
+ * spin, their centre of mass at rest at the origin, kept when two crash
+ * between 3 and 22 units in and nobody has left the picture by then: 29
+ * of them, and Lagrange's triangle makes 30 (Rafael asked for 20 to 30).
+ * Searching takes seconds, which is why the finds are written down here
+ * rather than made when the preset is chosen (Rafael, 2026-11-08: "randomly
+ * cycles through a library"). Each runs seven units past its first crash.
+ */
+const CRASH_STARTS: readonly ThreeBodyStart[] = [
+  {
+    masses: [1.4, 1.1, 0.9],
+    x: [-0.81, -0.21, 1.517],
+    y: [-0.682, 1.059, -0.234],
+    vx: [-0.097, 0.242, -0.145],
+    vy: [0.259, 0.058, -0.473],
+    radius: 0.05,
+    duration: 10.4,
+    dt: 0.02,
+  },
+  {
+    masses: [1.3, 1, 0.7],
+    x: [-0.392, -0.111, 0.888],
+    y: [0.753, -1.317, 0.484],
+    vx: [0.362, -0.447, -0.034],
+    vy: [0.192, 0.059, -0.441],
+    radius: 0.05,
+    duration: 12.1,
+    dt: 0.02,
+  },
+  {
+    masses: [1.1, 0.8, 0.7],
+    x: [-0.412, -0.237, 0.918],
+    y: [1.294, -1.253, -0.602],
+    vx: [-0.486, 0.485, 0.209],
+    vy: [-0.17, -0.087, 0.368],
+    radius: 0.05,
+    duration: 22.6,
+    dt: 0.02,
+  },
+  {
+    masses: [1.4, 1.2, 0.8],
+    x: [1.125, -0.581, -1.098],
+    y: [-0.389, 0.956, -0.753],
+    vx: [0.155, -0.309, 0.193],
+    vy: [0.555, -0.26, -0.58],
+    radius: 0.05,
+    duration: 11.9,
+    dt: 0.02,
+  },
+  {
+    masses: [0.6, 1, 1.4],
+    x: [-1.084, -0.677, 0.948],
+    y: [1.133, -1.193, 0.366],
+    vx: [0.017, -0.26, 0.178],
+    vy: [-0.047, 0.069, -0.029],
+    radius: 0.05,
+    duration: 21,
+    dt: 0.02,
+  },
+  {
+    masses: [1.5, 0.7, 0.9],
+    x: [1.129, -1.259, -0.902],
+    y: [-0.178, 0.817, -0.338],
+    vx: [0.041, -0.339, 0.196],
+    vy: [0.42, -0.442, -0.357],
+    radius: 0.05,
+    duration: 13.9,
+    dt: 0.02,
+  },
+  {
+    masses: [1.2, 0.8, 1],
+    x: [-0.471, 0.677, 0.023],
+    y: [0.841, 0.311, -1.258],
+    vx: [-0.284, -0.205, 0.505],
+    vy: [-0.259, 0.439, -0.041],
+    radius: 0.05,
+    duration: 10.3,
+    dt: 0.02,
+  },
+  {
+    masses: [0.8, 0.9, 1.5],
+    x: [0.214, -1.677, 0.892],
+    y: [-0.675, 0.07, 0.318],
+    vx: [-0.382, 0.001, 0.203],
+    vy: [-0.251, 0.692, -0.281],
+    radius: 0.05,
+    duration: 10.6,
+    dt: 0.02,
+  },
+  {
+    masses: [1.5, 1, 0.8],
+    x: [-0.193, 0.66, -0.462],
+    y: [1.145, -0.615, -1.378],
+    vx: [0.424, -0.1, -0.671],
+    vy: [0.212, -0.372, 0.068],
+    radius: 0.05,
+    duration: 13.6,
+    dt: 0.02,
+  },
+  {
+    masses: [0.8, 1.1, 1.4],
+    x: [-1.2, 0.233, 0.502],
+    y: [-0.294, -0.848, 0.834],
+    vx: [-0.003, 0.451, -0.353],
+    vy: [-0.673, 0.253, 0.186],
+    radius: 0.05,
+    duration: 22.4,
+    dt: 0.02,
+  },
+  {
+    masses: [0.8, 1.4, 1.6],
+    x: [-1.017, 0.496, 0.074],
+    y: [-1.024, -0.719, 1.141],
+    vx: [0.291, 0.383, -0.481],
+    vy: [-0.309, 0.098, 0.068],
+    radius: 0.05,
+    duration: 13.9,
+    dt: 0.02,
+  },
+  {
+    masses: [1.3, 1.5, 0.8],
+    x: [-0.601, 1.035, -0.964],
+    y: [0.893, -0.073, -1.314],
+    vx: [0.316, 0.061, -0.629],
+    vy: [0.25, -0.313, 0.182],
+    radius: 0.05,
+    duration: 12.2,
+    dt: 0.02,
+  },
+  {
+    masses: [1.1, 1.1, 1.2],
+    x: [0.044, 1.084, -1.034],
+    y: [-0.547, 0.72, -0.158],
+    vx: [0.343, -0.455, 0.103],
+    vy: [0.109, 0.543, -0.598],
+    radius: 0.05,
+    duration: 10.9,
+    dt: 0.02,
+  },
+  {
+    masses: [0.7, 1, 0.7],
+    x: [-0.428, -0.569, 1.241],
+    y: [0.944, -0.933, 0.389],
+    vx: [-0.36, 0.342, -0.129],
+    vy: [-0.209, -0.191, 0.481],
+    radius: 0.05,
+    duration: 23.6,
+    dt: 0.02,
+  },
+  {
+    masses: [1.4, 0.9, 0.7],
+    x: [-0.762, 0.801, 0.495],
+    y: [-0.649, -0.267, 1.642],
+    vx: [-0.135, -0.164, 0.482],
+    vy: [0.324, -0.275, -0.295],
+    radius: 0.05,
+    duration: 10,
+    dt: 0.02,
+  },
+  {
+    masses: [0.7, 0.7, 0.6],
+    x: [0.975, -1.22, 0.286],
+    y: [0.104, -0.728, 0.727],
+    vx: [0.053, 0.377, -0.503],
+    vy: [0.361, -0.438, 0.09],
+    radius: 0.05,
+    duration: 10.7,
+    dt: 0.02,
+  },
+  {
+    masses: [0.7, 0.9, 1.5],
+    x: [0.636, 0.728, -0.733],
+    y: [-0.663, 1.124, -0.365],
+    vx: [-0.228, 0.491, -0.188],
+    vy: [-0.314, -0.343, 0.352],
+    radius: 0.05,
+    duration: 14.2,
+    dt: 0.02,
+  },
+  {
+    masses: [1.5, 0.7, 0.7],
+    x: [0.928, -1.019, -0.97],
+    y: [0.046, 0.616, -0.715],
+    vx: [-0.015, -0.222, 0.255],
+    vy: [0.352, -0.424, -0.329],
+    radius: 0.05,
+    duration: 10.1,
+    dt: 0.02,
+  },
+  {
+    masses: [1.2, 1.5, 0.8],
+    x: [-0.309, -0.49, 1.383],
+    y: [1.026, -0.949, 0.241],
+    vx: [-0.332, 0.351, -0.16],
+    vy: [-0.234, -0.136, 0.606],
+    radius: 0.05,
+    duration: 12.1,
+    dt: 0.02,
+  },
+  {
+    masses: [1.3, 1.3, 1],
+    x: [-0.301, 0.612, -0.403],
+    y: [0.43, 0.836, -1.645],
+    vx: [-0.096, -0.433, 0.688],
+    vy: [-0.331, 0.383, -0.067],
+    radius: 0.05,
+    duration: 13.3,
+    dt: 0.02,
+  },
+  {
+    masses: [1, 0.9, 0.7],
+    x: [0.334, -0.619, 0.32],
+    y: [-1.091, 0.76, 0.581],
+    vx: [-0.48, 0.353, 0.231],
+    vy: [-0.065, 0.253, -0.233],
+    radius: 0.05,
+    duration: 11.5,
+    dt: 0.02,
+  },
+  {
+    masses: [1.5, 1.2, 1.3],
+    x: [0.966, -0.136, -0.989],
+    y: [-0.503, 1.077, -0.414],
+    vx: [0.096, -0.303, 0.169],
+    vy: [-0.017, 0.085, -0.059],
+    radius: 0.05,
+    duration: 10.9,
+    dt: 0.02,
+  },
+  {
+    masses: [0.7, 1, 0.9],
+    x: [-0.497, -0.724, 1.192],
+    y: [1.153, -0.924, 0.13],
+    vx: [0.191, -0.281, 0.163],
+    vy: [0.045, 0.411, -0.492],
+    radius: 0.05,
+    duration: 10.4,
+    dt: 0.02,
+  },
+  {
+    masses: [1, 1.1, 0.8],
+    x: [0.6, 0.403, -1.303],
+    y: [-0.75, 0.877, -0.268],
+    vx: [0.236, -0.353, 0.191],
+    vy: [0.304, 0.131, -0.56],
+    radius: 0.05,
+    duration: 13.5,
+    dt: 0.02,
+  },
+  {
+    masses: [0.7, 0.6, 0.8],
+    x: [0.963, -0.044, -0.81],
+    y: [-1.221, 1.114, 0.233],
+    vx: [-0.487, 0.531, 0.028],
+    vy: [-0.305, -0.089, 0.333],
+    radius: 0.05,
+    duration: 15,
+    dt: 0.02,
+  },
+  {
+    masses: [1, 0.8, 1.6],
+    x: [-0.949, 0.093, 0.547],
+    y: [0.287, -1.522, 0.582],
+    vx: [0.054, -0.51, 0.221],
+    vy: [0.432, 0.028, -0.284],
+    radius: 0.05,
+    duration: 13.1,
+    dt: 0.02,
+  },
+  {
+    masses: [1.1, 1.5, 0.9],
+    x: [-1.445, 0.751, 0.515],
+    y: [0.129, -0.614, 0.866],
+    vx: [0.033, -0.282, 0.43],
+    vy: [0.555, -0.337, -0.118],
+    radius: 0.05,
+    duration: 14.6,
+    dt: 0.02,
+  },
+  {
+    masses: [0.7, 1.1, 0.6],
+    x: [-0.587, 0.11, 0.484],
+    y: [-0.279, 0.844, -1.221],
+    vx: [0.027, -0.305, 0.527],
+    vy: [-0.234, 0.009, 0.257],
+    radius: 0.05,
+    duration: 13.7,
+    dt: 0.02,
+  },
+  {
+    masses: [0.8, 1, 0.8],
+    x: [-0.656, 0.275, 0.312],
+    y: [0.517, -1.264, 1.064],
+    vx: [-0.159, 0.455, -0.41],
+    vy: [-0.254, 0.073, 0.163],
+    radius: 0.05,
+    duration: 13.3,
+    dt: 0.02,
+  },
+  {
+    masses: [0.7, 0.7, 1.3],
+    x: [1.28, 0.276, -0.838],
+    y: [-0.237, -0.991, 0.661],
+    vx: [-0.211, -0.435, 0.348],
+    vy: [-0.383, -0.101, 0.261],
+    radius: 0.05,
+    duration: 16.3,
+    dt: 0.02,
+  },
+];
+
+/** How far from the centre any star still shining gets in a run. */
+function reachOf(run: ThreeBodyRun) {
+  let far = 0;
+  for (let i = 0; i < run.x.length; i++)
+    for (let k = 0; k < run.samples; k++)
+      if (run.mass[i][k] > 0)
+        far = Math.max(far, Math.hypot(run.x[i][k], run.y[i][k]));
+  return far;
+}
 
 /**
- * Burrau's Pythagorean problem (1913): masses 3, 4 and 5 let go from rest at
- * the corners of a 3-4-5 right triangle, each opposite the side of its own
- * length. As point masses they dance chaotically for some sixty units of
- * time before one is thrown out (Szebehely and Peters, 1967). Given a size
- * (0.1 for a mass of 1), the first close pass of the 4 and the 5 is a crash
- * instead, and what it leaves falls into the 3: two crashes in three units.
+ * Version `index` of the crash: 0 is Lagrange's triangle, the preset as it
+ * was; the rest are the library's. Scaled so the run fills the picture.
  */
-const PYTHAGOREAN = integrateThreeBody({
-  masses: [3, 4, 5],
-  x: [1, -2, 1],
-  y: [3, -1, -1],
-  vx: [0, 0, 0],
-  vy: [0, 0, 0],
-  radius: 0.1,
-  duration: 5.4,
-  dt: 0.01,
-});
-const PYTHAGOREAN_2D = crashing(["x", "y"], PYTHAGOREAN, {
-  scale: 1.6,
-  rate: 0.8,
-  tilt: 0,
-});
-const PYTHAGOREAN_3D = crashing(["x", "y", "z"], PYTHAGOREAN, {
-  scale: 1.4,
-  rate: 0.8,
-  tilt: 0.5,
-});
-const PYTHAGOREAN_SCENE = playbackScene(PYTHAGOREAN, {
-  scale: 1.6,
-  rate: 0.8,
-  colors: STARS,
-  trail: 1.5,
-  paths: 1,
-});
+function crashVersion(
+  index: number
+): Pick<GalleryPreset, "blurb" | "xLatex" | "yLatex" | "space"> &
+  Partial<GalleryPreset> {
+  const lagrange = index === 0;
+  const start = lagrange ? undefined : CRASH_STARTS[index - 1];
+  const run = start === undefined ? lagrangeRun() : integrateThreeBody(start);
+  const scale = lagrange ? 1.9 : Math.min(3, 6.5 / Math.max(1, reachOf(run)));
+  const plane = crashing(["x", "y"], run, { scale, rate: 1, tilt: 0 });
+  const box = crashing(["x", "y", "z"], run, {
+    scale: scale * 0.6,
+    rate: 1,
+    tilt: 0.5,
+  });
+  const scene = playbackScene(run, {
+    scale,
+    rate: 1,
+    colors: STARS,
+    trail: 2.5,
+    paths: 0,
+  });
+  const masses = (start?.masses ?? [1, 1, 1]).join(", ");
+  const crashes =
+    run.crashes.length === 1 ? "a crash" : `${run.crashes.length} crashes`;
+  const blurb = lagrange
+    ? "Three equal stars in Lagrange's triangle, one nudged 12% faster. Equal masses make the triangle unstable: it turns twice, breaks up, two stars pass close and crash, merging into one twice as heavy that then orbits the third. Momentum is conserved through the crash; the energy it loses becomes heat. Choose the preset again for another crash."
+    : `Three stars of masses ${masses}, let go near one another with a little spin, their centre of mass at rest. Their gravity pulls them into ${crashes}: the two that touch merge into one, with their summed mass and momentum, and the energy lost becomes heat. One of ${CRASH_STARTS.length + 1} crashes; choose the preset again for another.`;
+  return {
+    blurb,
+    xLatex: plane.x!,
+    yLatex: plane.y!,
+    seedLatex: plane.seed,
+    clockParameters: plane.clock,
+    sceneTime: "T_{scene}",
+    variables: scene.variables,
+    scene: scene.scene,
+    space: {
+      blurb,
+      xLatex: box.x!,
+      yLatex: box.y!,
+      zLatex: box.z!,
+      seedLatex: box.seed,
+      clockParameters: box.clock,
+      variables: [],
+      look: CRASH_LOOK,
+    },
+  };
+}
 
 /** How a crashing run's gas is drawn: as the eight's, long-lived and glowing. */
 const CRASH_FLOW = {
@@ -416,45 +673,6 @@ function pulsar(axes: readonly ("x" | "y" | "z")[]) {
   return { ...out, seed: `${beams}+${shell}+${body}${torus}` };
 }
 
-/**
- * A galaxy's matter: two logarithmic arms, cos(2θ − 4.5 ln r) — a pitch of
- * about 24°, a typical Sb spiral's — turning slowly as a density wave does,
- * raised to a high power so the arms are narrow; beaded with star-forming
- * clumps; on an exponential disk with an edge; and a round bulge.
- */
-function galaxySeed(o: {
-  power: number;
-  scale: number;
-  disk: number;
-  edge: number;
-  bulge: string;
-  thin: string;
-}) {
-  const r2 = String.raw`x^{2}+y^{2}`;
-  const phase = String.raw`2.25\ln\left(${r2}+0.01\right)-0.15t`;
-  const arm = String.raw`\left(\frac{1+\frac{\left(x^{2}-y^{2}\right)\cos\left(${phase}\right)+2xy\sin\left(${phase}\right)}{${r2}+0.01}}{2}\right)^{${o.power}}`;
-  const knots = String.raw`\left(0.45+0.55\sin\left(${num(9 / o.scale)}\sqrt{${r2}}+3\arctan\left(y,x\right)\right)^{2}\right)`;
-  const disk = String.raw`\frac{e^{-${num(o.disk)}\sqrt{${r2}}}}{1+e^{${num(4 / o.scale)}\left(\sqrt{${r2}}-${num(o.edge)}\right)}}`;
-  return String.raw`${o.thin}\left(0.03+${arm}${knots}\right)${disk}+${o.bulge}`;
-}
-
-const GALAXY_2D_SEED = galaxySeed({
-  power: 36,
-  scale: 2,
-  disk: 0.12,
-  edge: 9,
-  bulge: String.raw`e^{-0.6\left(x^{2}+y^{2}\right)}`,
-  thin: "",
-});
-const GALAXY_3D_SEED = galaxySeed({
-  power: 24,
-  scale: 1,
-  disk: 0.3,
-  edge: 4.6,
-  bulge: String.raw`0.5e^{-2.5\left(x^{2}+y^{2}+4z^{2}\right)}`,
-  thin: String.raw`e^{-\frac{z^{2}}{0.02}}`,
-});
-
 const PULSAR_2D = pulsar(["x", "y"]);
 const PULSAR_3D = pulsar(["x", "y", "z"]);
 
@@ -521,114 +739,6 @@ export const SPACE: readonly GalleryPreset[] = [
     },
   },
   {
-    id: "spiral-galaxy",
-    name: "Spiral galaxy",
-    category: "space",
-    blurb:
-      "A spiral galaxy face-on: stars on a flat rotation curve round a golden bulge of old stars, and two arms where the young blue ones are. The arms are a density wave the stars pass through, lit by stars too short-lived to leave it.",
-    xLatex: String.raw`\frac{-2y}{1.5+\sqrt{x^{2}+y^{2}}}`,
-    yLatex: String.raw`\frac{2x}{1.5+\sqrt{x^{2}+y^{2}}}`,
-    seedLatex: GALAXY_2D_SEED,
-    colorScale: 1.4,
-    palette: "galaxy",
-    backdrop: "#020206",
-    flow: {
-      particleCount: 50_000,
-      glow: 0.5,
-      opacity: 0.5,
-      pointSize: 1.4,
-      normalizeSpeed: false,
-      speed: 2,
-      trailPersistence: 0.93,
-      // Short lives, as the young blue stars that light real arms have.
-      dropRate: 0.08,
-    },
-    extent: 10,
-    space: {
-      blurb:
-        "A spiral galaxy: a thin disk of stars on a flat rotation curve — the curve that first told astronomers about dark matter — round a golden bulge of old stars. Its two arms are a density wave the stars pass through, beaded with clusters and lit by young blue stars too short-lived to leave it.",
-      xLatex: String.raw`\frac{-y}{0.6+${rho}}`,
-      yLatex: String.raw`\frac{x}{0.6+${rho}}`,
-      // A gentle pull to the plane: a stronger one put speeds off the disk
-      // into Auto's colour scale, and the disk came out cream, not blue.
-      zLatex: String.raw`-0.15z`,
-      seedLatex: GALAXY_3D_SEED,
-      look: {
-        particles: 90_000,
-        speed: 0.12,
-        trail: 16,
-        // About the time a star takes to cross an arm: any longer and it carries
-        // the arm's light round into a ring.
-        lifetime: 0.35,
-        // The flat part of the rotation curve, |F| ≈ 0.85, well into the
-        // blue; the bulge's slow centre in the gold.
-        scale: 0.6,
-        // Ninety thousand stars in a disk this thin add up to white at any
-        // more: their colour is in the faint ones.
-        opacity: 0.3,
-        glow: 0.25,
-        normalizeSpeed: false,
-        absorb: true,
-        colorMode: "speed",
-        backdrop: "#020206",
-        backdropOpacity: 1,
-      },
-    },
-  },
-  {
-    id: "aurora",
-    name: "Aurora",
-    category: "space",
-    blurb:
-      "Curtains that drift and fold, because both components read the clock.",
-    // Seen from the side: rays falling down the field lines to a sharp,
-    // folding lower edge, slowing as they reach it, which piles light there.
-    xLatex: String.raw`0.05`,
-    yLatex: String.raw`-0.4\left(y-\left(-4+1.2\sin\left(0.35x+0.3t\right)\right)+0.3\right)`,
-    seedLatex: String.raw`\frac{e^{-0.45\left(y-\left(-4+1.2\sin\left(0.35x+0.3t\right)\right)\right)}}{1+e^{-6\left(y-\left(-4+1.2\sin\left(0.35x+0.3t\right)\right)\right)}}\cdot\frac{0.6+0.4\sin\left(3x+0.5t\right)^{2}}{1+e^{1.5\left(\left|x\right|-8\right)}}`,
-    colorScale: 2,
-    palette: "auroral",
-    backdrop: "#02060a",
-    flow: {
-      particleCount: 35_000,
-      glow: 0.4,
-      opacity: 0.35,
-      pointSize: 1.3,
-      normalizeSpeed: false,
-      speed: 3,
-      trailPersistence: 0.95,
-      dropRate: 0.008,
-    },
-    extent: 10,
-    timeSpeed: 0.6,
-    space: {
-      blurb:
-        "Aurora curtains: a folded sheet hanging along the magnetic field, its rays streaming down to a sharp, bright lower edge where they stop, the curtain drifting and folding with the clock.",
-      // Down the field lines to the lower edge at z = −3, slowing as they
-      // reach it, which is what piles light into a sharp bottom border; and a
-      // drift along the fold.
-      xLatex: String.raw`0.06`,
-      yLatex: String.raw`0.05\cos\left(0.55x+0.35t\right)`,
-      zLatex: String.raw`-0.35\left(z+3.2\right)`,
-      // A thin folded sheet, starting sharply at the lower edge and fading
-      // with height.
-      seedLatex: String.raw`\frac{e^{-8\left(y-1.6\sin\left(0.55x+0.35t\right)\right)^{2}}e^{-0.3\left(z+3\right)}}{1+e^{-8\left(z+3\right)}}`,
-      look: {
-        particles: 60_000,
-        speed: 0.25,
-        trail: 40,
-        lifetime: 3,
-        opacity: 0.3,
-        glow: 0.2,
-        normalizeSpeed: false,
-        absorb: true,
-        colorMode: "speed",
-        backdrop: "#02060a",
-        backdropOpacity: 1,
-      },
-    },
-  },
-  {
     id: "pulsar",
     name: "Pulsar",
     category: "space",
@@ -676,121 +786,16 @@ export const SPACE: readonly GalleryPreset[] = [
     },
   },
   {
-    id: "star-cluster",
-    name: "Three-body eight",
-    category: "space",
-    blurb:
-      "Three equal stars on the figure-eight orbit, the well-known choreography in which three equal masses share a single path (Chenciner and Montgomery, 2000), each a third of an orbit behind the next. Each carries a cluster of glowing gas, and their trails draw the eight.",
-    xLatex: CLUSTER_2D.x!,
-    yLatex: CLUSTER_2D.y!,
-    seedLatex: CLUSTER_2D.seed,
-    clockParameters: CLUSTER_2D.clock,
-    sceneTime: "T_{scene}",
-    variables: EIGHT_SCENE.variables,
-    scene: EIGHT_SCENE.scene,
-    colorScale: 4,
-    palette: "blackbody",
-    backdrop: "#05030c",
-    flow: {
-      particleCount: 20_000,
-      glow: 0.6,
-      opacity: 0.5,
-      pointSize: 1.4,
-      normalizeSpeed: false,
-      // On the clock's time (see the double planet), and long-lived with
-      // long trails, so the trails are the orbit.
-      speed: 1.67,
-      trailPersistence: 0.995,
-      dropRate: 0.002,
-    },
-    extent: 10,
-    space: {
-      blurb:
-        "Three equal stars on the figure-eight orbit, the stable three-body orbit Chenciner and Montgomery proved exists, in a plane tilted to the view. Each carries a cluster of glowing gas, so three comets chase each other round the eight, their trails drawing it; outside the clusters, their gravity draws in the gas.",
-      xLatex: CLUSTER_3D.x!,
-      yLatex: CLUSTER_3D.y!,
-      zLatex: CLUSTER_3D.z!,
-      seedLatex: CLUSTER_3D.seed,
-      clockParameters: CLUSTER_3D.clock,
-      // Desmos 3D's curves are under the dark here; the gas is the picture.
-      variables: [],
-      look: {
-        palette: "blackbody",
-        particles: 20_000,
-        speed: 0.3,
-        // Half-width 5 × speed 0.3: the gas on the clock's time.
-        scale: 1.5,
-        trail: 64,
-        lifetime: 10,
-        opacity: 0.5,
-        glow: 0.35,
-        normalizeSpeed: false,
-        absorb: false,
-        colorMode: "speed",
-        backdrop: "#05030c",
-        backdropOpacity: 1,
-      },
-    },
-  },
-  {
     id: "three-body-crash",
     name: "Three-body crash",
     category: "space",
-    blurb:
-      "Three equal stars in Lagrange's triangle, one nudged 12% faster. Equal masses make the triangle unstable: it turns twice, breaks up, two stars pass close and crash, merging into one twice as heavy that then orbits the third. Momentum is conserved through the crash; the energy it loses becomes heat.",
-    xLatex: LAGRANGE_2D.x!,
-    yLatex: LAGRANGE_2D.y!,
-    seedLatex: LAGRANGE_2D.seed,
-    clockParameters: LAGRANGE_2D.clock,
-    sceneTime: "T_{scene}",
-    variables: LAGRANGE_SCENE.variables,
-    scene: LAGRANGE_SCENE.scene,
+    ...crashVersion(0),
     colorScale: 4,
     palette: "blackbody",
     backdrop: "#05030c",
     flow: CRASH_FLOW,
     extent: 10,
-    space: {
-      blurb:
-        "Lagrange's triangle of three equal stars, one nudged faster, in a plane tilted to the view: two turns, a break-up, a crash in a flash of gas, and the merged star orbiting the third.",
-      xLatex: LAGRANGE_3D.x!,
-      yLatex: LAGRANGE_3D.y!,
-      zLatex: LAGRANGE_3D.z!,
-      seedLatex: LAGRANGE_3D.seed,
-      clockParameters: LAGRANGE_3D.clock,
-      variables: [],
-      look: CRASH_LOOK,
-    },
-  },
-  {
-    id: "pythagorean",
-    name: "Pythagorean three-body",
-    category: "space",
-    blurb:
-      "Burrau's problem: masses 3, 4 and 5 let go from rest at the corners of a 3-4-5 triangle. As points they would dance chaotically for sixty time units until one is thrown out; as stars of real size, the 4 and the 5 crash at their first close pass, and the merged star falls into the 3.",
-    xLatex: PYTHAGOREAN_2D.x!,
-    yLatex: PYTHAGOREAN_2D.y!,
-    seedLatex: PYTHAGOREAN_2D.seed,
-    clockParameters: PYTHAGOREAN_2D.clock,
-    sceneTime: "T_{scene}",
-    variables: PYTHAGOREAN_SCENE.variables,
-    scene: PYTHAGOREAN_SCENE.scene,
-    colorScale: 4,
-    palette: "blackbody",
-    backdrop: "#05030c",
-    flow: CRASH_FLOW,
-    extent: 10,
-    space: {
-      blurb:
-        "Burrau's Pythagorean three-body problem in a tilted plane: masses 3, 4 and 5 fall together from rest, the 4 and the 5 crash, and the merged star falls into the 3.",
-      xLatex: PYTHAGOREAN_3D.x!,
-      yLatex: PYTHAGOREAN_3D.y!,
-      zLatex: PYTHAGOREAN_3D.z!,
-      seedLatex: PYTHAGOREAN_3D.seed,
-      clockParameters: PYTHAGOREAN_3D.clock,
-      variables: [],
-      look: CRASH_LOOK,
-    },
+    variants: { count: CRASH_STARTS.length + 1, build: crashVersion },
   },
   {
     id: "binary",
@@ -840,55 +845,6 @@ export const SPACE: readonly GalleryPreset[] = [
         absorb: false,
         colorMode: "speed",
         backdrop: "#02040c",
-        backdropOpacity: 1,
-      },
-    },
-  },
-  {
-    id: "solar-wind",
-    name: "Solar wind",
-    category: "space",
-    blurb:
-      "The Sun's magnetic field carried out by the solar wind while the Sun turns, wound into Parker's spiral. Slow wind, about 400 km/s, marks the sector boundaries, where the spiral winds tighter; fast wind, about 750 km/s, is bright.",
-    // Along B ∝ r̂ − (Ωr/v)φ̂, at the wind's speed v: 0.53 (slow) to 1 (fast),
-    // slow at four sector boundaries that spiral out with the field and turn.
-    xLatex: String.raw`\frac{\left(1-0.467e^{-\frac{\sin\left(2\arctan\left(y,x\right)+0.6\sqrt{x^{2}+y^{2}}-0.3t\right)^{2}}{0.08}}\right)\left(x+\frac{0.15\sqrt{x^{2}+y^{2}}}{\left(1-0.467e^{-\frac{\sin\left(2\arctan\left(y,x\right)+0.6\sqrt{x^{2}+y^{2}}-0.3t\right)^{2}}{0.08}}\right)}y\right)}{\sqrt{x^{2}+y^{2}}\sqrt{1+\left(\frac{0.15\sqrt{x^{2}+y^{2}}}{\left(1-0.467e^{-\frac{\sin\left(2\arctan\left(y,x\right)+0.6\sqrt{x^{2}+y^{2}}-0.3t\right)^{2}}{0.08}}\right)}\right)^{2}}}`,
-    yLatex: String.raw`\frac{\left(1-0.467e^{-\frac{\sin\left(2\arctan\left(y,x\right)+0.6\sqrt{x^{2}+y^{2}}-0.3t\right)^{2}}{0.08}}\right)\left(y-\frac{0.15\sqrt{x^{2}+y^{2}}}{\left(1-0.467e^{-\frac{\sin\left(2\arctan\left(y,x\right)+0.6\sqrt{x^{2}+y^{2}}-0.3t\right)^{2}}{0.08}}\right)}x\right)}{\sqrt{x^{2}+y^{2}}\sqrt{1+\left(\frac{0.15\sqrt{x^{2}+y^{2}}}{\left(1-0.467e^{-\frac{\sin\left(2\arctan\left(y,x\right)+0.6\sqrt{x^{2}+y^{2}}-0.3t\right)^{2}}{0.08}}\right)}\right)^{2}}}`,
-    seedLatex: String.raw`e^{-3\left(\sqrt{x^{2}+y^{2}}-1.2\right)^{2}}`,
-    colorScale: 0.6,
-    backdrop: "#070305",
-    extent: 10,
-    palette: "sunset",
-    flow: {
-      particleCount: 40_000,
-      speed: 6,
-      trailPersistence: 0.97,
-      dropRate: 0.004,
-      opacity: 0.4,
-      pointSize: 1.3,
-      glow: 0.35,
-      normalizeSpeed: false,
-    },
-    space: {
-      blurb:
-        "Parker's spiral in 3D, with the heliospheric current sheet: the Sun's tilted magnetic equator, flung out and wound up into the wavy 'ballerina skirt'. Particles are born on the skirt; the slow wind rides it.",
-      // B ∝ r̂ − (Ωρ/v)φ̂, which winds faster near the equator; the current
-      // sheet at z = 0.35ρ sin(φ + Ωr/v − Ωt), slow wind within it.
-      xLatex: String.raw`\frac{\frac{x}{\sqrt{x^{2}+y^{2}+z^{2}}}+\frac{0.3}{\left(1-0.467e^{-\frac{\left(z-0.35\sqrt{x^{2}+y^{2}}\sin\left(\arctan\left(y,x\right)+0.45\sqrt{x^{2}+y^{2}+z^{2}}-0.3t\right)\right)^{2}}{0.25}}\right)}y}{\sqrt{1+\left(\frac{0.3}{\left(1-0.467e^{-\frac{\left(z-0.35\sqrt{x^{2}+y^{2}}\sin\left(\arctan\left(y,x\right)+0.45\sqrt{x^{2}+y^{2}+z^{2}}-0.3t\right)\right)^{2}}{0.25}}\right)}\right)^{2}\left(x^{2}+y^{2}\right)}}\left(1-0.467e^{-\frac{\left(z-0.35\sqrt{x^{2}+y^{2}}\sin\left(\arctan\left(y,x\right)+0.45\sqrt{x^{2}+y^{2}+z^{2}}-0.3t\right)\right)^{2}}{0.25}}\right)`,
-      yLatex: String.raw`\frac{\frac{y}{\sqrt{x^{2}+y^{2}+z^{2}}}-\frac{0.3}{\left(1-0.467e^{-\frac{\left(z-0.35\sqrt{x^{2}+y^{2}}\sin\left(\arctan\left(y,x\right)+0.45\sqrt{x^{2}+y^{2}+z^{2}}-0.3t\right)\right)^{2}}{0.25}}\right)}x}{\sqrt{1+\left(\frac{0.3}{\left(1-0.467e^{-\frac{\left(z-0.35\sqrt{x^{2}+y^{2}}\sin\left(\arctan\left(y,x\right)+0.45\sqrt{x^{2}+y^{2}+z^{2}}-0.3t\right)\right)^{2}}{0.25}}\right)}\right)^{2}\left(x^{2}+y^{2}\right)}}\left(1-0.467e^{-\frac{\left(z-0.35\sqrt{x^{2}+y^{2}}\sin\left(\arctan\left(y,x\right)+0.45\sqrt{x^{2}+y^{2}+z^{2}}-0.3t\right)\right)^{2}}{0.25}}\right)`,
-      zLatex: String.raw`\frac{\frac{z}{\sqrt{x^{2}+y^{2}+z^{2}}}}{\sqrt{1+\left(\frac{0.3}{\left(1-0.467e^{-\frac{\left(z-0.35\sqrt{x^{2}+y^{2}}\sin\left(\arctan\left(y,x\right)+0.45\sqrt{x^{2}+y^{2}+z^{2}}-0.3t\right)\right)^{2}}{0.25}}\right)}\right)^{2}\left(x^{2}+y^{2}\right)}}\left(1-0.467e^{-\frac{\left(z-0.35\sqrt{x^{2}+y^{2}}\sin\left(\arctan\left(y,x\right)+0.45\sqrt{x^{2}+y^{2}+z^{2}}-0.3t\right)\right)^{2}}{0.25}}\right)`,
-      seedLatex: String.raw`\frac{e^{-\frac{\left(z-0.35\sqrt{x^{2}+y^{2}}\sin\left(\arctan\left(y,x\right)+0.45\sqrt{x^{2}+y^{2}+z^{2}}-0.3t\right)\right)^{2}}{0.05}}}{1+e^{-4\left(\sqrt{x^{2}+y^{2}+z^{2}}-1.2\right)}}+0.5e^{-6\left(\sqrt{x^{2}+y^{2}+z^{2}}-1\right)^{2}}`,
-      look: {
-        particles: 40_000,
-        speed: 0.3,
-        trail: 64,
-        lifetime: 6,
-        opacity: 0.4,
-        glow: 0.2,
-        normalizeSpeed: false,
-        absorb: false,
-        colorMode: "speed",
-        backdrop: "#070305",
         backdropOpacity: 1,
       },
     },

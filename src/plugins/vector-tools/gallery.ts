@@ -105,9 +105,19 @@ function finished(
   config: VectorFieldConfig
 ): VectorFieldConfig {
   const { tint } = preset;
+  // A preset with a tint colours its arrows by it too: round charges, red
+  // leaving a positive charge and blue entering a negative one, blending
+  // through the potential between them (Rafael, 2026-11-08). One without
+  // goes back to magnitude rather than keeping another preset's formula.
+  const mode =
+    tint !== undefined
+      ? "scalar"
+      : config.color.mode === "scalar"
+        ? "magnitude"
+        : config.color.mode;
   return {
     ...config,
-    color: { ...config.color, inkAuto: preset.onPaper === true },
+    color: { ...config.color, mode, inkAuto: preset.onPaper === true },
     flow:
       tint !== undefined
         ? {

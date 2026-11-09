@@ -60,19 +60,6 @@ test("conductor E is minus grad V, and tangential surface E vanishes", () => {
   expect(f.x(0, 0)).toBe(0);
 });
 
-test("the induced field satisfies Faraday's law inside and outside the solenoid", () => {
-  const f = demo("ap-induction");
-  for (const r of [1, 3])
-    for (const t of [0, 1, 4]) {
-      const circulation = 2 * Math.PI * r * f.y(r, 0, t);
-      // 2πr·E_φ = −dΦ/dt, Φ = πmin(r², R²)·B sin ωt, B = 2, ω = 1, R = 2.
-      expect(circulation).toBeCloseTo(
-        -Math.PI * Math.min(r * r, 4) * 2 * Math.cos(t),
-        9
-      );
-    }
-});
-
 test.each(AP_TEACHING.map((p) => [p.id, p] as const))(
   "%s has something to hide in Majestic, and a colour that means something",
   (_, p) => {

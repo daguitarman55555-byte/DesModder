@@ -45,7 +45,7 @@ testWithPage(
     });
     expect(
       items.filter((item) => item.id?.startsWith(`${NAMESPACE}_`)).length
-    ).toBe(21);
+    ).toBe(27);
     expect(
       items.find((item) => item.id === `${NAMESPACE}_shafts`)
     ).toMatchObject({
@@ -84,14 +84,14 @@ testWithPage(
           }),
       NAMESPACE
     );
-    expect(semanticSnapshot).toHaveLength(21);
+    expect(semanticSnapshot).toHaveLength(27);
     expect(semanticSnapshot.filter((item) => item.hasError)).toEqual([]);
     await driver.click(GENERATE);
     await driver.waitForSync();
     items = (await driver.getState()).expressions.list;
     expect(
       items.filter((item) => item.id?.startsWith(`${NAMESPACE}_`))
-    ).toHaveLength(21);
+    ).toHaveLength(27);
 
     await driver.evaluate(
       (id) => Calc.setExpression({ id, latex: "y=x^2" }),
@@ -193,10 +193,10 @@ testWithPage(
     await unfoldPanel(driver);
 
     // The panel opens on Field, and its sampling chips reflect stored state.
-    expect(await driver.evaluate(selectedChip, "Sampling x by")).toBe("step");
+    expect(await driver.evaluate(selectedChip, "Sampling x by")).toBe("count");
     // Each axis has its own group. They used to share one aria-label, so
     // nothing could tell the two apart.
-    expect(await driver.evaluate(selectedChip, "Sampling y by")).toBe("step");
+    expect(await driver.evaluate(selectedChip, "Sampling y by")).toBe("count");
 
     // Number inputs must be unique per axis, or the labels point at the wrong
     // field and the y axis mirrors the x axis.
@@ -425,7 +425,7 @@ testWithPage(
     });
     expect(
       items.filter((item) => item.id?.startsWith(`${NAMESPACE}_`))
-    ).toHaveLength(22);
+    ).toHaveLength(28);
 
     // Nothing errors, and the derivative is Desmos's own, so it is exact
     // rather than approximated: ∇(x²+y²) = (2x, 2y).
@@ -540,9 +540,9 @@ testWithPage(
     expect(domain.y.max).toBe(round(bounds.top));
     expect(domain.x.min).toBe(-3);
     expect(domain.x.max).toBe(7);
-    // Only the four bounds move: the sampling mode and step are the user's.
-    expect(domain.x.mode).toBe("step");
-    expect(domain.x.step).toBe(1);
+    // Only the four bounds move: the sampling mode and count are the user's.
+    expect(domain.x.mode).toBe("count");
+    expect(domain.x.count).toBe(35);
 
     // The panel's own number fields have to show the new bounds too.
     expect(
@@ -634,7 +634,7 @@ testWithPageAndOpts(
       (await driver.getState()).expressions.list.filter((item) =>
         item.id?.startsWith(`${NAMESPACE}_`)
       )
-    ).toHaveLength(21);
+    ).toHaveLength(27);
 
     await driver.click(REMOVE);
     await driver.waitForSync();
@@ -715,7 +715,7 @@ testWithPage(
       await driver.evaluate(
         () =>
           document.querySelector(
-            ".dsm-vector-tools-flow .dsm-vector-tools-warning"
+            '[data-vector-tools="draw-as-error"], .dsm-vector-tools-flow .dsm-vector-tools-warning'
           )?.textContent
       )
     ).toContain("is not defined");
@@ -892,6 +892,16 @@ testWithPage(
         {},
         count
       );
+    // Its counts are of the old default, 21 by 13 by step: set that grid.
+    const stepGrid = async () =>
+      await driver.evaluate(() => {
+        const plugin = DSM.enabledPlugins["vector-tools"] as any;
+        for (const axis of ["x", "y"]) {
+          plugin.setAxis(axis, "mode", "step");
+          plugin.setAxis(axis, "step", 1);
+        }
+      });
+    await stepGrid();
     await waitForArrows(273);
 
     const vt = async () =>
@@ -986,6 +996,7 @@ testWithPage(
     await driver.evaluate(() =>
       (DSM.enabledPlugins["vector-tools"] as any).resetConfig()
     );
+    await stepGrid();
     await waitForArrows(273);
 
     // Changing a setting re-measures the field's magnitude range, and that
@@ -2255,7 +2266,16 @@ testWithPage(
             ".dsm-preset-window-variable:not(.dsm-preset-window-switch)"
           ).length
       )
-    ).toBe(11);
+      // N_q, q_1, q_2, the probe p, q_0 and the arrow gain: a charge's and
+      // the probe's coordinates fold behind their "position" link
+      // (2026-11-08), one link each for q_1, q_2 and p.
+    ).toBe(6);
+    expect(
+      await driver.evaluate(
+        () =>
+          document.querySelectorAll(".dsm-preset-window-position-link").length
+      )
+    ).toBe(3);
     // The switches are checkboxes, not sliders.
     expect(
       await driver.evaluate(
@@ -2278,18 +2298,18 @@ testWithPage(
 
     // A name the graph already defines is the user's, and is left alone.
     await driver.evaluate(() => {
-      Calc.setExpression({ id: "mine", latex: "s=3" });
+      Calc.setExpression({ id: "mine", latex: "a=3" });
     });
     await driver.waitForSync();
     await driver.evaluate(() =>
       (window as any).DSM.enabledPlugins["vector-tools"].applyGalleryPreset(
-        "capacitor",
+        "bar-magnet",
         true
       )
     );
-    const plates = await variables();
-    expect(plates.slice(0, 3)).toEqual(["folder", "L=4", "d=3"]);
-    expect(plates.some((latex) => latex?.startsWith("s="))).toBe(false);
+    const magnet = await variables();
+    expect(magnet.slice(0, 3)).toEqual(["folder", "b=0.4", "c=0.4"]);
+    expect(magnet.some((latex) => latex?.startsWith("a="))).toBe(false);
 
     // A preset with none takes the folder away.
     await driver.evaluate(() =>

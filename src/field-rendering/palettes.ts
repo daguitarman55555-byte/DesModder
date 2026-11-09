@@ -244,15 +244,20 @@ export const PALETTES: Record<PaletteID, Palette> = {
       { at: 1, rgb: [180, 4, 38] },
     ],
   },
-  // Negative to positive as a physics textbook colours charge: its blue, a
-  // dark slate for zero, its red. Diverging like Cool to warm, but dark all
-  // the way across, so on white graph paper the zero line is not a gap.
+  // Negative to positive as a physics textbook colours charge: its blue, its
+  // red, and between them a blend of the two, a violet at zero, so a point
+  // nearer the positive charge is redder and one nearer the negative bluer,
+  // with no grey band where they meet (Rafael, 2026-11-08: "majestic and
+  // ethereal, not sudden"; it was a dark slate). Dark all the way across,
+  // so on white graph paper the zero line is not a gap.
   charge: {
     name: "Charge",
     group: "diverging",
     stops: [
       { at: 0, rgb: [24, 84, 170] },
-      { at: 0.5, rgb: [78, 86, 104] },
+      { at: 0.25, rgb: [70, 78, 176] },
+      { at: 0.5, rgb: [118, 68, 146] },
+      { at: 0.75, rgb: [162, 58, 88] },
       { at: 1, rgb: [186, 52, 34] },
     ],
   },

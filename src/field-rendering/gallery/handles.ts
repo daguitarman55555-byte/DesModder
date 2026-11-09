@@ -22,10 +22,8 @@ const D = "0.7071";
 const HANDLES: Readonly<
   Record<string, readonly (readonly [string, string])[]>
 > = {
-  capacitor: [["L", R`\frac{d}{2}`]],
   "bar-magnet": [["a", "b"]],
   "ap-conductor": [[`${D}R`, `${D}R`]],
-  "ap-induction": [[`${D}R`, `${D}R`]],
 };
 
 /** A preset's handles, as scene items, for the calculator. */

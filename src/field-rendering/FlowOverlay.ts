@@ -193,9 +193,15 @@ export class FlowOverlay {
     const scaleChanged = options.renderScale !== this.options.renderScale;
     this.options = { ...options };
     this.renderer?.setOptions(this.options);
+    // A fixed quality chosen holds: whatever Auto had lowered goes back.
+    if (options.autoQuality === false && this.autoScale !== 1) {
+      this.setAutoScale(1);
+      return;
+    }
     // Render scale is the one option that changes the size of the drawing
     // buffer, and nothing else will notice on its own — no element resized.
-    if (scaleChanged) this.resizeToBox();
+    // The trails are resampled, not cleared: the graph did not move.
+    if (scaleChanged) this.resizeToBox(true);
   }
 
   /**
@@ -360,15 +366,23 @@ export class FlowOverlay {
       this.calc.unobserve(this.identity.boundsObserverKey);
   }
 
-  private resizeToBox() {
+  /**
+   * `keep` when only the detail changed and the box did not: the trails are
+   * resampled into the new size. A resized box clears them, since the same
+   * pixels no longer show the same part of the graph.
+   */
+  private resizeToBox(keep = false) {
     if (this.canvas === undefined || this.renderer === undefined) return;
     const rect = this.canvas.getBoundingClientRect();
     const changed = this.renderer.resize(
       rect.width,
       rect.height,
-      (window.devicePixelRatio || 1) * this.options.renderScale * this.autoScale
+      (window.devicePixelRatio || 1) *
+        this.options.renderScale *
+        this.autoScale,
+      keep
     );
-    if (changed) this.renderer.clearTrails();
+    if (changed && !keep) this.renderer.clearTrails();
   }
 
   private syncBounds(force: boolean) {
@@ -416,6 +430,7 @@ export class FlowOverlay {
   private adaptDetail(now: number) {
     const interval = now - this.lastFrameAt;
     this.lastFrameAt = now;
+    if (this.options.autoQuality === false) return;
     // A pause, a hidden tab or a dragged window says nothing about drawing.
     if (interval <= 0 || interval > 250) return;
     this.frameEMA += 0.1 * (interval - this.frameEMA);
@@ -435,7 +450,10 @@ export class FlowOverlay {
     this.slowRun = 0;
     this.steadyRun = 0;
     this.frameEMA = 1000 / 60;
-    this.resizeToBox();
+    // Resampled, so the change is a softening, never a blank frame: it
+    // cleared the whole flow before, which Rafael saw as the screen
+    // flickering (2026-11-08).
+    this.resizeToBox(true);
   }
 
   private scheduleFrame() {

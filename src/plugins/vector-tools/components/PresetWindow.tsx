@@ -3,6 +3,8 @@ import { Component, jsx } from "#DCGView";
 import { For, If, IfElse } from "#components";
 import { paletteStops } from "../../../field-rendering/palettes";
 import type { GalleryPreset } from "../gallery";
+import type { PresetVariableRow } from "..";
+import { ownerAbout } from "../../../field-rendering/gallery/variable-notes";
 import { PRESET_THUMBNAILS } from "./presetThumbnails";
 import "./PresetWindow.less";
 
@@ -75,6 +77,38 @@ export class PresetWindow extends Component<{
               {/* What is loaded, beside what can be: the controls in a pane of
                   their own, so a variable can be set with the presets in view. */}
               <div class="dsm-preset-window-controls">
+                {/* An open preset is drawn from a field of its own, so the
+                    save in the Field tab is never written over; Export
+                    makes it a save to edit (Rafael, 2026-11-08). */}
+                <If predicate={() => vectorTools.presetOpen}>
+                  {() => (
+                    <div class="dsm-preset-window-export">
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        class="dsm-preset-window-export-button"
+                        data-vector-tools="export-preset"
+                        title="Copy this preset into Vector Tools as a new save, whose equations you can edit. Its sliders stay live."
+                        onTap={() => vectorTools.exportPresetForEditing()}
+                      >
+                        Export to Vector Tools for editing
+                      </span>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        class="dsm-preset-window-variables-reset"
+                        title={() =>
+                          `Close the preset and draw ${
+                            vectorTools.presetReturnName ?? "your field"
+                          } again, as it was`
+                        }
+                        onTap={() => vectorTools.closePreset()}
+                      >
+                        Back to my field
+                      </span>
+                    </div>
+                  )}
+                </If>
                 <div
                   class="dsm-preset-window-motion"
                   role="group"
@@ -163,14 +197,18 @@ export class PresetWindow extends Component<{
                       </div>
                       <div
                         class="dsm-preset-window-legend-bar"
-                        onUpdate={(element: HTMLElement) => {
-                          element.style.background =
-                            vectorTools.colorLegend?.gradient ?? "";
-                        }}
-                        didMount={(element: HTMLElement) => {
-                          element.style.background =
-                            vectorTools.colorLegend?.gradient ?? "";
-                        }}
+                        onUpdate={(element: HTMLElement) =>
+                          setBackground(
+                            element,
+                            vectorTools.colorLegend?.gradient ?? ""
+                          )
+                        }
+                        didMount={(element: HTMLElement) =>
+                          setBackground(
+                            element,
+                            vectorTools.colorLegend?.gradient ?? ""
+                          )
+                        }
                       />
                       <div class="dsm-preset-window-legend-ends">
                         <span>{() => vectorTools.colorLegend?.low ?? ""}</span>
@@ -201,82 +239,106 @@ export class PresetWindow extends Component<{
                         </span>
                       </div>
                       <For
-                        each={() => vectorTools.shownPresetVariables}
-                        key={(v: { id: string }) => v.id}
+                        each={() => vectorTools.presetVariableRows}
+                        key={(row: PresetVariableRow) => row.key}
                       >
-                        {(v: () => (typeof vectorTools.presetVariables)[0]) => (
+                        {(row: () => PresetVariableRow) => (
                           <div>
-                            {IfElse(() => v().toggle !== undefined, {
-                              true: () => (
-                                <label class="dsm-preset-window-variable dsm-preset-window-switch">
-                                  <input
-                                    type="checkbox"
-                                    // On mount too: onUpdate does not run
-                                    // there, and a box left unticked over a
-                                    // switch that was on swallowed the first
-                                    // click.
-                                    didMount={(element: HTMLInputElement) => {
-                                      element.checked = v().current === 1;
-                                    }}
-                                    onUpdate={(element: HTMLInputElement) => {
-                                      element.checked = v().current === 1;
-                                    }}
-                                    onChange={(event: Event) =>
-                                      vectorTools.setPresetVariable(
-                                        v().id,
-                                        (event.target as HTMLInputElement)
-                                          .checked
-                                          ? 1
-                                          : 0
-                                      )
-                                    }
-                                  />
-                                  <span>{() => v().toggle}</span>
-                                </label>
-                              ),
-                              false: () => (
-                                <label class="dsm-preset-window-variable">
-                                  <span class="dsm-preset-window-variable-name">
-                                    {() => nameParts(v().name).base}
-                                    <span class="dsm-preset-window-variable-sub">
-                                      {() => nameParts(v().name).sub}
-                                    </span>
-                                  </span>
-                                  <input
-                                    type="range"
-                                    didMount={(element: HTMLInputElement) => {
-                                      element.min = String(v().min);
-                                      element.max = String(v().max);
-                                      element.step = String(
-                                        v().step ?? (v().max - v().min) / 200
-                                      );
-                                      element.value = String(v().current);
-                                    }}
-                                    onUpdate={(element: HTMLInputElement) => {
-                                      element.min = String(v().min);
-                                      element.max = String(v().max);
-                                      element.step = String(
-                                        v().step ?? (v().max - v().min) / 200
-                                      );
-                                      if (document.activeElement !== element)
-                                        element.value = String(v().current);
-                                    }}
-                                    onInput={(event: Event) =>
-                                      vectorTools.setPresetVariable(
-                                        v().id,
-                                        Number(
+                            {IfElse(
+                              () => row().variable?.toggle !== undefined,
+                              {
+                                true: () => (
+                                  <label
+                                    class="dsm-preset-window-variable dsm-preset-window-switch"
+                                    title={() => row().about}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      // On mount too: onUpdate does not run
+                                      // there, and a box left unticked over a
+                                      // switch that was on swallowed the first
+                                      // click.
+                                      didMount={(element: HTMLInputElement) => {
+                                        element.checked =
+                                          row().variable?.current === 1;
+                                      }}
+                                      onUpdate={(element: HTMLInputElement) => {
+                                        element.checked =
+                                          row().variable?.current === 1;
+                                      }}
+                                      onChange={(event: Event) =>
+                                        vectorTools.setPresetVariable(
+                                          row().variable?.id ?? "",
                                           (event.target as HTMLInputElement)
-                                            .value
+                                            .checked
+                                            ? 1
+                                            : 0
                                         )
-                                      )
-                                    }
-                                  />
-                                  <span class="dsm-preset-window-variable-value">
-                                    {() => formatValue(v().current)}
-                                  </span>
-                                </label>
-                              ),
-                            })}
+                                      }
+                                    />
+                                    <span>{() => row().variable?.toggle}</span>
+                                  </label>
+                                ),
+                                false: () => (
+                                  <div class="dsm-preset-window-variable">
+                                    <span class="dsm-preset-window-variable-label">
+                                      <span
+                                        class="dsm-preset-window-variable-name"
+                                        title={() => row().about}
+                                      >
+                                        {() => nameParts(row().name).base}
+                                        <span class="dsm-preset-window-variable-sub">
+                                          {() => nameParts(row().name).sub}
+                                        </span>
+                                      </span>
+                                      <If predicate={() => row().hasPosition}>
+                                        {() => (
+                                          <span
+                                            role="button"
+                                            tabIndex={0}
+                                            class="dsm-preset-window-position-link"
+                                            data-owner={() => row().name}
+                                            title={() =>
+                                              `Move ${ownerAbout(row().name).toLowerCase()}: its coordinates in a small window`
+                                            }
+                                            didMount={(
+                                              element: HTMLElement
+                                            ) => {
+                                              element.addEventListener(
+                                                "click",
+                                                () => {
+                                                  const rect =
+                                                    element.getBoundingClientRect();
+                                                  vectorTools.openPositionPopup(
+                                                    row().name,
+                                                    rect.right + 12,
+                                                    rect.top - 10
+                                                  );
+                                                }
+                                              );
+                                            }}
+                                          >
+                                            position
+                                          </span>
+                                        )}
+                                      </If>
+                                    </span>
+                                    <If
+                                      predicate={() =>
+                                        row().variable !== undefined
+                                      }
+                                    >
+                                      {() =>
+                                        slider(
+                                          vectorTools,
+                                          () => row().variable!
+                                        )
+                                      }
+                                    </If>
+                                  </div>
+                                ),
+                              }
+                            )}
                           </div>
                         )}
                       </For>
@@ -371,18 +433,18 @@ export class PresetWindow extends Component<{
                               // On mount as well: a window opened and left
                               // alone is never updated, and its swatches were
                               // blank.
-                              didMount={(element: HTMLElement) => {
-                                element.style.background = swatchFor(
-                                  preset(),
-                                  vectorTools.is3d
-                                );
-                              }}
-                              onUpdate={(element: HTMLElement) => {
-                                element.style.background = swatchFor(
-                                  preset(),
-                                  vectorTools.is3d
-                                );
-                              }}
+                              didMount={(element: HTMLElement) =>
+                                setBackground(
+                                  element,
+                                  swatchFor(preset(), vectorTools.is3d)
+                                )
+                              }
+                              onUpdate={(element: HTMLElement) =>
+                                setBackground(
+                                  element,
+                                  swatchFor(preset(), vectorTools.is3d)
+                                )
+                              }
                             />
                             <span class="dsm-preset-window-name">
                               {() => preset().name}
@@ -414,9 +476,169 @@ export class PresetWindow extends Component<{
             </div>
           )}
         </If>
+        {positionPopup(vectorTools)}
       </div>
     );
   }
+}
+
+type SliderVariable = NonNullable<PresetVariableRow["variable"]>;
+
+/** A preset variable's slider and its value. */
+function slider(vectorTools: VectorTools, v: () => SliderVariable) {
+  const sync = (element: HTMLInputElement, force: boolean) => {
+    element.min = String(v().min);
+    element.max = String(v().max);
+    element.step = String(v().step ?? (v().max - v().min) / 200);
+    if (force || document.activeElement !== element)
+      element.value = String(v().current);
+  };
+  return (
+    <span class="dsm-preset-window-slider">
+      <input
+        type="range"
+        didMount={(element: HTMLInputElement) => sync(element, true)}
+        onUpdate={(element: HTMLInputElement) => sync(element, false)}
+        onInput={(event: Event) =>
+          vectorTools.setPresetVariable(
+            v().id,
+            Number((event.target as HTMLInputElement).value)
+          )
+        }
+      />
+      <span class="dsm-preset-window-variable-value">
+        {() => formatValue(v().current)}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * A small window of x, y (and z) sliders for one thing placed on the
+ * graph, titled by its name: dragged by its title, resized from its
+ * corner. Rafael, 2026-11-08: the charges' coordinate sliders made the
+ * list a wall; a "position" link under each name opens this instead.
+ *
+ * Dragged by moving the element directly, not through a re-render, so it
+ * keeps up with the pointer; where it is left is stored on release.
+ */
+function positionPopup(vectorTools: VectorTools) {
+  const popup = () => vectorTools.positionPopup;
+  return (
+    <If predicate={() => popup() !== undefined}>
+      {() => (
+        <div
+          class="dsm-position-popup"
+          role="dialog"
+          aria-label={() => `${popup()?.owner ?? ""} position`}
+          didMount={(element: HTMLElement) => placePopup(element, popup())}
+          onUpdate={(element: HTMLElement) => placePopup(element, popup())}
+        >
+          <div
+            class="dsm-position-popup-head"
+            didMount={(element: HTMLElement) => dragPopup(element, vectorTools)}
+          >
+            <span
+              class="dsm-preset-window-variable-name"
+              title={() => ownerAbout(popup()?.owner ?? "")}
+            >
+              {() => nameParts(popup()?.owner ?? "").base}
+              <span class="dsm-preset-window-variable-sub">
+                {() => nameParts(popup()?.owner ?? "").sub}
+              </span>
+            </span>
+            <span
+              role="button"
+              tabIndex={0}
+              class="dsm-preset-window-button"
+              aria-label="Close"
+              title="Close"
+              onTap={() => vectorTools.closePositionPopup()}
+            >
+              ×
+            </span>
+          </div>
+          <For
+            each={() => vectorTools.positionSliders(popup()?.owner ?? "")}
+            key={(v: { id: string }) => v.id}
+          >
+            {(v: () => SliderVariable & { axis: string }) => (
+              <div class="dsm-position-popup-row">
+                <span class="dsm-position-popup-axis">
+                  {() => `${v().axis} =`}
+                </span>
+                {slider(vectorTools, v)}
+              </div>
+            )}
+          </For>
+        </div>
+      )}
+    </If>
+  );
+}
+
+function placePopup(element: HTMLElement, at: VectorTools["positionPopup"]) {
+  if (at === undefined || element.dataset.dragging === "true") return;
+  const width = Math.max(160, at.width);
+  const left = Math.min(Math.max(4, at.left), window.innerWidth - width - 4);
+  const top = Math.min(Math.max(4, at.top), window.innerHeight - 60);
+  element.style.left = `${left}px`;
+  element.style.top = `${top}px`;
+  element.style.width = `${width}px`;
+  if (at.height > 0) element.style.height = `${at.height}px`;
+}
+
+function dragPopup(head: HTMLElement, vectorTools: VectorTools) {
+  head.addEventListener("pointerdown", (down: PointerEvent) => {
+    if ((down.target as HTMLElement).closest('[role="button"]') !== null)
+      return;
+    const popup = head.parentElement;
+    if (popup === null) return;
+    down.preventDefault();
+    head.setPointerCapture(down.pointerId);
+    popup.dataset.dragging = "true";
+    const startX = down.clientX - popup.offsetLeft;
+    const startY = down.clientY - popup.offsetTop;
+    const move = (event: PointerEvent) => {
+      popup.style.left = `${event.clientX - startX}px`;
+      popup.style.top = `${event.clientY - startY}px`;
+    };
+    const up = () => {
+      head.removeEventListener("pointermove", move);
+      head.removeEventListener("pointerup", up);
+      head.removeEventListener("pointercancel", up);
+      popup.dataset.dragging = "false";
+      const at = vectorTools.positionPopup;
+      if (at !== undefined) {
+        at.left = popup.offsetLeft;
+        at.top = popup.offsetTop;
+      }
+    };
+    head.addEventListener("pointermove", move);
+    head.addEventListener("pointerup", up);
+    head.addEventListener("pointercancel", up);
+  });
+  // The size the corner was dragged to, kept for the next one opened.
+  const popup = head.parentElement;
+  if (popup !== null && typeof ResizeObserver !== "undefined")
+    new ResizeObserver(() => {
+      const at = vectorTools.positionPopup;
+      if (at === undefined || popup.offsetWidth === 0) return;
+      at.width = popup.offsetWidth;
+      at.height = popup.offsetHeight;
+    }).observe(popup);
+}
+
+/**
+ * Sets a background only when it changed. The window re-renders many times
+ * a second while a preset moves, and writing each swatch's thumbnail (a
+ * data URL) again on every one made the list flicker.
+ */
+const lastBackground = new WeakMap<HTMLElement, string>();
+function setBackground(element: HTMLElement, background: string) {
+  if (lastBackground.get(element) === background) return;
+  lastBackground.set(element, background);
+  element.style.background = background;
 }
 
 /** Greek letters a preset's variable may be named with, as shown. */

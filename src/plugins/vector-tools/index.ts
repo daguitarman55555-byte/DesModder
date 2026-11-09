@@ -3,7 +3,11 @@ import { PluginController } from "../PluginController";
 import { VectorToolsPanelFunc } from "./components/VectorToolsPanel";
 import { PresetWindow } from "./components/PresetWindow";
 import { mountToNode, unmountFromNode, type MountedComponent } from "#DCGView";
-import { GALLERY_CATEGORIES, sceneParts } from "../../field-rendering/gallery";
+import {
+  choosePresetVariant,
+  GALLERY_CATEGORIES,
+  sceneParts,
+} from "../../field-rendering/gallery";
 import {
   fieldLinesLatex,
   traceFieldLines,
@@ -15,6 +19,12 @@ import {
   COUNT,
   MAX_CHARGES,
 } from "../../field-rendering/gallery/point-charges";
+import {
+  ownerAbout,
+  positionAxis,
+  variableAbout,
+} from "../../field-rendering/gallery/variable-notes";
+
 import {
   CalculatorExpressionAdapter,
   type GeneratedExpressionSpec,
@@ -38,6 +48,9 @@ import {
   activeField,
   cloneDefaultLibrary,
   MAX_FIELDS,
+  PRESET_FIELD_ID,
+  flowQualityScale,
+  savedFields,
   nextFieldID,
   nextSymbolToken,
   normalizeVectorFieldLibrary,
@@ -160,6 +173,19 @@ import {
   type SurfaceScan,
 } from "../../field-rendering/surfaces3d";
 import type { ConfigItem } from "..";
+
+/** A row of the presets window's variable list (`presetVariableRows`). */
+export interface PresetVariableRow {
+  key: string;
+  /** The variable's name, or the name of what a position belongs to. */
+  name: string;
+  /** What it is, said when the name is hovered. */
+  about: string;
+  /** Absent for an owner with no slider of its own. */
+  variable?: GalleryVariable & { id: string; current: number };
+  /** Whether it has a position to open. */
+  hasPosition: boolean;
+}
 
 /**
  * Where a preset's variables live in the expression list: outside every
@@ -374,7 +400,10 @@ function sliderValues(models: readonly ItemModel[]) {
  * that mode is the one drawn, so a formula left behind changes no shader.
  */
 function flowTintLatex(config: VectorFieldConfig) {
-  return effectiveFlowColor(config).colorMode === "scalar"
+  // The arrows read the same formula in their scalar colour, so it is
+  // compiled while either uses it.
+  return effectiveFlowColor(config).colorMode === "scalar" ||
+    config.color.mode === "scalar"
     ? config.flow.tintLatex.trim()
     : "";
 }
@@ -1904,6 +1933,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       headAngle: config.arrowhead.angleRadians,
       shaftWidth: 2.4,
       colorMode: config.color.mode,
+      tintScale: config.flow.tintScale,
       palette: config.color.palette,
       fixedColor: this.fixedInk(config, 2),
       saturation: config.color.saturation,
@@ -2223,6 +2253,9 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   }
 
   resetConfig() {
+    // Reset is of the field being edited: an open preset is closed first,
+    // and the save it was opened over is the one put back to the defaults.
+    if (this.presetOpen) this.closePreset();
     const restored = cloneDefaultConfig();
     this.updateLibrary((library) => {
       const current = activeField(library);
@@ -2243,6 +2276,11 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
 
   setActiveField(id: string) {
     if (this.getLibrary().fields.every((field) => field.id !== id)) return;
+    // Choosing a save while a preset is open closes the preset onto it.
+    if (this.presetOpen && id !== PRESET_FIELD_ID) {
+      this.closePreset(id);
+      return;
+    }
     this.updateLibrary((library) => {
       library.activeId = id;
     });
@@ -2436,14 +2474,23 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
    * graph has shrunk since, so a window can never be lost off its edge.
    */
   placePresetWindow(element: HTMLElement) {
+    // Not while it is being dragged: the panel re-renders many times a
+    // second while a preset animates, and each put the window back where it
+    // was last saved, so it fought the pointer and flickered (Rafael,
+    // 2026-11-08).
+    if (element.dataset.dragging === "true") return;
     const host = element.offsetParent as HTMLElement | null;
     const width = host?.clientWidth ?? window.innerWidth;
     const height = host?.clientHeight ?? window.innerHeight;
     const { x, y } = this.presetWindow;
     const left = x < 0 ? width - element.offsetWidth - 64 : x;
     const top = y < 0 ? 58 : y;
-    element.style.left = `${clampTo(left, 0, width - element.offsetWidth)}px`;
-    element.style.top = `${clampTo(top, 0, height - 32)}px`;
+    const l = `${clampTo(left, 0, width - element.offsetWidth)}px`;
+    const t = `${clampTo(top, 0, height - 32)}px`;
+    // Written only on a change, so a render that moves nothing touches no
+    // style.
+    if (element.style.left !== l) element.style.left = l;
+    if (element.style.top !== t) element.style.top = t;
   }
 
   /**
@@ -2459,19 +2506,37 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       if (element === null) return;
       down.preventDefault();
       handle.setPointerCapture(down.pointerId);
+      element.dataset.dragging = "true";
+      // Measured once, at the start: reading layout on every move forced a
+      // reflow per pointer event.
       const startX = element.offsetLeft;
       const startY = element.offsetTop;
+      const host = element.offsetParent as HTMLElement | null;
+      const maxX =
+        (host?.clientWidth ?? window.innerWidth) - element.offsetWidth;
+      const maxY = (host?.clientHeight ?? window.innerHeight) - 32;
+      let pending: PointerEvent | undefined;
+      let frame: number | undefined;
+      const apply = () => {
+        frame = undefined;
+        if (pending === undefined) return;
+        const event = pending;
+        pending = undefined;
+        element.style.left = `${clampTo(startX + event.clientX - down.clientX, 0, maxX)}px`;
+        element.style.top = `${clampTo(startY + event.clientY - down.clientY, 0, maxY)}px`;
+      };
+      // One move a frame, however many pointer events arrive in it.
       const move = (event: PointerEvent) => {
-        const host = element.offsetParent as HTMLElement | null;
-        const width = host?.clientWidth ?? window.innerWidth;
-        const height = host?.clientHeight ?? window.innerHeight;
-        element.style.left = `${clampTo(startX + event.clientX - down.clientX, 0, width - element.offsetWidth)}px`;
-        element.style.top = `${clampTo(startY + event.clientY - down.clientY, 0, height - 32)}px`;
+        pending = event;
+        frame ??= requestAnimationFrame(apply);
       };
       const up = () => {
         handle.removeEventListener("pointermove", move);
         handle.removeEventListener("pointerup", up);
         handle.removeEventListener("pointercancel", up);
+        if (frame !== undefined) cancelAnimationFrame(frame);
+        apply();
+        element.dataset.dragging = "false";
         this.setPresetWindow({ x: element.offsetLeft, y: element.offsetTop });
       };
       handle.addEventListener("pointermove", move);
@@ -2600,6 +2665,82 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
         shownWhen === undefined ||
         (current.get(shownWhen.name) ?? 0) >= shownWhen.atLeast
     );
+  }
+
+  /**
+   * The rows the presets window lists: each shown variable but the
+   * coordinates of something placed, which fold into their owner's
+   * "position" link (Rafael, 2026-11-08), and a row for an owner that has
+   * no slider of its own, such as the probe p.
+   */
+  get presetVariableRows(): PresetVariableRow[] {
+    const preset = this.activePresetId ?? "";
+    const shown = this.shownPresetVariables;
+    const names = new Set(shown.map((v) => v.name));
+    const rows: PresetVariableRow[] = [];
+    const owners = new Set<string>();
+    for (const v of shown) {
+      const axis = positionAxis(v.name);
+      if (axis !== undefined) {
+        if (!names.has(axis.owner) && !owners.has(axis.owner)) {
+          owners.add(axis.owner);
+          rows.push({
+            key: `owner:${axis.owner}`,
+            name: axis.owner,
+            about: `${ownerAbout(axis.owner)}. Position opens its sliders.`,
+            hasPosition: true,
+          });
+        }
+        continue;
+      }
+      const hasPosition = shown.some(
+        (other) => positionAxis(other.name)?.owner === v.name
+      );
+      rows.push({
+        key: v.id,
+        name: v.name,
+        about: variableAbout(preset, v.name, v.toggle),
+        variable: v,
+        hasPosition,
+      });
+    }
+    return rows;
+  }
+
+  /** The sliders of `owner`'s position, x then y then z. */
+  positionSliders(owner: string) {
+    return this.shownPresetVariables
+      .flatMap((v) => {
+        const axis = positionAxis(v.name);
+        return axis?.owner === owner ? [{ ...v, axis: axis.axis }] : [];
+      })
+      .sort((a, b) => a.axis.localeCompare(b.axis));
+  }
+
+  /** The open position popup, if any: whose, and where it was left. */
+  positionPopup?: {
+    owner: string;
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  };
+
+  openPositionPopup(owner: string, left: number, top: number) {
+    const previous = this.positionPopup;
+    this.positionPopup = {
+      owner,
+      left,
+      top,
+      width: previous?.width ?? 220,
+      height: previous?.height ?? 0,
+    };
+    this.util.tick();
+  }
+
+  closePositionPopup() {
+    this.positionPopup = undefined;
+    this.util.tick();
   }
 
   /** Sets a preset variable's slider in the graph, which redraws the field. */
@@ -2806,22 +2947,143 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   }
 
   /** A preset's look in the current demo mode, whole or colours only. */
+  /**
+   * Draws the preset from a field of its own (`PRESET_FIELD_ID`), made
+   * from the save being edited, so the save itself is never written over
+   * (Rafael, 2026-11-08). The first preset opened remembers that save, and
+   * closing goes back to it.
+   */
   private applyPresetLook(preset: GalleryPreset, withLook: boolean) {
     this.syncDemoAxes(preset);
     const shown = presetForMode(preset, this.demoMode);
-    this.updateConfig((config) => {
+    this.updateLibrary((library) => {
       const dimensions = this.is3d ? 3 : 2;
+      let field = library.fields.find((f) => f.id === PRESET_FIELD_ID);
+      if (field === undefined) {
+        const token = nextSymbolToken(library);
+        const base = activeField(library);
+        library.presetReturnId = base.id;
+        field = {
+          ...structuredClone(base),
+          id: PRESET_FIELD_ID,
+          symbolToken: token ?? base.symbolToken,
+        };
+        library.fields.push(field);
+      }
       const loaded = withLook
-        ? configFromGallery(shown, config, dimensions)
-        : colorsFromGallery(shown, config, dimensions);
-      // The identity stays with the field: its id and token address
-      // expressions already in the graph, and the chooser points at it.
-      const { id: keepID, symbolToken } = config;
-      Object.assign(config, loaded, { id: keepID, symbolToken });
+        ? configFromGallery(shown, field, dimensions)
+        : colorsFromGallery(shown, field, dimensions);
+      const { symbolToken } = field;
+      Object.assign(field, loaded, {
+        id: PRESET_FIELD_ID,
+        symbolToken,
+        name: preset.name,
+      });
+      library.activeId = PRESET_FIELD_ID;
     });
   }
 
+  /** Whether a preset is open, drawn in place of the save being edited. */
+  get presetOpen() {
+    return this.getLibrary().activeId === PRESET_FIELD_ID;
+  }
+
+  /** The save a preset returns to: what the Field tab says is kept. */
+  get presetReturnName() {
+    const library = this.getLibrary();
+    return library.fields.find((f) => f.id === library.presetReturnId)?.name;
+  }
+
+  /**
+   * Closes the open preset: its field and its Desmos arrows go, and the
+   * save it opened over is drawn again, as it was. Its sliders and objects
+   * stay in the graph, as they do after any preset; they are the user's
+   * to delete.
+   */
+  closePreset(returnTo?: string) {
+    const library = this.getLibrary();
+    const field = library.fields.find((f) => f.id === PRESET_FIELD_ID);
+    if (field === undefined) return;
+    this.removeGeneratedFor(field);
+    this.updateLibrary((next) => {
+      next.fields = next.fields.filter((f) => f.id !== PRESET_FIELD_ID);
+      const target =
+        returnTo ?? next.presetReturnId ?? next.fields[0]?.id ?? "";
+      next.activeId = next.fields.some((f) => f.id === target)
+        ? target
+        : next.fields[0].id;
+      delete next.presetReturnId;
+    });
+    this.refreshArrows();
+    this.refreshFlow();
+    this.util.tick();
+  }
+
+  /**
+   * Makes the open preset a save of its own, to edit: its equations keep
+   * reading the preset's sliders, which stay in the graph (Rafael chose
+   * live sliders over baked numbers, 2026-11-08).
+   */
+  exportPresetForEditing() {
+    const library = this.getLibrary();
+    const field = library.fields.find((f) => f.id === PRESET_FIELD_ID);
+    if (field === undefined) return;
+    if (savedFields(library).length >= MAX_FIELDS) {
+      this.lastActionMessage = `A library holds at most ${MAX_FIELDS} fields.`;
+      this.util.tick();
+      return;
+    }
+    this.removeGeneratedFor(field);
+    let { name } = field;
+    this.updateLibrary((next) => {
+      const preset = next.fields.find((f) => f.id === PRESET_FIELD_ID);
+      if (preset === undefined) return;
+      const id = nextFieldID(next);
+      // Unique among the saves only: the preset's own field, which this
+      // becomes, has the name, and was making it "Electric charges 2".
+      name = uniqueFieldName(
+        { ...next, fields: savedFields(next) },
+        preset.name
+      );
+      preset.id = id;
+      preset.name = name;
+      next.activeId = id;
+      delete next.presetReturnId;
+    });
+    this.lastActionMessage = `Exported ${name} to Vector Tools: it is a save of its own now, to edit.`;
+    this.refreshArrows();
+    this.refreshFlow();
+    this.util.tick();
+  }
+
+  /**
+   * The preset's field as Desmos expressions, written hidden: there for the
+   * graph to keep and share, shown by unhiding its rows (Rafael,
+   * 2026-11-08: "generate the standard desmos vector field, turned off").
+   */
+  private writePresetDesmosField() {
+    const config = this.getConfig();
+    if (config.id !== PRESET_FIELD_ID || this.is3d) return;
+    try {
+      const plan = createVectorFieldPlan(config, this.generationOptions);
+      this.expressions.applyGeneratedSet(
+        plan.namespace,
+        plan.folder,
+        plan.expressions.map((e) => ({ ...e, hidden: true })),
+        {
+          ticker: this.tickerToWrite(plan),
+          knownIDs: allGeneratedIDs(config),
+        }
+      );
+    } catch {
+      // A field Desmos cannot take as expressions is still drawn live.
+    }
+  }
+
   applyGalleryPreset(id: string, withLook: boolean) {
+    // A preset with several versions shows another each time it is chosen:
+    // the three-body crash, a different crash (Rafael, 2026-11-08).
+    choosePresetVariant(id);
     const preset = galleryPreset(id);
     if (preset === undefined) return;
     // The scene is written afresh with empty line lists, so trace again
@@ -2837,6 +3099,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       (this.is3d ? preset.space.scene : preset.scene) ?? []
     );
     this.applyPresetLook(preset, withLook);
+    this.writePresetDesmosField();
     if (this.hiddenNames3d.size > 0) {
       this.hiddenNames3d = new Set();
       this.scene3dKey = "";
@@ -3801,6 +4064,8 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       ...effectiveFlowColor(config),
       fixedColor: this.fixedInk(config, 2),
       margin: config.flow.edges === "auto" ? 0.1 : 0,
+      renderScale: flowQualityScale(config.flow.quality),
+      autoQuality: config.flow.quality === "auto",
     };
   }
 

@@ -116,6 +116,11 @@ export interface FlowOptions {
    */
   renderScale: number;
   /**
+   * Whether the overlay lowers the detail itself while frames run slow, on
+   * top of `renderScale`. Off holds `renderScale` as set.
+   */
+  autoQuality?: boolean;
+  /**
    * The speed the colour ramp is spread over, in math units per second, or
    * Auto: a third of the view's width.
    */
@@ -254,6 +259,8 @@ export class FlowRenderer {
   private readonly quadArray: WebGLVertexArrayObject;
   private indexArray?: WebGLVertexArrayObject;
 
+  /** No attributes: the line pass reads gl_VertexID. */
+  private readonly lineArray?: WebGLVertexArrayObject;
   private particleRead?: WebGLTexture;
   private particleWrite?: WebGLTexture;
   private indexBuffer?: WebGLBuffer;
@@ -309,6 +316,7 @@ export class FlowRenderer {
     gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, QUAD, gl.STATIC_DRAW);
     this.quadArray = this.createVertexArray(quadBuffer, 2);
+    this.lineArray = gl.createVertexArray() ?? undefined;
 
     this.fadeProgram = this.createProgram(
       SCREEN_VERTEX_SHADER,
@@ -439,17 +447,53 @@ export class FlowRenderer {
     );
   }
 
-  /** Matches the drawing buffer to the CSS box. Returns true if it changed. */
-  resize(cssWidth: number, cssHeight: number, devicePixelRatio: number) {
+  /**
+   * Matches the drawing buffer to the CSS box. Returns true if it changed.
+   *
+   * With `keep`, the trails drawn so far are resampled into the new size
+   * rather than cleared. The automatic detail changes the size while
+   * nothing on the graph moved, and clearing then blanked the whole flow
+   * for a moment, which Rafael saw as the screen flickering (2026-11-08).
+   */
+  resize(
+    cssWidth: number,
+    cssHeight: number,
+    devicePixelRatio: number,
+    keep = false
+  ) {
     const width = Math.max(1, Math.round(cssWidth * devicePixelRatio));
     const height = Math.max(1, Math.round(cssHeight * devicePixelRatio));
     if (width === this.trailWidth && height === this.trailHeight) return false;
+    const old = keep ? this.trailFront : undefined;
+    if (old !== undefined) this.trailFront = undefined;
     this.canvas.width = width;
     this.canvas.height = height;
     this.trailWidth = width;
     this.trailHeight = height;
     this.allocateTrails();
+    if (old !== undefined) {
+      this.copyTrails(old);
+      this.gl.deleteTexture(old);
+    }
     return true;
+  }
+
+  /** Draws `from`, at any size, into both trail textures. */
+  private copyTrails(from: WebGLTexture) {
+    const { gl } = this;
+    const program = this.fadeProgram;
+    gl.useProgram(program.program);
+    gl.disable(gl.BLEND);
+    gl.bindVertexArray(this.quadArray);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, from);
+    gl.uniform1i(program.uniforms.u_screen, 0);
+    gl.uniform1f(program.uniforms.u_fade, 1);
+    for (const target of [this.trailFront!, this.trailBack!]) {
+      this.bindTrailTarget(target);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
   /** Clears the trail texture, e.g. after a pan or zoom. */
@@ -511,6 +555,7 @@ export class FlowRenderer {
     if (this.indexBuffer !== undefined) gl.deleteBuffer(this.indexBuffer);
     if (this.indexArray !== undefined) gl.deleteVertexArray(this.indexArray);
     gl.deleteVertexArray(this.quadArray);
+    if (this.lineArray !== undefined) gl.deleteVertexArray(this.lineArray);
     gl.deleteBuffer(this.quadBuffer);
     gl.deleteFramebuffer(this.framebuffer);
     gl.getExtension("WEBGL_lose_context")?.loseContext();
@@ -636,11 +681,14 @@ export class FlowRenderer {
     // into the trail texture from washing out toward white.
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
-    gl.bindVertexArray(this.indexArray!);
-
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.particleRead!);
     gl.uniform1i(program.uniforms.u_particles, 0);
+    // After the step the two swapped: the write texture holds where each
+    // particle was a step ago.
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, this.particleWrite!);
+    gl.uniform1i(program.uniforms.u_previous, 1);
     gl.uniform1i(program.uniforms.u_resolution, this.particleResolution);
 
     const { xMin, xMax, yMin, yMax } = this.bounds;
@@ -685,6 +733,17 @@ export class FlowRenderer {
       Math.max(1e-9, this.options.tintScale ?? 1)
     );
 
+    // Each particle's step as a segment first, then the particle over its
+    // end. A particle moves several pixels a frame, so its points alone left
+    // a dotted trail (Rafael, 2026-11-08: "the flow quality is bad"); the
+    // segments join the dots into the streamline the particle is on.
+    if (this.lineArray !== undefined) {
+      gl.bindVertexArray(this.lineArray);
+      gl.uniform1i(program.uniforms.u_lineMode, 1);
+      gl.drawArrays(gl.LINES, 0, 2 * this.particleCount);
+    }
+    gl.bindVertexArray(this.indexArray!);
+    gl.uniform1i(program.uniforms.u_lineMode, 0);
     gl.drawArrays(gl.POINTS, 0, this.particleCount);
     gl.disable(gl.BLEND);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -1194,6 +1253,8 @@ function drawVertexShader(field: FlowField) {
 precision highp float;
 in float a_index;
 uniform sampler2D u_particles;
+uniform sampler2D u_previous;
+uniform int u_lineMode;
 uniform int u_resolution;
 uniform vec2 u_min;
 uniform vec2 u_max;
@@ -1205,14 +1266,28 @@ uniform vec3 u_fixedColor;
 uniform float u_speedScale;
 uniform float u_tintScale;
 out vec4 v_color;
+// Whether this is the line pass, for the fragment shader: a varying, since
+// an int uniform shared by both stages differs in default precision and the
+// program will not link.
+out float v_line;
 
 ${fieldFunctions(field)}
 ${PALETTE_GLSL}
 
 void main() {
-  int index = int(a_index);
+  // Points: one vertex a particle, by its index. Lines: two, by vertex id,
+  // the even one where the particle was a step ago.
+  int index = u_lineMode == 1 ? gl_VertexID / 2 : int(a_index);
   ivec2 texel = ivec2(index % u_resolution, index / u_resolution);
   vec4 state = texelFetch(u_particles, texel, 0);
+  if (u_lineMode == 1 && gl_VertexID % 2 == 0) {
+    vec4 before = texelFetch(u_previous, texel, 0);
+    // A particle born this step has no segment: it would streak across the
+    // picture from where it died. Nor does one that jumped further than a
+    // step goes, which is the same thing seen another way.
+    vec2 jump = (before.xy - state.xy) / (u_max - u_min);
+    if (state.z >= 1.0 && dot(jump, jump) < 0.0025) state.xy = before.xy;
+  }
 
   vec2 normalized = (state.xy - u_min) / (u_max - u_min);
   gl_Position = vec4(2.0 * normalized - 1.0, 0.0, 1.0);
@@ -1244,7 +1319,10 @@ void main() {
   float fade = min(1.0, state.z / 10.0) *
                min(1.0, (${MAX_PARTICLE_AGE}.0 - state.z) / 40.0);
   float alpha = clamp(u_opacity * fade, 0.0, 1.0);
+  // A segment is the thinner mark, a pixel wide, so it carries less ink.
+  if (u_lineMode == 1) alpha *= 0.7;
   v_color = vec4(rgb * alpha, alpha);
+  v_line = float(u_lineMode);
 }
 `;
 }
@@ -1274,9 +1352,14 @@ function glslFloat(value: number) {
 const DRAW_FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 in vec4 v_color;
+in float v_line;
 uniform float u_glow;
 out vec4 outColor;
 void main() {
+  if (v_line > 0.5) {
+    outColor = v_color;
+    return;
+  }
   // Distance from the sprite's centre, 0 at the middle and 1 at its edge.
   float d = length(gl_PointCoord - vec2(0.5)) * 2.0;
   float spread = 1.0 + ${glslFloat(GLOW_SPREAD)} * u_glow;

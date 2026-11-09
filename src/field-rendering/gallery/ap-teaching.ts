@@ -45,26 +45,12 @@ const { raw } = String;
 /** Ink for paper, and the lighter one the same object needs on the dark. */
 const INK = "#394555";
 const ARROW = "#244779";
-const SECOND_ARROW = "#a55222";
 
 const { obj, path, surface } = inked(INK);
 const atProbe = (s: string) =>
   ["x", "y", "z"].reduce((v, a) => renameIdentifier(v, a, `p_{${a}}`), s);
 
-/**
- * 2, 4, 6 and 8, a list Desmos draws one curve per element of: four guides,
- * not eight, which crowded the probe and its arrows out of the picture.
- */
-const WHOLE = raw`\left[2,4,...,8\right]`;
-
 /** Circles of radius 2, 4, 6 and 8, evenly spaced: parametric, not implicit. */
-const CIRCLES = (rho: string) => ({
-  latex: raw`\sqrt{${rho}}`,
-  perUnit: "1",
-  label: "Circles",
-  explicit: point(mul(WHOLE, cos("t")), mul(WHOLE, sin("t"))),
-  domain: ["0", raw`2\pi`] as const,
-});
 
 /** One preset in one dimension, before it is assembled. */
 interface Demo {
@@ -199,89 +185,8 @@ function conductor(m: Demo, dim: 2 | 3) {
       );
 }
 
-function induction(m: Demo, dim: 2 | 3) {
-  m.vars = [
-    // Strong enough at the defaults to flow, peaking at ½BωR = 2: at B = 1
-    // and ω = 0.6 the induced field crawled and its colour barely showed.
-    variable("B", 2, 0.5, 4),
-    variable("w", 1, 0.3, 2),
-    variable("R", 2, 1, 3),
-  ];
-  m.clock = true;
-  m.label = "E";
-  m.scale = 1;
-  m.extent = 6;
-  m.probe = dim === 2 ? [3, 0] : [3, 0, 0];
-  const rho = "x^{2}+y^{2}";
-  const derivative = mul("Bw", cos("wT_{scene}"));
-  const factor = raw`\left\{${rho}<R^{2}:1,${frac("R^{2}", rho)}\right\}`;
-  m.field = [
-    mul(".5", derivative, factor, "y"),
-    mul("-.5", derivative, factor, "x"),
-    "0",
-  ];
-  m.valid = `${rho}>0`;
-  m.tint = mul("-.5", derivative, factor, raw`\sqrt{${rho}}`);
-  m.stream = CIRCLES(rho);
-  m.speed = 0.5;
-  // Born mostly near the solenoid, where the field is: it falls off as 1/r
-  // outside, and particles spread evenly were faint there for nothing.
-  m.seed = mul(
-    "e^{-0.03\\left(x^{2}+y^{2}\\right)}",
-    dim === 3 ? "e^{-0.3z^{2}}" : "1"
-  );
-  const rim = { color: "#8b7a58", majesticColor: "#e0c27a", lineWidth: 4 };
-  // In 3D, three turns of the coil, so it reads as a solenoid.
-  const levels = dim === 3 ? ["-1.5", "0", "1.5"] : ["0"];
-  for (const [i, level] of levels.entries())
-    m.scene.push(
-      path(
-        `flux${i}`,
-        [mul("R", cos("t")), mul("R", sin("t")), ...(dim === 3 ? [level] : [])],
-        ["0", raw`2\pi`],
-        rim
-      )
-    );
-  const B = mul("B", sin("wT_{scene}"));
-  if (dim === 3)
-    m.scene.push(
-      obj(
-        "Bvector",
-        raw`\operatorname{vector}${par(point(...["0", "0", "0"]) + "," + point(...["0", "0", B]))}`,
-        { explains: true, color: SECOND_ARROW }
-      )
-    );
-  else {
-    // B out of the page as a dot, into it as a cross, sized by |B|.
-    m.scene.push(
-      obj("Bdot", point(...["0", "0"]) + only(`${B}>0`), {
-        explains: true,
-        points: true,
-        pointSize: 9,
-        color: SECOND_ARROW,
-      })
-    );
-    for (const s of [-1, 1])
-      m.scene.push(
-        path(
-          "Bcross" + (s > 0 ? "p" : "m"),
-          [".2t", mul(String(s * 0.2), "t")],
-          ["-1", "1"],
-          {
-            explains: true,
-            color: SECOND_ARROW,
-            lineWidth: 3,
-            latex:
-              point(...[".2t", mul(String(s * 0.2), "t")]) + only(`${B}<0`),
-          }
-        )
-      );
-  }
-}
-
 const MODELS: Record<string, (m: Demo, dim: 2 | 3) => void> = {
   "ap-conductor": conductor,
-  "ap-induction": induction,
 };
 
 function model(id: string, dim: 2 | 3): Demo {
@@ -323,18 +228,6 @@ const DESCRIPTIONS: Record<
       high: "positive",
     },
     unit: 10,
-  },
-  "ap-induction": {
-    name: "Changing flux",
-    blurb:
-      "B = B sin(ωt) inside a long solenoid of radius R, zero outside. The flow is the induced electric field: it circulates, strongest when B changes fastest, not when B is largest. Quasistatic, not radiation.",
-    meaning: {
-      quantity: "Induced E, around the axis",
-      low: "clockwise",
-      zero: "none",
-      high: "counterclockwise",
-    },
-    unit: 12,
   },
 };
 

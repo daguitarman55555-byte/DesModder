@@ -41,6 +41,7 @@ type VectorFieldPurpose =
   | "arrow end points"
   | "color range"
   | "color positions"
+  | "color formula"
   | "arrow lengths"
   | "arrowhead lengths"
   | "arrowhead half widths"
@@ -155,6 +156,7 @@ const GENERATED_SUFFIXES = [
   "color_low",
   "color_high",
   "color_t",
+  "tint_function",
   "starts",
   "ends",
   "lengths",
@@ -729,6 +731,7 @@ function createSymbols(config: Pick<VectorFieldConfig, "id" | "symbolToken">) {
     colorLow: symbol("cl"),
     colorHigh: symbol("ch"),
     colorT: symbol("ct"),
+    tint: symbol("w"),
     headLengths: symbol("hl"),
     headHalves: symbol("hw"),
     // The clock a time-varying field is rewritten onto. See `renameIdentifier`.
@@ -874,6 +877,25 @@ function colorListLatex(
     case "y-component":
       colorExpression = divergingColorLatex(componentT(symbols.v), adjust);
       break;
+    case "scalar": {
+      // The flow's tint formula at each arrow, through the live arrows'
+      // saturating ramp: 0.5 + 0.5 tanh(w / scale), so the colour runs
+      // smoothly from one end through the middle to the other.
+      const tint = config.flow.tintLatex.trim() || "0";
+      helpers.push({
+        suffix: "tint_function",
+        purpose: "color formula",
+        latex: String.raw`${symbols.tint}\left(x,y\right)=${tint}`,
+      });
+      colorExpression = paletteColorLatex(
+        config.color.palette,
+        position(
+          String.raw`0.5+0.5\tanh\left(${symbols.tint}\left(${symbols.gridX},${symbols.gridY}\right)/${numberLatex(Math.max(1e-9, config.flow.tintScale))}\right)`
+        ),
+        adjust
+      );
+      break;
+    }
     case "magnitude":
     case "log-magnitude":
       colorExpression = paletteColorLatex(

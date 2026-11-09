@@ -17,7 +17,6 @@ import {
   listField,
   listOutside,
   listPotential,
-  LISTS,
   MAX_CHARGES,
   outsideAll,
   potential,

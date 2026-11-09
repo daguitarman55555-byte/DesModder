@@ -189,6 +189,16 @@ export interface GalleryPreset {
   chargeLines?: { radius: number; extent: number };
   /** Numbers that move with the clock, worked out each frame. */
   clockParameters?: ClockParameters;
+  /**
+   * Other versions of this preset, one of which is shown at a time: the
+   * three-body crash plays a different crash each time it is chosen
+   * (Rafael, 2026-11-08). `build` is called when a version is first
+   * chosen, so none is worked out before it is wanted.
+   */
+  variants?: {
+    count: number;
+    build: (index: number) => Partial<GalleryPreset>;
+  };
   /** The speed the 2D colour ramp spans, where Auto's would not suit. */
   colorScale?: number;
   /** One colour rather than a ramp, for the 2D flow. */

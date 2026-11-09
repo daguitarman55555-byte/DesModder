@@ -293,3 +293,104 @@
     }
   }
 }
+
+.dsm-preset-window-export {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.dsm-preset-window-export-button {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: #2f72dc;
+  color: #fff;
+  cursor: pointer;
+
+  &:hover {
+    background: #245cb5;
+  }
+}
+
+// The name with, under it in small type, the link that opens its position.
+.dsm-preset-window-variable-label {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.1;
+}
+
+.dsm-preset-window-position-link {
+  font-size: 9px;
+  color: #2f72dc;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.dsm-preset-window-slider {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+
+  input[type="range"] {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.dsm-preset-window-variable-name[title] {
+  cursor: help;
+}
+
+// A small window of its own: fixed to the page, moved by its title bar,
+// resized from its corner.
+.dsm-position-popup {
+  position: fixed;
+  z-index: 10001;
+  min-width: 160px;
+  min-height: 70px;
+  padding: 0 10px 8px;
+  background: #fff;
+  border: 1px solid #c8ccd4;
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  resize: both;
+  overflow: auto;
+  font-size: 12px;
+}
+
+.dsm-position-popup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 -10px 6px;
+  padding: 4px 8px 4px 10px;
+  border-bottom: 1px solid #eceef2;
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+}
+
+.dsm-position-popup-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.dsm-position-popup-axis {
+  font-style: italic;
+  font-family: "Times New Roman", serif;
+  font-size: 14px;
+  min-width: 26px;
+}

@@ -51,6 +51,8 @@ import {
   Space3DConfig,
   type FlowLook3D,
   MAX_FLOW_COUNT_3D,
+  savedFields,
+  type FlowQuality,
 } from "../model";
 import {
   COLOR_CONTRAST_MAXIMUM,
@@ -106,6 +108,9 @@ const COLOR_MODES: readonly Choice<VectorColorMode>[] = [
   { value: "direction", label: "Direction" },
   { value: "x-component", label: "x component" },
   { value: "y-component", label: "y component" },
+  // The flow's "What the colour follows" formula, shared: the potential
+  // round charges, for one.
+  { value: "scalar", label: "By a formula" },
 ];
 
 const ARROW_MODES: readonly Choice<ArrowMode>[] = [
@@ -234,6 +239,70 @@ function fieldTab(
   return (
     <div>
       {gallerySection(vectorTools)}
+      {IfElse(() => vectorTools.presetOpen, {
+        true: () => presetOpenSection(vectorTools, config),
+        false: () => fieldEditor(vectorTools, config, validation),
+      })}
+
+      {analysisSection(vectorTools)}
+
+      {fieldTabRest(vectorTools, config, validation)}
+    </div>
+  );
+}
+
+/**
+ * What the Field tab says while a preset is open: whose picture is on
+ * screen, that the save is kept, and the two ways on. The preset's
+ * equations and sliders are not shown here to edit (Rafael, 2026-11-08);
+ * Export makes them a save of their own first.
+ */
+function presetOpenSection(vectorTools: VectorTools, config: ConfigGetter) {
+  return (
+    <section
+      class="dsm-vector-tools-section dsm-vector-tools-preset-open"
+      data-vector-tools="preset-open"
+    >
+      <div class="dsm-vector-tools-preset-open-title">
+        {() => `Showing the preset ${config().name}`}
+      </div>
+      <div class="dsm-vector-tools-hint">
+        {() => {
+          const kept = vectorTools.presetReturnName;
+          return `${
+            kept === undefined
+              ? "Your saves are kept as they were."
+              : `Your field “${kept}” is kept as it was.`
+          } Its sliders and objects are in the expression list, and a Desmos vector field of it is in its folder, hidden: unhide the arrows' rows to show it.`;
+        }}
+      </div>
+      <div class="dsm-vector-tools-inline">
+        <Button
+          color="blue"
+          class="dsm-vector-tools-export-preset"
+          onTap={() => vectorTools.exportPresetForEditing()}
+        >
+          Export to Vector Tools for editing
+        </Button>
+        <Button
+          color="light-gray"
+          class="dsm-vector-tools-close-preset"
+          onTap={() => vectorTools.closePreset()}
+        >
+          Back to my field
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function fieldEditor(
+  vectorTools: VectorTools,
+  config: ConfigGetter,
+  validation: () => VectorTools["validation"]
+) {
+  return (
+    <div>
       <section class="dsm-vector-tools-section">
         <div class="dsm-vector-tools-section-head">
           {textControl(
@@ -262,7 +331,9 @@ function fieldTab(
             </Button>
             {/* Deleting the last field would leave the panel with nothing to
                 edit, so the button goes rather than failing when pressed. */}
-            <If predicate={() => vectorTools.getLibrary().fields.length > 1}>
+            <If
+              predicate={() => savedFields(vectorTools.getLibrary()).length > 1}
+            >
               {() => (
                 <Button
                   color="light-gray"
@@ -331,9 +402,18 @@ function fieldTab(
           </If>
         </div>
       </section>
+    </div>
+  );
+}
 
-      {analysisSection(vectorTools)}
-
+/** The Field tab below the equations: clock, sampling and curve. */
+function fieldTabRest(
+  vectorTools: VectorTools,
+  config: ConfigGetter,
+  validation: () => VectorTools["validation"]
+) {
+  return (
+    <div>
       {/* Only for a field that reads the clock. A field written without `t` is
           a still picture and has nothing to play. */}
       <If predicate={() => vectorTools.fieldUsesTime}>
@@ -1817,6 +1897,13 @@ function flowTab(vectorTools: VectorTools, config: ConfigGetter) {
   );
 }
 
+const FLOW_QUALITY_CHOICES: readonly Choice<FlowQuality>[] = [
+  { value: "auto", label: "Auto" },
+  { value: "high", label: "High" },
+  { value: "medium", label: "Medium" },
+  { value: "low", label: "Low" },
+];
+
 function flowTab2D(vectorTools: VectorTools, config: ConfigGetter) {
   const flow = () => config().flow;
   const compilation = () => vectorTools.flowAvailability;
@@ -1827,6 +1914,15 @@ function flowTab2D(vectorTools: VectorTools, config: ConfigGetter) {
           Animates particles carried by the field, drawn over the graph paper.
           It reads the same P and Q, and adds no expressions.
         </p>
+        {/* Auto drops the detail while frames run slow and raises it when
+            they keep up; the others hold it (Rafael, 2026-11-08). */}
+        {chipGroup(
+          "Quality",
+          () => flow().quality,
+          FLOW_QUALITY_CHOICES,
+          (value) => vectorTools.setFlow("quality", value),
+          "dsm-vector-tools-flow-quality"
+        )}
         <div class="dsm-vector-tools-actions">
           <Button
             color={() => (vectorTools.isFlowRunning ? "light-gray" : "blue")}
@@ -3431,7 +3527,8 @@ function timeControls(vectorTools: VectorTools) {
  * props, and a dropdown inside a scrolling popover is awkward to hit.
  */
 function fieldChooser(vectorTools: VectorTools, config: ConfigGetter) {
-  const fields = () => vectorTools.getLibrary().fields;
+  // An open preset is not a save, and is never listed.
+  const fields = () => savedFields(vectorTools.getLibrary());
   return (
     <div
       class="dsm-vector-tools-chooser"

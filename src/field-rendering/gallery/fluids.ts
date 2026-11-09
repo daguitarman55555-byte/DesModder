@@ -1,4 +1,4 @@
-import { thinVortexRing, vortexStreet } from "./latex";
+import { vortexStreet } from "./latex";
 /** Fluids: vortices, wakes and storms. */
 import type { GalleryPreset } from "./types";
 
@@ -9,17 +9,6 @@ const STREET_3D = vortexStreet(
   0.562,
   0.5,
   String.raw`+0.25\sin\left(1.5z\right)`
-);
-
-/**
- * The smoke ring in the box: radius 2.5, core 0.4, k = Γ/2π = 2, its puff
- * pulsing.
- */
-const RING = thinVortexRing(
-  2.5,
-  0.4,
-  2,
-  String.raw`\left(1+0.35\sin\left(0.6t\right)\right)`
 );
 
 /**
@@ -173,53 +162,6 @@ export const FLUIDS: readonly GalleryPreset[] = [
         absorb: true,
         colorMode: "speed",
         backdrop: "#0a0907",
-        backdropOpacity: 1,
-      },
-    },
-  },
-  {
-    id: "smoke-ring",
-    name: "Smoke ring",
-    category: "fluids",
-    blurb:
-      "A smoke ring cut through its middle: Hill's spherical vortex, seen riding along with it. The smoke turns over and over inside the sphere while the air outside parts round it. The puff driving it pulses, so the smoke turns faster and slower.",
-    // Hill's spherical vortex (1894), radius 5, in the frame moving with it:
-    // inside, uniform vorticity; outside, potential flow round a sphere.
-    xLatex: String.raw`\left(1+0.35\sin\left(0.6t\right)\right)\left\{x^{2}+y^{2}<25:0.06xy,\frac{187.5xy}{\left(x^{2}+y^{2}\right)^{2.5}}\right\}`,
-    yLatex: String.raw`\left(1+0.35\sin\left(0.6t\right)\right)\left\{x^{2}+y^{2}<25:1.5\left(1-\frac{2x^{2}+y^{2}}{25}\right),-\left(1-\frac{125}{\left(x^{2}+y^{2}\right)^{1.5}}\right)-\frac{187.5x^{2}}{\left(x^{2}+y^{2}\right)^{2.5}}\right\}`,
-    seedLatex: String.raw`e^{-\frac{\left(\left|x\right|-3.536\right)^{2}+y^{2}}{2}}+0.03`,
-    colorScale: 1,
-    backdrop: "#040506",
-    extent: 10,
-    palette: "ocean",
-    flow: {
-      particleCount: 35_000,
-      speed: 4,
-      trailPersistence: 0.97,
-      dropRate: 0.004,
-      opacity: 0.35,
-      pointSize: 1.3,
-      glow: 0.35,
-      normalizeSpeed: false,
-    },
-    space: {
-      blurb:
-        "A smoke ring in 3D: smoke spinning round a thin core bent into a circle, as a real ring's is, in the frame moving with it, so the air streams past. Each cross-section is a pair of Lamb–Oseen vortices, the thin-core approximation. The puff driving it pulses.",
-      xLatex: RING.x,
-      yLatex: RING.y,
-      zLatex: RING.z,
-      seedLatex: String.raw`e^{-\frac{\left(\sqrt{x^{2}+y^{2}}-2.5\right)^{2}+z^{2}}{0.12}}+0.004`,
-      look: {
-        particles: 40_000,
-        speed: 0.3,
-        trail: 64,
-        lifetime: 8,
-        opacity: 0.35,
-        glow: 0.2,
-        normalizeSpeed: false,
-        absorb: true,
-        colorMode: "speed",
-        backdrop: "#040506",
         backdropOpacity: 1,
       },
     },

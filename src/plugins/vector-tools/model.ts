@@ -238,6 +238,12 @@ export interface FlowConfig {
    */
   renderScale: number;
   /**
+   * How much detail the flow is drawn at: Auto lowers it while frames run
+   * slow and raises it again when they keep up; the others hold it (Rafael,
+   * 2026-11-08: "make automatic quality an option").
+   */
+  quality: FlowQuality;
+  /**
    * Where particles are born, a chance from 0 to 1 over x and y in Desmos
    * LaTeX; empty for evenly across the view.
    */
@@ -926,6 +932,11 @@ export interface VectorFieldLibrary {
    */
   galleryWithLook: boolean;
   /**
+   * While a preset is open (`PRESET_FIELD_ID` is active), the save to go
+   * back to when it closes.
+   */
+  presetReturnId?: string;
+  /**
    * The Matrix tab: a map applied to the whole graph. On the library rather
    * than on a field, because transforming the graph is not a property of the
    * vector field being drawn, and switching fields should not switch it off.
@@ -1084,6 +1095,7 @@ const DEFAULT_VECTOR_FIELD_CONFIG: VectorFieldConfig = {
     look: "streamlines",
     normalizeSpeed: true,
     renderScale: 1,
+    quality: "auto",
     seedLatex: "",
     seedOn: true,
     edges: "auto",
@@ -1272,6 +1284,32 @@ export function cloneDefaultLibrary(): VectorFieldLibrary {
  * the first one rather than leaving the panel with nothing to show, and
  * `normalizeVectorFieldLibrary` guarantees there is always a first one.
  */
+/**
+ * The field a preset is drawn from while it is open. Not a save: the field
+ * chooser never lists it, and it goes when the preset is closed. Rafael,
+ * 2026-11-08: opening a preset must not overwrite the field being edited;
+ * Export to Vector Tools makes a save of it.
+ */
+export const PRESET_FIELD_ID = "presetview";
+
+/** The user's own saves: every field but an open preset's. */
+export function savedFields(library: VectorFieldLibrary) {
+  return library.fields.filter((field) => field.id !== PRESET_FIELD_ID);
+}
+
+export type FlowQuality = "auto" | "high" | "medium" | "low";
+export const FLOW_QUALITIES: readonly FlowQuality[] = [
+  "auto",
+  "high",
+  "medium",
+  "low",
+];
+
+/** The fraction of the display's pixels a fixed quality draws at. */
+export function flowQualityScale(quality: FlowQuality) {
+  return quality === "medium" ? 0.75 : quality === "low" ? 0.5 : 1;
+}
+
 export function activeField(library: VectorFieldLibrary): VectorFieldConfig {
   return (
     library.fields.find((field) => field.id === library.activeId) ??
@@ -1723,6 +1761,12 @@ export function normalizeVectorFieldLibrary(
     activeId,
     panel: normalizePanel(value.panel, fallback.panel),
     galleryWithLook: value.galleryWithLook === true,
+    ...(validID(value.presetReturnId) &&
+    trimmed.some(
+      (f) => f.id === value.presetReturnId && f.id !== PRESET_FIELD_ID
+    )
+      ? { presetReturnId: value.presetReturnId }
+      : {}),
     matrix: normalizeMatrixConfig(value.matrix),
   };
 }
@@ -2004,6 +2048,9 @@ function normalizeFlow(value: unknown, fallback: FlowConfig): FlowConfig {
     // slider that replaced, and would otherwise blur the flow for good with
     // no control left to undo it.
     renderScale: 1,
+    quality: FLOW_QUALITIES.includes(flow?.quality as FlowQuality)
+      ? (flow!.quality as FlowQuality)
+      : "auto",
     seedLatex:
       typeof flow?.seedLatex === "string" ? flow.seedLatex : fallback.seedLatex,
     seedOn: typeof flow?.seedOn === "boolean" ? flow.seedOn : fallback.seedOn,
@@ -2234,6 +2281,7 @@ function isColorMode(value: unknown): value is VectorColorMode {
     "direction",
     "x-component",
     "y-component",
+    "scalar",
   ].includes(value as string);
 }
 

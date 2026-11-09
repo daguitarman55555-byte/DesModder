@@ -57,15 +57,15 @@ describe("every gallery field compiles", () => {
 
 describe("loading one", () => {
   test("brings its look, and turns the arrows off", () => {
-    const preset = galleryPreset("spiral-galaxy")!;
+    const preset = galleryPreset("black-hole")!;
     const config = configFromGallery(preset);
-    expect(config.name).toBe("Spiral galaxy");
+    expect(config.name).toBe("Black hole");
     expect(config.components.xLatex).toBe(preset.xLatex);
     // These are flow pictures: an arrow grid is how you read a field, not how
     // you watch one.
     expect(config.arrowMode).toBe("off");
-    expect(config.flow.palette).toBe("galaxy");
-    expect(config.color.palette).toBe("galaxy");
+    expect(config.flow.palette).toBe("blackbody");
+    expect(config.color.palette).toBe("blackbody");
     // The backdrop is what keeps a near-black palette from disappearing into
     // white graph paper.
     expect(config.flow.backdropEnabled).toBe(true);

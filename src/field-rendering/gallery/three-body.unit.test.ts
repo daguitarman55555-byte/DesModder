@@ -1,4 +1,4 @@
-import { galleryPreset } from "./index";
+import { choosePresetVariant, galleryPreset } from "./index";
 import {
   flashAt,
   integrateThreeBody,
@@ -138,13 +138,34 @@ describe("the three-body scenes", () => {
     ]);
   });
 
-  test.each(["star-cluster", "three-body-crash", "pythagorean"])(
-    "%s keeps its LaTeX small enough for Desmos to load at once",
-    (id) => {
-      const preset = galleryPreset(id)!;
+  // Every crash in the library (2026-11-08), each of which is chosen at
+  // random when the preset is.
+  test("every crash keeps its LaTeX small enough for Desmos to load at once", () => {
+    const { count } = galleryPreset("three-body-crash")!.variants!;
+    expect(count).toBeGreaterThan(5);
+    const seen = new Set<string>();
+    for (let k = 0; k < count; k++) {
+      // Walks the versions in order: each pick moves on by one.
+      choosePresetVariant("three-body-crash", () => 0);
+      const preset = galleryPreset("three-body-crash")!;
       const chars = preset.scene!.reduce((a, s) => a + s.latex.length, 0);
       expect(chars).toBeLessThan(60_000);
       expect(preset.sceneTime).toBe("T_{scene}");
+      expect(preset.clockParameters).toBeDefined();
+      // The field is the same formula for every crash; its recorded path is not.
+      seen.add(preset.scene!.find((s) => s.key === "x1")!.latex);
     }
-  );
+    // They are different crashes, not one shown again.
+    expect(seen.size).toBe(count);
+  });
+
+  test("choosing the crash again never shows the same one twice in a row", () => {
+    let last = galleryPreset("three-body-crash")!.blurb;
+    for (let k = 0; k < 20; k++) {
+      choosePresetVariant("three-body-crash");
+      const now = galleryPreset("three-body-crash")!.blurb;
+      expect(now === last && !now.includes("Lagrange")).toBe(false);
+      last = now;
+    }
+  });
 });

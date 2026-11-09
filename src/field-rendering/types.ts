@@ -30,7 +30,9 @@ export type VectorColorMode =
   | "log-magnitude"
   | "direction"
   | "x-component"
-  | "y-component";
+  | "y-component"
+  /** The field's tint formula, as the flow's scalar colour (see below). */
+  | "scalar";
 
 /**
  * Whether the colour ramp follows the viewport or a range the user fixed.

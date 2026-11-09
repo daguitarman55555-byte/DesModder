@@ -24,8 +24,7 @@ import { probeArrows2D, probeArrows3D, type ProbeArrow } from "./probe";
 import type { GalleryPreset, GalleryVariable, SceneItem } from "./types";
 
 const { raw } = String;
-const { obj, curve, surface } = inked("#2c3646");
-const ALONG = frac("1", `1+e^{3${par(`${abs("z")}-2.5`)}}`);
+const { obj, surface } = inked("#2c3646");
 
 function box(
   key: string,
@@ -91,85 +90,7 @@ function model(id: string, dim: 2 | 3): Model {
     tintScale: 1,
     gain: 1,
   };
-  if (id === "capacitor") {
-    m.vars = [
-      variable("s", 1, -2, 2),
-      variable("L", dim === 2 ? 4 : 2.5, 1, 5),
-      variable("d", dim === 2 ? 3 : 1.5, 0.5, 4),
-    ];
-    const b = ["y-\\frac{d}{2}", "y+\\frac{d}{2}"];
-    const A = (b: string) =>
-      mul("0.5", ln(frac(`${sq("x+L")}+${sq(b)}`, `${sq("x-L")}+${sq(b)}`)));
-    const C = (b: string) =>
-      raw`\left\{${b}=0:0,${atan(frac("x+L", b))}-${atan(frac("x-L", b))}\right\}`;
-    // Integral of ln(distance), using |b| to preserve the physical potential across strips.
-    const H = (u: string, b: string) =>
-      par(
-        `${mul(u, ln(`${sq(u)}+${sq(b)}`))}-2${par(u)}+${mul("2", abs(b), atan(frac(u, abs(b))))}`
-      );
-    const V = (b: string) =>
-      `-${mul("0.5", par(`${H("x+L", b)}-${H("x-L", b)}`))}`;
-    m.valid = raw`\max${par(`${abs("x")}-L,\\min${par(`${abs(b[0])},${abs(b[1])}`)}-0.04`)}>0`;
-    m.field = [
-      mul("s", `${A(b[0])}-${A(b[1])}`),
-      mul("s", `${C(b[0])}-${C(b[1])}`),
-      "0",
-    ];
-    // b=0 outside the plate: limiting primitive u ln(u²)-2u.
-    const J = (bb: string) =>
-      raw`\left\{${bb}=0:-0.5${par(`${mul("x+L", ln(sq("x+L")))}-2${par("x+L")}-${mul("x-L", ln(sq("x-L")))}+2${par("x-L")}`)},${V(bb)}\right\}`;
-    m.potential = mul("s", `${J(b[0])}-${J(b[1])}`);
-    // Stream function branch constants are kept separate by restrictions in the scene.
-    const K = (u: string, bb: string) =>
-      `${mul(u, atan(frac(u, bb)))}-${mul(frac(bb, "2"), ln(`${sq(u)}+${sq(bb)}`))}`;
-    const S = (bb: string) => par(`-${par(K("x+L", bb))}+${par(K("x-L", bb))}`);
-    // Charge changes direction and strength, not the geometric family of lines.
-    m.stream = par(`${S(b[0])}-${S(b[1])}`);
-    m.tintScale = 3;
-    m.gain = 0.5;
-    m.seed = mul(
-      frac(
-        `e^{-${frac("y^{2}", "d^{2}")}}`,
-        `1+e^{3${par(`${abs("x")}-L-1`)}}`
-      ),
-      dim === 3 ? ALONG : "1"
-    );
-    for (let i = 0; i < 2; i++) {
-      const cy = i === 0 ? "\\frac{d}{2}" : "-\\frac{d}{2}";
-      const q = i === 0 ? "s" : "-s";
-      const cl = `C_{plate${i}vt}`;
-      m.scene.push(
-        obj(`color${i}`, `${cl}=${signColor(q)}`, { hidden: true }),
-        ...box(
-          `plate${i}`,
-          ["-L", `${cy}-0.04`, "-2.5"],
-          ["L", `${cy}+0.04`, "2.5"],
-          dim,
-          "#999999",
-          cl
-        )
-      );
-      for (let j = 0; j < 3; j++) {
-        const xx = ["-0.65L", "0", "0.65L"][j];
-        m.scene.push(
-          curve(
-            `minus${i}${j}`,
-            point(`${xx}+0.13t`, cy, ...(dim === 3 ? ["2.52"] : [])) +
-              only(`${abs("s")}>0`),
-            ["-1", "1"],
-            { color: "#ffffff", lineWidth: 3 }
-          ),
-          curve(
-            `plus${i}${j}`,
-            point(xx, `${cy}+0.13t`, ...(dim === 3 ? ["2.53"] : [])) +
-              only(`${q}>0`),
-            ["-1", "1"],
-            { color: "#ffffff", lineWidth: 3 }
-          )
-        );
-      }
-    }
-  } else if (id === "bar-magnet") {
+  if (id === "bar-magnet") {
     m.vars = [
       variable("a", 1.5, 0.5, 3),
       variable("b", 0.4, 0.2, 0.8),
@@ -259,7 +180,7 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
     const vars = [
       ...m.vars,
       variable("p_{x}", id === "bar-magnet" ? 2.5 : 0, -9, 9, 0.05),
-      variable("p_{y}", id === "capacitor" ? 0 : 1.5, -9, 9, 0.05),
+      variable("p_{y}", 1.5, -9, 9, 0.05),
       ...(dim === 3 ? [variable("p_{z}", 0.6, -5, 5, 0.05)] : []),
       variable("s_{arrow}", m.gain, 0, 20),
       toggle("s_{net}", 1, "Field arrow"),
@@ -305,29 +226,11 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
       scene.push(
         obj(
           "fieldlines",
-          `${sin(mul(id === "dipole" ? "3" : id === "capacitor" ? "0.25" : "1", raw`\pi`, m.stream))}=0${only("s_{lines}=1")}${only(mask)}${only(nonzero)}${extraMask}${id === "capacitor" ? only(`${abs("y-\\frac{d}{2}")}>0.04`) + only(`${abs("y+\\frac{d}{2}")}>0.04`) : ""}`,
+          `${sin(mul(id === "dipole" ? "3" : "1", raw`\pi`, m.stream))}=0${only("s_{lines}=1")}${only(mask)}${only(nonzero)}${extraMask}`,
           {
             explains: true,
             lineWidth: 1.5,
-            lineOpacity:
-              id === "capacitor"
-                ? raw`\left\{\left|s\right|>0:0.8,0\right\}`
-                : 0.8,
-          }
-        )
-      );
-    }
-    if (dim === 2 && id === "capacitor") {
-      vars.push(toggle("s_{equi}", 0, "Equipotentials"));
-      scene.push(
-        obj(
-          "equi",
-          `${sin(mul(raw`\pi`, frac(m.potential, String(m.tintScale * (id === "capacitor" ? 2 : 1)))))}=0${only("s_{equi}=1")}${only(m.valid)}`,
-          {
-            explains: true,
-            lineStyle: "DASHED",
-            color: "#303030",
-            lineWidth: 1,
+            lineOpacity: 0.8,
           }
         )
       );
@@ -384,17 +287,11 @@ function teaching(id: string, name: string, blurb: string): GalleryPreset {
  * unit 12.
  */
 const AP_PLACE: Record<string, Pick<GalleryPreset, "category" | "apUnit">> = {
-  capacitor: { category: "ap2", apUnit: 10 },
   "bar-magnet": { category: "ap2", apUnit: 12 },
   dipole: { category: "ap2", apUnit: 12 },
 };
 
 export const TEACHING_PHYSICS: readonly GalleryPreset[] = [
-  teaching(
-    "capacitor",
-    "Capacitor",
-    "Exact field of prescribed uniformly charged infinite-depth strips, not finite equipotential conductors. Tint is electric potential, zero at the midplane. Visible ends are display cuts; signs reverse with charge."
-  ),
   teaching(
     "bar-magnet",
     "Bar magnet",

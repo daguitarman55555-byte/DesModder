@@ -194,6 +194,9 @@ testWithPageAndOpts(
     const loaded = await driver.page.evaluate(() => {
       const vt = DSM.enabledPlugins["vector-tools"] as any;
       vt.applyGalleryPreset("dipole", false);
+      // An open preset's equations are not edited in the panel; exported,
+      // they are a save of their own, which is.
+      vt.exportPresetForEditing();
       return vt.getConfig().components.zLatex as string;
     });
     expect(loaded).toContain(String.raw`x^{2}+y^{2}+\left(z\right)^{2}`);

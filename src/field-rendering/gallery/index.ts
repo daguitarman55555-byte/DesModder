@@ -162,6 +162,46 @@ export function withVariablesInlined(preset: GalleryPreset): GalleryPreset {
   };
 }
 
+/** Which version of a preset with `variants` is shown, by preset id. */
+const chosenVariant = new Map<string, number>();
+/** Versions built so far, tidied, by `${id}:${index}`. */
+const builtVariants = new Map<string, GalleryPreset>();
+
+/**
+ * The preset, as the version of it now chosen if it has several (see
+ * `GalleryPreset.variants`).
+ */
 export function galleryPreset(id: string): GalleryPreset | undefined {
-  return FIELD_GALLERY.find((preset) => preset.id === id);
+  const preset = FIELD_GALLERY.find((p) => p.id === id);
+  const index = chosenVariant.get(id) ?? 0;
+  if (preset?.variants === undefined || index === 0) return preset;
+  const key = `${id}:${index}`;
+  let built = builtVariants.get(key);
+  if (built === undefined) {
+    const version = preset.variants.build(index);
+    built = tidied({
+      ...preset,
+      ...version,
+      space: { ...preset.space, ...version.space },
+    });
+    builtVariants.set(key, built);
+  }
+  return built;
+}
+
+/**
+ * Picks another version of a preset that has several, at random and never
+ * the one just shown, so choosing it again shows something new. Returns
+ * whether there was one to pick.
+ */
+export function choosePresetVariant(
+  id: string,
+  random: () => number = Math.random
+) {
+  const count = FIELD_GALLERY.find((p) => p.id === id)?.variants?.count ?? 0;
+  if (count < 2) return false;
+  const now = chosenVariant.get(id) ?? 0;
+  const next = (now + 1 + Math.floor(random() * (count - 1))) % count;
+  chosenVariant.set(id, next);
+  return true;
 }

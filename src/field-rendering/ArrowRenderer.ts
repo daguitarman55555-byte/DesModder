@@ -59,6 +59,8 @@ export interface ArrowOptions {
   /** Shaft thickness in CSS pixels, so it does not change with the zoom. */
   shaftWidth: number;
   colorMode: VectorColorMode;
+  /** For `scalar`: the tint at which the ramp is three quarters to an end. */
+  tintScale?: number;
   palette: PaletteID;
   fixedColor: string;
   /**
@@ -122,6 +124,7 @@ const COLOR_MODE_INDEX: Record<VectorColorMode, number> = {
   direction: 3,
   "x-component": 4,
   "y-component": 5,
+  scalar: 6,
 };
 
 /** Vertices per arrow: two triangles of shaft, one of head. */
@@ -420,6 +423,7 @@ export class ArrowRenderer {
     gl.uniform1i(uniforms.u_centered, options.centered === true ? 1 : 0);
     gl.uniform1f(uniforms.u_opacity, options.opacity);
     gl.uniform1i(uniforms.u_colorMode, COLOR_MODE_INDEX[options.colorMode]);
+    gl.uniform1f(uniforms.u_tintScale, Math.max(1e-9, options.tintScale ?? 1));
     const [r, g, b] = hexToUnitRGB(options.fixedColor);
     gl.uniform3f(uniforms.u_fixedColor, r, g, b);
     gl.uniform1f(uniforms.u_speedScale, Math.max(1e-6, (xMax - xMin) / 3));
@@ -543,6 +547,7 @@ uniform float u_shaftWidth;
 uniform int u_centered;
 uniform float u_opacity;
 uniform int u_colorMode;
+uniform float u_tintScale;
 uniform vec3 u_fixedColor;
 uniform float u_speedScale;
 uniform vec2 u_range;
@@ -571,10 +576,14 @@ float vtLengthFactor(float magnitude) {
          (u_compression * safe);
 }
 
-vec3 vtArrowColor(vec2 v, float magnitude) {
+vec3 vtArrowColor(vec2 p, vec2 v, float magnitude) {
   // vtPalette adjusts its own stops, so only the two colours that never
   // went through a ramp are adjusted here.
   if (u_colorMode == 0) return vtAdjust(u_fixedColor);
+  // A formula of where the arrow is (the field's tint), through the same
+  // saturating diverging ramp the flow's scalar colour uses: the potential
+  // round charges, red where it is positive and blue where it is negative.
+  if (u_colorMode == 6) return vtPalette(0.5 + 0.5 * tanh(vtTint(p) / u_tintScale));
   if (u_colorMode == 3) {
     return vtAdjust(vtHueRamp(fract(atan(v.y, v.x) / 6.2831853 + 1.0)));
   }
@@ -681,7 +690,7 @@ void main() {
   gl_Position = vec4(2.0 * normalized - 1.0, 0.0, 1.0);
 
   float alpha = clamp(u_opacity, 0.0, 1.0);
-  v_color = vec4(vtArrowColor(v, magnitude) * alpha, alpha);
+  v_color = vec4(vtArrowColor(base, v, magnitude) * alpha, alpha);
 }
 `;
 }

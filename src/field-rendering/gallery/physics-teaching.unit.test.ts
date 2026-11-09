@@ -33,7 +33,7 @@ const dx = (f: (x: number, y: number) => number, x: number, y: number) =>
 const dy = (f: (x: number, y: number) => number, x: number, y: number) =>
   (f(x, y + 1e-5) - f(x, y - 1e-5)) / 2e-5;
 
-test.each(["capacitor", "dipole"])(
+test.each(["dipole"])(
   "%s field is minus the gradient of its stated potential",
   (id) => {
     const f = field(id);
@@ -89,26 +89,20 @@ test("prism exterior field agrees with independent face quadrature, including fa
   }
 });
 
-test.each(["capacitor", "dipole"])(
-  "%s implicit lines are tangent to the field",
-  (id) => {
-    const f = field(id);
-    const line = f.p.scene!.find((s) => s.key === "fieldlines")!.latex;
-    const start =
-      line.indexOf(
-        String.raw`\cdot\left(`,
-        line.indexOf(String.raw`\cdot\left(`) + 1
-      ) + String.raw`\cdot\left(`.length;
-    const end = line.indexOf(String.raw`\right)\right)=0`);
-    const s = f.compile(line.slice(start, end));
-    for (const [x, y] of [
-      [2, 2],
-      [1, -2.5],
-      [-2, 3],
-    ])
-      expect(dx(s, x, y) * f.x(x, y) + dy(s, x, y) * f.y(x, y)).toBeCloseTo(
-        0,
-        5
-      );
-  }
-);
+test.each(["dipole"])("%s implicit lines are tangent to the field", (id) => {
+  const f = field(id);
+  const line = f.p.scene!.find((s) => s.key === "fieldlines")!.latex;
+  const start =
+    line.indexOf(
+      String.raw`\cdot\left(`,
+      line.indexOf(String.raw`\cdot\left(`) + 1
+    ) + String.raw`\cdot\left(`.length;
+  const end = line.indexOf(String.raw`\right)\right)=0`);
+  const s = f.compile(line.slice(start, end));
+  for (const [x, y] of [
+    [2, 2],
+    [1, -2.5],
+    [-2, 3],
+  ])
+    expect(dx(s, x, y) * f.x(x, y) + dy(s, x, y) * f.y(x, y)).toBeCloseTo(0, 5);
+});
