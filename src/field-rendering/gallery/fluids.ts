@@ -1,15 +1,5 @@
-import { vortexStreet } from "./latex";
 /** Fluids: vortices, wakes and storms. */
 import type { GalleryPreset } from "./types";
-
-/** The vortex street: spacing 6 on the plane, 4 in the box, rows 0.281 of it apart. */
-const STREET_2D = vortexStreet(1.0472, 0.843, 0.5);
-const STREET_3D = vortexStreet(
-  1.5708,
-  0.562,
-  0.5,
-  String.raw`+0.25\sin\left(1.5z\right)`
-);
 
 /**
  * A tornado standing on the ground, z = −5, under its cloud base at z = 4.
@@ -234,56 +224,6 @@ export const FLUIDS: readonly GalleryPreset[] = [
         absorb: true,
         colorMode: "speed",
         backdrop: "#0a0907",
-        backdropOpacity: 1,
-      },
-    },
-  },
-  {
-    id: "karman",
-    name: "Vortex street",
-    category: "fluids",
-    blurb:
-      "The wake behind a cylinder: vortices shed alternately from each side, spinning opposite ways, drifting downstream slower than the stream. Von Kármán showed only rows 0.281 of a spacing apart are stable.",
-    // Two infinite rows of point vortices, spacing a = 6, rows h = 0.281a apart,
-    // in a stream U = 1; each row's velocity is the sum over its vortices,
-    // (Γ/2a)·(sinh, sin)/(cosh − cos). The street drifts at 0.646U.
-    xLatex: STREET_2D.x,
-    yLatex: STREET_2D.y,
-    seedLatex: String.raw`e^{-\frac{y^{2}}{1.2}}`,
-    colorScale: 1,
-    backdrop: "#02060a",
-    extent: 10,
-    palette: "ocean",
-    flow: {
-      particleCount: 40_000,
-      speed: 5,
-      trailPersistence: 0.96,
-      dropRate: 0.006,
-      opacity: 0.4,
-      pointSize: 1.3,
-      glow: 0.35,
-      normalizeSpeed: false,
-    },
-    space: {
-      blurb:
-        "The vortex street in 3D: the vortices are tubes along the cylinder's span, and they wave — the instability that makes real wakes three-dimensional.",
-      // The same street, spacing 4, its tubes displaced 0.25 sin(1.5z)
-      // along the stream.
-      xLatex: STREET_3D.x,
-      yLatex: STREET_3D.y,
-      zLatex: String.raw`0`,
-      seedLatex: String.raw`e^{-\frac{y^{2}}{0.6}}`,
-      look: {
-        particles: 40_000,
-        speed: 0.3,
-        trail: 48,
-        lifetime: 5,
-        opacity: 0.35,
-        glow: 0.15,
-        normalizeSpeed: false,
-        absorb: true,
-        colorMode: "speed",
-        backdrop: "#02060a",
         backdropOpacity: 1,
       },
     },

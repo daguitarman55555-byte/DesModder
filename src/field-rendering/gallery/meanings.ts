@@ -32,7 +32,6 @@ export const COLOR_MEANINGS: Readonly<Record<string, ColorMeaning>> = {
     high: "turning counter-clockwise",
   },
   tornado: speed("the air"),
-  karman: speed("the water past the cylinder"),
   lorenz: speed("the state round the attractor"),
   thomas: speed("the state round the attractor"),
   charges: {

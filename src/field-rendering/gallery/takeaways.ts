@@ -21,8 +21,6 @@ export const TAKEAWAYS: Readonly<Record<string, string>> = {
     "Neighbouring vortices spin opposite ways, so where two meet the fluid moves the same way, and the cells shear against each other.",
   tornado:
     "Air drawn inward spins faster as it closes on the core, conserving angular momentum like a skater pulling in their arms, until the core turns as a solid.",
-  karman:
-    "A steady stream past a cylinder leaves an unsteady wake, with vortices shed alternately from each side. That is why wires hum and chimneys sway in the wind.",
   lorenz:
     "Deterministic is not predictable: two starts closer than any measurement could tell apart soon separate completely, yet both stay on the same butterfly.",
   thomas:
