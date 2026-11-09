@@ -464,8 +464,11 @@ export class FlowRenderer {
     const width = Math.max(1, Math.round(cssWidth * devicePixelRatio));
     const height = Math.max(1, Math.round(cssHeight * devicePixelRatio));
     if (width === this.trailWidth && height === this.trailHeight) return false;
-    const old = keep ? this.trailFront : undefined;
-    if (old !== undefined) this.trailFront = undefined;
+    // Between frames the newest trail is the back texture (the swap at the
+    // end of `frame`), so that is the one to keep; the front holds the
+    // frame before it.
+    const old = keep ? this.trailBack : undefined;
+    if (old !== undefined) this.trailBack = undefined;
     this.canvas.width = width;
     this.canvas.height = height;
     this.trailWidth = width;

@@ -128,6 +128,42 @@ describe("Vector Tools flow renderer allocation", () => {
   });
 });
 
+describe("Vector Tools flow trails kept across a resize", () => {
+  /**
+   * Between frames the newest trail is the back texture, because `frame`
+   * swaps at its end. A kept resize copied the front one, the frame before,
+   * so every automatic detail change dropped the last stroke drawn (found by
+   * GPT's audit of 11a8bd57, V3).
+   */
+  it("copies the newest trail, not the one before it", () => {
+    const gl = fakeGL();
+    const bound: unknown[] = [];
+    const watched = new Proxy(gl, {
+      get(target, property) {
+        if (property === "bindTexture")
+          return (_target: number, texture: unknown) => bound.push(texture);
+        return Reflect.get(target, property);
+      },
+    });
+    const renderer = new FlowRenderer(fakeCanvas(watched));
+    renderer.setField({ kind: "components", p: "p.x", q: "p.y" });
+    renderer.resize(400, 300, 1);
+    renderer.frame();
+    const trails = renderer as unknown as {
+      trailFront: unknown;
+      trailBack: unknown;
+    };
+    const newest = trails.trailBack;
+    const previous = trails.trailFront;
+
+    bound.length = 0;
+    renderer.resize(500, 300, 1, true);
+
+    expect(bound).toContain(newest);
+    expect(bound).not.toContain(previous);
+  });
+});
+
 describe("Vector Tools flow fixed color", () => {
   it("reads both hex lengths and falls back on nonsense", () => {
     expect(hexToUnitRGB("#ffffff")).toEqual([1, 1, 1]);
