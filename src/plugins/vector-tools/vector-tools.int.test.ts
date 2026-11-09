@@ -2519,6 +2519,96 @@ testWithPage(
 );
 
 testWithPage(
+  "ten charges' field lines retrace quickly and Desmos takes every list",
+  async (driver) => {
+    await driver.enablePlugin("vector-tools");
+    await resetLibrary(driver);
+    await driver.evaluate(() =>
+      (window as any).DSM.enabledPlugins["vector-tools"].applyGalleryPreset(
+        "charges",
+        true
+      )
+    );
+    await driver.waitForSync();
+    // The heaviest picture: ten charges of one sign, every line escaping.
+    await driver.evaluate(() => {
+      const vt = (window as any).DSM.enabledPlugins["vector-tools"];
+      const times: number[] = [];
+      const write = vt.writeChargeLines.bind(vt);
+      vt.writeChargeLines = () => {
+        const t = performance.now();
+        const wrote = write();
+        if (wrote) times.push(performance.now() - t);
+        return wrote;
+      };
+      (window as any).lineTimes = times;
+      Calc.setExpressions([
+        { id: "vector_tools_variables_Nq", latex: "N_{q}=10" },
+        ...Array.from({ length: 10 }, (_, i) => ({
+          id: `vector_tools_variables_q${i + 1}`,
+          latex: `q_{${i + 1}}=5`,
+        })),
+      ]);
+    });
+    await driver.waitForSync();
+    // Dragged: one charge moved a step at a time.
+    for (let step = 0; step < 8; step++) {
+      await driver.evaluate(
+        (x) =>
+          Calc.setExpression({
+            id: "vector_tools_variables_Xq1",
+            latex: `X_{q1}=${x}`,
+          }),
+        -2.5 + step * 0.3
+      );
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    }
+    await driver.waitForSync();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const result = await driver.evaluate(() => {
+      const ids = [
+        "vector_tools_variables_object_linesx",
+        "vector_tools_variables_object_linesy",
+        "vector_tools_variables_object_lines",
+      ];
+      const { list } = Calc.getState().expressions;
+      const xs = (
+        list.find((e) => e.id === ids[0]) as { latex: string }
+      ).latex.split(",").length;
+      return {
+        times: (window as any).lineTimes as number[],
+        xs,
+        errors: ids.filter(
+          (id) =>
+            (Calc.controller.getItemModel(id) as { error?: unknown })?.error !==
+            undefined
+        ),
+      };
+    });
+    // eslint-disable-next-line no-console
+    console.log(
+      `ten charges: ${result.xs} points, retrace ${result.times
+        .map((t) => t.toFixed(1))
+        .join(", ")} ms`
+    );
+    expect(result.errors).toEqual([]);
+    expect(result.xs).toBeGreaterThan(1000);
+    expect(result.xs).toBeLessThanOrEqual(9000);
+    // The heaviest arrangement, traced and handed to Desmos: about 40 ms
+    // a retrace here, of which Desmos taking the lists is 26 (measured
+    // 2026-11-09). A guard against a regression several times over, not a
+    // budget; the retraces are spaced so they take a third of a drag.
+    expect(result.times.length).toBeGreaterThan(2);
+    expect(Math.max(...result.times)).toBeLessThan(150);
+
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.waitForSync();
+  },
+  90000
+);
+
+testWithPage(
   "a preset's Desmos arrows wait in a hidden folder, N_arrows a side, and its field lines follow charges after it closes",
   async (driver) => {
     await driver.enablePlugin("vector-tools");

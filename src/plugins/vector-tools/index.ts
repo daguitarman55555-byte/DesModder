@@ -1457,24 +1457,35 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   private chargeLinesKey = "";
   private chargeLinesTimer?: ReturnType<typeof setTimeout>;
   private chargeLinesValues?: ReadonlyMap<string, number>;
+  /** How long the last retrace took, tracing and writing, in ms. */
+  private chargeLinesCost = 0;
 
   /**
    * Retraces the loaded preset's field lines (`chargeLines`) when its
    * charges have moved. Coalesced, not debounced, like the environment
    * refresh: a charge being dragged reports every frame, and the lines
-   * should follow it, at most about twenty times a second.
+   * should follow it, at most about twenty times a second. Never sooner
+   * than twice the last retrace took, so however many charges there are,
+   * the lines take at most a third of the page's time during a drag: ten
+   * charges of one sign took 40 ms a retrace live (2026-11-09), and every
+   * 50 ms they kept the page busy.
    */
   private scheduleChargeLines(values: ReadonlyMap<string, number>) {
     this.chargeLinesValues = values;
     if (this.chargeLinesTimer !== undefined) return;
-    this.chargeLinesTimer = setTimeout(() => {
-      this.chargeLinesTimer = undefined;
-      if (this.dispatching()) {
-        this.scheduleChargeLines(this.chargeLinesValues ?? new Map());
-        return;
-      }
-      this.writeChargeLines();
-    }, 50);
+    this.chargeLinesTimer = setTimeout(
+      () => {
+        this.chargeLinesTimer = undefined;
+        if (this.dispatching()) {
+          this.scheduleChargeLines(this.chargeLinesValues ?? new Map());
+          return;
+        }
+        const start = performance.now();
+        if (this.writeChargeLines())
+          this.chargeLinesCost = performance.now() - start;
+      },
+      Math.max(50, 2 * this.chargeLinesCost)
+    );
   }
 
   /**
@@ -1485,17 +1496,17 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
    * phantom charge (Rafael, 2026-11-09). The numbers are read from the
    * sliders themselves, since a closed preset's are no longer the field's.
    */
-  private writeChargeLines() {
+  private writeChargeLines(): boolean {
     const values = this.chargeLinesValues;
-    if (values === undefined || this.cc.is3dProduct()) return;
+    if (values === undefined || this.cc.is3dProduct()) return false;
     const spec =
       galleryPreset(this.activePresetId ?? "")?.chargeLines ??
       FIELD_GALLERY.find((preset) => preset.chargeLines !== undefined)
         ?.chargeLines;
-    if (spec === undefined) return;
+    if (spec === undefined) return false;
     const xs = sceneItemID({ key: "linesx", latex: "" });
     const ys = sceneItemID({ key: "linesy", latex: "" });
-    if (this.cc.getItemModel(xs) === undefined) return;
+    if (this.cc.getItemModel(xs) === undefined) return false;
     const sliders = sliderValues(this.cc.getAllItemModels());
     const read = (name: string) => {
       const id = canonicalIdentifier(name);
@@ -1513,7 +1524,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       charges.push({ q, x, y });
     }
     const key = JSON.stringify([on, charges]);
-    if (key === this.chargeLinesKey) return;
+    if (key === this.chargeLinesKey) return false;
     this.chargeLinesKey = key;
     // Off, the lists are emptied rather than kept: nothing reads them, and
     // a graph shared with them hidden should not carry thousands of points.
@@ -1524,6 +1535,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
       { id: xs, latex: `L_{xvt}=${xLatex}` },
       { id: ys, latex: `L_{yvt}=${yLatex}` },
     ]);
+    return true;
   }
 
   /**

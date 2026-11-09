@@ -1,5 +1,6 @@
 import {
   fieldLinesLatex,
+  MAX_POINTS,
   traceFieldLines,
   type PointCharge,
 } from "./charge-lines";
@@ -58,10 +59,31 @@ describe("traceFieldLines", () => {
       ],
       opts
     );
-    // 8 per unit charge out of the positive one; the negative one needs
-    // only the few that escaped past the picture's edge.
-    expect(lines.lines).toBeGreaterThanOrEqual(8);
-    expect(lines.lines).toBeLessThanOrEqual(12);
+    // 10 per unit charge out of the positive one, and every one of them
+    // comes back round to the negative one, which needs none of its own.
+    expect(lines.lines).toBe(10);
+  });
+
+  test("each charge of ±1 meets ten lines, among ten charges", () => {
+    const x = [-2.5, 2.5, 5.5, 2.3, -2.3, -5.5, -5.5, -2.3, 2.3, 5.5];
+    const y = [0, 0, 2.3, 5.5, 5.5, 2.3, -2.3, -5.5, -5.5, -2.3];
+    const charges = x.map((cx, i) => ({ q: i % 2 ? -1 : 1, x: cx, y: y[i] }));
+    const lines = traceFieldLines(charges, { radius: 0.4, extent: 10 });
+    // Five positive charges send ten each; the negative ones take them in.
+    expect(lines.lines).toBeGreaterThanOrEqual(50);
+    expect(lines.lines).toBeLessThanOrEqual(60);
+  });
+
+  test("the lists never pass what Desmos takes in one", () => {
+    const charges = Array.from({ length: 10 }, (_, i) => ({
+      q: 5,
+      x: 8 * Math.cos(i),
+      y: 8 * Math.sin(i),
+    }));
+    const lines = traceFieldLines(charges, { radius: 0.4, extent: 10 });
+    expect(lines.xs.length).toBeLessThanOrEqual(MAX_POINTS);
+    // And with room to spare, so the cap is a guard and not the picture.
+    expect(lines.xs.length).toBeLessThan(7000);
   });
 
   test("an equal dipole's lines are its mirror image", () => {
@@ -91,7 +113,7 @@ describe("traceFieldLines", () => {
 
   test("a lone negative charge sends its lines back out", () => {
     const lines = traceFieldLines([{ q: -1, x: 0, y: 0 }], opts);
-    expect(lines.lines).toBe(8);
+    expect(lines.lines).toBe(10);
   });
 
   test("ten charges stay within the line budget", () => {

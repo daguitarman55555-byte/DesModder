@@ -107,12 +107,37 @@ function trace(
   // up the lines it was missing from the widest gaps, so the picture was
   // lopsided: a line out of + on one side, none into − on the other
   // (Rafael, 2026-11-09: "the field lines are wrong").
-  const limit = extent * 8;
+  // Far, for the lines that do come back: the dipole's lines nearest its
+  // axis loop out hundreds of units, and at 8 × the extent the two at
+  // ±162° were cut, so the picture lost its symmetry again. The steps
+  // grow with the distance out there, so the whole loop is a few dozen.
+  const limit = extent * 100;
+  // Far from every charge the field is the net charge's, outward from the
+  // middle of them if the line runs with it: a line that far out, running
+  // outward, never comes back, and following it to the limit was most of
+  // the work when the charges did not cancel (666 ms for ten of one sign).
+  let net = 0;
+  let cx = 0;
+  let cy = 0;
+  for (const c of charges) {
+    net += c.q;
+    cx += c.x / charges.length;
+    cy += c.y / charges.length;
+  }
+  let spread = 0;
+  for (const c of charges)
+    spread = Math.max(spread, Math.hypot(c.x - cx, c.y - cy));
+  const escapes = sign * net > 0;
+  const far = Math.max(1.5 * extent, 3 * spread);
   let [x, y] = start;
   const xs = [x];
   const ys = [y];
   let lastKept = [x, y];
   let lastDir: readonly [number, number] | undefined;
+  // Headway: a line that wanders a long way and gets nowhere is circling
+  // where the field nearly vanishes, and has nothing more to draw.
+  let anchor = [x, y];
+  let walked = 0;
   for (let n = 0; n < maxSteps; n++) {
     // The step follows the nearest charge: fine near one, where lines bend
     // most, and long far out, where they are nearly straight.
@@ -150,6 +175,22 @@ function trace(
     lastDir = [dx / h, dy / h];
     x += dx;
     y += dy;
+    walked += h;
+    if (n % 40 === 39) {
+      if (Math.hypot(x - anchor[0], y - anchor[1]) < 0.2 * walked)
+        return { xs, ys, end: -1 };
+      anchor = [x, y];
+      walked = 0;
+    }
+    if (
+      escapes &&
+      Math.hypot(x - cx, y - cy) > far &&
+      (x - cx) * dx + (y - cy) * dy > 0
+    ) {
+      xs.push(x);
+      ys.push(y);
+      return { xs, ys, end: -1 };
+    }
     const hit = insideCharge(charges, x, y, radius, n < 3 ? from : -1);
     if (hit >= 0) {
       // End on the charge's rim, not inside the disc drawn over it.
@@ -165,9 +206,11 @@ function trace(
       return { xs, ys, end: -1 };
     }
     // Keep a point only once the line has turned or gone a way: straight
-    // runs need few, and Desmos parses every point written.
+    // runs need few, and Desmos parses every point written. A unit is
+    // about forty pixels in the preset's view, so 0.12 is five: a chord
+    // that short, bent by six degrees, is off the curve by under a pixel.
     const moved = Math.hypot(x - lastKept[0], y - lastKept[1]);
-    if (moved > 0.4 || (moved > 0.04 && turned(xs, ys, x, y))) {
+    if (moved > 0.8 || (moved > 0.12 && turned(xs, ys, x, y))) {
       xs.push(x);
       ys.push(y);
       lastKept = [x, y];
@@ -176,7 +219,7 @@ function trace(
   return { xs, ys, end: -1 };
 }
 
-/** Whether the last kept segment and the one to (x, y) bend by over ~3°. */
+/** Whether the last kept segment and the one to (x, y) bend by over ~6°. */
 function turned(xs: number[], ys: number[], x: number, y: number) {
   const n = xs.length;
   if (n < 2) return true;
@@ -185,7 +228,7 @@ function turned(xs: number[], ys: number[], x: number, y: number) {
   const bx = x - xs[n - 1];
   const by = y - ys[n - 1];
   const cross = Math.abs(ax * by - ay * bx);
-  return cross > 0.05 * Math.hypot(ax, ay) * Math.hypot(bx, by);
+  return cross > 0.1 * Math.hypot(ax, ay) * Math.hypot(bx, by);
 }
 
 /** Where each of a charge's `count` lines starts, round its rim. */
@@ -196,12 +239,17 @@ function starts(c: PointCharge, count: number, radius: number, phase: number) {
   });
 }
 
+/** The most points the lists may hold, under Desmos's 10,000 a list. */
+export const MAX_POINTS = 9000;
+
 export function traceFieldLines(
   charges: readonly PointCharge[],
   options: FieldLineOptions
 ): FieldLines {
   const o: Required<FieldLineOptions> = {
-    perUnit: 8,
+    // Ten a unit charge: eight looked sparse round a ±1 pair (Rafael,
+    // 2026-11-09). Ten charges of ±1 are a hundred lines, 2 ms to trace.
+    perUnit: 10,
     maxLines: 160,
     maxSteps: 1500,
     ...options,
@@ -216,14 +264,46 @@ export function traceFieldLines(
   const xs: number[] = [];
   const ys: number[] = [];
   let lines = 0;
+  // What is written: the lines inside a margin round the picture. A loop
+  // far outside it is followed (it decides where the line comes back) but
+  // not drawn, so it is a gap in the list: Desmos parses every number
+  // written, and parsing, not tracing, was most of a retrace (2026-11-09).
+  const box = o.extent * 1.3;
+  const inside = (line: { xs: number[]; ys: number[] }, k: number) =>
+    k >= 0 &&
+    k < line.xs.length &&
+    Math.abs(line.xs[k]) <= box &&
+    Math.abs(line.ys[k]) <= box;
   const add = (line: { xs: number[]; ys: number[] }) => {
     if (line.xs.length < 2) return;
+    const vx: number[] = [];
+    const vy: number[] = [];
+    for (let k = 0; k < line.xs.length; k++) {
+      // A point is kept if it or a neighbour is inside, so a segment
+      // that crosses into the picture keeps both its ends.
+      if (inside(line, k - 1) || inside(line, k) || inside(line, k + 1)) {
+        vx.push(line.xs[k]);
+        vy.push(line.ys[k]);
+      } else if (vx.length > 0 && Number.isFinite(vx[vx.length - 1])) {
+        vx.push(NaN);
+        vy.push(NaN);
+      }
+    }
+    while (vx.length > 0 && !Number.isFinite(vx[vx.length - 1])) {
+      vx.pop();
+      vy.pop();
+    }
+    if (vx.length < 2) return;
+    // Desmos refuses a list of more than 10,000, and the lines would then
+    // be an error instead of a picture: a line that would pass this is
+    // left out. The worst arrangement measured took 5,400.
+    if (xs.length + vx.length + 1 > MAX_POINTS) return;
     if (lines > 0) {
       xs.push(NaN);
       ys.push(NaN);
     }
-    xs.push(...line.xs);
-    ys.push(...line.ys);
+    xs.push(...vx);
+    ys.push(...vy);
     lines++;
   };
   // Angles at which lines arrived at each negative charge.
