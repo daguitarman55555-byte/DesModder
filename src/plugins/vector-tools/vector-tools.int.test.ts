@@ -2311,10 +2311,11 @@ testWithPage(
     expect(magnet.slice(0, 3)).toEqual(["folder", "b=0.4", "c=0.4"]);
     expect(magnet.some((latex) => latex?.startsWith("a="))).toBe(false);
 
-    // A preset with none takes the folder away.
+    // A preset with none takes the folder away. Not Lorenz any more: its
+    // butterfly has had an orbit drawn in the graph since c25c9cce.
     await driver.evaluate(() =>
       (window as any).DSM.enabledPlugins["vector-tools"].applyGalleryPreset(
-        "lorenz",
+        "tornado",
         true
       )
     );
