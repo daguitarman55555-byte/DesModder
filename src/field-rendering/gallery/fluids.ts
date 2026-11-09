@@ -57,37 +57,109 @@ const TORNADO_TOP = (() => {
   };
 })();
 
+/**
+ * A rotating superfluid's vortex lattice, on the plane: what "vortex
+ * lattice" means in a spun Bose–Einstein condensate or superfluid helium.
+ * The fluid cannot rotate as a whole, so it threads itself with identical
+ * quantised vortices that pack into a triangular (Abrikosov) lattice, and the
+ * lattice turns rigidly, carrying the fluid round as if it were solid. Seen
+ * in rotating condensates by Abo-Shaeer, Raman, Vogels and Ketterle (2001).
+ *
+ * Here 37 vortices, rings 0 to 3 of a triangular lattice of spacing 2.2,
+ * each a Lamb–Oseen vortex (circulation 2π·0.8, core radius 0.35), the
+ * lattice turning at Ω = 0.08 rad/s. Rafael found the Taylor–Green cells
+ * it replaces a flat checkerboard (2026-11-08: "cooler, more realistic").
+ */
+const LATTICE_SPACING = 2.2;
+const LATTICE_OMEGA = 0.08;
+const LATTICE_SITES = (() => {
+  const sites: [number, number][] = [];
+  for (let i = -3; i <= 3; i++)
+    for (let j = -3; j <= 3; j++) {
+      const k = -i - j;
+      if (Math.max(Math.abs(i), Math.abs(j), Math.abs(k)) > 3) continue;
+      sites.push([
+        LATTICE_SPACING * (i + j / 2),
+        LATTICE_SPACING * ((Math.sqrt(3) / 2) * j),
+      ]);
+    }
+  return sites;
+})();
+
+function latticeFlow() {
+  const R = String.raw;
+  const cos = R`\cos\left(${LATTICE_OMEGA}t\right)`;
+  const sin = R`\sin\left(${LATTICE_OMEGA}t\right)`;
+  const n = (v: number) => String(Math.round(v * 1000) / 1000);
+  // a·c + b·s, as Desmos would write it: no zero terms, no "+-".
+  const combine = (terms: [number, string][]) => {
+    const kept = terms.filter(([k]) => Math.abs(k) > 1e-9);
+    if (kept.length === 0) return "";
+    return kept
+      .map(
+        ([k, f], i) =>
+          `${k < 0 ? "-" : i === 0 ? "" : "+"}${n(Math.abs(k))}${f}`
+      )
+      .join("");
+  };
+  // Each vortex's offset from (x, y), its site turned by Ωt.
+  const offsets = LATTICE_SITES.map(([a, b]) => {
+    const px = combine([
+      [a, cos],
+      [-b, sin],
+    ]);
+    const py = combine([
+      [a, sin],
+      [b, cos],
+    ]);
+    const minus = (axis: string, p: string) =>
+      p === "" ? axis : R`\left(${axis}-\left(${p}\right)\right)`;
+    return [minus("x", px), minus("y", py)];
+  });
+  const r2 = (d: string[]) => R`${d[0]}^{2}+${d[1]}^{2}`;
+  // Lamb–Oseen: Γ/2π · (1 − e^(−r²/rc²))/r² times the perpendicular.
+  const term = (d: string[], along: string) =>
+    R`\frac{0.8${along}\left(1-e^{-\frac{${r2(d)}}{0.1225}}\right)}{${r2(d)}+0.0001}`;
+  const x = offsets.map((d) => term(d, R`\left(-${d[1]}\right)`)).join("+");
+  const y = offsets.map((d) => term(d, d[0])).join("+");
+  // Each core glowing: the vorticity, which a Lamb–Oseen vortex keeps in a
+  // Gaussian, less a constant so the space between reads as the ramp's
+  // other end.
+  const tint =
+    offsets.map((d) => R`e^{-\frac{${r2(d)}}{0.1225}}`).join("+") + "-0.15";
+  return { x, y, tint };
+}
+const LATTICE = latticeFlow();
+
 export const FLUIDS: readonly GalleryPreset[] = [
   {
     id: "cellular",
     name: "Vortex lattice",
     category: "fluids",
     blurb:
-      "Taylor–Green flow: an array of counter-rotating cells, each one shearing against its neighbours. Here it rides a steady current, so the cells sweep past: still an exact solution, since the equations do not change for a moving observer.",
-    // Bracketed: Desmos refuses `\sin x\cos y` ("Use parentheses around the
-    // argument of 'sin'"), and these are written into the expression list.
-    xLatex: String.raw`0.5+\sin\left(x-0.5t\right)\cos\left(y\right)`,
-    yLatex: String.raw`-\cos\left(x-0.5t\right)\sin\left(y\right)`,
-    colorScale: 0.5,
-    // Coloured by which way the fluid spins where it is: its vorticity,
-    // ∂v/∂x − ∂u/∂y, which for these cells is exactly 2 sin(x − 0.5t) sin y.
-    // Red turns counter-clockwise and blue clockwise, so the alternating
-    // cells read as alternating at a glance; speed would colour them alike.
+      "A rotating superfluid's vortex lattice: spun, a superfluid cannot turn as a whole, so it fills with identical quantised vortices that pack into a triangular lattice, which turns rigidly and carries the fluid round with it. Seen in rotating Bose–Einstein condensates (Ketterle's group, 2001). Each glowing core is one vortex.",
+    xLatex: LATTICE.x,
+    yLatex: LATTICE.y,
+    colorScale: 0.8,
+    // Coloured by vorticity: bright in each vortex's core, where a
+    // Lamb–Oseen vortex keeps it, dark in the fluid between, which flows
+    // without spinning.
     palette: "charge-glow",
     tint: {
-      latex: String.raw`2\sin\left(x-0.5t\right)\sin\left(y\right)`,
+      latex: LATTICE.tint,
+      // The box keeps the Taylor–Green cells: tubes through the depth.
       latex3d: String.raw`2\sin\left(x-0.5t\right)\sin\left(y\right)`,
-      scale: 1,
+      scale: 0.5,
     },
     backdrop: "#02060a",
     flow: {
-      particleCount: 40_000,
-      glow: 0.3,
+      particleCount: 45_000,
+      glow: 0.45,
       opacity: 0.4,
       pointSize: 1.3,
       normalizeSpeed: false,
-      speed: 6,
-      trailPersistence: 0.97,
+      speed: 2,
+      trailPersistence: 0.975,
       dropRate: 0.004,
     },
     extent: 10,

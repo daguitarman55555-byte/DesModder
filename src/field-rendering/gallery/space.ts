@@ -9,7 +9,12 @@ import {
   type ThreeBodyRun,
   type ThreeBodyStart,
 } from "./three-body";
-import type { ClockParameters, GalleryPreset, SpaceLook } from "./types";
+import type {
+  ClockParameters,
+  GalleryPreset,
+  SceneItem,
+  SpaceLook,
+} from "./types";
 
 type Axis = "x" | "y" | "z";
 
@@ -566,14 +571,25 @@ function doublePlanet(
     ball: readonly [number, number];
     ring: number;
     swirl: readonly [number, number];
+    /** The ellipses' long axis, from x, in the plane (radians). */
+    turn?: number;
+    /** The pair's pull on gas outside their plateaus, and a haze of it. */
+    gravity?: number;
   }
 ) {
+  const [c, s] = [Math.cos(o.turn ?? 0), Math.sin(o.turn ?? 0)];
+  const turned = (st: PlanarState): PlanarState => ({
+    x: st.x.map((x, i) => c * x - s * st.y[i]),
+    y: st.x.map((x, i) => s * x + c * st.y[i]),
+    vx: st.vx.map((x, i) => c * x - s * st.vy[i]),
+    vy: st.vx.map((x, i) => s * x + c * st.vy[i]),
+  });
   const moving = movingBodies(
     2,
     axes,
     { position: "P", velocity: "W" },
     o.tilt,
-    (t) => keplerPair(t, { a: o.a, e: o.e, n: 0.4, ratio: 0.45 })
+    (t) => turned(keplerPair(t, { a: o.a, e: o.e, n: 0.4, ratio: 0.45 }))
   );
   const field = carriedWorlds(
     moving.bodies.map((b, i) => ({
@@ -584,7 +600,8 @@ function doublePlanet(
       swirl: o.swirl[i],
     })),
     axes,
-    moving.normal
+    moving.normal,
+    o.gravity ?? 0
   );
   const { normal } = moving;
   // Each world a ball of its material; round the larger, a thin ring in the
@@ -605,17 +622,96 @@ function doublePlanet(
       axes.length === 2 ? "" : String.raw`e^{-\frac{${height}^{2}}{0.004}}`;
     return String.raw`${ball}+0.6${flat}e^{-\frac{\left(\sqrt{${across}}-${num(o.ring)}\right)^{2}}{${num((0.12 * o.ring) ** 2)}}}`;
   });
-  return { ...field, seed: seeds.join("+"), clock: moving.clock };
+  // With gravity, a faint haze of gas everywhere, so the pair's pull is
+  // seen across the whole picture, not only in the material they carry.
+  const haze = o.gravity === undefined ? "" : "+0.04";
+  // Each world's orbit about the centre of mass, one period sampled, for
+  // the picture to draw: Kepler's ellipses, the barycentre at a focus of
+  // both.
+  const orbits = [0, 1].map((i) => {
+    const xs: number[] = [];
+    const ys: number[] = [];
+    for (let k = 0; k <= 240; k++) {
+      const st = turned(
+        keplerPair((k / 240) * ((2 * Math.PI) / 0.4), {
+          a: o.a,
+          e: o.e,
+          n: 0.4,
+          ratio: 0.45,
+        })
+      );
+      xs.push(Math.round(st.x[i] * 1000) / 1000);
+      ys.push(Math.round(st.y[i] * 1000) / 1000);
+    }
+    return { xs, ys };
+  });
+  return {
+    ...field,
+    seed: seeds.join("+") + haze,
+    clock: moving.clock,
+    orbits,
+  };
 }
 
+/**
+ * The double planet's Desmos objects: each world's orbit, faint, and a
+ * small cross at the centre of mass they both go round.
+ */
+function planetScene(
+  orbits: readonly { xs: number[]; ys: number[] }[]
+): SceneItem[] {
+  const list = (v: number[]) => String.raw`\left[${v.join(",")}\right]`;
+  const colors = ["#f2c46b", "#7fc8ff"];
+  return [
+    ...orbits.flatMap((o, i): SceneItem[] => [
+      {
+        key: `orbitx${i + 1}`,
+        latex: String.raw`O_{x${i + 1}vt}=${list(o.xs)}`,
+        hidden: true,
+      },
+      {
+        key: `orbity${i + 1}`,
+        latex: String.raw`O_{y${i + 1}vt}=${list(o.ys)}`,
+        hidden: true,
+      },
+      {
+        key: `orbit${i + 1}`,
+        latex: String.raw`\left(O_{x${i + 1}vt},O_{y${i + 1}vt}\right)`,
+        color: colors[i],
+        points: false,
+        lines: true,
+        lineWidth: 1.5,
+        lineOpacity: 0.3,
+        lineStyle: "DASHED" as const,
+        explains: true,
+      },
+    ]),
+    {
+      key: "barycentre",
+      latex: String.raw`\left(0,0\right)`,
+      color: "#cfd6e6",
+      points: true,
+      pointSize: 6,
+      label: "centre of mass",
+      labelSize: 0.7,
+      explains: true,
+    },
+  ];
+}
+
+// Less eccentric and turned a third of the way up, so the pair sweeps the
+// whole picture rather than sliding along the middle of it (Rafael,
+// 2026-11-08: "not just a horizontal strip").
 const PLANETS_2D = doublePlanet(["x", "y"], {
-  a: 7.5,
-  e: 0.35,
+  a: 8.5,
+  e: 0.28,
   tilt: 0,
-  reach: [2.6, 1.3],
+  reach: [2.4, 1.3],
   ball: [0.7, 0.55],
   ring: 2,
   swirl: [2.5, 2],
+  turn: 0.5,
+  gravity: 0.6,
 });
 const PLANETS_3D = doublePlanet(["x", "y", "z"], {
   a: 4.2,
@@ -807,6 +903,7 @@ export const SPACE: readonly GalleryPreset[] = [
     yLatex: PLANETS_2D.y!,
     seedLatex: PLANETS_2D.seed,
     clockParameters: PLANETS_2D.clock,
+    scene: planetScene(PLANETS_2D.orbits),
     colorScale: 1.6,
     palette: "worlds",
     backdrop: "#02040c",
