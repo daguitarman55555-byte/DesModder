@@ -610,7 +610,7 @@ literature comparison sits behind the explanation control.
 
 ### 8.1 Decided after GPT's third round (2026-10-03)
 
-GPT's third reply (`VECTOR_TOOLS_FLUID_RESEARCH_FOLLOWUP_2.md`) left three
+GPT's third reply (`VECTOR_TOOLS_FLUID_RESEARCH_FOLLOWUPS.md`, round 3) left three
 trade-offs open. Rafael chose the recommended behaviour in each case, as an
 **Auto** mode with a manual switch where a switch makes sense. The numbers below
 come from that reply's measurements. Its 39 tests and 44 of its result files

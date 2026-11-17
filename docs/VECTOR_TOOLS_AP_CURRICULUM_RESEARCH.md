@@ -33,7 +33,7 @@ Check the unit lists against the CED rather than this summary.
 ## What the extension can draw
 
 Judge each idea against these. Read the code; the brief in
-`docs/VECTOR_TOOLS_PHYSICS_FIELDS_FOLLOWUP_3.md` and your own last answers in
+`docs/VECTOR_TOOLS_PHYSICS_FIELDS_FOLLOWUPS.md` (round D) and your own last answers in
 `docs/research/physics-fields-gpt/follow-up-3/` describe them.
 
 - **Vector fields** in 2D and 3D, drawn as flowing particles on the GPU or as

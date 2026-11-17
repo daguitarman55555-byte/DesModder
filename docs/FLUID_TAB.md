@@ -167,7 +167,7 @@ Evidence pictures: `assets/fluid-gate1-taylor-green.png`,
   the start of a drag and half a second after it.
 - **The solver is memory-bandwidth bound.** 300 × 167 cells cost 0.10 ms a
   step on Iris Xe, 600 × 334 cost 1.22 ms. Half-precision storage is round 4's
-  question A (`VECTOR_TOOLS_FLUID_RESEARCH_FOLLOWUP_3.md`).
+  question A (`VECTOR_TOOLS_FLUID_RESEARCH_FOLLOWUPS.md`, round 4).
 - **While the tank's mean pressure settles after a start**, the absorbing
   inlet's mean lags it and the inflow runs up to 2% short for some seconds.
 - **While a solid moves, its walls are partially saturated cells**, a blend
