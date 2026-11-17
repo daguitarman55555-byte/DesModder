@@ -8,6 +8,13 @@ Items are ranked within each section by payoff for effort. Anything marked
 What the pass itself fixed is in `PHYSICS_LAB_HANDOFF.md` ("The tightening
 pass"), and in the commits from `1aa6b26e` onwards.
 
+**Refreshed 2026-11-17.** Every item below was checked against the code and
+the commits since. Only two had moved: matrix fields, done as the Matrix tab,
+and the conservative check, already noted. The rest stand as written. Work
+that began after the roadmap has its own sections at the end: the Fluid tab,
+Vector Tools on Desmos 3D, the presets and AP demos, the CAS engine, and
+code health from the graphify map (`CLAUDE.md`).
+
 ---
 
 ## Physics Lab
@@ -130,8 +137,10 @@ pass"), and in the commits from `1aa6b26e` onwards.
    item 7).
 6. **A cursor probe.** P, Q, |V|, angle, divergence and curl at the pointer,
    through a hidden helper expression.
-7. **Matrix fields.** `V = Ax` for a 2×2 A, with eigenvalues, eigenvectors,
-   and the image of the unit circle.
+7. ~~**Matrix fields.**~~ **Done**, as more than this: the Matrix tab
+   (`392ebc35`, `c8a724eb`) applies any map to the whole graph, drawn
+   exactly or as a redrawn grid. Eigenvectors drawn on the field remain for
+   item 3.
 8. **Sums with constant bounds on the GPU**, unrolled in the shader, so that
    `Σ_{k=1}^{5} …` fields animate.
 
@@ -177,3 +186,103 @@ window than the linear fit it replaced.
    caught the wrong answers here. Pinning the whole list, as
    `coverage.unit.test.ts` and `limit.coverage.unit.test.ts` already do for
    theirs, would keep them caught.
+
+---
+
+## Fluid tab (added 2026-11-17)
+
+Built and live: the wind tunnel, the stirred box, moving solids
+(`FLUID_TAB.md`). The research rounds behind it are in
+`VECTOR_TOOLS_FLUID_RESEARCH_BRIEF.md` and
+`VECTOR_TOOLS_FLUID_RESEARCH_FOLLOWUPS.md`.
+
+### The air-flow plan (`VECTOR_TOOLS_AIRFLOW_PLAN.md`)
+
+1. ~~A time budget per frame.~~ **Done** (`96ec93e4`): the 1024-cell case
+   went from 6 to 33 fps at the same physics per second.
+2. **Survive a lost GPU context.** `FluidOverlay` still tells the user to
+   restart. It should rebuild the lattice from the last state held on the
+   CPU.
+3. **Auto that keeps acting**: halve again at every Mach crossing, and roll
+   back to the last valid state on a NaN instead of stopping.
+4. **A collision model for under-resolved, high-Re flow**: regularised,
+   cumulant or KBC, chosen on the cylinder benchmarks and the thin plate.
+   This is the research step, worth a GPT round.
+5. **Start at the speed Auto settles on**: 0.05, unless step 4 makes 0.1
+   safe.
+6. **decision — fast inflow**: real time at lower accuracy, or accurate in
+   slow motion.
+
+### The liquid
+
+The mock-up (`docs/mockups/liquid-mockup.html`) is real water in real time,
+and the port to the tab is ready to start. It waits on three answers from
+Rafael:
+
+- whether "too fast" meant the playback or the water;
+- whether bubbles start on;
+- whether to run a GPT round on energy decay, 2D dissipation and surface
+  tension.
+
+### Later
+
+Gate 7 onward: 3D flow, on the camera match in `DESMOS_3D_CAMERA.md`.
+
+---
+
+## Vector Tools on Desmos 3D (added 2026-11-17)
+
+Built (`VECTOR_TOOLS_3D_BUILD_PLAN.md` §7), including gradient fields and
+arrows on a surface. Left:
+
+1. **A drag by eye on a real GPU.** Every alignment check so far is
+   headless, so this needs a person at a screen.
+2. **decision — the five open questions** in the build plan's §5: arrow
+   length, undefined points, implicit surfaces, translucent surfaces, and
+   Desmos's terms on private fields. Each keeps its default until answered.
+
+---
+
+## Presets and AP demos (added 2026-11-17)
+
+1. **The Capacitor preset's upgrade** is wanted but not specified yet.
+2. **The PhET survey** (`VECTOR_TOOLS_PHET_SURVEY.md`) ranks more AP Physics
+   2 and C demos than are built. AP Physics 1 was cut on 2026-11-07.
+
+---
+
+## The CAS engine (added 2026-11-17)
+
+**decision — which engine**: the TypeScript engines, CalcForge on Pyodide,
+or a hybrid. CalcForge runs inside a Chrome extension
+(`CAS_ENGINE_CHROME_PROBE.md`), and the Unified CAS has been tested through
+v0.5 (`UNIFIED_CAS_V05_TEST.md`). **Firefox is untested**, and it should be
+probed before the choice is final.
+
+---
+
+## Code health, from the graphify map (added 2026-11-17)
+
+`python -m graphify query "…"` answers where things live; `GRAPH_REPORT.md`
+in `graphify-out/` has the numbers below. A dead-code sweep already removed
+eight unused exports (`a76935f7`).
+
+1. **Eighteen two-file import cycles.** Nine run through
+   `physics-lab/symbolic/integrate.ts` and its technique files. A registry
+   that the techniques add themselves to would break them all. Three more
+   are panel ↔ index, in Physics Lab, Vector Tools and Video Creator.
+2. **`VectorTools` is the most connected class**: 227 links, bridging about
+   twenty clusters. Moving each tab's logic into its own session, as
+   `FluidSession` and `MatrixSession` already are, would shrink it.
+3. **Three modules with weak cohesion**: `fold()` (0.05), `definite.ts`
+   (0.04) and `evaluate` (0.02). Their parts hardly use each other, which
+   suggests several modules in one.
+4. **A guard test for `onRedraw3dResults`.** It is the one private Desmos
+   3D field in the build plan's §6 that no integration test names; the
+   other four are covered by `camera3d.int.test.ts`, `vector3d.int.test.ts`
+   and `vector-tools.int.test.ts`.
+5. **Type-check before a push.** CI's lint job runs `tsc --build`, but the
+   pre-commit hook does not, and esbuild never type-checks. So `1f30a3dc`
+   built and committed cleanly while failing the type check (fixed in
+   `81c3294e`). Running `npm run lint:types` before pushing would catch the
+   next one locally.
