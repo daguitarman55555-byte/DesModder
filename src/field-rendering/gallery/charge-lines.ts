@@ -112,8 +112,10 @@ interface Frame {
   half: number;
 }
 
-/** The view, or ±extent, widened by half its size each way. */
-export function frameOf(options: FieldLineOptions): Frame {
+/** The view, or ±extent, widened by a margin each way. */
+export function frameOf(
+  options: Pick<FieldLineOptions, "extent" | "view">
+): Frame {
   const e = options.extent;
   const v = options.view ?? { left: -e, right: e, bottom: -e, top: e };
   const w = v.right - v.left;
