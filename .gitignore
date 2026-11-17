@@ -10,3 +10,6 @@ coverage
 # The Vector Tools CI report's working folders (vector-tools-pages.yml)
 /out/
 /site/
+
+# graphify knowledge graph (rebuild: python -m graphify extract . --code-only; python -m graphify cluster-only .)
+graphify-out/
