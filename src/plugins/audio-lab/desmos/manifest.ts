@@ -6,8 +6,6 @@
  * "Audio Lab", is not in here and is therefore not Audio Lab's to delete.
  */
 
-export const AUDIO_LAB_NAMESPACE = "audio_lab";
-
 export const IDS = {
   folder: "audio_lab_folder",
   time: "audio_lab_time",

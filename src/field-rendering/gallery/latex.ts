@@ -11,27 +11,6 @@ export const rho = String.raw`\sqrt{x^{2}+y^{2}}`;
 type Axis = "x" | "y" | "z";
 
 /**
- * Von Kármán's vortex street: two infinite rows of point vortices, spaced
- * 2π/k along the stream and `y0` either side of it, in a stream of 1, the
- * rows drifting at 0.646 (what they induce on each other at the stable
- * spacing ratio 0.281). Each row's velocity is the closed-form sum over its
- * vortices, `half·(sinh, sin)/(cosh − cos)` with half = Γ/2a. `shift` moves
- * the vortices along the stream, which in 3D makes the tubes wave.
- */
-export function vortexStreet(k: number, y0: number, half: number, shift = "") {
-  const a1 = String.raw`${k}\left(y-${y0}\right)`;
-  const b1 = String.raw`${k}\left(x-0.646t${shift}\right)`;
-  const a2 = String.raw`${k}\left(y+${y0}\right)`;
-  const b2 = String.raw`${k}\left(x-0.646t${shift}\right)-3.1416`;
-  const d1 = String.raw`\cosh\left(${a1}\right)-\cos\left(${b1}\right)+0.02`;
-  const d2 = String.raw`\cosh\left(${a2}\right)-\cos\left(${b2}\right)+0.02`;
-  return {
-    x: String.raw`1+\frac{${half}\sinh\left(${a1}\right)}{${d1}}-\frac{${half}\sinh\left(${a2}\right)}{${d2}}`,
-    y: String.raw`-\frac{${half}\sin\left(${b1}\right)}{${d1}}+\frac{${half}\sin\left(${b2}\right)}{${d2}}`,
-  };
-}
-
-/**
  * A thin-cored vortex ring of radius `R` round the z-axis, in the frame
  * moving with it. Each meridional cross-section is a pair of Lamb–Oseen
  * vortices of core radius `a` at ρ = ±R — the thin-core approximation, whose

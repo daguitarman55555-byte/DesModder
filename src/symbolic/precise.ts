@@ -206,7 +206,4 @@ function power(D: typeof Decimal, base: Decimal, exponent: Decimal): Decimal {
   return D.pow(base, exponent);
 }
 
-/** A decimal as a number, for the callers that only need a double. */
-export const toDouble = (value: Decimal) => value.toNumber();
-
 export type { Decimal };

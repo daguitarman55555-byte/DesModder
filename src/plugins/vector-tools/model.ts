@@ -277,8 +277,6 @@ export interface FlowConfig {
   tintScale: number;
 }
 
-/** Below this the flow is too soft to read, whatever it buys back. */
-export const FLOW_RENDER_SCALE_MINIMUM = 0.25;
 export const FLOW_PARTICLE_MINIMUM = 500;
 export const FLOW_PARTICLE_MAXIMUM = 400_000;
 /** Above this, a mid-range GPU starts dropping frames on a large viewport. */
@@ -1359,12 +1357,6 @@ export function getAxisSampleCount(axis: SamplingAxisConfig): number {
   const span = axis.max - axis.min;
   if (!Number.isFinite(span) || span < 0) return 0;
   return Math.floor(span / axis.step + 1e-10) + 1;
-}
-
-export function getAxisSpacing(axis: SamplingAxisConfig): number {
-  return axis.mode === "count"
-    ? (axis.max - axis.min) / (axis.count - 1)
-    : axis.step;
 }
 
 function estimateVectorCount(config: VectorFieldConfig): number {

@@ -316,8 +316,6 @@ function verifiedSecondOrder(
       };
 }
 
-export const SECOND_ORDER_CONSTANTS = [FIRST, SECOND];
-
 /** Exposed for the panel's hint, so the two cannot drift apart. */
 export const secondOrderHint =
   "Write the first derivative with a prime — type an apostrophe after y. For example, -y′-4y is a damped oscillator.";

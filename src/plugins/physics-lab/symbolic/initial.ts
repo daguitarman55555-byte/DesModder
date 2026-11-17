@@ -164,6 +164,3 @@ function isZero(node: Node) {
   const simplified = simplify(node);
   return simplified.type === "Constant" && simplified.value === 0;
 }
-
-/** The identifier the solvers use, exposed so the panel can name it. */
-export const CONSTANT_NAME = CONSTANT;

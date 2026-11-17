@@ -174,47 +174,6 @@ function survivor(crashes: readonly Crash[], i: number) {
   return host;
 }
 
-/**
- * A run recorded from a motion known in closed form, `state(τ)`, over one
- * `period`: the figure eight, which then plays back through the same scene.
- */
-export function recordMotion(
-  state: (tau: number) => {
-    x: readonly number[];
-    y: readonly number[];
-    vx: readonly number[];
-    vy: readonly number[];
-  },
-  period: number,
-  intervals: number
-): ThreeBodyRun {
-  const n = state(0).x.length;
-  const samples = intervals + 1;
-  const track = () =>
-    Array.from({ length: n }, () => new Float64Array(samples));
-  const run: ThreeBodyRun = {
-    dt: period / intervals,
-    samples,
-    x: track(),
-    y: track(),
-    vx: track(),
-    vy: track(),
-    mass: track(),
-    crashes: [],
-  };
-  for (let k = 0; k < samples; k++) {
-    const s = state(k * run.dt);
-    for (let i = 0; i < n; i++) {
-      run.x[i][k] = s.x[i];
-      run.y[i][k] = s.y[i];
-      run.vx[i][k] = s.vx[i];
-      run.vy[i][k] = s.vy[i];
-      run.mass[i][k] = 1;
-    }
-  }
-  return run;
-}
-
 /** The run's total energy and momentum at a sample, for the tests. */
 export function runInvariants(run: ThreeBodyRun, k: number) {
   const n = run.x.length;
