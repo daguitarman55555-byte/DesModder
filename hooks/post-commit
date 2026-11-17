@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Keep the graphify knowledge graph (graphify-out/, see CLAUDE.md) in step
+# with HEAD. The update parses only changed code files, offline, but takes
+# about 20 s, so it runs in the background and never holds up the commit.
+# Anyone without graphify, or without a graph built yet, is skipped quietly.
+
+[ -f graphify-out/graph.json ] || exit 0
+
+PYTHON=$(command -v python || command -v python3 || true)
+[ -n "$PYTHON" ] || exit 0
+"$PYTHON" -c "import graphify" 2>/dev/null || exit 0
+
+(GRAPHIFY_BACKEND=none PYTHONIOENCODING=utf-8 \
+	nohup "$PYTHON" -m graphify update . >graphify-out/post-commit.log 2>&1 &)
+
+exit 0
