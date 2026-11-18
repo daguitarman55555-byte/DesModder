@@ -25,11 +25,13 @@ const mm = [
   [3.33, 4.11],
 ];
 const opts = {
+  transfer: process.env.TRANSFER || "apic",
+  advect: process.env.ADVECT || "grid",
   cfl: +(process.env.CFL || 1),
   flipRatio: +(process.env.FLIP || 0.9),
   pressureIters: +(process.env.PRESSURE || 50),
   separate: process.env.SEPARATE !== "0",
-  driftK: +(process.env.DRIFTK || 0.5),
+  driftK: +(process.env.DRIFTK || 0.1),
   solver: process.env.SOLVER || "pcg",
 };
 const f = new FlipFluid({

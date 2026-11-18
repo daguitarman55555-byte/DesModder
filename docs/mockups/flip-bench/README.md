@@ -6,21 +6,30 @@ proposed FLIP/APIC on the CPU first. This folder is the test page for that:
 one FLIP solver, the same scenes for every engine, and numbers checked against
 experiments.
 
-| File            | What it is                                                                      |
-| --------------- | ------------------------------------------------------------------------------- |
-| `index.html`    | The bench page: six scenes, three views, speed and accuracy readings, `bench()` |
-| `flip.js`       | The FLIP solver, after Müller's Ten Minute Physics (MIT, `LICENSE-MULLER.txt`)  |
-| `dam.cjs`       | Dam break against Martin & Moyce (1952), same data as the LBM check             |
-| `rest.cjs`      | Still water: how fast anything moves when nothing should                        |
-| `slosh.cjs`     | Sloshing period and damping against Bäuerlein & Avila (2021)                    |
-| `slosh-amp.cjs` | Sloshing amplitude one period at a time, for finding what damps it              |
-| `profile.cjs`   | Time per phase of a step                                                        |
-| `drop.jpg`      | The water view, 0.55 s after a blob lands in a pool                             |
+| File               | What it is                                                                |
+| ------------------ | ------------------------------------------------------------------------- |
+| `index.html`       | The bench page: seven scenes, three views, speed and accuracy readings    |
+| `flip.js`          | The solver, after Müller's Ten Minute Physics (MIT, `LICENSE-MULLER.txt`) |
+| `scenes.js`        | The scenes, shared by the page and the worker                             |
+| `engine.js`        | Runs a scene; the same code in the worker and on the page                 |
+| `worker.js`        | The solver's own thread, so the page and Desmos keep the main thread      |
+| `dam.cjs`          | Dam break against Martin & Moyce (1952), same data as the LBM check       |
+| `rest.cjs`         | Still water: how fast anything moves when nothing should                  |
+| `slosh.cjs`        | Sloshing period and damping against Bäuerlein & Avila (2021)              |
+| `slosh-amp.cjs`    | Sloshing amplitude one period at a time, for finding what damps it        |
+| `slosh-energy.cjs` | Sloshing energy by peak kinetic energy each period                        |
+| `runup.cjs`        | Surge run-up on a wall against Liu et al. (2022)                          |
+| `energy.cjs`       | The dam break's energy budget and how high it climbs the far wall         |
+| `tune.cjs`         | Speed against quality for solver settings                                 |
+| `profile.cjs`      | Time per phase of a step                                                  |
+| `drop.jpg`         | The water view, 0.55 s after a blob lands in a pool                       |
 
 The page is published at https://claude.ai/artifact/RXsnU21QAvA95ycEyyB9Gq.
 Locally, start the `mockups` server in `.claude/launch.json` and open
 `/flip-bench/index.html`. With the page hidden, `bench({ scene, cell, cfl,
-seconds })` in the console runs frames back to back and returns the readings.
+seconds })` in the console runs frames back to back on the page's thread and
+returns the readings; `benchWorker({ scene, cell, seconds })` does the same
+through the worker. `#local` on the address runs without the worker.
 
 ## Step 1: the demos as published
 
@@ -60,41 +69,88 @@ Müller's demo runs at 3 cm, where these defects hide.
    with MIC(0) (Bridson, ch. 5) converges in 17–33 iterations. Gauss-Seidel
    stays as a choice on the page.
 
-## Results at 1 cm cells, CFL 1
+5. **Wall friction** (2026-11-18). Rafael found the dam break's wave at the
+   far wall too strong. Liu, Nistor, Mohammadian & Azimi (2022, Fluids 7(8)
+   258; tank, depths and run-up in Liu's uOttawa thesis) measured a surge
+   from a 25 cm reservoir climbing a wall 85 cm away to 2.03, 2.09 and 2.35
+   times depths of 20, 25 and 30 cm. Frictionless walls let the jet climb
+   2.66 H at 5 mm. The log-law wall the LBM used (κ 0.41, B 5.2) brings it
+   to 2.53 H for H = 30 cm. At 1 cm the thin jet is under-resolved and peaks
+   low (2.10 H). The dam scene's tank was also too short: its open top acted
+   as a lid, so it is 1.4 m tall now (`dam-runup.jpg`, 0.87 s).
+6. **Pour** was a 4 cm sheet at 1.5 m/s, three times a tap's flow; it is
+   2 cm at 1 m/s from 60 cm now, and stops at 30 cm deep.
+7. **Particles move through the grid** (Bridson, ch. 7), by RK2 through the
+   projected velocity, carried two faces out into the air; spray keeps its
+   own velocity. Müller moves each particle by its own noisy velocity, so the
+   water compressed and needed a strong drift correction, which damped waves.
+8. **APIC** (Jiang et al. 2015) instead of FLIP: each particle carries an
+   affine velocity, so the grid hands back its gradient too.
+9. **Drift correction is weak and occasional**: k 0.1, applied every fourth
+   step at four times the strength. Its warm start was rescaled the wrong way
+   (the drift unknown shrinks with the step, pressure grows), which made 5 mm
+   sloshing blow up.
 
-| Check                 | Result                                        | Reference                |
-| --------------------- | --------------------------------------------- | ------------------------ |
-| Dam break, mean error | 9.8% (front a little ahead)                   | Martin & Moyce           |
-| Dam break, late speed | 1.42 √(gH)                                    | 1.32 measured            |
-| Still water after 3 s | median 0.05, 99th 0.64, max 2.1 cm/s          | 0                        |
-| Volume drift          | under 0.3% in every scene                     | GPT's target: under 0.1% |
-| Paddle, tunnelling    | 0 particles inside the disc                   | 0                        |
-| **Sloshing damping**  | **δ ≈ 0.6 /s: 20 mm to under 1 in 3 periods** | **0.065 /s measured**    |
+## Results
 
-Speed in the browser pane, with drawing (`bench()`, 1 cm cells, CFL 1):
+Defaults: APIC, particles through the grid, conjugate gradient, CFL 1.
 
-| Scene    | Particles | Solver ms a frame, median / 95th | Real time |
-| -------- | --------- | -------------------------------- | --------- |
-| Dam      | 3,936     | 22 / 32                          | 0.74×     |
-| Sloshing | 6,347     | 10 / 11                          | 1.48×     |
-| Still    | 9,462     | 14 / 19                          | 1.02×     |
-| Drop     | 5,284     | 19 / 24                          | 0.86×     |
-| Pour     | 4,956     | 21 / 29                          | 0.82×     |
-| Paddle   | 9,462     | 23 / 32                          | 0.62×     |
+| Check                   | 1 cm cells                      | 5 mm cells   | Reference               |
+| ----------------------- | ------------------------------- | ------------ | ----------------------- |
+| Dam break, mean error   | 7.3%                            | 9.3%         | Martin & Moyce          |
+| Dam break, late speed   | 1.42 √(gH)                      | 1.44 √(gH)   | 1.32 measured           |
+| Wall run-up, H 30 cm    | 2.10 H                          | 2.53 H       | 2.35 H, Liu et al. 2022 |
+| **Sloshing damping δ**  | **0.45 /s**                     | **0.066 /s** | **0.065 ± 0.015 /s**    |
+| Still water after 3 s   | median 0.07, 99th 0.64 cm/s     |              | 0                       |
+| Still surface roughness | 2.3 mm (a fifth of a cell)      |              | 0                       |
+| Volume                  | level holds within 0.5 mm, 10 s |              |                         |
+| Paddle, tunnelling      | 0 particles inside the disc     |              | 0                       |
 
-Fast water needs several steps a frame at CFL 1 (seven in the dam break).
-CFL 2 or 4 is cheaper, but at 5 mm cells it breaks the dam break (19% and
-30% error), so speed has to come from the code, not the step size.
+Sloshing damping went from 0.6 /s (Müller's FLIP with particles moving by
+their own velocity) to 0.066 /s at 5 mm, inside the measurement. At 1 cm a
+wavelength is 100 cells and the wave still dies about seven times too fast,
+so realistic waves need 5 mm.
+
+What drift correction trades (`volume.cjs`, `slosh-energy.cjs`): without it
+still water is perfectly still (0.23 mm roughness) but a splashed dam break
+settles 30 mm too high, spread out. A dead band of 20% (`driftBand`) keeps
+still water still but the splashed water 6 mm high and still water sinks
+0.6 mm in 8 s. The default has no band.
+
+## Speed
+
+Through the worker in the browser pane (`benchWorker`), solver only; the page
+draws on its own thread meanwhile. Real time means simulated seconds per
+second.
+
+| Scene, 1 cm cells | Particles | ms a frame | Steps a frame | Real time |
+| ----------------- | --------- | ---------- | ------------- | --------- |
+| Sloshing          | 6,347     | 10         | 2             | 1.25×     |
+| Pour              | 2,646     | 11         | 7             | 1.23×     |
+| Wall run-up       | 2,337     | 12         | 5             | 1.09×     |
+| Still             | 9,462     | 13         | 2             | 1.06×     |
+| Drop              | 5,284     | 17         | 5             | 0.85×     |
+| Paddle            | 9,462     | 21         | 3             | 0.67×     |
+| Dam break         | 3,936     | 25         | 7             | 0.58×     |
+| Sloshing, 5 mm    | 25,542    | 56         | 3             | 0.29×     |
+| Dam break, 5 mm   | 15,840    | 59         | 4             | 0.27×     |
+
+What sped it up: the worker (the page thread is free); warm-starting the
+pressure solve (33 to 22 iterations); one separation pass instead of two; a
+1e-4 solver tolerance; drift correction every fourth step. Grid advection and
+APIC cost some of that back.
+
+**CFL 2** halves the steps in fast scenes. With APIC through the grid it
+leaves the dam break as close (6.0%) and lowers the 1 cm run-up from 2.10 to
+2.03 H. That is Rafael's call; the page offers it.
+
+At 5 mm, a step costs about 31 ms: pressure 29%, drift 22%, separation 18%,
+transfers 14%, advection 14%. Real time at 5 mm needs about four times that
+speed, which means the GPU (the LBM already runs there) or several workers.
 
 ## Open
 
-- **Sloshing over-damps about 10×.** Neither the PIC share (FLIP 1 still
-  decays), separation nor the step size is the cause. It goes with drift
-  compensation, which no working setting can do without: without it, the water
-  collapses 25 cm in 6 s. APIC (step 3) and a particle-level density
-  correction are the next things to try.
-- **Speed.** Use a Web Worker so Desmos keeps the main thread. Profile: pressure
-  solve 31%, drift solve 24%, separation 26%, transfers 16%.
+- **5 mm in real time**: GPU or multi-worker; see Speed.
 - **Comparison engines.** Jean Timex's hybrid FLIP and the LBM have to go
   behind the same scenes to make this a comparison.
-- **Volume settles 1.8%** in the first second (7 mm in 40 cm), then holds.
+- **Still surface roughness** against volume, above.

@@ -59,6 +59,8 @@
       this.maxParticles = maxParticles;
       this.pos = new Float32Array(2 * maxParticles);
       this.vel = new Float32Array(2 * maxParticles);
+      // APIC's affine velocity per particle: du/dx, du/dy, dv/dx, dv/dy.
+      this.aff = new Float32Array(4 * maxParticles);
       this.numParticles = 0;
 
       this.pInvSpacing = 1 / (2.2 * this.r);
@@ -88,6 +90,7 @@
       this.pos[2 * i + 1] = y;
       this.vel[2 * i] = vx;
       this.vel[2 * i + 1] = vy;
+      this.aff.fill(0, 4 * i, 4 * i + 4);
       return true;
     }
 
@@ -127,14 +130,17 @@
         }
     }
 
-    integrateParticles(dt, gx, gy) {
+    /** Gravity on every particle; with `move`, also move it by its own velocity. */
+    integrateParticles(dt, gx, gy, move = true) {
       const { pos, vel } = this;
       let max2 = 0;
       for (let i = 0; i < this.numParticles; i++) {
         vel[2 * i] += dt * gx;
         vel[2 * i + 1] += dt * gy;
-        pos[2 * i] += vel[2 * i] * dt;
-        pos[2 * i + 1] += vel[2 * i + 1] * dt;
+        if (move) {
+          pos[2 * i] += vel[2 * i] * dt;
+          pos[2 * i + 1] += vel[2 * i + 1] * dt;
+        }
         const s2 = vel[2 * i] ** 2 + vel[2 * i + 1] ** 2;
         if (s2 > max2) max2 = s2;
       }
@@ -210,6 +216,59 @@
       }
     }
 
+    /**
+     * Wall friction by the log law, as the LBM's slip wall (Malaspinas &
+     * Sagaut): for a particle a distance y from a wall, sliding along it at
+     * u, the friction velocity u* solves u / u* = ln(y u* / nu) / kappa + B,
+     * and the wall's stress rho u*^2 slows the cell-thick layer beside it by
+     * u*^2 / h a second. Without it a dam-break jet climbed the far wall to
+     * 2.96 times the column, against 2.1-2.3 measured (energy.cjs).
+     */
+    applyWallFriction(dt, nu = 1e-6) {
+      const { pos, vel, h, fNumX } = this;
+      const left = h;
+      const right = (fNumX - 1) * h;
+      const floor = h;
+      const o = this.obstacle;
+      for (let i = 0; i < this.numParticles; i++) {
+        const x = pos[2 * i];
+        const y = pos[2 * i + 1];
+        // Each wall within a cell: [distance, tangent x, tangent y, wall speed].
+        if (x - left < h) this.rub(i, x - left, 0, 1, 0, dt, nu);
+        if (right - x < h) this.rub(i, right - x, 0, 1, 0, dt, nu);
+        if (y - floor < h) this.rub(i, y - floor, 1, 0, 0, dt, nu);
+        if (o.active) {
+          const dx = x - o.x;
+          const dy = y - o.y;
+          const d = Math.hypot(dx, dy);
+          if (d > 0 && d - o.r < h) {
+            const tx = -dy / d;
+            const ty = dx / d;
+            this.rub(i, d - o.r, tx, ty, o.vx * tx + o.vy * ty, dt, nu);
+          }
+        }
+      }
+    }
+
+    rub(i, dist, tx, ty, wallSpeed, dt, nu) {
+      const { vel, h } = this;
+      const y = Math.min(Math.max(dist, 0.1 * h), h);
+      const ut = vel[2 * i] * tx + vel[2 * i + 1] * ty - wallSpeed;
+      const u = Math.abs(ut);
+      if (u < 1e-6) return;
+      // Fixed point for u*; the laminar sublayer (u* = sqrt(nu u / y)) floors it.
+      let us = Math.sqrt((nu * u) / y);
+      for (let k = 0; k < 6; k++) {
+        const plus = (y * us) / nu;
+        if (plus < 11) break;
+        us = u / (Math.log(plus) / 0.41 + 5.2);
+      }
+      const slow = Math.min(((us * us) / h) * dt, u);
+      const s = Math.sign(ut) * slow;
+      vel[2 * i] -= s * tx;
+      vel[2 * i + 1] -= s * ty;
+    }
+
     handleParticleCollisions() {
       const { pos, vel, h, r, fNumX, fNumY } = this;
       const minX = h + r;
@@ -255,8 +314,16 @@
       }
     }
 
-    transferVelocities(toGrid, flipRatio) {
-      const { fNumX, fNumY, h, invH, pos, vel, cellType, s } = this;
+    /**
+     * Particle-to-grid (toGrid) or back. FLIP blends the grid's velocity
+     * (PIC) with the particle's own plus the grid's change; APIC (Jiang et al.
+     * 2015, SIGGRAPH) instead carries an affine velocity per particle, so the
+     * grid hands back its local gradient as well as its value: little of the
+     * damping of PIC and none of the noise of FLIP. For bilinear weights the
+     * affine part is the gradient of the interpolated field.
+     */
+    transferVelocities(toGrid, flipRatio, apic = false) {
+      const { fNumX, fNumY, h, invH, pos, vel, cellType, s, aff } = this;
       const n = fNumY;
       const h2 = 0.5 * h;
       const np = this.numParticles;
@@ -308,13 +375,27 @@
 
           if (toGrid) {
             const pv = vel[2 * i + component];
-            f[nr0] += pv * d0;
+            if (apic) {
+              // Each face gets the particle's velocity at that face.
+              const cx = aff[4 * i + 2 * component];
+              const cy = aff[4 * i + 2 * component + 1];
+              const fx0 = x0 * h + dx - x;
+              const fx1 = x1 * h + dx - x;
+              const fy0 = y0 * h + dy - y;
+              const fy1 = y1 * h + dy - y;
+              f[nr0] += (pv + cx * fx0 + cy * fy0) * d0;
+              f[nr1] += (pv + cx * fx1 + cy * fy0) * d1;
+              f[nr2] += (pv + cx * fx1 + cy * fy1) * d2;
+              f[nr3] += (pv + cx * fx0 + cy * fy1) * d3;
+            } else {
+              f[nr0] += pv * d0;
+              f[nr1] += pv * d1;
+              f[nr2] += pv * d2;
+              f[nr3] += pv * d3;
+            }
             d[nr0] += d0;
-            f[nr1] += pv * d1;
             d[nr1] += d1;
-            f[nr2] += pv * d2;
             d[nr2] += d2;
-            f[nr3] += pv * d3;
             d[nr3] += d3;
           } else {
             // A face counts if it borders liquid and no solid. Müller also
@@ -338,8 +419,24 @@
                   valid2 * d2 * (f[nr2] - prevF[nr2]) +
                   valid3 * d3 * (f[nr3] - prevF[nr3])) /
                 w;
-              const flip = vel[2 * i + component] + corr;
-              vel[2 * i + component] = (1 - flipRatio) * pic + flipRatio * flip;
+              if (apic) {
+                vel[2 * i + component] = pic;
+                // The gradient of the bilinear interpolant, where all four
+                // faces count; next to a solid or open air, plain PIC.
+                if (valid0 && valid1 && valid2 && valid3) {
+                  aff[4 * i + 2 * component] =
+                    (sy * (f[nr1] - f[nr0]) + ty * (f[nr2] - f[nr3])) * invH;
+                  aff[4 * i + 2 * component + 1] =
+                    (sx * (f[nr3] - f[nr0]) + tx * (f[nr2] - f[nr1])) * invH;
+                } else {
+                  aff[4 * i + 2 * component] = 0;
+                  aff[4 * i + 2 * component + 1] = 0;
+                }
+              } else {
+                const flip = vel[2 * i + component] + corr;
+                vel[2 * i + component] =
+                  (1 - flipRatio) * pic + flipRatio * flip;
+              }
             }
           }
         }
@@ -407,7 +504,9 @@
           dt,
           driftScale,
           this.pcgMaxIters ?? 200,
-          1e-5
+          this.pcgTol ?? 1e-4,
+          driftScale > 0 ? "drift" : "main",
+          driftScale === 0 && this.warmStart !== false
         );
       const { fNumX, fNumY, s, cellType } = this;
       const n = fNumY;
@@ -451,14 +550,29 @@
      * ed., ch. 5). The unknown q is pressure in velocity units, p dt/(rho h):
      * a face between cells a and b changes by q_a - q_b, air cells hold 0,
      * and solid faces do not move. Liquid cells solve A q = target - div.
+     *
+     * The main solve starts from the last step's pressure, rescaled to this
+     * step's length (`warm`): pressure changes little between steps, so this
+     * saves iterations. Each solve keeps its own workspace.
      */
-    projectPcg(u, v, p, dt, driftScale, maxIters, relTol) {
+    projectPcg(
+      u,
+      v,
+      p,
+      dt,
+      driftScale,
+      maxIters,
+      relTol,
+      key = "main",
+      warm = false
+    ) {
       const { fNumX, fNumY, s, cellType } = this;
       const n = fNumY;
       const N = this.fNumCells;
-      if (!this.pcg || this.pcg.q.length !== N) {
+      if (!this.pcgWs) this.pcgWs = {};
+      if (!this.pcgWs[key] || this.pcgWs[key].q.length !== N) {
         const a = () => new Float64Array(N);
-        this.pcg = {
+        this.pcgWs[key] = {
           q: a(),
           r: a(),
           z: a(),
@@ -469,10 +583,13 @@
           ai: a(),
           aj: a(),
           cells: new Int32Array(N),
+          prevQ: a(),
+          dtPrev: 0,
         };
       }
-      const { q, r, z, d, w, precon, diag, ai, aj } = this.pcg;
-      const list = this.pcg.cells;
+      const ws = this.pcgWs[key];
+      const { q, r, z, d, w, precon, diag, ai, aj } = ws;
+      const list = ws.cells;
       let count = 0;
       const rest = this.restDensity;
       q.fill(0);
@@ -500,13 +617,40 @@
             // surface, which reads light because its particles spread into
             // the half-empty cell above, acts like surface tension and damped
             // the sloshing 15 times too fast (slosh.cjs).
-            const excess = this.particleDensity[c] - rest;
+            // A dead band: cells within `driftBand` of rest density are
+            // noise, and correcting them roughened still water's surface by
+            // 2 mm as the displacement escaped through it (volume.cjs).
+            const raw = this.particleDensity[c] - rest;
+            const band = this.driftBand * rest;
+            const excess =
+              raw > band ? raw - band : raw < -band ? raw + band : 0;
             const inside = this.deepInside(c);
-            if (excess > 0 || inside) div -= driftScale * excess;
+            if (inside || (excess > 0 && this.driftSurface))
+              div -= driftScale * excess;
           }
           r[c] = -div;
           if (Math.abs(r[c]) > maxB) maxB = Math.abs(r[c]);
         }
+      if (warm && ws.dtPrev > 0) {
+        // Pressure in velocity units, p dt / (rho h), grows with the step;
+        // the drift solve's unknown, a displacement over dt, shrinks with it.
+        // Rescaling the drift start the main solve's way made 5 mm sloshing
+        // blow up (slosh-energy.cjs).
+        const scale = key === "drift" ? ws.dtPrev / dt : dt / ws.dtPrev;
+        for (let k = 0; k < count; k++) {
+          const c = list[k];
+          q[c] = ws.prevQ[c] * scale;
+        }
+        for (let k = 0; k < count; k++) {
+          const c = list[k];
+          r[c] -=
+            diag[c] * q[c] +
+            ai[c] * q[c + n] +
+            ai[c - n] * q[c - n] +
+            aj[c] * q[c + 1] +
+            aj[c - 1] * q[c - 1];
+        }
+      }
       // A cell whose every neighbour is solid has diag 0 above and is left out.
       if (count && maxB > 1e-9) {
         // MIC(0): tau 0.97, safety 0.25, in increasing cell order.
@@ -600,6 +744,10 @@
         }
         this.lastPcgIters = iters;
       }
+      if (warm) {
+        ws.prevQ.set(q);
+        ws.dtPrev = dt;
+      }
       // Faces: u[c] sits between c - n and c, v[c] between c - 1 and c.
       for (let i = 1; i < fNumX; i++)
         for (let j = 1; j < fNumY; j++) {
@@ -634,7 +782,18 @@
       // Positions only, so a rough solve does: 1e-3 or 15 iterations.
       if (this.solver === "gs")
         this.project(cu, cv, this.cp, numIters, dt, overRelaxation, driftScale);
-      else this.projectPcg(cu, cv, this.cp, dt, driftScale, 15, 1e-3);
+      else
+        this.projectPcg(
+          cu,
+          cv,
+          this.cp,
+          dt,
+          driftScale,
+          15,
+          1e-3,
+          "drift",
+          this.warmStart
+        );
       const { pos } = this;
       for (let i = 0; i < this.numParticles; i++) {
         const x = pos[2 * i];
@@ -662,8 +821,112 @@
       return true;
     }
 
+    /**
+     * Move particles through the last projected grid velocity, by RK2
+     * (Bridson, ch. 7). Müller moves each particle by its own velocity, whose
+     * FLIP noise is not divergence-free, so the water compresses unless a
+     * strong drift correction undoes it. A particle with no liquid face near
+     * it, spray in open air, keeps its own velocity.
+     */
+    advectThroughGrid(dt) {
+      const { pos, vel, u, v } = this;
+      if (!this.knownU) return; // no projected field yet
+      const ku = this.knownU;
+      const kv = this.knownV;
+      for (let i = 0; i < this.numParticles; i++) {
+        const x = pos[2 * i];
+        const y = pos[2 * i + 1];
+        const u1 = this.sampleKnown(u, ku, 0, x, y, vel[2 * i]);
+        const v1 = this.sampleKnown(v, kv, 1, x, y, vel[2 * i + 1]);
+        const mx = x + 0.5 * dt * u1;
+        const my = y + 0.5 * dt * v1;
+        pos[2 * i] = x + dt * this.sampleKnown(u, ku, 0, mx, my, vel[2 * i]);
+        pos[2 * i + 1] =
+          y + dt * this.sampleKnown(v, kv, 1, mx, my, vel[2 * i + 1]);
+      }
+    }
+
+    /**
+     * Carry the projected velocity two faces out into the air, each unknown
+     * face taking the mean of its known neighbours (Bridson, ch. 4). Without
+     * it a particle at the surface sampled only the faces below it, and still
+     * water's surface stood 2-5 mm rough instead of 1 (the bench's still
+     * scene).
+     */
+    extrapolateVelocity(layers = 2) {
+      const { fNumX, fNumY, cellType } = this;
+      const n = fNumY;
+      const N = this.fNumCells;
+      if (!this.knownU) {
+        this.knownU = new Uint8Array(N);
+        this.knownV = new Uint8Array(N);
+        this.knownTmp = new Uint8Array(N);
+      }
+      for (let component = 0; component < 2; component++) {
+        const f = component === 0 ? this.u : this.v;
+        const known = component === 0 ? this.knownU : this.knownV;
+        const offset = component === 0 ? n : 1;
+        for (let c = 0; c < N; c++) {
+          const a = cellType[c];
+          const b = c - offset >= 0 ? cellType[c - offset] : SOLID;
+          known[c] = a !== AIR || b !== AIR ? 1 : 0;
+        }
+        const tmp = this.knownTmp;
+        for (let layer = 0; layer < layers; layer++) {
+          tmp.set(known);
+          for (let i = 1; i < fNumX - 1; i++)
+            for (let j = 1; j < fNumY - 1; j++) {
+              const c = i * n + j;
+              if (known[c]) continue;
+              let sum = 0;
+              let count = 0;
+              if (known[c - n]) (sum += f[c - n]), count++;
+              if (known[c + n]) (sum += f[c + n]), count++;
+              if (known[c - 1]) (sum += f[c - 1]), count++;
+              if (known[c + 1]) (sum += f[c + 1]), count++;
+              if (count) {
+                f[c] = sum / count;
+                tmp[c] = 1;
+              }
+            }
+          known.set(tmp);
+        }
+      }
+    }
+
+    /** Bilinear sample over known faces; with none near, `fallback`. */
+    sampleKnown(f, known, component, px, py, fallback) {
+      const { fNumX, fNumY, h, invH } = this;
+      const n = fNumY;
+      const dx = component === 0 ? 0 : 0.5 * h;
+      const dy = component === 0 ? 0.5 * h : 0;
+      const x = clamp(px, h, (fNumX - 1) * h);
+      const y = clamp(py, h, (fNumY - 1) * h);
+      const x0 = Math.min(Math.floor((x - dx) * invH), fNumX - 2);
+      const tx = (x - dx - x0 * h) * invH;
+      const x1 = Math.min(x0 + 1, fNumX - 2);
+      const y0 = Math.min(Math.floor((y - dy) * invH), fNumY - 2);
+      const ty = (y - dy - y0 * h) * invH;
+      const y1 = Math.min(y0 + 1, fNumY - 2);
+      const c0 = x0 * n + y0;
+      const c1 = x1 * n + y0;
+      const c2 = x1 * n + y1;
+      const c3 = x0 * n + y1;
+      const k0 = known[c0] * (1 - tx) * (1 - ty);
+      const k1 = known[c1] * tx * (1 - ty);
+      const k2 = known[c2] * tx * ty;
+      const k3 = known[c3] * (1 - tx) * ty;
+      const w = k0 + k1 + k2 + k3;
+      if (w < 0.999)
+        return (
+          fallback * (1 - w) +
+          (w > 0 ? k0 * f[c0] + k1 * f[c1] + k2 * f[c2] + k3 * f[c3] : 0)
+        );
+      return k0 * f[c0] + k1 * f[c1] + k2 * f[c2] + k3 * f[c3];
+    }
+
     /** Bilinear sample of a face field (0: u, 1: v) over faces next to liquid. */
-    sampleFace(f, component, px, py) {
+    sampleFace(f, component, px, py, fallback = 0) {
       const { fNumX, fNumY, h, invH, cellType } = this;
       const n = fNumY;
       const dx = component === 0 ? 0 : 0.5 * h;
@@ -691,7 +954,7 @@
       const k3 = cellType[c3] !== AIR || cellType[c3 - offset] !== AIR ? w3 : 0;
       const sum = k0 * f[c0] + k1 * f[c1] + k2 * f[c2] + k3 * f[c3];
       const wsum = k0 + k1 + k2 + k3;
-      return wsum > 0 ? sum / wsum : 0;
+      return wsum > 0 ? sum / wsum : fallback;
     }
 
     /** One step of length dt. */
@@ -699,17 +962,35 @@
       const iters = o.pressureIters ?? 50;
       const omega = o.overRelaxation ?? 1.9;
       this.solver = o.solver ?? "pcg";
+      this.warmStart = o.warmStart !== false;
+      this.pcgTol = o.pcgTol ?? 1e-4;
+      this.driftSurface = o.driftSurface ?? true;
+      this.driftBand = o.driftBand ?? 0;
       this.updateSolids();
-      this.integrateParticles(dt, o.gx ?? 0, o.gy ?? -9.81);
+      const gridAdvect = o.advect === "grid";
+      if (gridAdvect) this.advectThroughGrid(dt);
+      this.integrateParticles(dt, o.gx ?? 0, o.gy ?? -9.81, !gridAdvect);
       if (o.separate !== false)
-        this.pushParticlesApart(o.particleIters ?? 2, o.separation ?? 1);
+        this.pushParticlesApart(o.particleIters ?? 1, o.separation ?? 1);
       this.handleParticleCollisions();
-      this.transferVelocities(true);
+      const apic = o.transfer === "apic";
+      this.transferVelocities(true, 0, apic);
       this.updateParticleDensity();
       this.solveIncompressibility(iters, dt, omega);
-      this.transferVelocities(false, o.flipRatio ?? 0.9);
-      if (o.compensateDrift !== false)
-        this.correctDrift(dt, o.driftIters ?? 20, omega, o.driftK ?? 0.5);
+      if (gridAdvect) this.extrapolateVelocity();
+      this.transferVelocities(false, o.flipRatio ?? 0.9, apic);
+      if (o.wallFriction !== false) this.applyWallFriction(dt);
+      // Drift correction every `driftEvery` steps, at that many times the
+      // strength (capped at all the excess), since drift builds up slowly.
+      this.stepCount = (this.stepCount || 0) + 1;
+      const every = o.driftEvery ?? 4;
+      if (o.compensateDrift !== false && this.stepCount % every === 0)
+        this.correctDrift(
+          dt,
+          o.driftIters ?? 20,
+          omega,
+          Math.min((o.driftK ?? 0.1) * every, 1)
+        );
       this.time += dt;
     }
 

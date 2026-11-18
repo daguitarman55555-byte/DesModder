@@ -320,6 +320,8 @@
         <dd id="steps">–</dd>
         <dt>Particles</dt>
         <dd id="count">–</dd>
+        <dt>Solver runs in</dt>
+        <dd id="thread">–</dd>
         <dt>Grid</dt>
         <dd id="grid">–</dd>
         <dt>Volume drift</dt>
@@ -350,6 +352,16 @@
           <option value="1" selected>1 cell a step</option>
           <option value="2">2 cells</option>
           <option value="4">4 cells</option>
+        </select>
+        <label for="transfer">Transfer</label>
+        <select id="transfer">
+          <option value="apic" selected>APIC</option>
+          <option value="flip">FLIP (Müller)</option>
+        </select>
+        <label for="advect">Particles move</label>
+        <select id="advect">
+          <option value="grid" selected>Through the grid</option>
+          <option value="particle">By own velocity (Müller)</option>
         </select>
         <label for="solver">Pressure</label>
         <select id="solver">
@@ -386,336 +398,27 @@
         <button id="pause">Pause</button>
       </div>
       <p class="ref">
-        Changing cell size restarts the scene. FLIP share 1 keeps every
-        particle's own velocity; 0 takes the grid's, which damps. Gauss-Seidel
+        Changing cell size restarts the scene. APIC through the grid keeps
+        sloshing waves about three times longer than Müller's FLIP with
+        particles moving by their own velocity, and is closer on the dam break
+        and run-up too. FLIP share applies only to FLIP: 1 keeps every
+        particle's own velocity, 0 takes the grid's, which damps. Gauss-Seidel
         is Müller's original; at 1 cm cells its 50 passes leave still water
-        moving.
+        moving. CFL 2 halves the steps in fast scenes; it lowers the run-up from
+        2.20 to 2.03 H (2.35 measured) and leaves the dam break as close.
       </p>
     </section>
   </div>
 </div>
 
 <script src="flip.js"></script>
+<script src="scenes.js"></script>
+<script src="engine.js"></script>
 <script>
   "use strict";
-  const G = 9.81;
   const $ = (id) => document.getElementById(id);
   const css = (name) =>
     getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-
-  // ---------------------------------------------------------------- scenes
-  const A = 0.25; // dam column width
-  const MM = [
-    [0.41, 1.11],
-    [0.84, 1.22],
-    [1.19, 1.44],
-    [1.43, 1.67],
-    [1.63, 1.89],
-    [1.83, 2.11],
-    [1.98, 2.33],
-    [2.2, 2.56],
-    [2.32, 2.78],
-    [2.51, 3],
-    [2.65, 3.22],
-    [2.83, 3.44],
-    [2.97, 3.67],
-    [3.11, 3.89],
-    [3.33, 4.11],
-  ];
-  const SLOSH = { L: 0.5, depth: 0.4, amp: 0.02, period: (2 * Math.PI) / 7.8 };
-
-  function interp(series, x) {
-    for (let i = 1; i < series.length; i++)
-      if (series[i][0] >= x) {
-        const [x0, y0] = series[i - 1],
-          [x1, y1] = series[i];
-        return y0 + ((y1 - y0) * (x - x0)) / Math.max(x1 - x0, 1e-12);
-      }
-    return null;
-  }
-  const fmt = (x, d = 2) => (x == null || !isFinite(x) ? "–" : x.toFixed(d));
-
-  const SCENES = {
-    dam: {
-      label: "Dam break",
-      W: 1.2,
-      H: 0.65,
-      about:
-        "A column of water 25 cm wide and 50 cm tall collapses along a dry floor.",
-      ref: "Martin & Moyce (1952), Phil. Trans. R. Soc. A 244: front Z = x/a against T = t√(2g/a), red dots. The experiment's gate took time to lift, so simulations usually run a little ahead early on.",
-      setup(f) {
-        f.fill(f.h, f.h, f.h + A, f.h + 2 * A);
-        return { series: [] };
-      },
-      measure(f, d) {
-        const T = f.time * Math.sqrt((2 * G) / A);
-        if (T <= 3.6)
-          d.series.push([T, (f.front(f.h + Math.max(A / 10, f.h)) - f.h) / A]);
-      },
-      readout(f, d) {
-        let err = 0,
-          n = 0;
-        for (const [T, Z] of MM) {
-          const z = interp(d.series, T);
-          if (z != null) {
-            err += Math.abs(z - Z) / Z;
-            n++;
-          }
-        }
-        const z1 = interp(d.series, 1.98),
-          z2 = interp(d.series, 3.33);
-        const slope =
-          z1 != null && z2 != null ? (z2 - z1) / (3.33 - 1.98) : null;
-        const e = n ? (100 * err) / n : null;
-        return [
-          ["T now", fmt(f.time * Math.sqrt((2 * G) / A))],
-          [
-            "Mean error vs data",
-            e == null ? "–" : e.toFixed(1) + "%",
-            e == null ? "" : e < 10 ? "good" : e < 15 ? "warn" : "bad",
-          ],
-          [
-            "Late front speed",
-            slope == null ? "–" : slope.toFixed(2) + " √(gH), 1.32 measured",
-          ],
-        ];
-      },
-      chart(ctx, w, h, d) {
-        plot(
-          ctx,
-          w,
-          h,
-          { x: [0, 3.5], y: [1, 4.6], xl: "T", yl: "Z" },
-          MM.map(([x, y]) => ({ x, y })),
-          d.series.map(([x, y]) => ({ x, y }))
-        );
-      },
-    },
-    slosh: {
-      label: "Sloshing",
-      W: SLOSH.L,
-      H: 0.6,
-      about:
-        "A 50 cm tank, 40 cm deep, starts with a 2 cm tilt of its first mode and rings down.",
-      ref: "Linear theory in 2D: ω = 7.80 rad/s. Bäuerlein & Avila (2021), J. Fluid Mech. 925: ω = 7.86 ± 0.10 rad/s, damping δ = 0.065 ± 0.015 /s in a tank 5 cm deep, whose side walls add friction a 2D model has not got. So δ here should come out lower, not higher.",
-      setup(f) {
-        const { L, depth, amp } = SLOSH,
-          h = f.h;
-        f.fill(
-          h,
-          h,
-          h + L,
-          h + depth + amp + h,
-          (x, y) => y < h + depth + amp * Math.cos((Math.PI * (x - h)) / L)
-        );
-        return {
-          series: [],
-          amps: [],
-          lo: Infinity,
-          hi: -Infinity,
-          next: SLOSH.period,
-        };
-      },
-      // Half the left-right height difference, its range over each full
-      // period, as slosh-amp.cjs measures it.
-      measure(f, d) {
-        const { L } = SLOSH,
-          h = f.h;
-        const eta = (f.surfaceAt(h + 0.03) - f.surfaceAt(h + L - 0.03)) / 2;
-        d.series.push([f.time, eta]);
-        d.lo = Math.min(d.lo, eta);
-        d.hi = Math.max(d.hi, eta);
-        if (f.time >= d.next) {
-          d.amps.push((d.hi - d.lo) / 2);
-          d.lo = Infinity;
-          d.hi = -Infinity;
-          d.next += SLOSH.period;
-        }
-      },
-      readout(f, d) {
-        const a = d.amps,
-          n = a.length;
-        const delta =
-          n >= 2 && a[n - 1] > 0
-            ? Math.log(a[0] / a[n - 1]) / (SLOSH.period * (n - 1))
-            : null;
-        return [
-          ["Periods measured", String(n)],
-          [
-            "Amplitude now",
-            n ? (1000 * a[n - 1]).toFixed(1) + " mm, from 20" : "–",
-          ],
-          [
-            "Damping δ",
-            delta == null ? "–" : delta.toFixed(3) + " /s, 0.065 measured",
-            delta == null
-              ? ""
-              : delta <= 0.1
-                ? "good"
-                : delta < 0.3
-                  ? "warn"
-                  : "bad",
-          ],
-        ];
-      },
-      chart(ctx, w, h, d) {
-        const t1 = Math.max(
-          4,
-          d.series.length ? d.series[d.series.length - 1][0] : 4
-        );
-        plot(
-          ctx,
-          w,
-          h,
-          {
-            x: [Math.max(0, t1 - 8), t1],
-            y: [-0.025, 0.025],
-            xl: "t (s)",
-            yl: "η (m)",
-          },
-          [],
-          d.series.map(([x, y]) => ({ x, y }))
-        );
-      },
-    },
-    rest: {
-      label: "Still water",
-      W: 1,
-      H: 0.6,
-      about:
-        "A tank 30 cm deep with nothing moving. Real water stays flat and still.",
-      ref: "Any motion here comes from the solver, not physics. The particles start packed slightly unevenly, so the first half second settles.",
-      setup(f) {
-        f.fill(f.h, f.h, f.width - f.h, f.h + 0.3);
-        return {};
-      },
-      measure(f, d) {
-        if (f.time < 1) return;
-        let max2 = 0;
-        for (let i = 0; i < f.numParticles; i++)
-          max2 = Math.max(max2, f.vel[2 * i] ** 2 + f.vel[2 * i + 1] ** 2);
-        let sum = 0,
-          sum2 = 0,
-          n = 0;
-        for (let x = 0.1; x <= f.width - 0.1; x += f.h) {
-          const y = f.surfaceAt(x);
-          sum += y;
-          sum2 += y * y;
-          n++;
-        }
-        d.maxSpeed = Math.sqrt(max2);
-        d.rough = Math.sqrt(Math.max(sum2 / n - (sum / n) ** 2, 0));
-      },
-      readout(f, d) {
-        return [
-          [
-            "Fastest particle",
-            d.maxSpeed == null
-              ? "settling…"
-              : (100 * d.maxSpeed).toFixed(1) + " cm/s",
-            d.maxSpeed == null
-              ? ""
-              : d.maxSpeed < 0.02
-                ? "good"
-                : d.maxSpeed < 0.1
-                  ? "warn"
-                  : "bad",
-          ],
-          [
-            "Surface roughness",
-            d.rough == null ? "–" : (1000 * d.rough).toFixed(1) + " mm",
-          ],
-        ];
-      },
-    },
-    drop: {
-      label: "Drop",
-      W: 1,
-      H: 0.8,
-      about:
-        "A 16 cm blob falls 30 cm into a pool 15 cm deep: splash, crown and merging.",
-      ref: "Judge by eye against slow-motion footage; the volume drift is the number to watch.",
-      setup(f) {
-        f.fill(f.h, f.h, f.width - f.h, f.h + 0.15);
-        f.fill(
-          0.42,
-          0.47,
-          0.58,
-          0.63,
-          (x, y) => (x - 0.5) ** 2 + (y - 0.55) ** 2 < 0.08 ** 2
-        );
-        return {};
-      },
-    },
-    pour: {
-      label: "Pour",
-      W: 1,
-      H: 0.8,
-      about:
-        "A tap 4 cm wide pours at 1.5 m/s into a shallow pool until the tank holds its particle limit.",
-      ref: "The stream should fall like a jet, break into drops only where it thins, and merge without a gap.",
-      setup(f) {
-        f.fill(f.h, f.h, f.width - f.h, f.h + 0.05);
-        return { acc: 0 };
-      },
-      beforeStep(f, dt, d) {
-        if (f.numParticles > 0.9 * f.maxParticles) return;
-        const speed = 1.5,
-          x0 = 0.2,
-          x1 = 0.24,
-          y = 0.72;
-        d.acc += speed * dt;
-        while (d.acc >= f.seedDy) {
-          d.acc -= f.seedDy;
-          for (let x = x0 + f.r; x <= x1 - f.r; x += f.seedDx)
-            f.addParticle(x, y - d.acc, 0, -speed);
-        }
-      },
-    },
-    paddle: {
-      label: "Paddle",
-      W: 1,
-      H: 0.6,
-      about:
-        "A 12 cm disc sweeps back and forth through 30 cm of water, up to 0.75 m/s.",
-      ref: "No particle may end a step inside the disc; that would be water tunnelling through a solid.",
-      setup(f) {
-        f.fill(f.h, f.h, f.width - f.h, f.h + 0.3);
-        return { inside: 0 };
-      },
-      beforeStep(f, dt, d) {
-        if (drag.active) return;
-        const o = f.obstacle,
-          t = f.time + dt;
-        const x = 0.5 + 0.24 * Math.sin((2 * Math.PI * t) / 2);
-        o.vx = (x - (o.active ? o.x : x)) / dt;
-        o.vy = 0;
-        Object.assign(o, { active: true, x, y: 0.2, r: 0.06 });
-      },
-      afterStep(f, dt, d) {
-        const o = f.obstacle;
-        if (!o.active) return;
-        let n = 0;
-        for (let i = 0; i < f.numParticles; i++)
-          if (
-            (f.pos[2 * i] - o.x) ** 2 + (f.pos[2 * i + 1] - o.y) ** 2 <
-            (o.r * 0.999) ** 2
-          )
-            n++;
-        d.inside = Math.max(d.inside, n);
-      },
-      readout(f, d) {
-        return [
-          [
-            "Most particles inside the disc",
-            String(d.inside),
-            d.inside === 0 ? "good" : "bad",
-          ],
-        ];
-      },
-    },
-  };
-
   // ---------------------------------------------------------------- state
   const state = {
     scene: "dam",
@@ -727,104 +430,111 @@
     separate: true,
     paused: false,
     solver: "pcg",
+    transfer: "apic",
+    advect: "grid",
   };
-  let fluid,
+  // The solver runs in a worker so the main thread, which Desmos shares,
+  // only draws. `local` is the same engine on this thread, for bench() and
+  // for browsers without workers; add #local to the address to use it.
+  const local = new LiquidEngine();
+  let worker = null;
+  if (typeof Worker !== "undefined" && location.hash !== "#local") {
+    try {
+      worker = new Worker("worker.js");
+    } catch (e) {
+      worker = null;
+    }
+  }
+  let snap = null,
     scene,
-    data,
-    volume0 = null,
+    data = {},
+    generation = 0,
+    workerGeneration = 0,
+    busy = false,
+    owed = 0,
+    lastReply = performance.now(),
     simTotal = 0,
     frameNo = 0;
-  const drag = { active: false, x: 0, y: 0, px: 0, py: 0, t: 0 };
+  const drag = { active: false, x: 0, y: 0, vx: 0, vy: 0, t: 0 };
+  let drift = null;
   const solverMs = [],
     renderMs = [],
     stepsPer = [],
     window2s = [];
 
-  function opts() {
-    return {
-      cfl: state.cfl,
-      flipRatio: state.flip,
-      pressureIters: state.pressure,
-      separate: state.separate,
-      solver: state.solver,
-      gx: 0,
-      gy: -G,
-      maxDt: 1 / 60,
-    };
+  function settings() {
+    const { cfl, flip, pressure, separate, solver, transfer, advect } = state;
+    return { cfl, flip, pressure, separate, solver, transfer, advect };
   }
 
   function restart() {
     scene = SCENES[state.scene];
-    const h = state.cell;
-    const capacity = Math.ceil(((scene.W * scene.H) / (h * h)) * 3.3);
-    fluid = new FlipFluid({
-      width: scene.W + 2 * h,
-      height: scene.H + h,
-      h,
-      maxParticles: capacity,
-    });
-    data = scene.setup(fluid) || {};
-    volume0 = null;
+    local.settings = settings();
+    local.restart(state.scene, state.cell);
+    snap = local.snapshot(false);
+    data = local.data;
+    generation++;
+    if (worker) {
+      busy = true;
+      worker.postMessage({
+        type: "restart",
+        scene: state.scene,
+        cell: state.cell,
+        settings: settings(),
+      });
+    }
     simTotal = 0;
     frameNo = 0;
+    owed = 0;
     solverMs.length = renderMs.length = stepsPer.length = window2s.length = 0;
+    drift = null;
     $("about").textContent = scene.about;
     $("ref").textContent = scene.ref;
     $("chart").hidden = !scene.chart;
-    $("grid").textContent = `${fluid.fNumX} × ${fluid.fNumY}`;
+    $("grid").textContent = `${snap.fNumX} × ${snap.fNumY}`;
+    $("thread").textContent = worker ? "a worker" : "this page";
     resizeCanvas();
   }
 
-  // One frame of simulation: catch up with the wall clock, but give up after
-  // 45 ms so the page stays responsive. Falling behind shows as speed < 1.
-  function simulate(wall) {
-    const target = Math.min(wall, 1 / 20);
-    const o = opts();
-    const t0 = performance.now();
-    let done = 0,
-      steps = 0;
-    while (done < target - 1e-9 && performance.now() - t0 < 45) {
-      const dt = fluid.nextDt(target - done, o);
-      applyDrag(dt);
-      scene.beforeStep?.(fluid, dt, data);
-      fluid.step(dt, o);
-      scene.afterStep?.(fluid, dt, data);
-      done += dt;
-      steps++;
-    }
-    scene.measure?.(fluid, data);
-    return { ms: performance.now() - t0, done, steps };
+  function sendSettings() {
+    local.settings = settings();
+    if (worker) worker.postMessage({ type: "settings", settings: settings() });
+  }
+  function sendDrag() {
+    local.drag = { ...drag };
+    if (worker) worker.postMessage({ type: "drag", drag: { ...drag } });
   }
 
-  function applyDrag(dt) {
-    const o = fluid.obstacle;
-    if (drag.active) {
-      // Move toward the pointer at the pointer's own speed, so every sub-step
-      // of a frame sees the same motion.
-      const cap = 3;
-      const vx = Math.max(-cap, Math.min(cap, drag.vx)),
-        vy = Math.max(-cap, Math.min(cap, drag.vy));
-      const x = o.active ? o.x + vx * dt : drag.x,
-        y = o.active ? o.y + vy * dt : drag.y;
-      const close = Math.hypot(drag.x - x, drag.y - y) < 0.02;
-      Object.assign(o, {
-        active: true,
-        x: close ? x : drag.x,
-        y: close ? y : drag.y,
-        r: 0.05,
-        vx,
-        vy,
-      });
-    } else if (state.scene !== "paddle") {
-      o.active = false;
-    }
+  function record(timing, wall) {
+    simTotal += timing.done;
+    push(solverMs, timing.ms);
+    push(stepsPer, timing.steps);
+    window2s.push([timing.done, wall]);
+    let total = 0;
+    for (const [, w] of window2s) total += w;
+    while (total > 2 && window2s.length > 1) total -= window2s.shift()[1];
   }
 
-  function measureVolume() {
-    const per = fluid.seedDx * fluid.seedDy;
-    const ratio = fluid.volume() / Math.max(fluid.numParticles * per, 1e-12);
-    if (volume0 == null) volume0 = ratio;
-    return ratio / volume0 - 1;
+  if (worker) {
+    // Replies to steps sent before the latest restart are dropped: the
+    // worker answers each restart once, so counting those answers gives its
+    // generation.
+    worker.onmessage = (e) => {
+      const m = e.data;
+      if (m.restarted) workerGeneration++;
+      busy = false;
+      if (workerGeneration !== generation) return;
+      const now = performance.now();
+      if (!m.restarted) record(m.timing, (now - lastReply) / 1000);
+      lastReply = now;
+      snap = m.snap;
+      data = m.data;
+      if (m.drift !== undefined) drift = m.drift;
+    };
+    worker.onerror = () => {
+      worker = null;
+      $("thread").textContent = "this page";
+    };
   }
 
   // ---------------------------------------------------------------- drawing
@@ -1041,7 +751,7 @@ void main() {
   // The water surface: particles splatted on a grid of half cells with a smooth
   // kernel; a full interior reads 1 after uNorm, the surface is drawn at 0.5.
   function splat() {
-    const f = fluid,
+    const f = snap,
       s = f.h / 2,
       R = 1.1 * f.h,
       R2 = R * R;
@@ -1096,9 +806,9 @@ void main() {
 
   function common(prog) {
     const u = prog.u,
-      o = fluid.obstacle;
-    gl.uniform2f(u.uDomain, fluid.width, fluid.height);
-    if (u.uH) gl.uniform1f(u.uH, fluid.h);
+      o = snap.obstacle;
+    gl.uniform2f(u.uDomain, snap.width, snap.height);
+    if (u.uH) gl.uniform1f(u.uH, snap.h);
     if (u.uObstacle) gl.uniform4f(u.uObstacle, o.x, o.y, o.r, o.active ? 1 : 0);
   }
 
@@ -1109,10 +819,10 @@ void main() {
   }
 
   function drawPoints(mode, size) {
-    const f = fluid,
+    const f = snap,
       n = f.numParticles;
-    if (!speeds || speeds.length < f.maxParticles)
-      speeds = new Float32Array(f.maxParticles);
+    if (!speeds || speeds.length < n)
+      speeds = new Float32Array(Math.max(n, 1024) * 2);
     if (mode === 1)
       for (let i = 0; i < n; i++)
         speeds[i] = Math.hypot(f.vel[2 * i], f.vel[2 * i + 1]);
@@ -1130,7 +840,7 @@ void main() {
 
   function render() {
     const t0 = performance.now();
-    const f = fluid;
+    const f = snap;
     const pxPerM = canvas.width / f.width;
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.disable(gl.BLEND);
@@ -1195,7 +905,7 @@ void main() {
   function resizeCanvas() {
     const box = canvas.parentElement.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const aspect = fluid.height / fluid.width;
+    const aspect = snap.height / snap.width;
     const cssW = Math.max(200, box.width);
     const cssH = Math.min(cssW * aspect, window.innerHeight * 0.7);
     const w = cssH / aspect;
@@ -1287,7 +997,6 @@ void main() {
     if (arr.length > n) arr.shift();
   }
 
-  let drift = null;
   function updateReadings() {
     let sim = 0,
       wall = 0;
@@ -1323,7 +1032,7 @@ void main() {
     $("steps").textContent = stepsPer.length
       ? fmt(percentile(stepsPer, 0.5), 0)
       : "–";
-    $("count").textContent = fluid.numParticles.toLocaleString();
+    $("count").textContent = snap.numParticles.toLocaleString();
     const dd = $("drift");
     dd.textContent = drift == null ? "–" : (100 * drift).toFixed(2) + "%";
     dd.className =
@@ -1334,7 +1043,7 @@ void main() {
           : Math.abs(drift) < 0.03
             ? "warn"
             : "bad";
-    const rows = scene.readout ? scene.readout(fluid, data) : [];
+    const rows = scene.readout ? scene.readout(snap, data) : [];
     $("readout").replaceChildren(
       ...rows.flatMap(([k, v, cls]) => {
         const dt = document.createElement("dt");
@@ -1354,15 +1063,25 @@ void main() {
     const wall = Math.min((now - last) / 1000, 0.25);
     last = now;
     if (!state.paused) {
-      const r = simulate(wall);
-      simTotal += r.done;
-      push(solverMs, r.ms);
-      push(stepsPer, r.steps);
-      window2s.push([r.done, wall]);
-      let total = 0;
-      for (const [, w] of window2s) total += w;
-      while (total > 2 && window2s.length > 1) total -= window2s.shift()[1];
-      if (frameNo % 10 === 0) drift = measureVolume();
+      owed = Math.min(owed + wall, 1 / 20);
+      if (worker) {
+        if (!busy) {
+          worker.postMessage({
+            type: "step",
+            wall: owed,
+            measureVolume: frameNo % 10 === 0,
+          });
+          busy = true;
+          owed = 0;
+        }
+      } else {
+        const timing = local.simulate(owed);
+        owed = 0;
+        record(timing, wall);
+        snap = local.snapshot(false);
+        data = local.data;
+        if (frameNo % 10 === 0) drift = local.measureVolume();
+      }
     }
     push(renderMs, render());
     if (frameNo % 6 === 0) updateReadings();
@@ -1370,8 +1089,9 @@ void main() {
     requestAnimationFrame(frame);
   }
 
-  // A synchronous run for measuring with the page hidden: frames of 1/60 s
-  // back to back, solver and drawing timed, gl.finish() so the GPU is counted.
+  // A synchronous run on this thread for measuring with the page hidden:
+  // frames of 1/60 s back to back, solver and drawing timed, gl.finish() so
+  // the GPU is counted.
   window.bench = function ({
     scene: name = state.scene,
     cell = state.cell,
@@ -1380,15 +1100,17 @@ void main() {
   } = {}) {
     Object.assign(state, { scene: name, cell, cfl });
     restart();
-    measureVolume();
+    local.measureVolume();
     const frames = Math.round(seconds * 60),
       s = [],
       d = [];
     let steps = 0;
     for (let i = 0; i < frames; i++) {
       const t0 = performance.now();
-      const r = simulate(1 / 60);
+      const r = local.simulate(1 / 60);
       const t1 = performance.now();
+      snap = local.snapshot(false);
+      data = local.data;
       render();
       gl.finish();
       s.push(t1 - t0);
@@ -1401,16 +1123,56 @@ void main() {
       cell,
       cfl,
       solver: state.solver,
-      particles: fluid.numParticles,
-      grid: `${fluid.fNumX}x${fluid.fNumY}`,
+      particles: snap.numParticles,
+      grid: `${snap.fNumX}x${snap.fNumY}`,
       solverP50: +percentile(s, 0.5).toFixed(2),
       solverP95: +percentile(s, 0.95).toFixed(2),
       drawP50: +percentile(d, 0.5).toFixed(2),
       stepsPerFrame: +(steps / frames).toFixed(1),
       simSecondsPerSecond: +(seconds / (total / 1000)).toFixed(2),
-      volumeDrift: +(100 * measureVolume()).toFixed(2),
+      volumeDrift: +(100 * local.measureVolume()).toFixed(2),
       readout: scene.readout
-        ? scene.readout(fluid, data).map((r) => r.slice(0, 2).join(": "))
+        ? scene.readout(snap, data).map((r) => r.slice(0, 2).join(": "))
+        : [],
+    };
+  };
+
+  // The worker alone: frames of 1/60 s sent one after another, timing the
+  // solver and the hand-over; drawing runs on the other thread in real use.
+  window.benchWorker = async function ({
+    scene: name = state.scene,
+    cell = state.cell,
+    seconds = 2,
+  } = {}) {
+    if (!worker) return "no worker";
+    const wait = () =>
+      new Promise((res) => {
+        const check = () => (busy ? setTimeout(check, 0) : res());
+        check();
+      });
+    Object.assign(state, { scene: name, cell });
+    state.paused = true;
+    restart();
+    await wait();
+    const frames = Math.round(seconds * 60);
+    const t0 = performance.now();
+    lastReply = t0;
+    for (let i = 0; i < frames; i++) {
+      busy = true;
+      worker.postMessage({ type: "step", wall: 1 / 60, measureVolume: false });
+      await wait();
+    }
+    const wall = (performance.now() - t0) / 1000;
+    state.paused = false;
+    return {
+      scene: name,
+      cell,
+      particles: snap.numParticles,
+      simSecondsPerSecond: +(seconds / wall).toFixed(2),
+      solverP50: +percentile(solverMs, 0.5).toFixed(2),
+      stepsPerFrame: +percentile(stepsPer, 0.5).toFixed(1),
+      readout: scene.readout
+        ? scene.readout(snap, data).map((r) => r.slice(0, 2).join(": "))
         : [],
     };
   };
@@ -1445,39 +1207,54 @@ void main() {
   });
   $("cfl").addEventListener("change", (e) => {
     state.cfl = +e.target.value;
+    sendSettings();
   });
   $("flip").addEventListener("input", (e) => {
     state.flip = +e.target.value;
     $("flip-out").textContent = state.flip.toFixed(2);
+    sendSettings();
   });
   $("pressure").addEventListener("input", (e) => {
     state.pressure = +e.target.value;
     $("pressure-out").textContent = state.pressure;
+    sendSettings();
+  });
+  $("transfer").addEventListener("change", (e) => {
+    state.transfer = e.target.value;
+    sendSettings();
+  });
+  $("advect").addEventListener("change", (e) => {
+    state.advect = e.target.value;
+    sendSettings();
   });
   $("solver").addEventListener("change", (e) => {
     state.solver = e.target.value;
+    sendSettings();
   });
   $("separate").addEventListener("change", (e) => {
     state.separate = e.target.checked;
+    sendSettings();
   });
   $("restart").addEventListener("click", restart);
   $("pause").addEventListener("click", (e) => {
     state.paused = !state.paused;
     e.target.textContent = state.paused ? "Resume" : "Pause";
     window2s.length = 0;
+    lastReply = performance.now();
   });
 
   function toWorld(e) {
     const r = canvas.getBoundingClientRect();
     return [
-      ((e.clientX - r.left) / r.width) * fluid.width,
-      (1 - (e.clientY - r.top) / r.height) * fluid.height,
+      ((e.clientX - r.left) / r.width) * snap.width,
+      (1 - (e.clientY - r.top) / r.height) * snap.height,
     ];
   }
   canvas.addEventListener("pointerdown", (e) => {
     canvas.setPointerCapture(e.pointerId);
     [drag.x, drag.y] = toWorld(e);
     Object.assign(drag, { active: true, vx: 0, vy: 0, t: e.timeStamp });
+    sendDrag();
   });
   canvas.addEventListener("pointermove", (e) => {
     if (!drag.active) return;
@@ -1486,10 +1263,12 @@ void main() {
     drag.vx = 0.6 * drag.vx + 0.4 * ((x - drag.x) / dt);
     drag.vy = 0.6 * drag.vy + 0.4 * ((y - drag.y) / dt);
     Object.assign(drag, { x, y, t: e.timeStamp });
+    sendDrag();
   });
   const endDrag = () => {
     drag.active = false;
     drag.vx = drag.vy = 0;
+    sendDrag();
   };
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointercancel", endDrag);

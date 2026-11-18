@@ -10,13 +10,15 @@ const f = new FlipFluid({
 });
 f.fill(h, h, f.width - h, h + 0.3);
 const o = {
+  transfer: process.env.TRANSFER || "apic",
+  advect: process.env.ADVECT || "grid",
   cfl: +(process.env.CFL || 1),
   flipRatio: +(process.env.FLIP || 0.9),
   pressureIters: +(process.env.PRESSURE || 50),
   separate: process.env.SEPARATE !== "0",
   compensateDrift: process.env.DRIFT !== "0",
   maxDt: +(process.env.MAXDT || 1 / 60),
-  driftK: +(process.env.DRIFTK || 0.5),
+  driftK: +(process.env.DRIFTK || 0.1),
   solver: process.env.SOLVER || "pcg",
 };
 const t0 = Date.now();

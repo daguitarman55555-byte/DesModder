@@ -18,8 +18,10 @@ f.fill(
   (x, y) => y < h + depth + 0.02 * Math.cos((Math.PI * (x - h)) / L)
 );
 const o = {
-  cfl: 1,
-  driftK: +(process.env.DRIFTK || 0.5),
+  cfl: +(process.env.CFL || 1),
+  transfer: process.env.TRANSFER || "apic",
+  advect: process.env.ADVECT || "grid",
+  driftK: +(process.env.DRIFTK || 0.1),
   flipRatio: +(process.env.FLIP || 0.9),
   separate: process.env.SEPARATE !== "0",
   compensateDrift: process.env.DRIFT !== "0",
