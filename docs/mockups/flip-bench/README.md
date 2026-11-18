@@ -275,6 +275,10 @@ A minute of the 1 cm paddle matches the CPU's long run: drift −0.57 to
 outside the tank, and the cost per step flat (3.7–4.2 ms). Thirty seconds of
 the 5 mm paddle, where the CPU once ran away, hold too: fastest particle
 1.7–2.1 m/s, energy 1.67–1.73 J/kg, nothing outside, drift −0.6 to −1.2%.
+The CPU over the same 30 s (`longrun.cjs 30 0.005 paddle`): fastest
+1.67–1.76 m/s, energy 1.67–1.69 J/kg, nothing outside, drift −0.5 to −0.9%,
+at 35–38 ms a step (its last 10 s read 121 ms with the browser runs sharing
+the machine). So the GPU drifts a little more at 5 mm, about 0.3 points.
 
 Speed, the pane hidden, solver only:
 
