@@ -61,6 +61,9 @@
       this.vel = new Float32Array(2 * maxParticles);
       // APIC's affine velocity per particle: du/dx, du/dy, dv/dx, dv/dy.
       this.aff = new Float32Array(4 * maxParticles);
+      // Whether the grid set the particle's velocity this step; spray it
+      // could not reach moves by its own velocity, not the grid's.
+      this.onGrid = new Uint8Array(maxParticles);
       this.numParticles = 0;
 
       this.pInvSpacing = 1 / (2.2 * this.r);
@@ -79,7 +82,9 @@
       for (let i = 0; i < this.fNumX; i++)
         for (let j = 0; j < this.fNumY; j++)
           this.wallS[i * n + j] =
-            i === 0 || i === this.fNumX - 1 || j === 0 ? 0 : 1;
+            i === 0 || i === this.fNumX - 1 || j === 0 || j === this.fNumY - 1
+              ? 0
+              : 1;
       this.s.set(this.wallS);
     }
 
@@ -91,6 +96,7 @@
       this.vel[2 * i] = vx;
       this.vel[2 * i + 1] = vy;
       this.aff.fill(0, 4 * i, 4 * i + 4);
+      this.onGrid[i] = 0;
       return true;
     }
 
@@ -274,7 +280,10 @@
       const minX = h + r;
       const maxX = (fNumX - 1) * h - r;
       const minY = h + r;
-      const maxY = fNumY * h - r;
+      // The top row is a lid. It was open, but never pressure-solved, and its
+      // neighbour above wrapped into the next column's floor; splash held
+      // against it in the 5 mm paddle ran away to 27 m/s (trace.cjs).
+      const maxY = (fNumY - 1) * h - r;
       const o = this.obstacle;
       const reach = o.r + r;
       for (let i = 0; i < this.numParticles; i++) {
@@ -305,10 +314,7 @@
         if (x < minX) x = minX;
         if (x > maxX) x = maxX;
         if (y < minY) y = minY;
-        if (y > maxY) {
-          y = maxY;
-          if (vel[2 * i + 1] > 0) vel[2 * i + 1] = 0; // the open top has no grid wall
-        }
+        if (y > maxY) y = maxY;
         pos[2 * i] = x;
         pos[2 * i + 1] = y;
       }
@@ -406,6 +412,8 @@
             const valid2 = faceValid(cellType[nr2], cellType[nr2 - offset]);
             const valid3 = faceValid(cellType[nr3], cellType[nr3 - offset]);
             const w = valid0 * d0 + valid1 * d1 + valid2 * d2 + valid3 * d3;
+            if (component === 0) this.onGrid[i] = w > 0 ? 1 : 0;
+            else if (w <= 0) this.onGrid[i] = 0;
             if (w > 0) {
               const pic =
                 (valid0 * d0 * f[nr0] +
@@ -836,6 +844,14 @@
       for (let i = 0; i < this.numParticles; i++) {
         const x = pos[2 * i];
         const y = pos[2 * i + 1];
+        // Spray the grid did not reach last step flies on its own velocity;
+        // moving it with the grid's while gravity built up in its own held
+        // it in place as its velocity ran away (trace.cjs).
+        if (!this.onGrid[i]) {
+          pos[2 * i] = x + dt * vel[2 * i];
+          pos[2 * i + 1] = y + dt * vel[2 * i + 1];
+          continue;
+        }
         const u1 = this.sampleKnown(u, ku, 0, x, y, vel[2 * i]);
         const v1 = this.sampleKnown(v, kv, 1, x, y, vel[2 * i + 1]);
         const mx = x + 0.5 * dt * u1;

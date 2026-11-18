@@ -1,0 +1,49 @@
+dam at 10 mm
+   10 s: 2.98 ms/step, 4.0 steps/frame, 3936 particles, drift -0.57%, E 0.6170 J/kg, fastest 0.48 m/s, outside 0, data 620 bytes
+   20 s: 2.85 ms/step, 2.0 steps/frame, 3936 particles, drift -0.54%, E 0.5970 J/kg, fastest 0.19 m/s, outside 0, data 620 bytes
+   30 s: 2.82 ms/step, 2.0 steps/frame, 3936 particles, drift -0.40%, E 0.5920 J/kg, fastest 0.10 m/s, outside 0, data 620 bytes
+   40 s: 2.81 ms/step, 2.0 steps/frame, 3936 particles, drift -0.43%, E 0.5920 J/kg, fastest 0.08 m/s, outside 0, data 620 bytes
+   50 s: 2.73 ms/step, 2.0 steps/frame, 3936 particles, drift -0.48%, E 0.5919 J/kg, fastest 0.08 m/s, outside 0, data 620 bytes
+   60 s: 2.68 ms/step, 2.0 steps/frame, 3936 particles, drift -0.45%, E 0.5918 J/kg, fastest 0.09 m/s, outside 0, data 620 bytes
+runup at 10 mm
+   10 s: 1.70 ms/step, 3.1 steps/frame, 2337 particles, drift -0.16%, E 0.4275 J/kg, fastest 0.30 m/s, outside 0, data 75 bytes
+   20 s: 1.84 ms/step, 2.0 steps/frame, 2337 particles, drift -0.17%, E 0.4189 J/kg, fastest 0.13 m/s, outside 0, data 75 bytes
+   30 s: 1.62 ms/step, 2.0 steps/frame, 2337 particles, drift -0.15%, E 0.4179 J/kg, fastest 0.08 m/s, outside 0, data 75 bytes
+   40 s: 1.66 ms/step, 2.0 steps/frame, 2337 particles, drift -0.13%, E 0.4173 J/kg, fastest 0.06 m/s, outside 0, data 75 bytes
+   50 s: 1.58 ms/step, 2.0 steps/frame, 2337 particles, drift -0.22%, E 0.4169 J/kg, fastest 0.11 m/s, outside 0, data 75 bytes
+   60 s: 1.56 ms/step, 2.0 steps/frame, 2337 particles, drift -0.18%, E 0.4170 J/kg, fastest 0.03 m/s, outside 0, data 75 bytes
+slosh at 10 mm
+   10 s: 3.37 ms/step, 2.0 steps/frame, 6347 particles, drift -0.09%, E 2.0267 J/kg, fastest 0.01 m/s, outside 0, data 25623 bytes
+   20 s: 3.07 ms/step, 2.0 steps/frame, 6347 particles, drift -0.06%, E 2.0266 J/kg, fastest 0.02 m/s, outside 0, data 30647 bytes
+   30 s: 3.00 ms/step, 2.0 steps/frame, 6347 particles, drift -0.04%, E 2.0266 J/kg, fastest 0.02 m/s, outside 0, data 30659 bytes
+   40 s: 3.13 ms/step, 2.0 steps/frame, 6347 particles, drift -0.02%, E 2.0263 J/kg, fastest 0.04 m/s, outside 0, data 30790 bytes
+   50 s: 3.20 ms/step, 2.0 steps/frame, 6347 particles, drift -0.03%, E 2.0261 J/kg, fastest 0.02 m/s, outside 0, data 31164 bytes
+   60 s: 2.99 ms/step, 2.0 steps/frame, 6347 particles, drift -0.02%, E 2.0260 J/kg, fastest 0.01 m/s, outside 0, data 31104 bytes
+rest at 10 mm
+   10 s: 4.46 ms/step, 2.0 steps/frame, 9462 particles, drift 0.19%, E 1.5352 J/kg, fastest 0.04 m/s, outside 0, data 62 bytes
+   20 s: 4.46 ms/step, 2.0 steps/frame, 9462 particles, drift 0.17%, E 1.5352 J/kg, fastest 0.02 m/s, outside 0, data 62 bytes
+   30 s: 4.57 ms/step, 2.0 steps/frame, 9462 particles, drift 0.17%, E 1.5352 J/kg, fastest 0.03 m/s, outside 0, data 61 bytes
+   40 s: 4.65 ms/step, 2.0 steps/frame, 9462 particles, drift 0.13%, E 1.5352 J/kg, fastest 0.05 m/s, outside 0, data 61 bytes
+   50 s: 4.55 ms/step, 2.0 steps/frame, 9462 particles, drift 0.12%, E 1.5352 J/kg, fastest 0.02 m/s, outside 0, data 63 bytes
+   60 s: 4.61 ms/step, 2.0 steps/frame, 9462 particles, drift 0.11%, E 1.5351 J/kg, fastest 0.03 m/s, outside 0, data 62 bytes
+drop at 10 mm
+   10 s: 3.04 ms/step, 3.5 steps/frame, 5284 particles, drift -0.66%, E 0.9472 J/kg, fastest 0.52 m/s, outside 0, data 2 bytes
+   20 s: 3.07 ms/step, 2.3 steps/frame, 5284 particles, drift -0.72%, E 0.9119 J/kg, fastest 0.27 m/s, outside 0, data 2 bytes
+   30 s: 3.02 ms/step, 2.0 steps/frame, 5284 particles, drift -0.71%, E 0.8989 J/kg, fastest 0.10 m/s, outside 0, data 2 bytes
+   40 s: 2.99 ms/step, 2.0 steps/frame, 5284 particles, drift -0.67%, E 0.8983 J/kg, fastest 0.13 m/s, outside 0, data 2 bytes
+   50 s: 2.96 ms/step, 2.0 steps/frame, 5284 particles, drift -0.65%, E 0.8976 J/kg, fastest 0.06 m/s, outside 0, data 2 bytes
+   60 s: 2.98 ms/step, 2.0 steps/frame, 5284 particles, drift -0.66%, E 0.8977 J/kg, fastest 0.05 m/s, outside 0, data 2 bytes
+pour at 10 mm
+   10 s: 2.61 ms/step, 6.9 steps/frame, 7266 particles, drift -0.85%, E 1.6392 J/kg, fastest 2.82 m/s, outside 0, data 41 bytes
+   20 s: 5.28 ms/step, 4.5 steps/frame, 9624 particles, drift -1.08%, E 1.6115 J/kg, fastest 0.64 m/s, outside 0, data 42 bytes
+   30 s: 5.65 ms/step, 2.7 steps/frame, 9624 particles, drift -1.00%, E 1.5803 J/kg, fastest 0.37 m/s, outside 0, data 42 bytes
+   40 s: 5.62 ms/step, 2.0 steps/frame, 9624 particles, drift -0.96%, E 1.5722 J/kg, fastest 0.32 m/s, outside 0, data 42 bytes
+   50 s: 5.58 ms/step, 2.0 steps/frame, 9624 particles, drift -0.97%, E 1.5684 J/kg, fastest 0.25 m/s, outside 0, data 42 bytes
+   60 s: 5.59 ms/step, 2.0 steps/frame, 9624 particles, drift -0.94%, E 1.5655 J/kg, fastest 0.21 m/s, outside 0, data 42 bytes
+paddle at 10 mm
+   10 s: 5.98 ms/step, 3.9 steps/frame, 9462 particles, drift -0.75%, E 1.6841 J/kg, fastest 2.27 m/s, outside 0, data 12 bytes
+   20 s: 6.02 ms/step, 4.2 steps/frame, 9462 particles, drift -0.58%, E 1.7078 J/kg, fastest 2.00 m/s, outside 0, data 12 bytes
+   30 s: 5.98 ms/step, 4.2 steps/frame, 9462 particles, drift -0.80%, E 1.6916 J/kg, fastest 1.57 m/s, outside 0, data 12 bytes
+   40 s: 5.98 ms/step, 4.3 steps/frame, 9462 particles, drift -0.74%, E 1.7018 J/kg, fastest 1.95 m/s, outside 0, data 12 bytes
+   50 s: 5.98 ms/step, 4.1 steps/frame, 9462 particles, drift -0.95%, E 1.6776 J/kg, fastest 1.55 m/s, outside 0, data 12 bytes
+   60 s: 6.20 ms/step, 4.2 steps/frame, 9462 particles, drift -0.62%, E 1.6812 J/kg, fastest 1.23 m/s, outside 0, data 12 bytes

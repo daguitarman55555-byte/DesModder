@@ -169,6 +169,20 @@
     color: var(--muted);
     margin: 0;
   }
+  .playback {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
   .speed {
     display: flex;
     align-items: baseline;
@@ -308,9 +322,33 @@
     <section class="card" aria-labelledby="speed-h">
       <h2 id="speed-h">Speed</h2>
       <div class="speed">
-        <b id="ratio">–</b><span>simulated s per real s</span
+        <b id="ratio">–</b><span id="ratio-unit">simulated s per real s</span
         ><span class="pill" id="ratio-pill">–</span>
       </div>
+      <div class="playback">
+        <div class="tabs" id="playback" role="group" aria-label="Playback">
+          <button data-play="realtime" aria-pressed="true">Real time</button>
+          <button data-play="smooth" aria-pressed="false">Smooth</button>
+        </div>
+        <label class="visually-hidden" for="speed">Smooth playback speed</label>
+        <select id="speed" disabled>
+          <option value="auto" selected>Auto</option>
+          <option value="1">1×</option>
+          <option value="0.5">½×</option>
+          <option value="0.25">¼×</option>
+          <option value="0.125">⅛×</option>
+          <option value="0.0625">1/16×</option>
+          <option value="0.03125">1/32×</option>
+          <option value="0.015625">1/64×</option>
+        </select>
+      </div>
+      <p class="ref" id="playback-note">
+        Real time keeps pace with the clock and drops frames when the solver
+        falls behind. Smooth computes the same slice of simulated time for every
+        frame, a few frames ahead, and plays them at a steady 60 a second,
+        slowed down as far as it needs. Auto picks the fastest speed this
+        machine keeps up with.
+      </p>
       <dl>
         <dt>Solver, median / 95th</dt>
         <dd id="solver-ms">–</dd>
@@ -318,6 +356,8 @@
         <dd id="render">–</dd>
         <dt>Steps per frame</dt>
         <dd id="steps">–</dd>
+        <dt>Simulated time</dt>
+        <dd id="simtime">–</dd>
         <dt>Particles</dt>
         <dd id="count">–</dd>
         <dt>Solver runs in</dt>
@@ -432,6 +472,8 @@
     solver: "pcg",
     transfer: "apic",
     advect: "grid",
+    playback: "realtime",
+    speed: "auto",
   };
   // The solver runs in a worker so the main thread, which Desmos shares,
   // only draws. `local` is the same engine on this thread, for bench() and
@@ -457,6 +499,78 @@
     frameNo = 0;
   const drag = { active: false, x: 0, y: 0, vx: 0, vy: 0, t: 0 };
   let drift = null;
+
+  // Smooth playback: the worker keeps BUFFER frames of `speed / 60`
+  // simulated seconds ready, and the page shows one every 1/60 s. A frame
+  // missing when its turn comes is a stall; Auto slows down to avoid them.
+  const BUFFER = 4;
+  const SPEEDS = [1, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625];
+  const queue = [];
+  let inflight = 0,
+    showAcc = 0,
+    autoSpeed = 0.25,
+    requested = 0;
+  const stallTimes = [],
+    costs = [];
+  function speedNow() {
+    return state.speed === "auto" ? autoSpeed : +state.speed;
+  }
+  function speedLabel(x) {
+    return (
+      {
+        1: "1×",
+        0.5: "½×",
+        0.25: "¼×",
+        0.125: "⅛×",
+        0.0625: "1/16×",
+        0.03125: "1/32×",
+        0.015625: "1/64×",
+      }[x] || x + "×"
+    );
+  }
+  function clearSmooth() {
+    queue.length = 0;
+    showAcc = 0;
+    stallTimes.length = 0;
+    phase = 0;
+    prevKey = nextKey = null;
+  }
+
+  // Keyframes: one solver step can cost more than a display frame (28 ms
+  // for the 5 mm paddle), and then no speed is slow enough. So the worker
+  // computes every `keyEvery`-th frame, and the page draws the frames
+  // between by blending particle positions: motion stays at 60 a second.
+  let keyEvery = 1,
+    phase = 0,
+    prevKey = null,
+    nextKey = null,
+    keyDone = 0,
+    blendPos = null;
+  const stepCosts = [];
+  function blend(a, b, t) {
+    if (!a || t >= 1) return b;
+    const n = b.numParticles,
+      m = Math.min(a.numParticles, n);
+    if (!blendPos || blendPos.length < 2 * n)
+      blendPos = new Float32Array(4 * n + 64);
+    const pa = a.pos,
+      pb = b.pos;
+    for (let i = 0; i < 2 * m; i++) blendPos[i] = pa[i] + (pb[i] - pa[i]) * t;
+    for (let i = 2 * m; i < 2 * n; i++) blendPos[i] = pb[i];
+    const oa = a.obstacle,
+      ob = b.obstacle;
+    const both = oa.active && ob.active;
+    return {
+      ...b,
+      pos: blendPos.subarray(0, 2 * n),
+      time: a.time + (b.time - a.time) * t,
+      obstacle: {
+        ...ob,
+        x: both ? oa.x + (ob.x - oa.x) * t : ob.x,
+        y: both ? oa.y + (ob.y - oa.y) * t : ob.y,
+      },
+    };
+  }
   const solverMs = [],
     renderMs = [],
     stepsPer = [],
@@ -488,6 +602,13 @@
     owed = 0;
     solverMs.length = renderMs.length = stepsPer.length = window2s.length = 0;
     drift = null;
+    clearSmooth();
+    inflight = 0;
+    lastAuto = 0;
+    costs.length = 0;
+    stepCosts.length = 0;
+    cflDts.length = 0;
+    keyEvery = 1;
     $("about").textContent = scene.about;
     $("ref").textContent = scene.ref;
     $("chart").hidden = !scene.chart;
@@ -500,9 +621,13 @@
     local.settings = settings();
     if (worker) worker.postMessage({ type: "settings", settings: settings() });
   }
+  // In slow motion the hand moves faster than the slowed water, so the
+  // pointer's speed is divided by the playback speed.
   function sendDrag() {
-    local.drag = { ...drag };
-    if (worker) worker.postMessage({ type: "drag", drag: { ...drag } });
+    const k = state.playback === "smooth" ? 1 / speedNow() : 1;
+    const d = { ...drag, vx: drag.vx * k, vy: drag.vy * k };
+    local.drag = d;
+    if (worker) worker.postMessage({ type: "drag", drag: d });
   }
 
   function record(timing, wall) {
@@ -522,6 +647,17 @@
     worker.onmessage = (e) => {
       const m = e.data;
       if (m.restarted) workerGeneration++;
+      if (m.kind === "exact") {
+        if (workerGeneration !== generation) return;
+        inflight = Math.max(0, inflight - 1);
+        push(solverMs, m.timing.ms);
+        push(stepsPer, m.timing.steps);
+        push(costs, [m.timing.ms, m.timing.done], 60);
+        if (m.timing.steps) push(stepCosts, m.timing.ms / m.timing.steps, 30);
+        if (m.timing.cflDt) push(cflDts, m.timing.cflDt, 30);
+        if (state.playback === "smooth" && !state.paused) queue.push(m);
+        return;
+      }
       busy = false;
       if (workerGeneration !== generation) return;
       const now = performance.now();
@@ -1006,8 +1142,31 @@ void main() {
     }
     const ratio = wall > 0 ? sim / wall : null;
     $("ratio").textContent = ratio == null ? "–" : ratio.toFixed(2);
+    $("simtime").textContent = snap.time.toFixed(2) + " s";
     const pill = $("ratio-pill");
-    if (state.paused) {
+    if (state.playback === "smooth") {
+      const s = speedNow();
+      $("ratio").textContent = speedLabel(s);
+      $("ratio-unit").textContent =
+        state.speed === "auto" ? "playback speed, auto" : "playback speed";
+      const now = performance.now();
+      const stalled = stallTimes.some((t) => now - t < 2000);
+      if (state.paused) {
+        pill.textContent = "paused";
+        pill.className = "pill";
+      } else if (stalled) {
+        pill.textContent = "stuttering";
+        pill.className = "pill warn";
+      } else {
+        pill.textContent = "smooth";
+        pill.className = "pill good";
+      }
+    } else {
+      $("ratio-unit").textContent = "simulated s per real s";
+    }
+    if (state.playback === "smooth") {
+      // set above
+    } else if (state.paused) {
       pill.textContent = "paused";
       pill.className = "pill";
     } else if (ratio == null) {
@@ -1062,7 +1221,9 @@ void main() {
   function frame(now) {
     const wall = Math.min((now - last) / 1000, 0.25);
     last = now;
-    if (!state.paused) {
+    if (!state.paused && state.playback === "smooth") {
+      if (!benching) smoothTick(wall);
+    } else if (!state.paused) {
       owed = Math.min(owed + wall, 1 / 20);
       if (worker) {
         if (!busy) {
@@ -1088,6 +1249,159 @@ void main() {
     frameNo++;
     requestAnimationFrame(frame);
   }
+
+  // One display tick of smooth playback: top up the worker's queue, then,
+  // when a 1/60 s slot has come round, show the next frame: a new keyframe
+  // every `keyEvery` slots and a blend of the last two between them.
+  function smoothTick(wall) {
+    const duration = (keyEvery * speedNow()) / 60;
+    if (worker) {
+      while (queue.length + inflight < BUFFER) {
+        worker.postMessage({
+          type: "exact",
+          duration,
+          measureVolume: requested++ % 10 === 0,
+        });
+        inflight++;
+      }
+    }
+    showAcc += wall;
+    if (showAcc < 1 / 60 - 0.004) return;
+    const slot = Math.min(showAcc, 2 / 60);
+    showAcc = Math.min(showAcc - 1 / 60, 1 / 60);
+    let shown = 0;
+    if (worker) {
+      // Between keyframes, blend on; at a keyframe, take the next one, or
+      // hold the picture if it isn't ready (a stall).
+      let advance = phase > 0;
+      if (phase === 0) {
+        const m = queue.shift();
+        if (m) {
+          prevKey = nextKey;
+          nextKey = m.snap;
+          data = m.data;
+          if (m.drift !== undefined) drift = m.drift;
+          keyDone = m.timing.done;
+          advance = true;
+        } else {
+          stallTimes.push(performance.now());
+        }
+      }
+      if (advance) {
+        phase++;
+        snap = blend(prevKey, nextKey, phase / keyEvery);
+        shown = keyDone / keyEvery;
+        // The very first keyframe has nothing to blend from: show it whole.
+        if (phase >= keyEvery || !prevKey) phase = 0;
+      }
+    } else {
+      const timing = local.simulateExact(speedNow() / 60);
+      push(solverMs, timing.ms);
+      push(stepsPer, timing.steps);
+      push(costs, [timing.ms, timing.done], 60);
+      snap = local.snapshot(false);
+      data = local.data;
+      if (requested++ % 10 === 0) drift = local.measureVolume();
+      shown = timing.done;
+      if (timing.ms > 1000 / 60) stallTimes.push(performance.now());
+    }
+    simTotal += shown;
+    window2s.push([shown, slot]);
+    let total = 0;
+    for (const [, w] of window2s) total += w;
+    while (total > 2 && window2s.length > 1) total -= window2s.shift()[1];
+    tuneSmooth();
+  }
+
+  // Once a second, plan from two measurements: what one solver step costs
+  // (90th percentile) and the step the CFL rule allows now. A keyframe of
+  // k slots and speed s needs ceil(k s / 60 / cflDt) steps, at least one,
+  // and must fit in k slots at 70% busy. The gap k is the smallest that fits
+  // one step; Auto takes the fastest preset that then fits. Judging from the
+  // measured cost per simulated second instead trapped Auto slow: at slow
+  // speeds every frame still pays a whole step, so the cost looked high and
+  // Auto went slower (the 1 cm paddle sank to 1/64x).
+  let lastAuto = 0,
+    benching = false;
+  const cflDts = [];
+  function plan(s, k, stepMs, dt) {
+    const steps = Math.max(1, Math.ceil((k * s) / 60 / dt - 1e-9));
+    return steps * stepMs <= 0.7 * k * (1000 / 60);
+  }
+  function tuneSmooth() {
+    const now = performance.now();
+    // The first plan comes as soon as 10 frames are timed, then once a second.
+    if (
+      stepCosts.length < 10 ||
+      !cflDts.length ||
+      (lastAuto && now - lastAuto < 1000)
+    )
+      return;
+    lastAuto = now;
+    const stepMs = percentile(stepCosts, 0.9);
+    const dt = percentile(cflDts, 0.1);
+    if (!worker) return;
+    const k = Math.max(1, Math.min(6, Math.ceil(stepMs / (0.7 * (1000 / 60)))));
+    let s = speedNow();
+    if (state.speed === "auto") {
+      s =
+        SPEEDS.find((x) => plan(x, k, stepMs, dt)) ?? SPEEDS[SPEEDS.length - 1];
+      // Any stall in the last second: one preset slower than the plan.
+      if (stallTimes.some((t) => now - t < 1000) && s >= autoSpeed) {
+        const i = SPEEDS.indexOf(autoSpeed);
+        s = SPEEDS[Math.min(i + 1, SPEEDS.length - 1)];
+      }
+    }
+    if (k !== keyEvery || (state.speed === "auto" && s !== autoSpeed)) {
+      keyEvery = k;
+      if (state.speed === "auto") autoSpeed = s;
+      sendDrag();
+    }
+  }
+
+  // Smooth playback without the screen: ticks of 1/60 s by timer, as the
+  // page would show them. Returns the speed held and the stalls.
+  window.benchSmooth = async function ({
+    scene: name = state.scene,
+    cell = state.cell,
+    speed = "auto",
+    seconds = 4,
+  } = {}) {
+    Object.assign(state, {
+      scene: name,
+      cell,
+      speed,
+      playback: "smooth",
+      paused: false,
+    });
+    benching = true;
+    restart();
+    const ticks = Math.round(seconds * 60);
+    let stalls0 = 0;
+    const t0 = performance.now();
+    let prev = t0;
+    for (let i = 0; i < ticks; i++) {
+      await new Promise((r) => setTimeout(r, 1000 / 60));
+      const now = performance.now();
+      if (i === 30) stalls0 = stallTimes.length;
+      smoothTick((now - prev) / 1000);
+      prev = now;
+    }
+    benching = false;
+    return {
+      scene: name,
+      cell,
+      speed:
+        state.speed === "auto"
+          ? "auto → " + speedLabel(autoSpeed)
+          : speedLabel(+state.speed),
+      stallsAfterHalfSecond: stallTimes.length - stalls0,
+      keyEvery,
+      simulated: +snap.time.toFixed(2),
+      wall: +((performance.now() - t0) / 1000).toFixed(2),
+      solverP50: +percentile(solverMs, 0.5).toFixed(1),
+    };
+  };
 
   // A synchronous run on this thread for measuring with the page hidden:
   // frames of 1/60 s back to back, solver and drawing timed, gl.finish() so
@@ -1193,6 +1507,25 @@ void main() {
     for (const x of scenesEl.children)
       x.setAttribute("aria-pressed", String(x === b));
     restart();
+  });
+  $("playback").addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    state.playback = b.dataset.play;
+    for (const x of $("playback").children)
+      x.setAttribute("aria-pressed", String(x === b));
+    $("speed").disabled = state.playback !== "smooth";
+    clearSmooth();
+    window2s.length = 0;
+    owed = 0;
+    lastReply = performance.now();
+    sendDrag();
+  });
+  $("speed").addEventListener("change", (e) => {
+    state.speed = e.target.value;
+    clearSmooth();
+    window2s.length = 0;
+    sendDrag();
   });
   $("views").addEventListener("click", (e) => {
     const b = e.target.closest("button");

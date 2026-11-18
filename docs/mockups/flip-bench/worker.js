@@ -1,8 +1,9 @@
 /*
  * The solver's own thread, so the page (and Desmos beside it) keeps the main
- * thread. The page sends restart, settings, drag and step messages; each step
- * and restart answers with a snapshot whose arrays are transferred, not
- * copied twice.
+ * thread. The page sends restart, settings, drag, step (real time: catch up
+ * with the clock) and exact (smooth playback: a fixed slice of simulated
+ * time) messages; each step, exact and restart answers with a snapshot whose
+ * arrays are transferred, not copied twice.
  */
 "use strict";
 importScripts("flip.js", "scenes.js", "engine.js");
@@ -22,13 +23,21 @@ self.onmessage = (e) => {
   } else if (m.type === "step") {
     const timing = engine.simulate(m.wall);
     send(timing, m.measureVolume ? engine.measureVolume() : undefined);
+  } else if (m.type === "exact") {
+    const timing = engine.simulateExact(m.duration);
+    send(
+      timing,
+      m.measureVolume ? engine.measureVolume() : undefined,
+      false,
+      "exact"
+    );
   }
 };
 
-function send(timing, drift, restarted = false) {
+function send(timing, drift, restarted = false, kind = "step") {
   const snap = engine.snapshot(true);
   self.postMessage(
-    { type: "frame", snap, data: engine.data, timing, drift, restarted },
+    { type: "frame", kind, snap, data: engine.data, timing, drift, restarted },
     [snap.pos.buffer, snap.vel.buffer, snap.p.buffer, snap.cellType.buffer]
   );
 }

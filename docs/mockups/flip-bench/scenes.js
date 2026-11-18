@@ -178,6 +178,13 @@ const SCENES = {
         h = f.h;
       const eta = (f.surfaceAt(h + 0.03) - f.surfaceAt(h + L - 0.03)) / 2;
       d.series.push([f.time, eta]);
+      // Keep the 10 s the chart shows: the worker sends this every frame,
+      // and over a long run an unbounded history grew the copy without end.
+      if (d.series.length > 700 && d.series[0][0] < f.time - 10)
+        d.series.splice(
+          0,
+          d.series.findIndex(([t]) => t >= f.time - 10)
+        );
       d.lo = Math.min(d.lo, eta);
       d.hi = Math.max(d.hi, eta);
       if (f.time >= d.next) {

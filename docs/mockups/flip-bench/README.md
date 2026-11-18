@@ -21,6 +21,9 @@ experiments.
 | `runup.cjs`        | Surge run-up on a wall against Liu et al. (2022)                          |
 | `energy.cjs`       | The dam break's energy budget and how high it climbs the far wall         |
 | `tune.cjs`         | Speed against quality for solver settings                                 |
+| `longrun.cjs`      | A simulated minute of each scene: cost, drift, energy, strays, data size  |
+| `trace.cjs`        | One scene second by second, for spikes a long run averages away           |
+| `who.cjs`          | The fastest particles and the cells around them                           |
 | `profile.cjs`      | Time per phase of a step                                                  |
 | `drop.jpg`         | The water view, 0.55 s after a blob lands in a pool                       |
 
@@ -100,14 +103,14 @@ Defaults: APIC, particles through the grid, conjugate gradient, CFL 1.
 | Dam break, mean error   | 7.3%                            | 9.3%         | Martin & Moyce          |
 | Dam break, late speed   | 1.42 √(gH)                      | 1.44 √(gH)   | 1.32 measured           |
 | Wall run-up, H 30 cm    | 2.10 H                          | 2.53 H       | 2.35 H, Liu et al. 2022 |
-| **Sloshing damping δ**  | **0.45 /s**                     | **0.066 /s** | **0.065 ± 0.015 /s**    |
+| **Sloshing damping δ**  | **0.45 /s**                     | **0.052 /s** | **0.065 ± 0.015 /s**    |
 | Still water after 3 s   | median 0.07, 99th 0.64 cm/s     |              | 0                       |
 | Still surface roughness | 2.3 mm (a fifth of a cell)      |              | 0                       |
 | Volume                  | level holds within 0.5 mm, 10 s |              |                         |
 | Paddle, tunnelling      | 0 particles inside the disc     |              | 0                       |
 
 Sloshing damping went from 0.6 /s (Müller's FLIP with particles moving by
-their own velocity) to 0.066 /s at 5 mm, inside the measurement. At 1 cm a
+their own velocity) to 0.052 /s at 5 mm (0.066 before the lid and spray fixes), inside the measurement. At 1 cm a
 wavelength is 100 cells and the wave still dies about seven times too fast,
 so realistic waves need 5 mm.
 
@@ -147,6 +150,82 @@ leaves the dam break as close (6.0%) and lowers the 1 cm run-up from 2.10 to
 At 5 mm, a step costs about 31 ms: pressure 29%, drift 22%, separation 18%,
 transfers 14%, advection 14%. Real time at 5 mm needs about four times that
 speed, which means the GPU (the LBM already runs there) or several workers.
+
+## Smooth playback
+
+Rafael asked (2026-11-18) for a mode where the calculations and drawing have
+time to happen, so everything moves smoothly. The Speed card now offers:
+
+- **Real time**: as before. It keeps pace with the clock, and when the
+  solver falls behind it drops frames.
+- **Smooth**: every frame shown is the same slice of simulated time,
+  speed/60 s. The worker computes them with no time limit and keeps four
+  ready; the page shows one every 1/60 s. When the next frame isn't ready,
+  the page holds the current one, and the card reads "stuttering".
+- **Speeds**: 1× down to 1/64×, or **Auto**.
+- **Keyframes**: one solver step can cost more than a display frame (28 ms
+  for the 5 mm paddle), and then no speed is slow enough, since every frame
+  pays at least one step. So the worker computes every k-th frame (k 1–6)
+  and the page draws the frames between by blending particle positions; a
+  stall holds the picture rather than blending backwards.
+- **Auto plans; it doesn't extrapolate**. Once a second it takes the solver's
+  cost per step (90th percentile) and the step the CFL rule allows. A
+  keyframe of k slots at speed s needs ceil(k s / 60 / dt) steps, at least
+  one, and must fit in k slots at 70% busy. The gap k is the smallest that
+  fits one step, and Auto takes the fastest preset that then fits. The first
+  version judged from the measured cost per simulated second instead, which
+  trapped it slow: at slow speeds each frame still pays a whole step, so the
+  cost looked higher and it went slower (the 1 cm paddle sank to 1/64×).
+  Any stall in the last second puts it one preset below the plan.
+- **Dragging** in slow motion divides the pointer's speed by the playback
+  speed, since the hand moves faster than the slowed water.
+
+`benchSmooth({ scene, cell, speed, seconds })` plays by timer with the page
+hidden, and reports the speed held, the keyframe gap and the stalls. On an
+otherwise idle machine, with Auto:
+
+| Scene           | Auto chose | Keyframe every | Stalls after the first ½ s |
+| --------------- | ---------- | -------------- | -------------------------- |
+| Paddle, 1 cm    | ¼×         | 1 frame        | 0                          |
+| Dam break, 1 cm | ¼×         | 1              | 0                          |
+| Sloshing, 5 mm  | ⅛×         | 3              | 0                          |
+| Dam break, 5 mm | 1/32×      | 2              | 0                          |
+| Paddle, 5 mm    | 1/32×      | 5              | 0                          |
+
+A fixed speed the machine can't sustain stutters, and the card says so. For
+example, the 5 mm dam break at ¼× stalls on most frames.
+
+## Long runs
+
+`longrun.cjs` runs each scene for a simulated minute through the page's
+own engine and scenes, as smooth playback does. At 1 cm:
+
+- **Cost per step holds**, with no slowdown as particles mix (paddle 6.19 ms
+  at 10 s, 6.09 at 60 s).
+- **Volume drift stays put**, under 1% in every scene, without creeping.
+- **Energy only falls** where nothing drives the water (dam 0.622 to
+  0.592 J/kg), and holds in still water (1.5352 to 1.5351).
+- **Nothing escapes**: no particle leaves the tank or turns non-finite.
+- **One leak, fixed**: the sloshing scene kept its whole history and the
+  worker sent it every frame, 155 KB by a minute. It keeps the 10 s the
+  chart shows now.
+
+At 5 mm the paddle **ran away**: by 6 s a few particles moved at 27 m/s
+against a disc at 0.75, and a frame took 77 steps (`trace.cjs`, `who.cjs`).
+They were splash held against the open top of the tank, and two things
+combined:
+
+- **The top row was never solved.** It was never part of the pressure solve,
+  and its neighbour above wrapped into the next column's floor. It is a lid
+  now; the scenes already reserved that row.
+- **Grid advection held spray in place.** A particle no water face reaches
+  keeps its own velocity, and gravity added to it every step. But it was
+  moved with the extrapolated grid velocity, close to zero up there, so it
+  stayed put while its velocity ran away. Such spray now flies on its own
+  velocity.
+
+After both fixes the 5 mm paddle peaks at 2–3 m/s over 8 s, and the 1 cm
+run-up rose to 2.27 H (2.35 measured).
 
 ## Open
 

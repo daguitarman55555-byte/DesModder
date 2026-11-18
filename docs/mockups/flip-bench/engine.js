@@ -58,13 +58,24 @@ class LiquidEngine {
    * thread stays responsive. Falling behind shows on the page as speed < 1.
    */
   simulate(wall) {
-    const target = Math.min(wall, 1 / 20);
+    return this.advanceBy(Math.min(wall, 1 / 20), 45);
+  }
+
+  /**
+   * Smooth playback: exactly `duration` of simulated time, however long it
+   * takes. The page plays these back at a steady rate, a few frames behind.
+   */
+  simulateExact(duration) {
+    return this.advanceBy(duration, Infinity);
+  }
+
+  advanceBy(target, budgetMs) {
     const o = this.opts();
     const { fluid, scene, data } = this;
     const t0 = performance.now();
     let done = 0;
     let steps = 0;
-    while (done < target - 1e-9 && performance.now() - t0 < 45) {
+    while (done < target - 1e-9 && performance.now() - t0 < budgetMs) {
       const dt = fluid.nextDt(target - done, o);
       this.applyDrag(dt);
       if (scene.beforeStep) scene.beforeStep(fluid, dt, data);
@@ -74,7 +85,13 @@ class LiquidEngine {
       steps++;
     }
     if (scene.measure) scene.measure(fluid, data);
-    return { ms: performance.now() - t0, done, steps };
+    // cflDt: the step the CFL rule allows now, for the page to plan with.
+    return {
+      ms: performance.now() - t0,
+      done,
+      steps,
+      cflDt: fluid.nextDt(Infinity, o),
+    };
   }
 
   applyDrag(dt) {
