@@ -357,7 +357,9 @@ const SCENES = {
       o.vy = 0;
       Object.assign(o, { active: true, x, y: 0.2, r: 0.06 });
     },
-    afterStep(f, dt, d) {
+    // Once a frame, not a step: on the GPU each look at the particles is a
+    // read back from the graphics card.
+    measure(f, d) {
       const o = f.obstacle;
       if (!o.active) return;
       let n = 0;

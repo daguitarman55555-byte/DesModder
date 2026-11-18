@@ -10,6 +10,7 @@ experiments.
 | ------------------ | ------------------------------------------------------------------------- |
 | `index.html`       | The bench page: seven scenes, three views, speed and accuracy readings    |
 | `flip.js`          | The solver, after Müller's Ten Minute Physics (MIT, `LICENSE-MULLER.txt`) |
+| `gpu-flip.js`      | The same solver in WebGL2 shaders, for cells below 1 cm (see The GPU)     |
 | `scenes.js`        | The scenes, shared by the page and the worker                             |
 | `engine.js`        | Runs a scene; the same code in the worker and on the page                 |
 | `worker.js`        | The solver's own thread, so the page and Desmos keep the main thread      |
@@ -149,7 +150,7 @@ leaves the dam break as close (6.0%) and lowers the 1 cm run-up from 2.10 to
 
 At 5 mm, a step costs about 31 ms: pressure 29%, drift 22%, separation 18%,
 transfers 14%, advection 14%. Real time at 5 mm needs about four times that
-speed, which means the GPU (the LBM already runs there) or several workers.
+speed; the GPU solver below gets most of the way.
 
 ## Smooth playback
 
@@ -227,9 +228,80 @@ combined:
 After both fixes the 5 mm paddle peaks at 2–3 m/s over 8 s, and the 1 cm
 run-up rose to 2.27 H (2.35 measured).
 
+## The GPU
+
+Rafael chose the GPU next (2026-11-18), so 5 mm runs faster than 1/32×.
+`gpu-flip.js` is `flip.js` step for step in WebGL2 fragment shaders, with
+particles and grid in float textures. It runs in the worker through an
+OffscreenCanvas. **Runs on** in the Solver card picks it: Auto takes the GPU
+below 1 cm, where it is faster, and the CPU at 1 cm and above. Scenes and the
+page read particles and grid as before; each is read back once a frame.
+
+What a shader cannot do the CPU's way, and what it does instead:
+
+- **Pressure.** MIC(0) works cell after cell. Red-black relaxation moves
+  pressure a cell a sweep, and with 50 sweeps the 5 mm paddle's water lost 16%
+  of its volume in half a second. Multigrid V-cycles alone cut the residual
+  only 25% a cycle, since the coarse grids see the free surface coarsely. So
+  it is conjugate gradient with one V-cycle as the preconditioner (McAdams,
+  Sifakis & Teran 2010), 4 iterations from the last step's pressure, and
+  every scalar stays on the GPU. From cold, 16 iterations reach 2.5e-4.
+- **Keep apart.** Each particle is written into a table of bins 0.4 h across,
+  about one each, and pushed from every neighbour within 2r at once. Without
+  this the water loses volume on either solver: in 1 s of the 5 mm paddle,
+  the CPU without it lost 2.95% and the GPU 3.15%; with it the GPU loses
+  0.43–0.71%, the CPU 0.45–0.77%.
+- **Particle to grid** adds by float blending, one 3×3 point a particle.
+  Drawn in seeding order, neighbours queued on the same pixels: 2.4 ms. Drawn
+  interleaved, 64 apart: 0.57 ms.
+- **The fastest particle**, which sizes the next step, was read at once, and
+  the CPU then waited for the GPU every step: 6.8 ms a 5 mm paddle step. It
+  is read into a buffer and collected a step or two later, plus what gravity
+  can have added since: 4.6 ms.
+
+Same scenes, GPU against CPU:
+
+| Check, 5 mm cells      | GPU      | CPU      | Measured             |
+| ---------------------- | -------- | -------- | -------------------- |
+| Dam break, mean error  | 9.8%     | 9.7%     | Martin & Moyce       |
+| Run-up peak            | 2.65 H   | 2.58 H   | 2.35 H (Liu 2022)    |
+| Run-up above H         | 0.65 s   | 0.63 s   | 0.80 s               |
+| Sloshing damping δ     | 0.066 /s | 0.052 /s | 0.065 ± 0.015 /s     |
+| Still water, 1 cm, 5 s | 3.0 cm/s | 3.4 cm/s | 0 (fastest particle) |
+| Dam break, 1 cm        | 7.6%     | 7.5%     | Martin & Moyce       |
+
+A minute of the 1 cm paddle matches the CPU's long run: drift −0.57 to
+−0.90% (CPU −0.58 to −0.95%), energy 1.67–1.69 J/kg (1.68–1.71), nothing
+outside the tank, and the cost per step flat (3.7–4.2 ms). Thirty seconds of
+the 5 mm paddle, where the CPU once ran away, hold too: fastest particle
+1.7–2.1 m/s, energy 1.67–1.73 J/kg, nothing outside, drift −0.6 to −1.2%.
+
+Speed, the pane hidden, solver only:
+
+| Scene           | GPU ms a step | CPU ms a step | GPU real time | CPU real time |
+| --------------- | ------------- | ------------- | ------------- | ------------- |
+| Paddle, 5 mm    | 6.4–8.3       | 30            | 0.36×         | 0.09×         |
+| Dam break, 5 mm | 3.9           | 13.9          | 0.29×         | –             |
+| Dam break, 1 cm | 3.1           | 4.1           | 0.70×         | 0.61×         |
+
+CPU step costs at 5 mm are from Node (`scene.cjs`-style runs of the page's
+engine); the browser was slower still. A GPU step is mostly the fixed cost
+of some 250 shader passes, about 10 µs each before any work, so it gains
+least on small scenes: at 1 cm it only just beats the CPU, which is why Auto
+keeps the CPU there.
+
+In smooth playback, Auto now holds the **5 mm paddle at ⅛×** with a keyframe
+every 4 frames and no stalls (CPU: 1/32×). The planner had to learn that a
+keyframe on the GPU costs about 7 ms besides its steps, for reading particles
+and grid back; counted as part of one step, that held it at 1/16×. The **5 mm
+dam break stays at 1/32×**: when its jet hits the wall the CFL step falls to
+0.74 ms, and a frame of those does not fit at 1/16×. CFL 2 would double it.
+
 ## Open
 
-- **5 mm in real time**: GPU or multi-worker; see Speed.
+- **5 mm in real time**: the GPU reaches 0.3×. What is left is the fixed
+  cost of shader passes (the pressure solve is about two thirds of a step),
+  and CFL 2, which is Rafael's call.
 - **Comparison engines.** Jean Timex's hybrid FLIP and the LBM have to go
   behind the same scenes to make this a comparison.
 - **Still surface roughness** against volume, above.

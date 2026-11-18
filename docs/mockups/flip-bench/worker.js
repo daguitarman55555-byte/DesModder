@@ -6,7 +6,7 @@
  * arrays are transferred, not copied twice.
  */
 "use strict";
-importScripts("flip.js", "scenes.js", "engine.js");
+importScripts("flip.js", "gpu-flip.js", "scenes.js", "engine.js");
 
 const engine = new LiquidEngine();
 
@@ -35,7 +35,9 @@ self.onmessage = (e) => {
 };
 
 function send(timing, drift, restarted = false, kind = "step") {
+  const t0 = performance.now();
   const snap = engine.snapshot(true);
+  timing.snapMs = performance.now() - t0;
   self.postMessage(
     { type: "frame", kind, snap, data: engine.data, timing, drift, restarted },
     [snap.pos.buffer, snap.vel.buffer, snap.p.buffer, snap.cellType.buffer]

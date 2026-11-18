@@ -14,6 +14,7 @@ class LiquidEngine {
       solver: "pcg",
       transfer: "apic",
       advect: "grid",
+      engine: "auto",
     };
     this.drag = { active: false, x: 0, y: 0, vx: 0, vy: 0 };
     this.generation = 0;
@@ -42,7 +43,18 @@ class LiquidEngine {
     const h = cell;
     const { W, H } = this.scene;
     const capacity = Math.ceil(((W * H) / (h * h)) * 3.3);
-    this.fluid = new FlipFluid({
+    if (this.fluid && this.fluid.dispose) this.fluid.dispose();
+    // The GPU solver where WebGL2 has float render targets, else the CPU's.
+    // Auto takes the GPU below 1 cm only: at 1 cm a GPU step (about 7 ms,
+    // most of it the fixed cost of some 250 shader passes) is no faster than
+    // the CPU's, and at 5 mm it is four times faster (README).
+    const want =
+      this.settings.engine === "gpu" ||
+      (this.settings.engine === "auto" && cell < 0.01 - 1e-9);
+    const gpu = want && typeof GpuFlip !== "undefined" && GpuFlip.available();
+    this.engineUsed = gpu ? "gpu" : "cpu";
+    const Solver = gpu ? GpuFlip : FlipFluid;
+    this.fluid = new Solver({
       width: W + 2 * h,
       height: H + h,
       h,
@@ -84,10 +96,14 @@ class LiquidEngine {
       done += dt;
       steps++;
     }
+    // On the GPU the steps are only queued until something waits for them.
+    if (fluid.finish) fluid.finish();
+    const stepMs = performance.now() - t0;
     if (scene.measure) scene.measure(fluid, data);
     // cflDt: the step the CFL rule allows now, for the page to plan with.
     return {
       ms: performance.now() - t0,
+      stepMs,
       done,
       steps,
       cflDt: fluid.nextDt(Infinity, o),
@@ -139,6 +155,7 @@ class LiquidEngine {
     const pick = (a, len) => (copy ? a.slice(0, len) : a);
     return {
       generation: this.generation,
+      engine: this.engineUsed,
       width: f.width,
       height: f.height,
       h: f.h,

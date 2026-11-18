@@ -387,6 +387,12 @@
           <option value="0.00625">6.25 mm</option>
           <option value="0.005">5 mm</option>
         </select>
+        <label for="engine">Runs on</label>
+        <select id="engine">
+          <option value="auto" selected>Auto: GPU below 1 cm</option>
+          <option value="gpu">GPU (WebGL2)</option>
+          <option value="cpu">CPU</option>
+        </select>
         <label for="cfl">CFL</label>
         <select id="cfl">
           <option value="1" selected>1 cell a step</option>
@@ -452,6 +458,7 @@
 </div>
 
 <script src="flip.js"></script>
+<script src="gpu-flip.js"></script>
 <script src="scenes.js"></script>
 <script src="engine.js"></script>
 <script>
@@ -472,6 +479,7 @@
     solver: "pcg",
     transfer: "apic",
     advect: "grid",
+    engine: "auto",
     playback: "realtime",
     speed: "auto",
   };
@@ -577,8 +585,9 @@
     window2s = [];
 
   function settings() {
-    const { cfl, flip, pressure, separate, solver, transfer, advect } = state;
-    return { cfl, flip, pressure, separate, solver, transfer, advect };
+    const { cfl, flip, pressure, separate, solver, transfer, advect, engine } =
+      state;
+    return { cfl, flip, pressure, separate, solver, transfer, advect, engine };
   }
 
   function restart() {
@@ -607,6 +616,7 @@
     lastAuto = 0;
     costs.length = 0;
     stepCosts.length = 0;
+    fixedCosts.length = 0;
     cflDts.length = 0;
     keyEvery = 1;
     $("about").textContent = scene.about;
@@ -653,7 +663,10 @@
         push(solverMs, m.timing.ms);
         push(stepsPer, m.timing.steps);
         push(costs, [m.timing.ms, m.timing.done], 60);
-        if (m.timing.steps) push(stepCosts, m.timing.ms / m.timing.steps, 30);
+        // Steps apart from the rest (reading back, measuring, packing).
+        const stepMs = m.timing.stepMs ?? m.timing.ms;
+        if (m.timing.steps) push(stepCosts, stepMs / m.timing.steps, 30);
+        push(fixedCosts, m.timing.ms - stepMs + (m.timing.snapMs || 0), 30);
         if (m.timing.cflDt) push(cflDts, m.timing.cflDt, 30);
         if (state.playback === "smooth" && !state.paused) queue.push(m);
         return;
@@ -1192,6 +1205,9 @@ void main() {
       ? fmt(percentile(stepsPer, 0.5), 0)
       : "–";
     $("count").textContent = snap.numParticles.toLocaleString();
+    $("thread").textContent =
+      (worker ? "a worker" : "this page") +
+      (snap.engine === "gpu" ? ", on the GPU" : ", on the CPU");
     const dd = $("drift");
     dd.textContent = drift == null ? "–" : (100 * drift).toFixed(2) + "%";
     dd.className =
@@ -1313,20 +1329,28 @@ void main() {
     tuneSmooth();
   }
 
-  // Once a second, plan from two measurements: what one solver step costs
-  // (90th percentile) and the step the CFL rule allows now. A keyframe of
-  // k slots and speed s needs ceil(k s / 60 / cflDt) steps, at least one,
-  // and must fit in k slots at 70% busy. The gap k is the smallest that fits
-  // one step; Auto takes the fastest preset that then fits. Judging from the
-  // measured cost per simulated second instead trapped Auto slow: at slow
-  // speeds every frame still pays a whole step, so the cost looked high and
-  // Auto went slower (the 1 cm paddle sank to 1/64x).
+  // Once a second, plan from three measurements: what one solver step costs
+  // and what a keyframe costs besides its steps (90th percentiles), and the
+  // step the CFL rule allows now. A keyframe of k slots and speed s needs
+  // ceil(k s / 60 / cflDt) steps, at least one, and must fit in k slots at
+  // 70% busy. Auto takes the fastest preset that fits some gap k up to 6,
+  // with the smallest such k. Judging from the measured cost per simulated
+  // second instead trapped Auto slow: at slow speeds every frame still pays
+  // a whole step, so the cost looked high and Auto went slower (the 1 cm
+  // paddle sank to 1/64x). The cost besides the steps matters on the GPU:
+  // reading particles and grid back takes some 7 ms a keyframe at 5 mm, and
+  // counting it as part of one step held the 5 mm paddle at 1/16x.
   let lastAuto = 0,
     benching = false;
-  const cflDts = [];
-  function plan(s, k, stepMs, dt) {
+  const cflDts = [],
+    fixedCosts = [];
+  function plan(s, k, stepMs, fixedMs, dt) {
     const steps = Math.max(1, Math.ceil((k * s) / 60 / dt - 1e-9));
-    return steps * stepMs <= 0.7 * k * (1000 / 60);
+    return fixedMs + steps * stepMs <= 0.7 * k * (1000 / 60);
+  }
+  function gapFor(s, stepMs, fixedMs, dt) {
+    for (let k = 1; k <= 6; k++) if (plan(s, k, stepMs, fixedMs, dt)) return k;
+    return null;
   }
   function tuneSmooth() {
     const now = performance.now();
@@ -1339,19 +1363,22 @@ void main() {
       return;
     lastAuto = now;
     const stepMs = percentile(stepCosts, 0.9);
+    const fixedMs = fixedCosts.length ? percentile(fixedCosts, 0.9) : 0;
     const dt = percentile(cflDts, 0.1);
     if (!worker) return;
-    const k = Math.max(1, Math.min(6, Math.ceil(stepMs / (0.7 * (1000 / 60)))));
     let s = speedNow();
-    if (state.speed === "auto") {
+    if (state.speed === "auto")
       s =
-        SPEEDS.find((x) => plan(x, k, stepMs, dt)) ?? SPEEDS[SPEEDS.length - 1];
+        SPEEDS.find((x) => gapFor(x, stepMs, fixedMs, dt)) ??
+        SPEEDS[SPEEDS.length - 1];
+    if (state.speed === "auto") {
       // Any stall in the last second: one preset slower than the plan.
       if (stallTimes.some((t) => now - t < 1000) && s >= autoSpeed) {
         const i = SPEEDS.indexOf(autoSpeed);
         s = SPEEDS[Math.min(i + 1, SPEEDS.length - 1)];
       }
     }
+    const k = gapFor(s, stepMs, fixedMs, dt) ?? 6;
     if (k !== keyEvery || (state.speed === "auto" && s !== autoSpeed)) {
       keyEvery = k;
       if (state.speed === "auto") autoSpeed = s;
@@ -1395,6 +1422,12 @@ void main() {
         state.speed === "auto"
           ? "auto → " + speedLabel(autoSpeed)
           : speedLabel(+state.speed),
+      engine: snap.engine,
+      plannedWith: {
+        stepMs: +percentile(stepCosts, 0.9).toFixed(1),
+        otherMs: +percentile(fixedCosts, 0.9).toFixed(1),
+        cflDtMs: +(1000 * percentile(cflDts, 0.1)).toFixed(2),
+      },
       stallsAfterHalfSecond: stallTimes.length - stalls0,
       keyEvery,
       simulated: +snap.time.toFixed(2),
@@ -1436,6 +1469,7 @@ void main() {
       scene: name,
       cell,
       cfl,
+      engine: snap.engine,
       solver: state.solver,
       particles: snap.numParticles,
       grid: `${snap.fNumX}x${snap.fNumY}`,
@@ -1481,6 +1515,7 @@ void main() {
     return {
       scene: name,
       cell,
+      engine: snap.engine,
       particles: snap.numParticles,
       simSecondsPerSecond: +(seconds / wall).toFixed(2),
       solverP50: +percentile(solverMs, 0.5).toFixed(2),
@@ -1536,6 +1571,10 @@ void main() {
   });
   $("cell").addEventListener("change", (e) => {
     state.cell = +e.target.value;
+    restart();
+  });
+  $("engine").addEventListener("change", (e) => {
+    state.engine = e.target.value;
     restart();
   });
   $("cfl").addEventListener("change", (e) => {
