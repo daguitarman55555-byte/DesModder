@@ -79,6 +79,7 @@ import {
   type Bindings,
 } from "../../../src/symbolic";
 import { renameIdentifier } from "../../../src/field-rendering/identifiers";
+export { placeAnswer } from "../../../src/plugins/physics-lab/graphNames";
 
 type Node = Aug.Latex.AnyChild;
 

@@ -80,6 +80,17 @@ New, and what is being judged:
     ζ(−1) = −1/12, ζ(3) as Apéry's constant, ψ(n) and ψ(n+½) through γ and
     ln 2, B(a,b) through Γ, Li₂(½) = π²/12 − (ln 2)²/2, W₀(a·eᵃ) = a,
     K(0) = π/2, and the Mittag-Leffler cases that are exponentials.
+  - **In the other add-ons:** Vector Tools fields, flows, 3D fields and Audio
+    Lab compile them to native GLSL (`src/field-rendering/specialGLSL.ts`),
+    each held to the JavaScript on the GPU in `fieldFunctions.int.test.ts`.
+    The Matrix tab evaluates them on the CPU. Vector Tools switches the typing
+    and the locked folder on as Physics Lab does (`src/symbolic/graphInstall.ts`,
+    counted, so turning one plugin off leaves them on for the other).
+  - **Add to graph never overwrites:** a constant the answer introduces (C,
+    C₁, C₂, K) that the graph already uses gets the next free name, C₁ then
+    C₂, renamed across every line the answer adds; a definition already
+    present is not added twice, and one whose name means something else is
+    renamed instead (`src/plugins/physics-lab/graphNames.ts`).
   - **Checking:** `node scripts/check-special-functions.cjs` compares every
     Desmos definition with the JavaScript value in live Desmos (worst
     relative error 3×10⁻¹⁴ on 2026-11-23).

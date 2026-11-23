@@ -28,6 +28,7 @@ import {
   scanDefinitions,
 } from "../../field-rendering/environment";
 import { mentions, renameIdentifier } from "../../field-rendering/identifiers";
+import { placeAnswer } from "./graphNames";
 import {
   evaluateExact,
   irreducibleParts,
@@ -1159,20 +1160,44 @@ export default class PhysicsLabSession {
     const constant = this.particular;
     const general = this.solution;
     if (constant?.ok !== true || general?.ok !== true) return;
-    this.plugin.calc.setExpression({
-      latex: general.solution.latex,
-      color: "#c74440",
-    });
-    this.plugin.calc.setExpression({ latex: constant.latex });
+    const [curve, value] = this.placeInGraph(
+      [general.solution.latex, constant.latex],
+      this.config.slope.fLatex
+    );
+    this.plugin.calc.setExpression({ latex: curve, color: "#c74440" });
+    this.plugin.calc.setExpression({ latex: value });
+  }
+
+  /**
+   * The graph's expression LaTeX, every line of it.
+   */
+  private graphLatex(): string[] {
+    return this.plugin.calc
+      .getExpressions()
+      .flatMap((item) =>
+        item.type === "expression" && typeof item.latex === "string"
+          ? [item.latex]
+          : []
+      );
+  }
+
+  /**
+   * An answer's lines with each constant it introduces renamed off any name
+   * the graph already uses — C becomes C_1 beside an existing C — so adding
+   * it never shares or overwrites anything (graphNames.ts).
+   */
+  private placeInGraph(items: string[], input: string): string[] {
+    return placeAnswer(items, this.graphLatex(), { input }).items;
   }
 
   insertSecondOrderSolution() {
     const result = this.secondOrderSolution;
     if (result?.ok !== true) return;
-    this.plugin.calc.setExpression({
-      latex: result.solution.latex,
-      color: "#c74440",
-    });
+    const [latex] = this.placeInGraph(
+      [result.solution.latex],
+      this.config.secondOrder.fLatex
+    );
+    this.plugin.calc.setExpression({ latex, color: "#c74440" });
   }
 
   /**
@@ -1186,8 +1211,12 @@ export default class PhysicsLabSession {
   insertSolution() {
     const result = this.solution;
     if (result?.ok !== true) return;
+    const [latex] = this.placeInGraph(
+      [result.solution.latex],
+      this.config.slope.fLatex
+    );
     this.plugin.calc.setExpression({
-      latex: result.solution.latex,
+      latex,
       // Desmos's red, because Desmos's first colour is the same blue the slope
       // field defaults to, and a solution curve indistinguishable from the
       // marks it is meant to be tangent to defeats the point of drawing both.
@@ -2141,20 +2170,14 @@ export default class PhysicsLabSession {
   insertDefinite() {
     const definite = this.integral?.definite;
     if (definite?.ok !== true) return;
-    const existing = this.plugin.calc
-      .getExpressions()
-      .flatMap((item) =>
-        item.type === "expression" && typeof item.latex === "string"
-          ? [item.latex]
-          : []
-      );
-    for (const definition of definite.definitions ?? []) {
-      const name = definition.latex.slice(0, definition.latex.indexOf("=") + 1);
-      if (!existing.some((latex) => latex.startsWith(name)))
-        this.plugin.calc.setExpression({ latex: definition.latex });
-    }
+    const placed = placeAnswer([definite.valueLatex], this.graphLatex(), {
+      input: this.config.integral.fLatex,
+      definitions: (definite.definitions ?? []).map((d) => d.latex),
+    });
+    for (const latex of placed.definitions)
+      this.plugin.calc.setExpression({ latex });
     this.plugin.calc.setExpression({
-      latex: definite.valueLatex,
+      latex: placed.items[0],
       color: "#388c46",
     });
   }
@@ -2190,7 +2213,11 @@ export default class PhysicsLabSession {
   insertIntegral() {
     const found = this.integral;
     if (found?.ok !== true) return;
-    this.plugin.calc.setExpression({ latex: found.latex, color: "#388c46" });
+    const [latex] = this.placeInGraph(
+      [found.latex],
+      this.config.integral.fLatex
+    );
+    this.plugin.calc.setExpression({ latex, color: "#388c46" });
   }
 
   /** Puts the series antiderivative into the graph, as its finite sum. */

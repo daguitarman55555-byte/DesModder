@@ -1057,6 +1057,21 @@
           Desmos.Colors.PURPLE,
           Desmos.Colors.ORANGE,
         ];
+        // Each constant the answer introduces gets a name nothing in the
+        // graph uses yet: C becomes C_1 beside an existing C (graphNames.ts),
+        // so adding an answer never shares or overwrites a constant.
+        const graphLatex = calc
+          .getExpressions()
+          .flatMap((e) => (typeof e.latex === "string" ? [e.latex] : []));
+        const flat = items.flatMap((g) => [g.latex ?? "", g.slider ?? ""]);
+        const placed = CalcEngine.placeAnswer(flat, graphLatex, {
+          input: mainField.latex(),
+        }).items;
+        items = items.map((g, i) => ({
+          ...g,
+          latex: g.latex ? placed[2 * i] : g.latex,
+          slider: g.slider ? placed[2 * i + 1] : g.slider,
+        }));
         for (const g of items) {
           if (g.slider) {
             const name = g.slider.split("=")[0];

@@ -8,6 +8,7 @@ import {
 import { compileExpression } from "./sim/strictEvaluate";
 import { emitExpressionGLSL, STRICT_GLSL_PRELUDE } from "./sim/strictGLSL";
 import { parseStrictExpression } from "./sim/strictParse";
+import { specialFunction } from "../symbolic";
 
 declare let Calc: CalcType;
 
@@ -305,6 +306,109 @@ testWithPageAndOpts(
         )
           mismatches.push(
             `${latex} at (${x}, ${y}): Desmos ${expected}, GPU ${gpu[k]}`
+          );
+      });
+    }
+    expect(mismatches).toEqual([]);
+  }
+);
+
+/**
+ * The special functions Desmos lacks, held to the JavaScript in
+ * src/symbolic/special.ts rather than to Desmos: in the graph each is a
+ * definition in a locked folder, and in a field it is native GLSL
+ * (specialGLSL.ts). [LaTeX, symbol, arguments at (x, y), tolerance].
+ */
+const SPECIAL_CASES: [
+  string,
+  string,
+  (x: number, y: number) => number[],
+  number,
+][] = [
+  [R`\Gamma\left(x+1.5\right)`, "Gamma", (x) => [x + 1.5], 1e-4],
+  [R`\Gamma_{r}\left(x\right)`, "Gamma_r", (x) => [x], 1e-4],
+  [
+    R`\operatorname{Beta}\left(x+2,y+1\right)`,
+    "Beta",
+    (x, y) => [x + 2, y + 1],
+    1e-4,
+  ],
+  [R`\psi\left(x\right)`, "psi", (x) => [x], 1e-4],
+  [R`\zeta\left(x+2.5\right)`, "zeta", (x) => [x + 2.5], 1e-4],
+  [R`\zeta\left(x-1\right)`, "zeta", (x) => [x - 1], 1e-4],
+  [R`\operatorname{erfc}\left(x\right)`, "erfc", (x) => [x], 1e-5],
+  [R`\operatorname{erfi}\left(y\right)`, "erfi", (_, y) => [y], 1e-5],
+  [R`\operatorname{Si}\left(5x\right)`, "Si", (x) => [5 * x], 1e-4],
+  [R`\operatorname{Si}\left(10x\right)`, "Si", (x) => [10 * x], 1e-4],
+  [R`\operatorname{Ci}\left(x+2\right)`, "Ci", (x) => [x + 2], 1e-4],
+  [R`\operatorname{Ci}\left(10x+15\right)`, "Ci", (x) => [10 * x + 15], 1e-4],
+  [R`\operatorname{Shi}\left(2x\right)`, "Shi", (x) => [2 * x], 1e-5],
+  [R`\operatorname{Chi}\left(x+2\right)`, "Chi", (x) => [x + 2], 1e-5],
+  [R`\operatorname{Ei}\left(3x\right)`, "Ei", (x) => [3 * x], 1e-5],
+  [R`\operatorname{Ei}\left(y\right)`, "Ei", (_, y) => [y], 1e-5],
+  [R`\operatorname{li}\left(x+2\right)`, "li", (x) => [x + 2], 1e-5],
+  // Not x - 1.1: at x = 2.1 that is 1 + 2e-16 in a double and just over 1,
+  // where Li2 is undefined, in a float.
+  [R`\operatorname{Li}_{2}\left(x-1.2\right)`, "Li_2", (x) => [x - 1.2], 1e-5],
+  [
+    R`\operatorname{Li}_{2}\left(y-0.5\right)`,
+    "Li_2",
+    (_, y) => [y - 0.5],
+    1e-5,
+  ],
+  [R`\operatorname{FresnelS}\left(2x\right)`, "FresnelS", (x) => [2 * x], 1e-4],
+  [R`\operatorname{FresnelC}\left(x\right)`, "FresnelC", (x) => [x], 1e-4],
+  [
+    R`\operatorname{BesselJ}\left(2,3x\right)`,
+    "BesselJ",
+    (x) => [2, 3 * x],
+    1e-4,
+  ],
+  [R`W_{0}\left(x+0.9\right)`, "W_0", (x) => [x + 0.9], 1e-5],
+  [R`W_{0}\left(5y+2.9\right)`, "W_0", (_, y) => [5 * y + 2.9], 1e-5],
+  [
+    R`\operatorname{EllipticK}\left(\frac{y}{2}\right)`,
+    "EllipticK",
+    (_, y) => [y / 2],
+    1e-5,
+  ],
+  [R`E_{ML}\left(0.5,1,x\right)`, "E_ML", (x) => [0.5, 1, x], 1e-4],
+  [R`E_{ML}\left(1,2,y\right)`, "E_ML", (_, y) => [1, 2, y], 1e-4],
+];
+
+testWithPageAndOpts(
+  "the field compiler draws the special functions Desmos lacks as special.ts computes them",
+  { timeout: 240000 },
+  async (driver) => {
+    const mismatches: string[] = [];
+    for (const [latex, symbol, args, tolerance] of SPECIAL_CASES) {
+      const compiled = compileFieldComponentToGLSL(latex, env);
+      if (!compiled.ok) {
+        mismatches.push(`${latex}: refused, ${compiled.error}`);
+        continue;
+      }
+      const gpu = await gpuValues(
+        driver,
+        compiled.glsl,
+        compiled.helpers.map((h) => h.glsl).join("\n")
+      );
+      if (!Array.isArray(gpu)) {
+        mismatches.push(`${latex}: GPU ${gpu.error}`);
+        continue;
+      }
+      const f = specialFunction(symbol)!;
+      POINTS.forEach(([x, y], k) => {
+        const expected = f.evaluate(...args(x, y));
+        const value = gpu[k];
+        if (Number.isNaN(expected) && Number.isNaN(value)) return;
+        if (
+          !(
+            Math.abs(value - expected) <=
+            tolerance * Math.max(1, Math.abs(expected))
+          )
+        )
+          mismatches.push(
+            `${latex} at (${x}, ${y}): special.ts ${expected}, GPU ${value}`
           );
       });
     }

@@ -11,6 +11,11 @@
  */
 
 import { canonicalIdentifier, IDENTIFIER_SOURCE } from "./identifiers";
+import {
+  SPECIAL_GLSL,
+  SPECIAL_GLSL_FUNCTIONS,
+  SPECIAL_SUBSCRIPTED,
+} from "./specialGLSL";
 
 /** A single-expression definition read out of the expression list. */
 export interface FunctionDefinition {
@@ -215,7 +220,7 @@ float vtNPr(float n, float r) {
   }
   return vtGamma(n + 1.0) / vtGamma(n - r + 1.0);
 }
-`;
+${SPECIAL_GLSL}`;
 
 const PI = "3.1415926535897932";
 
@@ -303,6 +308,9 @@ function medianOf(args: readonly string[]): string {
 }
 
 const FUNCTIONS: Record<string, FunctionSpec> = {
+  // Γ, ψ, ζ, Ei, Li₂ and the rest: Desmos lacks them, the graph defines them
+  // in a locked folder, and here they are native (specialGLSL.ts).
+  ...SPECIAL_GLSL_FUNCTIONS,
   sin: { arity: [1], emit: ([a]) => `sin(${a})` },
   cos: { arity: [1], emit: ([a]) => `cos(${a})` },
   tan: { arity: [1], emit: ([a]) => `tan(${a})` },
@@ -808,6 +816,20 @@ export function rewriteLatexSugar(latex: string): string {
   return out;
 }
 
+/**
+ * A subscript that makes a function name a different special function:
+ * `\Gamma_{r}` and `\operatorname{Li}_{2}`. Nothing is consumed otherwise.
+ */
+function specialSubscript(latex: string, at: number, name: string) {
+  const match = /^_(?:\{([A-Za-z0-9]+)\}|([A-Za-z0-9]))/.exec(latex.slice(at));
+  if (match !== null) {
+    const joined = `${name}_${match[1] ?? match[2]}`;
+    if (joined in SPECIAL_GLSL_FUNCTIONS)
+      return { name: joined, length: match[0].length };
+  }
+  return { name, length: 0 };
+}
+
 export function tokenize(source: string): Token[] {
   const latex = rewriteLatexSugar(source);
   const tokens: Token[] = [];
@@ -875,7 +897,9 @@ export function tokenize(source: string): Token[] {
         if (opMatch === null)
           throw new CompileError("Could not read an operator name.");
         i += opMatch[0].length;
-        tokens.push({ kind: "function", value: opMatch[1] });
+        const sub = specialSubscript(latex, i, opMatch[1]);
+        i += sub.length;
+        tokens.push({ kind: "function", value: sub.name });
         continue;
       }
       if (name === "frac" || name === "dfrac" || name === "tfrac") {
@@ -899,7 +923,10 @@ export function tokenize(source: string): Token[] {
         continue;
       }
       if (name in FUNCTIONS) {
-        tokens.push({ kind: "function", value: name });
+        // `\Gamma_{r}` is its own function, not Γ with a subscript.
+        const sub = specialSubscript(latex, i, name);
+        i += sub.length;
+        tokens.push({ kind: "function", value: sub.name });
         continue;
       }
       if (name in COMPARISONS) {
@@ -934,7 +961,17 @@ export function tokenize(source: string): Token[] {
       // outright as unreachable; they are now looked up in the environment the
       // caller read out of the expression list.
       const [identifier] = IDENTIFIER_AT_START.exec(latex.slice(i))!;
-      tokens.push({ kind: "variable", value: canonicalIdentifier(identifier) });
+      const canonical = canonicalIdentifier(identifier);
+      // W_{0}(z) and E_{ML}(a,b,z) are special functions when called.
+      if (
+        SPECIAL_SUBSCRIPTED.has(canonical) &&
+        /^\s*(?:\\left)?\(/.test(latex.slice(i + identifier.length))
+      ) {
+        tokens.push({ kind: "function", value: canonical });
+        i += identifier.length;
+        continue;
+      }
+      tokens.push({ kind: "variable", value: canonical });
       i += identifier.length;
       continue;
     }

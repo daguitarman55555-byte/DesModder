@@ -1220,6 +1220,19 @@ testWithPage(
       list.some((item) => item.type === "expression" && item.latex === answer)
     ).toBe(true);
 
+    // Added again, beside a graph that already uses C, it gets a C of its
+    // own rather than sharing that one (graphNames.ts).
+    await driver.click(ADD_INTEGRAL);
+    await driver.waitForSync();
+    const again = (await driver.getState()).expressions.list;
+    expect(
+      again.some(
+        (item) =>
+          item.type === "expression" &&
+          item.latex === answer.replace(/\+C$/, "+C_{1}")
+      )
+    ).toBe(true);
+
     // The check nothing offline can make. The unit tests differentiate the
     // answer with this extension's own engine, which would agree with itself
     // whatever it had done; here Desmos differentiates it and is asked whether

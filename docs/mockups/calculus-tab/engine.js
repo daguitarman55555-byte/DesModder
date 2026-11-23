@@ -683,6 +683,7 @@ var CalcEngine = (() => {
     defineSpecialFunctionsFor: () => defineSpecialFunctionsFor,
     init: () => init,
     installSpecialFunctionNames: () => installSpecialFunctionNames,
+    placeAnswer: () => placeAnswer,
     precise: () => precise,
     readGraph: () => readGraph
   });
@@ -20150,6 +20151,7 @@ var CalcEngine = (() => {
   var IDENTIFIER_AT_START = new RegExp(`^${IDENTIFIER_SOURCE}`);
   var COMMAND_AT_START = /^\\([A-Za-z]+)/;
   var canonicalIdentifier = (name) => name.replace(/_\{([A-Za-z0-9]*)\}/, "_$1");
+  var identifierLatex = (name) => name.replace(/_([A-Za-z0-9]+)$/, "_{$1}");
   function skipBraceGroup(latex, open) {
     let depth2 = 0;
     for (let i = open; i < latex.length; i++) {
@@ -20193,6 +20195,9 @@ var CalcEngine = (() => {
     }
     return found;
   }
+  function identifierNames(latex) {
+    return new Set(scanIdentifiers(latex).map((found) => found.name));
+  }
   function renameIdentifier(latex, from, to) {
     const wanted = canonicalIdentifier(from);
     const occurrences = scanIdentifiers(latex).filter(
@@ -20207,6 +20212,71 @@ var CalcEngine = (() => {
       cursor2 = occurrence.end;
     }
     return out + latex.slice(cursor2);
+  }
+
+  // src/plugins/physics-lab/graphNames.ts
+  var CONSTANT2 = /^[CKD](?:_[0-9]+)?$/;
+  function definedName(latex) {
+    const match = /^\s*([A-Za-z](?:_(?:\{[A-Za-z0-9]*\}|[A-Za-z0-9]))?)\s*(?:=|\\left\(|\()/.exec(
+      latex
+    );
+    return match === null ? void 0 : canonicalIdentifier(match[1]);
+  }
+  function placeAnswer(items, existing, options = {}) {
+    const taken = /* @__PURE__ */ new Set();
+    for (const latex of existing)
+      for (const name of identifierNames(latex))
+        taken.add(name);
+    const inInput = identifierNames(options.input ?? "");
+    const inAnswer = /* @__PURE__ */ new Set();
+    for (const latex of [...items, ...options.definitions ?? []])
+      for (const name of identifierNames(latex))
+        inAnswer.add(name);
+    const renamed = /* @__PURE__ */ new Map();
+    const fresh = (name) => {
+      const [base2] = name;
+      for (let k = 1; ; k++) {
+        const candidate = `${base2}_${k}`;
+        if (!taken.has(candidate) && !inAnswer.has(candidate)) {
+          taken.add(candidate);
+          inAnswer.add(candidate);
+          return candidate;
+        }
+      }
+    };
+    const definitions = [];
+    const existingSet = new Set(existing.map((latex) => latex.trim()));
+    for (const definition of options.definitions ?? []) {
+      if (existingSet.has(definition.trim()))
+        continue;
+      const name = definedName(definition);
+      if (name === void 0) {
+        const head = definition.slice(0, definition.indexOf("=") + 1);
+        if (head !== "" && existing.some((latex) => latex.startsWith(head)))
+          continue;
+      }
+      if (name !== void 0 && taken.has(name) && !inInput.has(name))
+        renamed.set(name, identifierLatex(fresh(name)));
+      definitions.push(definition);
+    }
+    for (const name of [...inAnswer]) {
+      if (renamed.has(name) || inInput.has(name))
+        continue;
+      if (!CONSTANT2.test(name) || !taken.has(name))
+        continue;
+      renamed.set(name, identifierLatex(fresh(name)));
+    }
+    const apply = (latex) => {
+      let out = latex;
+      for (const [from, to] of renamed)
+        out = renameIdentifier(out, from, to);
+      return out;
+    };
+    return {
+      items: items.map(apply),
+      definitions: definitions.map(apply),
+      renamed
+    };
   }
 
   // docs/mockups/calculus-tab/engine.ts

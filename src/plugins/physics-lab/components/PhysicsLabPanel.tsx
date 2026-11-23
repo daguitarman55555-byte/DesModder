@@ -17,6 +17,7 @@
  * scrolling popover is awkward to hit, and DCGView cannot drive its selection
  * through props anyway. Option lists are rows of one-click chips.
  */
+import { placeAnswer } from "../graphNames";
 import PhysicsLab from "..";
 import { Component, jsx } from "#DCGView";
 import { mathquillFocusHelper } from "#globals";
@@ -2338,12 +2339,14 @@ function insertExact(
         ? [item.latex]
         : []
     );
-  for (const definition of reading.definitions) {
-    const name = definition.latex.slice(0, definition.latex.indexOf("=") + 1);
-    if (!existing.some((latex) => latex.startsWith(name)))
-      physicsLab.calc.setExpression({ latex: definition.latex });
-  }
-  physicsLab.calc.setExpression({ latex: reading.latex });
+  // A definition already there is not added again, and one whose name the
+  // graph uses for something else is renamed rather than overwriting it.
+  const placed = placeAnswer([reading.latex], existing, {
+    definitions: reading.definitions.map((d) => d.latex),
+  });
+  for (const latex of placed.definitions)
+    physicsLab.calc.setExpression({ latex });
+  physicsLab.calc.setExpression({ latex: placed.items[0] });
 }
 
 function matchViewport(physicsLab: PhysicsLab) {

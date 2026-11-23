@@ -622,7 +622,18 @@ describe("a compiled T means what the evaluator means", () => {
     ["the fisheye", fisheye],
     ["a wave reading a slider", wave],
     ["an unknown function", fn("nope", id("x"))],
+    // The special functions Desmos lacks (special.ts), with one argument or
+    // two: compiled, they were NaN everywhere.
+    ["Ei, a special function", fn("Ei", id("x"))],
+    ["Gamma", fn("Gamma", binop("Add", id("y"), number(4)))],
+    ["BesselJ, two arguments", functionCall(id("BesselJ"), number(2), id("x"))],
   ])("%s", (_, tree) => {
+    if (tree.type === "FunctionCall" && tree.callee.symbol === "Ei")
+      // Not NaN on both sides: Ei(2) itself.
+      expect(compileNode(tree)({ x: 2 })).toBeCloseTo(4.954234356001891, 12);
+    if (tree.type === "FunctionCall" && tree.callee.symbol === "BesselJ")
+      // J₂(1.5), two arguments read as two.
+      expect(compileNode(tree)({ x: 1.5 })).toBeCloseTo(0.2320876721, 8);
     const compiled = compileNode(tree);
     for (const [x, y] of [
       [0, 0],

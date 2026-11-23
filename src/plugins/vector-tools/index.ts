@@ -1,4 +1,8 @@
 import type { ItemModel } from "#globals";
+import {
+  releaseSpecialFunctions,
+  useSpecialFunctions,
+} from "../../symbolic/graphInstall";
 import { PluginController } from "../PluginController";
 import { VectorToolsPanelFunc } from "./components/VectorToolsPanel";
 import { PresetWindow } from "./components/PresetWindow";
@@ -980,6 +984,9 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   };
 
   afterEnable() {
+    // Γ, Ei, Li₂ and the rest, typeable and defined, so a field can use
+    // them (src/symbolic/graphInstall.ts, field-rendering/specialGLSL.ts).
+    useSpecialFunctions("vector-tools", this.calc);
     this.ensureStoredConfigIsCurrent();
     this.syncPresetWindow();
     this.refreshArrows();
@@ -2175,6 +2182,7 @@ export default class VectorTools extends PluginController<VectorToolsSettings> {
   }
 
   afterDisable() {
+    releaseSpecialFunctions("vector-tools");
     this.calc.unobserve(LINES_VIEW_KEY);
     if (this.chargeLinesTimer !== undefined)
       clearTimeout(this.chargeLinesTimer);

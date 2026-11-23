@@ -12,6 +12,7 @@
  * handed to `evaluate` whole. A unit test holds the two to the same answers.
  */
 import { FUNCTIONS, evaluate } from "../../../symbolic/evaluate";
+import { specialFunction } from "../../../symbolic/special";
 import type { Node } from "../../../symbolic/tree";
 
 export type Compiled = (bindings: Record<string, number>) => number;
@@ -34,7 +35,15 @@ export function compileNode(node: Node): Compiled {
     }
     case "FunctionCall": {
       const fn = FUNCTIONS[node.callee.symbol];
-      if (fn === undefined || node.args.length !== 1) return () => NaN;
+      if (fn === undefined || node.args.length !== 1) {
+        // Γ, Ei, Li₂, BesselJ(n, z) and the rest (special.ts), whatever
+        // their number of arguments; anything else is undefined, as before.
+        const special = specialFunction(node.callee.symbol);
+        if (special === undefined || special.arity !== node.args.length)
+          return () => NaN;
+        const args = node.args.map(compileNode);
+        return (b) => special.evaluate(...args.map((arg) => arg(b)));
+      }
       const arg = compileNode(node.args[0]);
       return (b) => fn(arg(b));
     }

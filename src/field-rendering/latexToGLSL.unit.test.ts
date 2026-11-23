@@ -199,7 +199,8 @@ describe("LaTeX to GLSL field compiler", () => {
       ["y=x", "not an equation"],
       ["z", "is not defined"],
       ["\\sin\\left(x", "closing parenthesis"],
-      ["\\operatorname{zeta}\\left(x\\right)", "not supported"],
+      // Not ζ any more: that one is native now (specialGLSL.ts).
+      ["\\operatorname{potato}\\left(x\\right)", "not supported"],
       ["\\operatorname{real}\\left(x\\right)", "complex numbers"],
       ["\\arctan\\left(x,y,1\\right)", "cannot take 3 arguments"],
     ];
@@ -321,7 +322,7 @@ describe("Vector Tools LaTeX referencing the expression list", () => {
     // graph is the one the shader cannot follow.
     const result = compileFieldComponentToGLSL(
       "f\\left(x\\right)",
-      environment([], { f: [["u"], "\\operatorname{erfc}\\left(u\\right)"] })
+      environment([], { f: [["u"], "\\operatorname{potato}\\left(u\\right)"] })
     );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("not supported");
