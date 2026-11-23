@@ -1,0 +1,1074 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Calculus tab mock-up</title>
+    <!--
+      A mock-up of Physics Lab as one general Calculus tab, beside a Precise
+      values tab. It runs on a real Desmos graph (the public API, with Desmos's
+      demo key) and Physics Lab's real symbolic engines (engine.js, bundled
+      from src/ by build.mjs). Serve docs/mockups and open /calculus-tab/.
+    -->
+    <script src="https://www.desmos.com/api/v1.11/calculator.js?apiKey=dcb31709b452b1cf9dc26972add0fda6"></script>
+    <script src="engine.js"></script>
+    <style>
+      :root {
+        --ink: #222;
+        --muted: #666;
+        --faint: #999;
+        --line: #e2e2e2;
+        --panel: #fff;
+        --chip: #f4f4f4;
+        --chip-on: #2f72dc;
+        --proved: #2e7d32;
+        --numeric: #b26a00;
+        --series: #6042a6;
+        --refused: #777;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #fff;
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        color: var(--ink);
+      }
+      #calculator {
+        position: absolute;
+        inset: 0;
+      }
+
+      /* The pillbox button, as Desmos's own beside it. */
+      #pillbox {
+        position: absolute;
+        top: 150px;
+        right: 9px;
+        z-index: 10;
+      }
+      .pill-button {
+        width: 38px;
+        height: 38px;
+        border-radius: 5px;
+        background: #fff;
+        border: 1px solid #d6d6d6;
+        box-shadow: 0 0 6px rgba(0, 0, 0, 0.1);
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        color: #555;
+      }
+      .pill-button.open {
+        background: #f0f0f0;
+      }
+      .pill-button svg {
+        width: 24px;
+        height: 24px;
+      }
+
+      #panel {
+        position: absolute;
+        top: 56px;
+        right: 58px;
+        width: min(460px, calc(100vw - 74px));
+        max-height: calc(100vh - 72px);
+        overflow-y: auto;
+        background: var(--panel);
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        box-shadow: 0 2px 14px rgba(0, 0, 0, 0.18);
+        z-index: 10;
+        font-size: 14px;
+        line-height: 1.4;
+      }
+      #panel[hidden] {
+        display: none;
+      }
+      .panel-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px 8px;
+        border-bottom: 1px solid var(--line);
+      }
+      .panel-head svg {
+        width: 22px;
+        height: 22px;
+        color: #555;
+      }
+      .panel-title {
+        font-weight: 600;
+        font-size: 15px;
+        flex: 1;
+      }
+      .segmented {
+        display: flex;
+        margin: 10px 12px 4px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .segmented button {
+        flex: 1;
+        border: 0;
+        background: #fff;
+        padding: 6px 4px;
+        font: inherit;
+        cursor: pointer;
+        color: var(--muted);
+      }
+      .segmented button + button {
+        border-left: 1px solid #ccc;
+      }
+      .segmented button.on {
+        background: #e9eef8;
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .body {
+        padding: 6px 12px 14px;
+      }
+      .label {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 10px 0 4px;
+      }
+      .field {
+        display: block;
+        width: 100%;
+        min-height: 40px;
+        padding: 6px 8px;
+        border: 1px solid #bbb;
+        border-radius: 4px;
+        font-size: 18px;
+        background: #fff;
+      }
+      .field.small {
+        min-height: 30px;
+        font-size: 15px;
+        display: inline-block;
+        width: 90px;
+        vertical-align: middle;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+      .chip {
+        border: 1px solid #ccc;
+        background: var(--chip);
+        border-radius: 14px;
+        padding: 3px 10px;
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+        color: var(--ink);
+      }
+      .chip:hover {
+        border-color: #999;
+      }
+      .chip.on {
+        background: var(--chip-on);
+        border-color: var(--chip-on);
+        color: #fff;
+      }
+      .chip.op {
+        font-family: "Times New Roman", serif;
+        font-size: 15px;
+        font-style: italic;
+      }
+      .examples .chip {
+        background: #fff;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .readback {
+        margin-top: 10px;
+        padding: 8px 10px;
+        background: #f6f8fc;
+        border: 1px solid #dfe6f3;
+        border-radius: 6px;
+        font-size: 13.5px;
+      }
+      .readback .row {
+        margin-top: 6px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 5px;
+      }
+      .answer {
+        margin-top: 10px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 10px;
+      }
+      .verdict {
+        display: inline-block;
+        font-size: 11.5px;
+        font-weight: 600;
+        border-radius: 10px;
+        padding: 1px 8px;
+        color: #fff;
+        margin-bottom: 6px;
+      }
+      .verdict.proved {
+        background: var(--proved);
+      }
+      .verdict.numeric {
+        background: var(--numeric);
+      }
+      .verdict.series {
+        background: var(--series);
+      }
+      .verdict.refused {
+        background: var(--refused);
+      }
+      .result {
+        font-size: 20px;
+        overflow-x: auto;
+        padding: 4px 0;
+      }
+      .decimal {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .method {
+        margin-top: 6px;
+        color: #333;
+        font-size: 13.5px;
+      }
+      .steps {
+        margin-top: 8px;
+        border-top: 1px dashed var(--line);
+        padding-top: 6px;
+      }
+      .step {
+        margin: 6px 0;
+        font-size: 13px;
+      }
+      .step b {
+        font-weight: 600;
+      }
+      .step .math {
+        display: block;
+        margin-top: 2px;
+        font-size: 15px;
+        overflow-x: auto;
+      }
+      .notes {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+      .actions {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
+      .primary {
+        background: var(--chip-on);
+        color: #fff;
+        border: 0;
+        border-radius: 4px;
+        padding: 6px 12px;
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .primary:disabled {
+        background: #aac0e8;
+        cursor: default;
+      }
+      .error {
+        margin-top: 10px;
+        color: #a33;
+        font-size: 13px;
+      }
+      .hint {
+        margin-top: 10px;
+        color: var(--faint);
+        font-size: 13px;
+      }
+      .stepper button {
+        width: 24px;
+      }
+      .rows .r {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        font-size: 13px;
+        padding: 3px 0;
+        border-bottom: 1px dotted var(--line);
+      }
+      .rows .r small {
+        display: block;
+        color: var(--faint);
+      }
+
+      /* Mock-up controls, outside the product. */
+      #mock {
+        position: absolute;
+        right: 12px;
+        bottom: 12px;
+        z-index: 20;
+        background: #333;
+        color: #eee;
+        border-radius: 18px;
+        padding: 5px 8px 5px 14px;
+        font-size: 12.5px;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+      }
+      #mock button {
+        background: #4a4a4a;
+        border: 1px solid #666;
+        color: #eee;
+        border-radius: 12px;
+        width: 32px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+      }
+      #mock button.on {
+        background: #2f72dc;
+        border-color: #2f72dc;
+      }
+      #mock svg {
+        width: 18px;
+        height: 18px;
+      }
+      /* An indefinite ∫ has empty bound slots in Desmos's MathQuill; in
+         read-only maths they are hidden rather than drawn as boxes. */
+      .examples .dcg-mq-empty,
+      .answer .dcg-mq-empty,
+      .readback .dcg-mq-empty {
+        display: none !important;
+      }
+      #toast {
+        position: absolute;
+        left: 50%;
+        top: 14px;
+        transform: translateX(-50%);
+        background: #333;
+        color: #fff;
+        padding: 6px 14px;
+        border-radius: 4px;
+        font-size: 13px;
+        z-index: 30;
+        opacity: 0;
+        transition: opacity 0.2s;
+        pointer-events: none;
+      }
+      #toast.show {
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="calculator"></div>
+    <div id="pillbox">
+      <div class="pill-button" id="pill" title="Calculus Lab"></div>
+    </div>
+    <div id="panel" class="dcg-calculator-api-container-v1_11" hidden>
+      <!-- Desmos scopes its MathQuill styles under these two classes. -->
+      <div class="dcg-container">
+        <div class="panel-head">
+          <span id="head-icon"></span>
+          <span class="panel-title">Calculus Lab</span>
+        </div>
+        <div class="segmented" id="tabs">
+          <button data-tab="calculus" class="on">Calculus</button>
+          <button data-tab="precise">Precise values</button>
+        </div>
+        <div class="body" id="calculus-body"></div>
+        <div class="body" id="precise-body" hidden></div>
+      </div>
+    </div>
+    <div id="mock">
+      Icon:
+      <button data-icon="integral" title="Integral sign"></button>
+      <button data-icon="area" title="Area under a curve"></button>
+      <button data-icon="tangent" title="Tangent to a curve"></button>
+    </div>
+    <div id="toast"></div>
+
+    <script>
+      const ICONS = {
+        integral: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15.5 4.2c-.6-.9-1.6-1.2-2.4-.9-1 .4-1.3 1.6-1.4 2.9l-.5 11.6c-.1 1.4-.5 2.6-1.5 3-.8.3-1.8 0-2.4-.9"/></svg>`,
+        area: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M7 20v-7.5C9 9 11 7 13.5 7S18 9 19 11v9z" fill="currentColor" fill-opacity=".22" stroke="none"/><path d="M3 15c3-6 6-8.5 10.5-8.5 3 0 5.5 2 7.5 5"/><path d="M7 12.5V20M19 11v9" stroke-dasharray="2 2"/></svg>`,
+        tangent: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 18c4 0 6-2 8-6s4-7 10-7"/><path d="M4 21 19 6.5" stroke-width="1.4"/><circle cx="11.5" cy="12" r="1.8" fill="currentColor" stroke="none"/></svg>`,
+      };
+
+      const calc = Desmos.GraphingCalculator(
+        document.getElementById("calculator"),
+        { expressionsCollapsed: false, border: false }
+      );
+      calc.setExpressions([
+        { id: "a", latex: "a=2", sliderBounds: { min: 0, max: 5 } },
+        { id: "k", latex: "k=0.5", sliderBounds: { min: 0, max: 2 } },
+        {
+          id: "f",
+          latex: String.raw`f\left(x\right)=\sin\left(x\right)e^{-\frac{x}{4}}`,
+          color: Desmos.Colors.BLUE,
+        },
+      ]);
+      CalcEngine.init(Desmos, calc);
+
+      const MQ = Desmos.MathQuill.getInterface
+        ? Desmos.MathQuill.getInterface(2)
+        : Desmos.MathQuill;
+      const desmosConfig = calc.controller.getMathquillConfig({});
+      // Desmos's MathQuill has no lim command; as an operator name, typing
+      // "lim" upright works and its subscript holds the approach.
+      const mqConfig = {
+        ...desmosConfig,
+        autoOperatorNames: `${desmosConfig.autoOperatorNames} lim`,
+      };
+
+      const state = {
+        icon: "area",
+        tab: "calculus",
+        depth: "standard",
+        useSliderValues: false,
+        variable: undefined,
+        terms: 6,
+        preciseMode: "value",
+      };
+
+      // ---- helpers --------------------------------------------------------
+      const $ = (sel) => document.querySelector(sel);
+      const el = (tag, attrs = {}, ...kids) => {
+        const node = document.createElement(tag);
+        for (const [k, v] of Object.entries(attrs)) {
+          if (k === "class") node.className = v;
+          else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+          else node.setAttribute(k, v);
+        }
+        for (const kid of kids.flat())
+          if (kid !== undefined && kid !== null && kid !== false)
+            node.append(kid);
+        return node;
+      };
+      const math = (latex, cls = "math") => {
+        const span = el("span", { class: cls });
+        try {
+          MQ.StaticMath(span, mqConfig).latex(latex);
+        } catch {
+          span.textContent = latex;
+        }
+        return span;
+      };
+      /** Prose with \( … \) maths in it. */
+      const prose = (text) => {
+        const span = el("span");
+        text.split(/\\\((.+?)\\\)/).forEach((part, i) => {
+          span.append(i % 2 ? math(part, "") : part);
+        });
+        return span;
+      };
+      const toast = (text) => {
+        const t = $("#toast");
+        t.textContent = text;
+        t.classList.add("show");
+        clearTimeout(toast.timer);
+        toast.timer = setTimeout(() => t.classList.remove("show"), 1600);
+      };
+      const graphDefs = () =>
+        CalcEngine.readGraph(
+          calc
+            .getState()
+            .expressions.list.filter((e) => e.type === "expression" && e.latex)
+            .map((e) => e.latex)
+        );
+
+      // ---- icon and panel -------------------------------------------------
+      function renderIcon() {
+        $("#pill").innerHTML = ICONS[state.icon];
+        $("#head-icon").innerHTML = ICONS[state.icon];
+        document.querySelectorAll("#mock button").forEach((b) => {
+          b.innerHTML = ICONS[b.dataset.icon];
+          b.classList.toggle("on", b.dataset.icon === state.icon);
+        });
+      }
+      document.querySelectorAll("#mock button").forEach((b) =>
+        b.addEventListener("click", () => {
+          state.icon = b.dataset.icon;
+          renderIcon();
+        })
+      );
+      $("#pill").addEventListener("click", () => {
+        $("#panel").hidden = !$("#panel").hidden;
+        $("#pill").classList.toggle("open", !$("#panel").hidden);
+        if (!$("#panel").hidden) mainField.focus();
+      });
+      document.querySelectorAll("#tabs button").forEach((b) =>
+        b.addEventListener("click", () => {
+          state.tab = b.dataset.tab;
+          document
+            .querySelectorAll("#tabs button")
+            .forEach((x) => x.classList.toggle("on", x === b));
+          $("#calculus-body").hidden = state.tab !== "calculus";
+          $("#precise-body").hidden = state.tab !== "precise";
+          (state.tab === "calculus" ? mainField : preciseField).focus();
+        })
+      );
+
+      // ---- the Calculus tab -----------------------------------------------
+      const calcBody = $("#calculus-body");
+      const fieldSpan = el("span", { class: "field" });
+      const OPS = [
+        ["d/dx", "derivative", "Differentiate"],
+        ["∫", "integral", "Integrate"],
+        ["∫ₐᵇ", "definite", "Definite integral"],
+        ["lim", "limit", "Limit"],
+        ["Σ", "sum", "Sum a series"],
+        ["y′ =", "ode", "Differential equation"],
+      ];
+      const EXAMPLES = [
+        String.raw`\frac{d}{dt}\left(t^{2}\sin\left(at\right)\right)`,
+        String.raw`\int x\cos\left(x\right)dx`,
+        String.raw`\int e^{-u^{2}}du`,
+        String.raw`\int_{0}^{1}\frac{\ln\left(1+x\right)}{x}dx`,
+        String.raw`\lim_{h\to0}\frac{f\left(1+h\right)-f\left(1\right)}{h}`,
+        String.raw`\lim_{x\to\infty}\left(1+\frac{1}{x}\right)^{x}`,
+        String.raw`\frac{dp}{dt}=kp`,
+        String.raw`y''=-4y`,
+        String.raw`r^{3}\cos\left(\theta\right)`,
+      ];
+      const output = el("div");
+      calcBody.append(
+        el(
+          "div",
+          { class: "label" },
+          "Type anything Desmos can read, or start from an operation:"
+        ),
+        el(
+          "div",
+          { class: "chips" },
+          OPS.map(([label, op, title]) =>
+            el(
+              "button",
+              { class: "chip op", title, onclick: () => applyOperation(op) },
+              label
+            )
+          )
+        ),
+        el("div", { style: "margin-top:8px" }, fieldSpan),
+        output,
+        el("div", { class: "label" }, "Try:"),
+        el(
+          "div",
+          { class: "chips examples" },
+          EXAMPLES.map((latex) =>
+            el(
+              "button",
+              {
+                class: "chip",
+                onclick: () => {
+                  state.variable = undefined;
+                  mainField.latex(latex);
+                  mainField.focus();
+                },
+              },
+              math(latex, "")
+            )
+          )
+        )
+      );
+
+      let timer;
+      const mainField = MQ.MathField(fieldSpan, {
+        ...mqConfig,
+        handlers: {
+          edit: () => {
+            clearTimeout(timer);
+            timer = setTimeout(renderCalculus, 120);
+          },
+        },
+      });
+
+      /** Wraps what is typed in an operation's notation, so it is visible. */
+      function applyOperation(op, variableLatex) {
+        const body = mainField.latex().trim();
+        const analysis = body
+          ? CalcEngine.analyze(body, graphDefs(), options())
+          : undefined;
+        const v =
+          variableLatex ??
+          analysis?.variableLatex ??
+          (analysis?.candidates.length === 1
+            ? analysis.candidates[0].latex
+            : undefined) ??
+          "x";
+        const wrapped = body
+          ? /^[\w\\{}^]+$/.test(body)
+            ? body
+            : String.raw`\left(${body}\right)`
+          : "";
+        const templates = {
+          derivative: String.raw`\frac{d}{d${v}}${wrapped}`,
+          integral: String.raw`\int ${body}d${v}`,
+          definite: String.raw`\int_{0}^{1}${body}d${v}`,
+          limit: String.raw`\lim_{${v}\to0}${body}`,
+          sum: String.raw`\sum_{n=1}^{\infty}${body || String.raw`\frac{1}{n^{2}}`}`,
+          ode: body ? String.raw`y'=${body}` : "y'=",
+        };
+        state.variable = undefined;
+        mainField.latex(templates[op]);
+        mainField.focus();
+      }
+
+      const options = () => ({
+        useSliderValues: state.useSliderValues,
+        depth: state.depth,
+        seriesTerms: state.terms,
+        variable: state.variable,
+      });
+
+      const VERDICT_CLASS = {
+        Proved: "proved",
+        "Proved, checked by differentiating back": "proved",
+        "Checked numerically, not proved": "numeric",
+        "Series answer": "series",
+        "Not decided": "refused",
+        Refused: "refused",
+      };
+
+      function renderCalculus() {
+        output.replaceChildren();
+        const latex = mainField.latex();
+        if (!latex.trim()) {
+          output.append(
+            el(
+              "div",
+              { class: "hint" },
+              "Any letters work: the variable comes from the notation (d/dt, du, h→0), or from the one free letter, or you pick it."
+            )
+          );
+          return;
+        }
+        let a;
+        const started = performance.now();
+        try {
+          a = CalcEngine.analyze(latex, graphDefs(), options());
+        } catch (error) {
+          output.append(el("div", { class: "error" }, String(error)));
+          return;
+        }
+        const took = performance.now() - started;
+        if (a.status === "error") {
+          output.append(el("div", { class: "error" }, a.error));
+          return;
+        }
+
+        // What was understood, before any answer.
+        const readback = el("div", { class: "readback" }, prose(a.summary));
+        if (a.status === "choose" && a.candidates.length > 1) {
+          readback.append(
+            el(
+              "div",
+              { class: "row" },
+              "With respect to:",
+              a.candidates.map((c) =>
+                el(
+                  "button",
+                  {
+                    class: "chip" + (state.variable === c.name ? " on" : ""),
+                    onclick: () => {
+                      state.variable = c.name;
+                      renderCalculus();
+                    },
+                  },
+                  math(c.latex, "")
+                )
+              )
+            )
+          );
+        }
+        if (
+          a.status === "choose" &&
+          (a.candidates.length <= 1 || state.variable)
+        ) {
+          const v =
+            a.candidates.find((c) => c.name === state.variable)?.latex ??
+            a.candidates[0]?.latex;
+          readback.append(
+            el(
+              "div",
+              { class: "row" },
+              "Do:",
+              OPS.map(([label, op, title]) =>
+                el(
+                  "button",
+                  { class: "chip", onclick: () => applyOperation(op, v) },
+                  title
+                )
+              )
+            )
+          );
+        }
+        if (a.sliders.length > 0) {
+          readback.append(
+            el(
+              "div",
+              { class: "row" },
+              "Sliders:",
+              el(
+                "button",
+                {
+                  class: "chip" + (state.useSliderValues ? "" : " on"),
+                  onclick: () => {
+                    state.useSliderValues = false;
+                    renderCalculus();
+                  },
+                },
+                "keep as letters"
+              ),
+              el(
+                "button",
+                {
+                  class: "chip" + (state.useSliderValues ? " on" : ""),
+                  onclick: () => {
+                    state.useSliderValues = true;
+                    renderCalculus();
+                  },
+                },
+                "use current values"
+              )
+            )
+          );
+        }
+        output.append(readback);
+        if (a.status !== "ok" || !a.answer) return;
+
+        const ans = a.answer;
+        const card = el(
+          "div",
+          { class: "answer" },
+          el(
+            "span",
+            { class: "verdict " + (VERDICT_CLASS[ans.verdict] ?? "refused") },
+            ans.verdict
+          )
+        );
+        if (ans.latex)
+          card.append(el("div", { class: "result" }, math(ans.latex, "")));
+        if (ans.decimal && ans.decimal !== ans.latex)
+          card.append(el("div", { class: "decimal" }, `≈ ${ans.decimal}`));
+        card.append(el("div", { class: "method" }, prose(ans.method)));
+
+        if (a.operation === "derivative") {
+          card.append(
+            el(
+              "div",
+              { class: "actions" },
+              "Explain:",
+              [
+                ["simple", "Answer only"],
+                ["standard", "Main steps"],
+                ["every", "Every step"],
+              ].map(([d, label]) =>
+                el(
+                  "button",
+                  {
+                    class: "chip" + (state.depth === d ? " on" : ""),
+                    onclick: () => {
+                      state.depth = d;
+                      renderCalculus();
+                    },
+                  },
+                  label
+                )
+              )
+            )
+          );
+        }
+        if (ans.steps.length > 0)
+          card.append(
+            el(
+              "div",
+              { class: "steps" },
+              ans.steps.map((s) =>
+                el(
+                  "div",
+                  { class: "step", style: `margin-left:${s.depth * 14}px` },
+                  el("b", {}, s.title),
+                  s.detail ? [" — ", prose(s.detail)] : "",
+                  s.latex ? math(s.latex) : ""
+                )
+              )
+            )
+          );
+        if (ans.notes.length)
+          card.append(
+            el(
+              "div",
+              { class: "notes" },
+              ans.notes.map((n) => el("div", {}, prose(n)))
+            )
+          );
+
+        const actions = el("div", { class: "actions" });
+        if (ans.verdict === "Series answer") {
+          actions.append(
+            "Terms:",
+            el(
+              "span",
+              { class: "stepper" },
+              el(
+                "button",
+                {
+                  class: "chip",
+                  onclick: () => {
+                    state.terms = Math.max(2, state.terms - 1);
+                    renderCalculus();
+                  },
+                },
+                "−"
+              ),
+              ` ${state.terms} `,
+              el(
+                "button",
+                {
+                  class: "chip",
+                  onclick: () => {
+                    state.terms = Math.min(40, state.terms + 1);
+                    renderCalculus();
+                  },
+                },
+                "+"
+              )
+            )
+          );
+        }
+        const add = el(
+          "button",
+          { class: "primary", onclick: () => addToGraph(ans.graph) },
+          "Add to graph"
+        );
+        if (!ans.graph.some((g) => g.latex)) add.disabled = true;
+        actions.append(
+          add,
+          el("span", { class: "decimal" }, `${took.toFixed(0)} ms`)
+        );
+        card.append(actions);
+        output.append(card);
+      }
+
+      let added = 0;
+      function addToGraph(items) {
+        const colors = [
+          Desmos.Colors.RED,
+          Desmos.Colors.GREEN,
+          Desmos.Colors.PURPLE,
+          Desmos.Colors.ORANGE,
+        ];
+        for (const g of items) {
+          if (g.slider) {
+            const name = g.slider.split("=")[0];
+            const exists = calc
+              .getState()
+              .expressions.list.some((e) => e.latex?.startsWith(`${name}=`));
+            if (!exists)
+              calc.setExpression({
+                id: `s${added}${name}`,
+                latex: g.slider,
+                sliderBounds: { min: -5, max: 5 },
+              });
+          }
+          if (g.latex)
+            calc.setExpression({
+              id: `r${added++}`,
+              latex: g.latex,
+              color: colors[added % colors.length],
+            });
+        }
+        toast("Added to the graph");
+      }
+
+      // ---- the Precise values tab -----------------------------------------
+      const preciseBody = $("#precise-body");
+      const preciseSpan = el("span", { class: "field" });
+      const preciseOut = el("div");
+      const PRECISE_EXAMPLES = {
+        value: [
+          "1.6449340668",
+          "0.693147180560",
+          "0.915965594177",
+          "2.6651441427",
+          "3.14159265359",
+        ],
+        sum: [
+          String.raw`\sum_{n=1}^{\infty}\frac{1}{n^{2}}`,
+          String.raw`\sum_{n=1}^{\infty}\frac{\left(-1\right)^{n+1}}{n}`,
+          String.raw`\sum_{k=0}^{\infty}\frac{\left(-1\right)^{k}}{2k+1}`,
+          String.raw`\sum_{n=1}^{\infty}\frac{1}{n^{3}}`,
+          String.raw`\sum_{n=1}^{\infty}\frac{n}{n+1}`,
+        ],
+      };
+      const preciseModes = el("div", { class: "chips" });
+      const preciseExamples = el("div", { class: "chips examples" });
+      preciseBody.append(
+        el("div", { class: "label" }, "What do you have?"),
+        preciseModes,
+        el("div", { style: "margin-top:8px" }, preciseSpan),
+        preciseOut,
+        el("div", { class: "label" }, "Try:"),
+        preciseExamples
+      );
+      let preciseTimer;
+      const preciseField = MQ.MathField(preciseSpan, {
+        ...mqConfig,
+        handlers: {
+          edit: () => {
+            clearTimeout(preciseTimer);
+            preciseTimer = setTimeout(renderPrecise, 200);
+          },
+        },
+      });
+      function renderPreciseChrome() {
+        preciseModes.replaceChildren(
+          ...[
+            ["value", "A value (a decimal)"],
+            ["sum", "A sum or series"],
+          ].map(([mode, label]) =>
+            el(
+              "button",
+              {
+                class: "chip" + (state.preciseMode === mode ? " on" : ""),
+                onclick: () => {
+                  state.preciseMode = mode;
+                  preciseField.latex("");
+                  renderPreciseChrome();
+                  renderPrecise();
+                  preciseField.focus();
+                },
+              },
+              label
+            )
+          )
+        );
+        preciseExamples.replaceChildren(
+          ...PRECISE_EXAMPLES[state.preciseMode].map((latex) =>
+            el(
+              "button",
+              {
+                class: "chip",
+                onclick: () => {
+                  preciseField.latex(latex);
+                  preciseField.focus();
+                },
+              },
+              math(latex, "")
+            )
+          )
+        );
+      }
+      function renderPrecise() {
+        preciseOut.replaceChildren();
+        const latex = preciseField.latex();
+        if (!latex.trim()) {
+          preciseOut.append(
+            el(
+              "div",
+              { class: "hint" },
+              state.preciseMode === "value"
+                ? "Paste the digits you have. The more digits, the more a match means."
+                : "Type the series. Partial sums are accelerated toward the limit, then the limit is matched against known constants."
+            )
+          );
+          return;
+        }
+        const started = performance.now();
+        const r = CalcEngine.precise(latex, state.preciseMode, graphDefs());
+        const took = performance.now() - started;
+        if (r.status === "error") {
+          preciseOut.append(el("div", { class: "error" }, r.error));
+          return;
+        }
+        const card = el("div", { class: "answer" });
+        const proved = r.verdict.startsWith("Diverges, proved");
+        card.append(
+          el(
+            "span",
+            {
+              class:
+                "verdict " +
+                (proved ? "proved" : r.closedLatex ? "numeric" : "refused"),
+            },
+            proved
+              ? "Proved"
+              : r.closedLatex
+                ? "Matches, not proved"
+                : "No match"
+          )
+        );
+        if (r.closedLatex)
+          card.append(
+            el(
+              "div",
+              { class: "result" },
+              math(`\\approx ${r.closedLatex}`, "")
+            )
+          );
+        card.append(
+          el(
+            "div",
+            { class: "rows" },
+            r.rows.map((row) =>
+              el(
+                "div",
+                { class: "r" },
+                el(
+                  "span",
+                  {},
+                  row.label,
+                  row.note ? el("small", {}, row.note) : ""
+                ),
+                math(row.latex, "")
+              )
+            )
+          )
+        );
+        card.append(el("div", { class: "method" }, r.verdict));
+        const add = el(
+          "button",
+          {
+            class: "primary",
+            onclick: () =>
+              addToGraph([{ latex: `c_{${added}}=${r.closedLatex}` }]),
+          },
+          "Add to graph"
+        );
+        if (!r.closedLatex) add.disabled = true;
+        card.append(
+          el(
+            "div",
+            { class: "actions" },
+            add,
+            el("span", { class: "decimal" }, `${took.toFixed(0)} ms`)
+          )
+        );
+        preciseOut.append(card);
+      }
+
+      renderIcon();
+      renderPreciseChrome();
+      renderPrecise();
+      renderCalculus();
+      // Open on an example, so the first look is a working answer.
+      $("#pill").click();
+      mainField.latex(EXAMPLES[0]);
+    </script>
+  </body>
+</html>

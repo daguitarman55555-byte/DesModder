@@ -16,3 +16,6 @@ docs/mockups/vector-3d-arrows.html
 # Agent worktrees: whole checkouts of this repository, excluded from git
 # through .git/info/exclude, which Prettier does not read.
 .claude/worktrees/
+
+# Built from docs/mockups/calculus-tab/engine.ts by its build.mjs
+docs/mockups/calculus-tab/engine.js
