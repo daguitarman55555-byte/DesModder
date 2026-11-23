@@ -21,7 +21,17 @@ module.exports = {
     "\\.grammar": "<rootDir>/jest-config/lezer-transformer.mjs",
     "\\.replacements": "<rootDir>/jest-config/replacements-transformer.mjs",
   },
-  testPathIgnorePatterns: ["<rootDir>/node_modules/", "dist", "dist-ts"],
+  // `.claude/` holds whole checkouts of this repository (agent worktrees).
+  // Left unignored, Jest ran every one of their tests as well as ours — more
+  // than twice the suites, against stale code — and its module map saw two
+  // packages named @desmodder/text-mode-core.
+  testPathIgnorePatterns: [
+    "<rootDir>/node_modules/",
+    "<rootDir>/.claude/",
+    "dist",
+    "dist-ts",
+  ],
+  modulePathIgnorePatterns: ["<rootDir>/.claude/"],
   moduleDirectories: ["node_modules", "src"],
   transformIgnorePatterns: [
     "setup-unit",

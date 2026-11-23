@@ -60,7 +60,8 @@ testWithPage(
     expect(afterGenerate).toEqual(expect.arrayContaining([WAVEFORM, SPECTRUM]));
     expect(
       afterGenerate.filter((id) => id?.startsWith(`${NAMESPACE}_`))
-    ).toHaveLength(20);
+      // The same count vector-tools.int.test.ts holds the generator to.
+    ).toHaveLength(28);
 
     // And removing the field takes only the field.
     await driver.click(REMOVE);
