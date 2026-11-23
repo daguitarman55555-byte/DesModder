@@ -1,0 +1,3773 @@
+{
+  "description": "Mathematical references for planned adapters, not an asserted current engine pass list. Generated variants share their family proof.",
+  "cases": [
+    {
+      "id": "integral-monomial-01",
+      "operation": "integral",
+      "family": "monomial",
+      "domain": "real",
+      "input": "integrate(q^1,q)",
+      "expected": {
+        "verdict": "proved",
+        "result": "q^2/2+C"
+      },
+      "reference": "Differentiate by the power rule."
+    },
+    {
+      "id": "integral-reciprocal-shift-01",
+      "operation": "integral",
+      "family": "reciprocal-shift",
+      "domain": "w != 1",
+      "input": "integrate(1/(w-1),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(abs(w-1))+C"
+      },
+      "reference": "Differentiate on each connected component. Integration constants can differ."
+    },
+    {
+      "id": "integral-quadratic-reciprocal-01",
+      "operation": "integral",
+      "family": "quadratic-reciprocal",
+      "domain": "real",
+      "input": "integrate(1/(w^2+1),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "atan(w/1)/1+C"
+      },
+      "reference": "Differentiate arctangent or substitute w=a*t."
+    },
+    {
+      "id": "integral-exponential-gaussian-01",
+      "operation": "integral",
+      "family": "exponential-gaussian",
+      "domain": "real",
+      "input": "integrate(exp(-1*z^2),z)",
+      "expected": {
+        "verdict": "proved",
+        "result": "sqrt(pi)/(2*sqrt(1))*erf(sqrt(1)*z)+C"
+      },
+      "reference": "DLMF 7.2 definition of erf and chain rule."
+    },
+    {
+      "id": "integral-improper-gamma-01",
+      "operation": "integral",
+      "family": "improper-gamma",
+      "domain": "t >= 0",
+      "input": "integrate(t^1*exp(-t),t,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "1!"
+      },
+      "reference": "Gamma recurrence or integration by parts. Exponential decay gives vanishing upper endpoint."
+    },
+    {
+      "id": "integral-log-subtraction-01",
+      "operation": "integral",
+      "family": "log-subtraction",
+      "domain": "0 <= x <= 1/1",
+      "input": "integrate(ln(1+x)/x,x,0,1/1)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Li_2(-1/1)"
+      },
+      "reference": "DLMF 25.12 dilogarithm derivative with the removable endpoint extended by continuity."
+    },
+    {
+      "id": "limit-removable-factor-01",
+      "operation": "limit",
+      "family": "removable-factor",
+      "domain": "real",
+      "input": "limit((x^2-1)/(x-1),x,1)",
+      "expected": {
+        "verdict": "proved",
+        "result": "2"
+      },
+      "reference": "Factor numerator and cancel on a punctured neighborhood."
+    },
+    {
+      "id": "limit-directional-pole-01",
+      "operation": "limit",
+      "family": "directional-pole",
+      "domain": "real",
+      "input": "limit(-1/(x-3),x,3,right)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Infinity"
+      },
+      "reference": "Denominator is eventually positive, with modulus tending to zero."
+    },
+    {
+      "id": "limit-sinc-scale-01",
+      "operation": "limit",
+      "family": "sinc-scale",
+      "domain": "real",
+      "input": "limit(sin(1*t)/t,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "1"
+      },
+      "reference": "Use sin(q)/q→1 by squeeze argument."
+    },
+    {
+      "id": "limit-cos-second-order-01",
+      "operation": "limit",
+      "family": "cos-second-order",
+      "domain": "real",
+      "input": "limit((1-cos(1*t))/t^2,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "1/2"
+      },
+      "reference": "Use 1-cos(q)=2 sin(q/2)^2 and the sinc limit."
+    },
+    {
+      "id": "limit-polynomial-exponential-01",
+      "operation": "limit",
+      "family": "polynomial-exponential",
+      "domain": "real",
+      "input": "limit(q^1/exp(q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "0"
+      },
+      "reference": "For q>0, exp(q)≥q^(a+1)/(a+1)!, so comparison proves the result."
+    },
+    {
+      "id": "limit-growing-oscillation-01",
+      "operation": "limit",
+      "family": "growing-oscillation",
+      "domain": "real",
+      "input": "limit(q*sin(1*q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "does not exist"
+      },
+      "reference": "Use q=(pi/2+2pi*n)/a and q=(3pi/2+2pi*n)/a as witnesses."
+    },
+    {
+      "id": "series-geometric-01",
+      "operation": "series",
+      "family": "geometric",
+      "domain": "real",
+      "input": "sum((1/2)^j,j,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "2"
+      },
+      "reference": "Finite geometric sum and a/(a+1)<1."
+    },
+    {
+      "id": "series-telescoping-01",
+      "operation": "series",
+      "family": "telescoping",
+      "domain": "real",
+      "input": "sum(1/((j+1)*(j+2)),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "1/2"
+      },
+      "reference": "Term equals 1/(j+a)−1/(j+a+1)."
+    },
+    {
+      "id": "series-basel-tail-01",
+      "operation": "series",
+      "family": "basel-tail",
+      "domain": "real",
+      "input": "sum(1/j^2,j,2,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "pi^2/6-sum(1/j^2,j,1,1)"
+      },
+      "reference": "DLMF 25.6 at ζ(2), minus the finite initial segment."
+    },
+    {
+      "id": "series-harmonic-shift-01",
+      "operation": "series",
+      "family": "harmonic-shift",
+      "domain": "real",
+      "input": "sum(1/(j+1),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "diverges to +Infinity"
+      },
+      "reference": "Deleting finitely many terms preserves harmonic divergence."
+    },
+    {
+      "id": "series-alternating-log-01",
+      "operation": "series",
+      "family": "alternating-log",
+      "domain": "real",
+      "input": "sum((-1)^(j-1)/(2^j*j),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(3/2) (absolute convergence)"
+      },
+      "reference": "Integrate geometric series on [0,1/(a+1)]."
+    },
+    {
+      "id": "series-log-power-radius-01",
+      "operation": "series",
+      "family": "log-power-radius",
+      "domain": "real z",
+      "input": "sum((1*z)^j/j,j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-ln(1-1*z); radius=1/1; converges conditionally at -1/1; diverges at 1/1"
+      },
+      "reference": "Ratio test inside/outside, harmonic and alternating harmonic at endpoints."
+    },
+    {
+      "id": "ode-scalar-linear-01",
+      "operation": "ode",
+      "family": "scalar-linear",
+      "domain": "real",
+      "input": "u'(t)=1*u(t); u(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=2*exp(1*t)"
+      },
+      "reference": "Differentiate, verify initial condition, and use linear uniqueness."
+    },
+    {
+      "id": "ode-second-order-oscillator-01",
+      "operation": "ode",
+      "family": "second-order-oscillator",
+      "domain": "real",
+      "input": "w''(s)=-1*w(s); w(0)=1; w'(0)=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "w(s)=cos(1*s)"
+      },
+      "reference": "Differentiate twice, verify both ICs, and use linear uniqueness."
+    },
+    {
+      "id": "ode-third-order-zero-01",
+      "operation": "ode",
+      "family": "third-order-zero",
+      "domain": "real",
+      "input": "v'''(t)=0; v(0)=1; v'(0)=1; v''(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "v(t)=1+t+t^2"
+      },
+      "reference": "Integrate successively, using each initial condition."
+    },
+    {
+      "id": "ode-quadratic-blowup-01",
+      "operation": "ode",
+      "family": "quadratic-blowup",
+      "domain": "real",
+      "input": "u'(t)=1*u(t)^2; u(0)=1",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=1/(1-1*t); maximal interval t<1/1"
+      },
+      "reference": "Separate variables and check the pole at t=1/a."
+    },
+    {
+      "id": "ode-coupled-rotation-01",
+      "operation": "ode",
+      "family": "coupled-rotation",
+      "domain": "real",
+      "input": "u'=-1*v; v'=1*u; (u(0),v(0))=(1,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "(u(t),v(t))=(cos(1*t),sin(1*t))"
+      },
+      "reference": "Substitute both derivatives and initial data, then apply linear system uniqueness."
+    },
+    {
+      "id": "ode-fractional-nonunique-01",
+      "operation": "ode",
+      "family": "fractional-nonunique",
+      "domain": "t >= 0",
+      "input": "u'=1*abs(u)^(1/2); u(0)=0; find u(t) on t>=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "nonunique: zero, and u(t)=0 for t<=c, 1*(t-c)^2/4 for t>=c, c>=0"
+      },
+      "reference": "Both types satisfy the differential equation at t=c as well as away from it."
+    },
+    {
+      "id": "pde-heat-mode-01",
+      "operation": "pde",
+      "family": "heat-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(1*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-1*t)*sin(1*x)"
+      },
+      "reference": "Sine eigenmode, verify PDE, IC, and both BCs. Heat uniqueness by energy."
+    },
+    {
+      "id": "pde-heat-two-modes-01",
+      "operation": "pde",
+      "family": "heat-two-modes",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=1*u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(x)+sin(2*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-1*t)*sin(x)+exp(-4*t)*sin(2*x)"
+      },
+      "reference": "Verify by linear superposition and heat uniqueness."
+    },
+    {
+      "id": "pde-wave-mode-01",
+      "operation": "pde",
+      "family": "wave-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_tt=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=0; u_t(x,0)=sin(1*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=sin(1*t)*sin(1*x)/1"
+      },
+      "reference": "Verify mode, both initial data and both boundaries. Wave uniqueness by energy."
+    },
+    {
+      "id": "pde-transport-01",
+      "operation": "pde",
+      "family": "transport",
+      "domain": "real x, t >= 0",
+      "input": "u_t+1*u_x=0; u(x,0)=exp(-x^2)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-(x-1*t)^2)"
+      },
+      "reference": "u is constant along lines x−a*t = constant."
+    },
+    {
+      "id": "pde-laplace-strip-01",
+      "operation": "pde",
+      "family": "laplace-strip",
+      "domain": "0 <= x <= pi, 0 <= y <= 1",
+      "input": "u_xx+u_yy=0 on [0,pi]×[0,1]; u zero on sides/bottom; u(x,1)=sin(1*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=sin(1*x)*sinh(1*y)/sinh(1)"
+      },
+      "reference": "Substitute Laplace operator and all boundary values. Uniqueness by maximum principle."
+    },
+    {
+      "id": "pde-poisson-polynomial-01",
+      "operation": "pde",
+      "family": "poisson-polynomial",
+      "domain": "0 <= x,y <= 1",
+      "input": "Delta u=-2*1*[x*(1-x)+y*(1-y)] on [0,1]^2; zero boundary values",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=1*x*(1-x)*y*(1-y)"
+      },
+      "reference": "Manufacture source by differentiating u. Difference of solutions is harmonic with zero boundary."
+    },
+    {
+      "id": "integral-monomial-02",
+      "operation": "integral",
+      "family": "monomial",
+      "domain": "real",
+      "input": "integrate(q^2,q)",
+      "expected": {
+        "verdict": "proved",
+        "result": "q^3/3+C"
+      },
+      "reference": "Differentiate by the power rule."
+    },
+    {
+      "id": "integral-reciprocal-shift-02",
+      "operation": "integral",
+      "family": "reciprocal-shift",
+      "domain": "w != 2",
+      "input": "integrate(1/(w-2),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(abs(w-2))+C"
+      },
+      "reference": "Differentiate on each connected component. Integration constants can differ."
+    },
+    {
+      "id": "integral-quadratic-reciprocal-02",
+      "operation": "integral",
+      "family": "quadratic-reciprocal",
+      "domain": "real",
+      "input": "integrate(1/(w^2+4),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "atan(w/2)/2+C"
+      },
+      "reference": "Differentiate arctangent or substitute w=a*t."
+    },
+    {
+      "id": "integral-exponential-gaussian-02",
+      "operation": "integral",
+      "family": "exponential-gaussian",
+      "domain": "real",
+      "input": "integrate(exp(-2*z^2),z)",
+      "expected": {
+        "verdict": "proved",
+        "result": "sqrt(pi)/(2*sqrt(2))*erf(sqrt(2)*z)+C"
+      },
+      "reference": "DLMF 7.2 definition of erf and chain rule."
+    },
+    {
+      "id": "integral-improper-gamma-02",
+      "operation": "integral",
+      "family": "improper-gamma",
+      "domain": "t >= 0",
+      "input": "integrate(t^2*exp(-t),t,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "2!"
+      },
+      "reference": "Gamma recurrence or integration by parts. Exponential decay gives vanishing upper endpoint."
+    },
+    {
+      "id": "integral-log-subtraction-02",
+      "operation": "integral",
+      "family": "log-subtraction",
+      "domain": "0 <= x <= 1/2",
+      "input": "integrate(ln(1+x)/x,x,0,1/2)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Li_2(-1/2)"
+      },
+      "reference": "DLMF 25.12 dilogarithm derivative with the removable endpoint extended by continuity."
+    },
+    {
+      "id": "limit-removable-factor-02",
+      "operation": "limit",
+      "family": "removable-factor",
+      "domain": "real",
+      "input": "limit((x^2-4)/(x-2),x,2)",
+      "expected": {
+        "verdict": "proved",
+        "result": "4"
+      },
+      "reference": "Factor numerator and cancel on a punctured neighborhood."
+    },
+    {
+      "id": "limit-directional-pole-02",
+      "operation": "limit",
+      "family": "directional-pole",
+      "domain": "real",
+      "input": "limit(-2/(x-3),x,3,right)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Infinity"
+      },
+      "reference": "Denominator is eventually positive, with modulus tending to zero."
+    },
+    {
+      "id": "limit-sinc-scale-02",
+      "operation": "limit",
+      "family": "sinc-scale",
+      "domain": "real",
+      "input": "limit(sin(2*t)/t,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "2"
+      },
+      "reference": "Use sin(q)/q→1 by squeeze argument."
+    },
+    {
+      "id": "limit-cos-second-order-02",
+      "operation": "limit",
+      "family": "cos-second-order",
+      "domain": "real",
+      "input": "limit((1-cos(2*t))/t^2,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "4/2"
+      },
+      "reference": "Use 1-cos(q)=2 sin(q/2)^2 and the sinc limit."
+    },
+    {
+      "id": "limit-polynomial-exponential-02",
+      "operation": "limit",
+      "family": "polynomial-exponential",
+      "domain": "real",
+      "input": "limit(q^2/exp(q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "0"
+      },
+      "reference": "For q>0, exp(q)≥q^(a+1)/(a+1)!, so comparison proves the result."
+    },
+    {
+      "id": "limit-growing-oscillation-02",
+      "operation": "limit",
+      "family": "growing-oscillation",
+      "domain": "real",
+      "input": "limit(q*sin(2*q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "does not exist"
+      },
+      "reference": "Use q=(pi/2+2pi*n)/a and q=(3pi/2+2pi*n)/a as witnesses."
+    },
+    {
+      "id": "series-geometric-02",
+      "operation": "series",
+      "family": "geometric",
+      "domain": "real",
+      "input": "sum((2/3)^j,j,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "3"
+      },
+      "reference": "Finite geometric sum and a/(a+1)<1."
+    },
+    {
+      "id": "series-telescoping-02",
+      "operation": "series",
+      "family": "telescoping",
+      "domain": "real",
+      "input": "sum(1/((j+2)*(j+3)),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "1/3"
+      },
+      "reference": "Term equals 1/(j+a)−1/(j+a+1)."
+    },
+    {
+      "id": "series-basel-tail-02",
+      "operation": "series",
+      "family": "basel-tail",
+      "domain": "real",
+      "input": "sum(1/j^2,j,3,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "pi^2/6-sum(1/j^2,j,1,2)"
+      },
+      "reference": "DLMF 25.6 at ζ(2), minus the finite initial segment."
+    },
+    {
+      "id": "series-harmonic-shift-02",
+      "operation": "series",
+      "family": "harmonic-shift",
+      "domain": "real",
+      "input": "sum(1/(j+2),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "diverges to +Infinity"
+      },
+      "reference": "Deleting finitely many terms preserves harmonic divergence."
+    },
+    {
+      "id": "series-alternating-log-02",
+      "operation": "series",
+      "family": "alternating-log",
+      "domain": "real",
+      "input": "sum((-1)^(j-1)/(3^j*j),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(4/3) (absolute convergence)"
+      },
+      "reference": "Integrate geometric series on [0,1/(a+1)]."
+    },
+    {
+      "id": "series-log-power-radius-02",
+      "operation": "series",
+      "family": "log-power-radius",
+      "domain": "real z",
+      "input": "sum((2*z)^j/j,j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-ln(1-2*z); radius=1/2; converges conditionally at -1/2; diverges at 1/2"
+      },
+      "reference": "Ratio test inside/outside, harmonic and alternating harmonic at endpoints."
+    },
+    {
+      "id": "ode-scalar-linear-02",
+      "operation": "ode",
+      "family": "scalar-linear",
+      "domain": "real",
+      "input": "u'(t)=2*u(t); u(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=2*exp(2*t)"
+      },
+      "reference": "Differentiate, verify initial condition, and use linear uniqueness."
+    },
+    {
+      "id": "ode-second-order-oscillator-02",
+      "operation": "ode",
+      "family": "second-order-oscillator",
+      "domain": "real",
+      "input": "w''(s)=-4*w(s); w(0)=1; w'(0)=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "w(s)=cos(2*s)"
+      },
+      "reference": "Differentiate twice, verify both ICs, and use linear uniqueness."
+    },
+    {
+      "id": "ode-third-order-zero-02",
+      "operation": "ode",
+      "family": "third-order-zero",
+      "domain": "real",
+      "input": "v'''(t)=0; v(0)=2; v'(0)=1; v''(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "v(t)=2+t+t^2"
+      },
+      "reference": "Integrate successively, using each initial condition."
+    },
+    {
+      "id": "ode-quadratic-blowup-02",
+      "operation": "ode",
+      "family": "quadratic-blowup",
+      "domain": "real",
+      "input": "u'(t)=2*u(t)^2; u(0)=1",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=1/(1-2*t); maximal interval t<1/2"
+      },
+      "reference": "Separate variables and check the pole at t=1/a."
+    },
+    {
+      "id": "ode-coupled-rotation-02",
+      "operation": "ode",
+      "family": "coupled-rotation",
+      "domain": "real",
+      "input": "u'=-2*v; v'=2*u; (u(0),v(0))=(1,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "(u(t),v(t))=(cos(2*t),sin(2*t))"
+      },
+      "reference": "Substitute both derivatives and initial data, then apply linear system uniqueness."
+    },
+    {
+      "id": "ode-fractional-nonunique-02",
+      "operation": "ode",
+      "family": "fractional-nonunique",
+      "domain": "t >= 0",
+      "input": "u'=2*abs(u)^(1/2); u(0)=0; find u(t) on t>=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "nonunique: zero, and u(t)=0 for t<=c, 4*(t-c)^2/4 for t>=c, c>=0"
+      },
+      "reference": "Both types satisfy the differential equation at t=c as well as away from it."
+    },
+    {
+      "id": "pde-heat-mode-02",
+      "operation": "pde",
+      "family": "heat-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(2*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-4*t)*sin(2*x)"
+      },
+      "reference": "Sine eigenmode, verify PDE, IC, and both BCs. Heat uniqueness by energy."
+    },
+    {
+      "id": "pde-heat-two-modes-02",
+      "operation": "pde",
+      "family": "heat-two-modes",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=2*u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(x)+sin(2*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-2*t)*sin(x)+exp(-8*t)*sin(2*x)"
+      },
+      "reference": "Verify by linear superposition and heat uniqueness."
+    },
+    {
+      "id": "pde-wave-mode-02",
+      "operation": "pde",
+      "family": "wave-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_tt=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=0; u_t(x,0)=sin(2*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=sin(2*t)*sin(2*x)/2"
+      },
+      "reference": "Verify mode, both initial data and both boundaries. Wave uniqueness by energy."
+    },
+    {
+      "id": "pde-transport-02",
+      "operation": "pde",
+      "family": "transport",
+      "domain": "real x, t >= 0",
+      "input": "u_t+2*u_x=0; u(x,0)=exp(-x^2)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-(x-2*t)^2)"
+      },
+      "reference": "u is constant along lines x−a*t = constant."
+    },
+    {
+      "id": "pde-laplace-strip-02",
+      "operation": "pde",
+      "family": "laplace-strip",
+      "domain": "0 <= x <= pi, 0 <= y <= 1",
+      "input": "u_xx+u_yy=0 on [0,pi]×[0,1]; u zero on sides/bottom; u(x,1)=sin(2*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=sin(2*x)*sinh(2*y)/sinh(2)"
+      },
+      "reference": "Substitute Laplace operator and all boundary values. Uniqueness by maximum principle."
+    },
+    {
+      "id": "pde-poisson-polynomial-02",
+      "operation": "pde",
+      "family": "poisson-polynomial",
+      "domain": "0 <= x,y <= 1",
+      "input": "Delta u=-2*2*[x*(1-x)+y*(1-y)] on [0,1]^2; zero boundary values",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=2*x*(1-x)*y*(1-y)"
+      },
+      "reference": "Manufacture source by differentiating u. Difference of solutions is harmonic with zero boundary."
+    },
+    {
+      "id": "integral-monomial-03",
+      "operation": "integral",
+      "family": "monomial",
+      "domain": "real",
+      "input": "integrate(q^3,q)",
+      "expected": {
+        "verdict": "proved",
+        "result": "q^4/4+C"
+      },
+      "reference": "Differentiate by the power rule."
+    },
+    {
+      "id": "integral-reciprocal-shift-03",
+      "operation": "integral",
+      "family": "reciprocal-shift",
+      "domain": "w != 3",
+      "input": "integrate(1/(w-3),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(abs(w-3))+C"
+      },
+      "reference": "Differentiate on each connected component. Integration constants can differ."
+    },
+    {
+      "id": "integral-quadratic-reciprocal-03",
+      "operation": "integral",
+      "family": "quadratic-reciprocal",
+      "domain": "real",
+      "input": "integrate(1/(w^2+9),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "atan(w/3)/3+C"
+      },
+      "reference": "Differentiate arctangent or substitute w=a*t."
+    },
+    {
+      "id": "integral-exponential-gaussian-03",
+      "operation": "integral",
+      "family": "exponential-gaussian",
+      "domain": "real",
+      "input": "integrate(exp(-3*z^2),z)",
+      "expected": {
+        "verdict": "proved",
+        "result": "sqrt(pi)/(2*sqrt(3))*erf(sqrt(3)*z)+C"
+      },
+      "reference": "DLMF 7.2 definition of erf and chain rule."
+    },
+    {
+      "id": "integral-improper-gamma-03",
+      "operation": "integral",
+      "family": "improper-gamma",
+      "domain": "t >= 0",
+      "input": "integrate(t^3*exp(-t),t,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "3!"
+      },
+      "reference": "Gamma recurrence or integration by parts. Exponential decay gives vanishing upper endpoint."
+    },
+    {
+      "id": "integral-log-subtraction-03",
+      "operation": "integral",
+      "family": "log-subtraction",
+      "domain": "0 <= x <= 1/3",
+      "input": "integrate(ln(1+x)/x,x,0,1/3)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Li_2(-1/3)"
+      },
+      "reference": "DLMF 25.12 dilogarithm derivative with the removable endpoint extended by continuity."
+    },
+    {
+      "id": "limit-removable-factor-03",
+      "operation": "limit",
+      "family": "removable-factor",
+      "domain": "real",
+      "input": "limit((x^2-9)/(x-3),x,3)",
+      "expected": {
+        "verdict": "proved",
+        "result": "6"
+      },
+      "reference": "Factor numerator and cancel on a punctured neighborhood."
+    },
+    {
+      "id": "limit-directional-pole-03",
+      "operation": "limit",
+      "family": "directional-pole",
+      "domain": "real",
+      "input": "limit(-3/(x-3),x,3,right)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Infinity"
+      },
+      "reference": "Denominator is eventually positive, with modulus tending to zero."
+    },
+    {
+      "id": "limit-sinc-scale-03",
+      "operation": "limit",
+      "family": "sinc-scale",
+      "domain": "real",
+      "input": "limit(sin(3*t)/t,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "3"
+      },
+      "reference": "Use sin(q)/q→1 by squeeze argument."
+    },
+    {
+      "id": "limit-cos-second-order-03",
+      "operation": "limit",
+      "family": "cos-second-order",
+      "domain": "real",
+      "input": "limit((1-cos(3*t))/t^2,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "9/2"
+      },
+      "reference": "Use 1-cos(q)=2 sin(q/2)^2 and the sinc limit."
+    },
+    {
+      "id": "limit-polynomial-exponential-03",
+      "operation": "limit",
+      "family": "polynomial-exponential",
+      "domain": "real",
+      "input": "limit(q^3/exp(q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "0"
+      },
+      "reference": "For q>0, exp(q)≥q^(a+1)/(a+1)!, so comparison proves the result."
+    },
+    {
+      "id": "limit-growing-oscillation-03",
+      "operation": "limit",
+      "family": "growing-oscillation",
+      "domain": "real",
+      "input": "limit(q*sin(3*q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "does not exist"
+      },
+      "reference": "Use q=(pi/2+2pi*n)/a and q=(3pi/2+2pi*n)/a as witnesses."
+    },
+    {
+      "id": "series-geometric-03",
+      "operation": "series",
+      "family": "geometric",
+      "domain": "real",
+      "input": "sum((3/4)^j,j,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "4"
+      },
+      "reference": "Finite geometric sum and a/(a+1)<1."
+    },
+    {
+      "id": "series-telescoping-03",
+      "operation": "series",
+      "family": "telescoping",
+      "domain": "real",
+      "input": "sum(1/((j+3)*(j+4)),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "1/4"
+      },
+      "reference": "Term equals 1/(j+a)−1/(j+a+1)."
+    },
+    {
+      "id": "series-basel-tail-03",
+      "operation": "series",
+      "family": "basel-tail",
+      "domain": "real",
+      "input": "sum(1/j^2,j,4,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "pi^2/6-sum(1/j^2,j,1,3)"
+      },
+      "reference": "DLMF 25.6 at ζ(2), minus the finite initial segment."
+    },
+    {
+      "id": "series-harmonic-shift-03",
+      "operation": "series",
+      "family": "harmonic-shift",
+      "domain": "real",
+      "input": "sum(1/(j+3),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "diverges to +Infinity"
+      },
+      "reference": "Deleting finitely many terms preserves harmonic divergence."
+    },
+    {
+      "id": "series-alternating-log-03",
+      "operation": "series",
+      "family": "alternating-log",
+      "domain": "real",
+      "input": "sum((-1)^(j-1)/(4^j*j),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(5/4) (absolute convergence)"
+      },
+      "reference": "Integrate geometric series on [0,1/(a+1)]."
+    },
+    {
+      "id": "series-log-power-radius-03",
+      "operation": "series",
+      "family": "log-power-radius",
+      "domain": "real z",
+      "input": "sum((3*z)^j/j,j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-ln(1-3*z); radius=1/3; converges conditionally at -1/3; diverges at 1/3"
+      },
+      "reference": "Ratio test inside/outside, harmonic and alternating harmonic at endpoints."
+    },
+    {
+      "id": "ode-scalar-linear-03",
+      "operation": "ode",
+      "family": "scalar-linear",
+      "domain": "real",
+      "input": "u'(t)=3*u(t); u(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=2*exp(3*t)"
+      },
+      "reference": "Differentiate, verify initial condition, and use linear uniqueness."
+    },
+    {
+      "id": "ode-second-order-oscillator-03",
+      "operation": "ode",
+      "family": "second-order-oscillator",
+      "domain": "real",
+      "input": "w''(s)=-9*w(s); w(0)=1; w'(0)=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "w(s)=cos(3*s)"
+      },
+      "reference": "Differentiate twice, verify both ICs, and use linear uniqueness."
+    },
+    {
+      "id": "ode-third-order-zero-03",
+      "operation": "ode",
+      "family": "third-order-zero",
+      "domain": "real",
+      "input": "v'''(t)=0; v(0)=3; v'(0)=1; v''(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "v(t)=3+t+t^2"
+      },
+      "reference": "Integrate successively, using each initial condition."
+    },
+    {
+      "id": "ode-quadratic-blowup-03",
+      "operation": "ode",
+      "family": "quadratic-blowup",
+      "domain": "real",
+      "input": "u'(t)=3*u(t)^2; u(0)=1",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=1/(1-3*t); maximal interval t<1/3"
+      },
+      "reference": "Separate variables and check the pole at t=1/a."
+    },
+    {
+      "id": "ode-coupled-rotation-03",
+      "operation": "ode",
+      "family": "coupled-rotation",
+      "domain": "real",
+      "input": "u'=-3*v; v'=3*u; (u(0),v(0))=(1,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "(u(t),v(t))=(cos(3*t),sin(3*t))"
+      },
+      "reference": "Substitute both derivatives and initial data, then apply linear system uniqueness."
+    },
+    {
+      "id": "ode-fractional-nonunique-03",
+      "operation": "ode",
+      "family": "fractional-nonunique",
+      "domain": "t >= 0",
+      "input": "u'=3*abs(u)^(1/2); u(0)=0; find u(t) on t>=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "nonunique: zero, and u(t)=0 for t<=c, 9*(t-c)^2/4 for t>=c, c>=0"
+      },
+      "reference": "Both types satisfy the differential equation at t=c as well as away from it."
+    },
+    {
+      "id": "pde-heat-mode-03",
+      "operation": "pde",
+      "family": "heat-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(3*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-9*t)*sin(3*x)"
+      },
+      "reference": "Sine eigenmode, verify PDE, IC, and both BCs. Heat uniqueness by energy."
+    },
+    {
+      "id": "pde-heat-two-modes-03",
+      "operation": "pde",
+      "family": "heat-two-modes",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=3*u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(x)+sin(2*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-3*t)*sin(x)+exp(-12*t)*sin(2*x)"
+      },
+      "reference": "Verify by linear superposition and heat uniqueness."
+    },
+    {
+      "id": "pde-wave-mode-03",
+      "operation": "pde",
+      "family": "wave-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_tt=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=0; u_t(x,0)=sin(3*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=sin(3*t)*sin(3*x)/3"
+      },
+      "reference": "Verify mode, both initial data and both boundaries. Wave uniqueness by energy."
+    },
+    {
+      "id": "pde-transport-03",
+      "operation": "pde",
+      "family": "transport",
+      "domain": "real x, t >= 0",
+      "input": "u_t+3*u_x=0; u(x,0)=exp(-x^2)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-(x-3*t)^2)"
+      },
+      "reference": "u is constant along lines x−a*t = constant."
+    },
+    {
+      "id": "pde-laplace-strip-03",
+      "operation": "pde",
+      "family": "laplace-strip",
+      "domain": "0 <= x <= pi, 0 <= y <= 1",
+      "input": "u_xx+u_yy=0 on [0,pi]×[0,1]; u zero on sides/bottom; u(x,1)=sin(3*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=sin(3*x)*sinh(3*y)/sinh(3)"
+      },
+      "reference": "Substitute Laplace operator and all boundary values. Uniqueness by maximum principle."
+    },
+    {
+      "id": "pde-poisson-polynomial-03",
+      "operation": "pde",
+      "family": "poisson-polynomial",
+      "domain": "0 <= x,y <= 1",
+      "input": "Delta u=-2*3*[x*(1-x)+y*(1-y)] on [0,1]^2; zero boundary values",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=3*x*(1-x)*y*(1-y)"
+      },
+      "reference": "Manufacture source by differentiating u. Difference of solutions is harmonic with zero boundary."
+    },
+    {
+      "id": "integral-monomial-04",
+      "operation": "integral",
+      "family": "monomial",
+      "domain": "real",
+      "input": "integrate(q^4,q)",
+      "expected": {
+        "verdict": "proved",
+        "result": "q^5/5+C"
+      },
+      "reference": "Differentiate by the power rule."
+    },
+    {
+      "id": "integral-reciprocal-shift-04",
+      "operation": "integral",
+      "family": "reciprocal-shift",
+      "domain": "w != 4",
+      "input": "integrate(1/(w-4),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(abs(w-4))+C"
+      },
+      "reference": "Differentiate on each connected component. Integration constants can differ."
+    },
+    {
+      "id": "integral-quadratic-reciprocal-04",
+      "operation": "integral",
+      "family": "quadratic-reciprocal",
+      "domain": "real",
+      "input": "integrate(1/(w^2+16),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "atan(w/4)/4+C"
+      },
+      "reference": "Differentiate arctangent or substitute w=a*t."
+    },
+    {
+      "id": "integral-exponential-gaussian-04",
+      "operation": "integral",
+      "family": "exponential-gaussian",
+      "domain": "real",
+      "input": "integrate(exp(-4*z^2),z)",
+      "expected": {
+        "verdict": "proved",
+        "result": "sqrt(pi)/(2*sqrt(4))*erf(sqrt(4)*z)+C"
+      },
+      "reference": "DLMF 7.2 definition of erf and chain rule."
+    },
+    {
+      "id": "integral-improper-gamma-04",
+      "operation": "integral",
+      "family": "improper-gamma",
+      "domain": "t >= 0",
+      "input": "integrate(t^4*exp(-t),t,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "4!"
+      },
+      "reference": "Gamma recurrence or integration by parts. Exponential decay gives vanishing upper endpoint."
+    },
+    {
+      "id": "integral-log-subtraction-04",
+      "operation": "integral",
+      "family": "log-subtraction",
+      "domain": "0 <= x <= 1/4",
+      "input": "integrate(ln(1+x)/x,x,0,1/4)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Li_2(-1/4)"
+      },
+      "reference": "DLMF 25.12 dilogarithm derivative with the removable endpoint extended by continuity."
+    },
+    {
+      "id": "limit-removable-factor-04",
+      "operation": "limit",
+      "family": "removable-factor",
+      "domain": "real",
+      "input": "limit((x^2-16)/(x-4),x,4)",
+      "expected": {
+        "verdict": "proved",
+        "result": "8"
+      },
+      "reference": "Factor numerator and cancel on a punctured neighborhood."
+    },
+    {
+      "id": "limit-directional-pole-04",
+      "operation": "limit",
+      "family": "directional-pole",
+      "domain": "real",
+      "input": "limit(-4/(x-3),x,3,right)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Infinity"
+      },
+      "reference": "Denominator is eventually positive, with modulus tending to zero."
+    },
+    {
+      "id": "limit-sinc-scale-04",
+      "operation": "limit",
+      "family": "sinc-scale",
+      "domain": "real",
+      "input": "limit(sin(4*t)/t,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "4"
+      },
+      "reference": "Use sin(q)/q→1 by squeeze argument."
+    },
+    {
+      "id": "limit-cos-second-order-04",
+      "operation": "limit",
+      "family": "cos-second-order",
+      "domain": "real",
+      "input": "limit((1-cos(4*t))/t^2,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "16/2"
+      },
+      "reference": "Use 1-cos(q)=2 sin(q/2)^2 and the sinc limit."
+    },
+    {
+      "id": "limit-polynomial-exponential-04",
+      "operation": "limit",
+      "family": "polynomial-exponential",
+      "domain": "real",
+      "input": "limit(q^4/exp(q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "0"
+      },
+      "reference": "For q>0, exp(q)≥q^(a+1)/(a+1)!, so comparison proves the result."
+    },
+    {
+      "id": "limit-growing-oscillation-04",
+      "operation": "limit",
+      "family": "growing-oscillation",
+      "domain": "real",
+      "input": "limit(q*sin(4*q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "does not exist"
+      },
+      "reference": "Use q=(pi/2+2pi*n)/a and q=(3pi/2+2pi*n)/a as witnesses."
+    },
+    {
+      "id": "series-geometric-04",
+      "operation": "series",
+      "family": "geometric",
+      "domain": "real",
+      "input": "sum((4/5)^j,j,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "5"
+      },
+      "reference": "Finite geometric sum and a/(a+1)<1."
+    },
+    {
+      "id": "series-telescoping-04",
+      "operation": "series",
+      "family": "telescoping",
+      "domain": "real",
+      "input": "sum(1/((j+4)*(j+5)),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "1/5"
+      },
+      "reference": "Term equals 1/(j+a)−1/(j+a+1)."
+    },
+    {
+      "id": "series-basel-tail-04",
+      "operation": "series",
+      "family": "basel-tail",
+      "domain": "real",
+      "input": "sum(1/j^2,j,5,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "pi^2/6-sum(1/j^2,j,1,4)"
+      },
+      "reference": "DLMF 25.6 at ζ(2), minus the finite initial segment."
+    },
+    {
+      "id": "series-harmonic-shift-04",
+      "operation": "series",
+      "family": "harmonic-shift",
+      "domain": "real",
+      "input": "sum(1/(j+4),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "diverges to +Infinity"
+      },
+      "reference": "Deleting finitely many terms preserves harmonic divergence."
+    },
+    {
+      "id": "series-alternating-log-04",
+      "operation": "series",
+      "family": "alternating-log",
+      "domain": "real",
+      "input": "sum((-1)^(j-1)/(5^j*j),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(6/5) (absolute convergence)"
+      },
+      "reference": "Integrate geometric series on [0,1/(a+1)]."
+    },
+    {
+      "id": "series-log-power-radius-04",
+      "operation": "series",
+      "family": "log-power-radius",
+      "domain": "real z",
+      "input": "sum((4*z)^j/j,j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-ln(1-4*z); radius=1/4; converges conditionally at -1/4; diverges at 1/4"
+      },
+      "reference": "Ratio test inside/outside, harmonic and alternating harmonic at endpoints."
+    },
+    {
+      "id": "ode-scalar-linear-04",
+      "operation": "ode",
+      "family": "scalar-linear",
+      "domain": "real",
+      "input": "u'(t)=4*u(t); u(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=2*exp(4*t)"
+      },
+      "reference": "Differentiate, verify initial condition, and use linear uniqueness."
+    },
+    {
+      "id": "ode-second-order-oscillator-04",
+      "operation": "ode",
+      "family": "second-order-oscillator",
+      "domain": "real",
+      "input": "w''(s)=-16*w(s); w(0)=1; w'(0)=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "w(s)=cos(4*s)"
+      },
+      "reference": "Differentiate twice, verify both ICs, and use linear uniqueness."
+    },
+    {
+      "id": "ode-third-order-zero-04",
+      "operation": "ode",
+      "family": "third-order-zero",
+      "domain": "real",
+      "input": "v'''(t)=0; v(0)=4; v'(0)=1; v''(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "v(t)=4+t+t^2"
+      },
+      "reference": "Integrate successively, using each initial condition."
+    },
+    {
+      "id": "ode-quadratic-blowup-04",
+      "operation": "ode",
+      "family": "quadratic-blowup",
+      "domain": "real",
+      "input": "u'(t)=4*u(t)^2; u(0)=1",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=1/(1-4*t); maximal interval t<1/4"
+      },
+      "reference": "Separate variables and check the pole at t=1/a."
+    },
+    {
+      "id": "ode-coupled-rotation-04",
+      "operation": "ode",
+      "family": "coupled-rotation",
+      "domain": "real",
+      "input": "u'=-4*v; v'=4*u; (u(0),v(0))=(1,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "(u(t),v(t))=(cos(4*t),sin(4*t))"
+      },
+      "reference": "Substitute both derivatives and initial data, then apply linear system uniqueness."
+    },
+    {
+      "id": "ode-fractional-nonunique-04",
+      "operation": "ode",
+      "family": "fractional-nonunique",
+      "domain": "t >= 0",
+      "input": "u'=4*abs(u)^(1/2); u(0)=0; find u(t) on t>=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "nonunique: zero, and u(t)=0 for t<=c, 16*(t-c)^2/4 for t>=c, c>=0"
+      },
+      "reference": "Both types satisfy the differential equation at t=c as well as away from it."
+    },
+    {
+      "id": "pde-heat-mode-04",
+      "operation": "pde",
+      "family": "heat-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(4*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-16*t)*sin(4*x)"
+      },
+      "reference": "Sine eigenmode, verify PDE, IC, and both BCs. Heat uniqueness by energy."
+    },
+    {
+      "id": "pde-heat-two-modes-04",
+      "operation": "pde",
+      "family": "heat-two-modes",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=4*u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(x)+sin(2*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-4*t)*sin(x)+exp(-16*t)*sin(2*x)"
+      },
+      "reference": "Verify by linear superposition and heat uniqueness."
+    },
+    {
+      "id": "pde-wave-mode-04",
+      "operation": "pde",
+      "family": "wave-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_tt=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=0; u_t(x,0)=sin(4*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=sin(4*t)*sin(4*x)/4"
+      },
+      "reference": "Verify mode, both initial data and both boundaries. Wave uniqueness by energy."
+    },
+    {
+      "id": "pde-transport-04",
+      "operation": "pde",
+      "family": "transport",
+      "domain": "real x, t >= 0",
+      "input": "u_t+4*u_x=0; u(x,0)=exp(-x^2)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-(x-4*t)^2)"
+      },
+      "reference": "u is constant along lines x−a*t = constant."
+    },
+    {
+      "id": "pde-laplace-strip-04",
+      "operation": "pde",
+      "family": "laplace-strip",
+      "domain": "0 <= x <= pi, 0 <= y <= 1",
+      "input": "u_xx+u_yy=0 on [0,pi]×[0,1]; u zero on sides/bottom; u(x,1)=sin(4*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=sin(4*x)*sinh(4*y)/sinh(4)"
+      },
+      "reference": "Substitute Laplace operator and all boundary values. Uniqueness by maximum principle."
+    },
+    {
+      "id": "pde-poisson-polynomial-04",
+      "operation": "pde",
+      "family": "poisson-polynomial",
+      "domain": "0 <= x,y <= 1",
+      "input": "Delta u=-2*4*[x*(1-x)+y*(1-y)] on [0,1]^2; zero boundary values",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=4*x*(1-x)*y*(1-y)"
+      },
+      "reference": "Manufacture source by differentiating u. Difference of solutions is harmonic with zero boundary."
+    },
+    {
+      "id": "integral-monomial-05",
+      "operation": "integral",
+      "family": "monomial",
+      "domain": "real",
+      "input": "integrate(q^5,q)",
+      "expected": {
+        "verdict": "proved",
+        "result": "q^6/6+C"
+      },
+      "reference": "Differentiate by the power rule."
+    },
+    {
+      "id": "integral-reciprocal-shift-05",
+      "operation": "integral",
+      "family": "reciprocal-shift",
+      "domain": "w != 5",
+      "input": "integrate(1/(w-5),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(abs(w-5))+C"
+      },
+      "reference": "Differentiate on each connected component. Integration constants can differ."
+    },
+    {
+      "id": "integral-quadratic-reciprocal-05",
+      "operation": "integral",
+      "family": "quadratic-reciprocal",
+      "domain": "real",
+      "input": "integrate(1/(w^2+25),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "atan(w/5)/5+C"
+      },
+      "reference": "Differentiate arctangent or substitute w=a*t."
+    },
+    {
+      "id": "integral-exponential-gaussian-05",
+      "operation": "integral",
+      "family": "exponential-gaussian",
+      "domain": "real",
+      "input": "integrate(exp(-5*z^2),z)",
+      "expected": {
+        "verdict": "proved",
+        "result": "sqrt(pi)/(2*sqrt(5))*erf(sqrt(5)*z)+C"
+      },
+      "reference": "DLMF 7.2 definition of erf and chain rule."
+    },
+    {
+      "id": "integral-improper-gamma-05",
+      "operation": "integral",
+      "family": "improper-gamma",
+      "domain": "t >= 0",
+      "input": "integrate(t^5*exp(-t),t,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "5!"
+      },
+      "reference": "Gamma recurrence or integration by parts. Exponential decay gives vanishing upper endpoint."
+    },
+    {
+      "id": "integral-log-subtraction-05",
+      "operation": "integral",
+      "family": "log-subtraction",
+      "domain": "0 <= x <= 1/5",
+      "input": "integrate(ln(1+x)/x,x,0,1/5)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Li_2(-1/5)"
+      },
+      "reference": "DLMF 25.12 dilogarithm derivative with the removable endpoint extended by continuity."
+    },
+    {
+      "id": "limit-removable-factor-05",
+      "operation": "limit",
+      "family": "removable-factor",
+      "domain": "real",
+      "input": "limit((x^2-25)/(x-5),x,5)",
+      "expected": {
+        "verdict": "proved",
+        "result": "10"
+      },
+      "reference": "Factor numerator and cancel on a punctured neighborhood."
+    },
+    {
+      "id": "limit-directional-pole-05",
+      "operation": "limit",
+      "family": "directional-pole",
+      "domain": "real",
+      "input": "limit(-5/(x-3),x,3,right)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Infinity"
+      },
+      "reference": "Denominator is eventually positive, with modulus tending to zero."
+    },
+    {
+      "id": "limit-sinc-scale-05",
+      "operation": "limit",
+      "family": "sinc-scale",
+      "domain": "real",
+      "input": "limit(sin(5*t)/t,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "5"
+      },
+      "reference": "Use sin(q)/q→1 by squeeze argument."
+    },
+    {
+      "id": "limit-cos-second-order-05",
+      "operation": "limit",
+      "family": "cos-second-order",
+      "domain": "real",
+      "input": "limit((1-cos(5*t))/t^2,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "25/2"
+      },
+      "reference": "Use 1-cos(q)=2 sin(q/2)^2 and the sinc limit."
+    },
+    {
+      "id": "limit-polynomial-exponential-05",
+      "operation": "limit",
+      "family": "polynomial-exponential",
+      "domain": "real",
+      "input": "limit(q^5/exp(q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "0"
+      },
+      "reference": "For q>0, exp(q)≥q^(a+1)/(a+1)!, so comparison proves the result."
+    },
+    {
+      "id": "limit-growing-oscillation-05",
+      "operation": "limit",
+      "family": "growing-oscillation",
+      "domain": "real",
+      "input": "limit(q*sin(5*q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "does not exist"
+      },
+      "reference": "Use q=(pi/2+2pi*n)/a and q=(3pi/2+2pi*n)/a as witnesses."
+    },
+    {
+      "id": "series-geometric-05",
+      "operation": "series",
+      "family": "geometric",
+      "domain": "real",
+      "input": "sum((5/6)^j,j,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "6"
+      },
+      "reference": "Finite geometric sum and a/(a+1)<1."
+    },
+    {
+      "id": "series-telescoping-05",
+      "operation": "series",
+      "family": "telescoping",
+      "domain": "real",
+      "input": "sum(1/((j+5)*(j+6)),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "1/6"
+      },
+      "reference": "Term equals 1/(j+a)−1/(j+a+1)."
+    },
+    {
+      "id": "series-basel-tail-05",
+      "operation": "series",
+      "family": "basel-tail",
+      "domain": "real",
+      "input": "sum(1/j^2,j,6,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "pi^2/6-sum(1/j^2,j,1,5)"
+      },
+      "reference": "DLMF 25.6 at ζ(2), minus the finite initial segment."
+    },
+    {
+      "id": "series-harmonic-shift-05",
+      "operation": "series",
+      "family": "harmonic-shift",
+      "domain": "real",
+      "input": "sum(1/(j+5),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "diverges to +Infinity"
+      },
+      "reference": "Deleting finitely many terms preserves harmonic divergence."
+    },
+    {
+      "id": "series-alternating-log-05",
+      "operation": "series",
+      "family": "alternating-log",
+      "domain": "real",
+      "input": "sum((-1)^(j-1)/(6^j*j),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(7/6) (absolute convergence)"
+      },
+      "reference": "Integrate geometric series on [0,1/(a+1)]."
+    },
+    {
+      "id": "series-log-power-radius-05",
+      "operation": "series",
+      "family": "log-power-radius",
+      "domain": "real z",
+      "input": "sum((5*z)^j/j,j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-ln(1-5*z); radius=1/5; converges conditionally at -1/5; diverges at 1/5"
+      },
+      "reference": "Ratio test inside/outside, harmonic and alternating harmonic at endpoints."
+    },
+    {
+      "id": "ode-scalar-linear-05",
+      "operation": "ode",
+      "family": "scalar-linear",
+      "domain": "real",
+      "input": "u'(t)=5*u(t); u(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=2*exp(5*t)"
+      },
+      "reference": "Differentiate, verify initial condition, and use linear uniqueness."
+    },
+    {
+      "id": "ode-second-order-oscillator-05",
+      "operation": "ode",
+      "family": "second-order-oscillator",
+      "domain": "real",
+      "input": "w''(s)=-25*w(s); w(0)=1; w'(0)=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "w(s)=cos(5*s)"
+      },
+      "reference": "Differentiate twice, verify both ICs, and use linear uniqueness."
+    },
+    {
+      "id": "ode-third-order-zero-05",
+      "operation": "ode",
+      "family": "third-order-zero",
+      "domain": "real",
+      "input": "v'''(t)=0; v(0)=5; v'(0)=1; v''(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "v(t)=5+t+t^2"
+      },
+      "reference": "Integrate successively, using each initial condition."
+    },
+    {
+      "id": "ode-quadratic-blowup-05",
+      "operation": "ode",
+      "family": "quadratic-blowup",
+      "domain": "real",
+      "input": "u'(t)=5*u(t)^2; u(0)=1",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=1/(1-5*t); maximal interval t<1/5"
+      },
+      "reference": "Separate variables and check the pole at t=1/a."
+    },
+    {
+      "id": "ode-coupled-rotation-05",
+      "operation": "ode",
+      "family": "coupled-rotation",
+      "domain": "real",
+      "input": "u'=-5*v; v'=5*u; (u(0),v(0))=(1,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "(u(t),v(t))=(cos(5*t),sin(5*t))"
+      },
+      "reference": "Substitute both derivatives and initial data, then apply linear system uniqueness."
+    },
+    {
+      "id": "ode-fractional-nonunique-05",
+      "operation": "ode",
+      "family": "fractional-nonunique",
+      "domain": "t >= 0",
+      "input": "u'=5*abs(u)^(1/2); u(0)=0; find u(t) on t>=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "nonunique: zero, and u(t)=0 for t<=c, 25*(t-c)^2/4 for t>=c, c>=0"
+      },
+      "reference": "Both types satisfy the differential equation at t=c as well as away from it."
+    },
+    {
+      "id": "pde-heat-mode-05",
+      "operation": "pde",
+      "family": "heat-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(5*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-25*t)*sin(5*x)"
+      },
+      "reference": "Sine eigenmode, verify PDE, IC, and both BCs. Heat uniqueness by energy."
+    },
+    {
+      "id": "pde-heat-two-modes-05",
+      "operation": "pde",
+      "family": "heat-two-modes",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=5*u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(x)+sin(2*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-5*t)*sin(x)+exp(-20*t)*sin(2*x)"
+      },
+      "reference": "Verify by linear superposition and heat uniqueness."
+    },
+    {
+      "id": "pde-wave-mode-05",
+      "operation": "pde",
+      "family": "wave-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_tt=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=0; u_t(x,0)=sin(5*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=sin(5*t)*sin(5*x)/5"
+      },
+      "reference": "Verify mode, both initial data and both boundaries. Wave uniqueness by energy."
+    },
+    {
+      "id": "pde-transport-05",
+      "operation": "pde",
+      "family": "transport",
+      "domain": "real x, t >= 0",
+      "input": "u_t+5*u_x=0; u(x,0)=exp(-x^2)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-(x-5*t)^2)"
+      },
+      "reference": "u is constant along lines x−a*t = constant."
+    },
+    {
+      "id": "pde-laplace-strip-05",
+      "operation": "pde",
+      "family": "laplace-strip",
+      "domain": "0 <= x <= pi, 0 <= y <= 1",
+      "input": "u_xx+u_yy=0 on [0,pi]×[0,1]; u zero on sides/bottom; u(x,1)=sin(5*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=sin(5*x)*sinh(5*y)/sinh(5)"
+      },
+      "reference": "Substitute Laplace operator and all boundary values. Uniqueness by maximum principle."
+    },
+    {
+      "id": "pde-poisson-polynomial-05",
+      "operation": "pde",
+      "family": "poisson-polynomial",
+      "domain": "0 <= x,y <= 1",
+      "input": "Delta u=-2*5*[x*(1-x)+y*(1-y)] on [0,1]^2; zero boundary values",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=5*x*(1-x)*y*(1-y)"
+      },
+      "reference": "Manufacture source by differentiating u. Difference of solutions is harmonic with zero boundary."
+    },
+    {
+      "id": "integral-monomial-06",
+      "operation": "integral",
+      "family": "monomial",
+      "domain": "real",
+      "input": "integrate(q^6,q)",
+      "expected": {
+        "verdict": "proved",
+        "result": "q^7/7+C"
+      },
+      "reference": "Differentiate by the power rule."
+    },
+    {
+      "id": "integral-reciprocal-shift-06",
+      "operation": "integral",
+      "family": "reciprocal-shift",
+      "domain": "w != 6",
+      "input": "integrate(1/(w-6),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(abs(w-6))+C"
+      },
+      "reference": "Differentiate on each connected component. Integration constants can differ."
+    },
+    {
+      "id": "integral-quadratic-reciprocal-06",
+      "operation": "integral",
+      "family": "quadratic-reciprocal",
+      "domain": "real",
+      "input": "integrate(1/(w^2+36),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "atan(w/6)/6+C"
+      },
+      "reference": "Differentiate arctangent or substitute w=a*t."
+    },
+    {
+      "id": "integral-exponential-gaussian-06",
+      "operation": "integral",
+      "family": "exponential-gaussian",
+      "domain": "real",
+      "input": "integrate(exp(-6*z^2),z)",
+      "expected": {
+        "verdict": "proved",
+        "result": "sqrt(pi)/(2*sqrt(6))*erf(sqrt(6)*z)+C"
+      },
+      "reference": "DLMF 7.2 definition of erf and chain rule."
+    },
+    {
+      "id": "integral-improper-gamma-06",
+      "operation": "integral",
+      "family": "improper-gamma",
+      "domain": "t >= 0",
+      "input": "integrate(t^6*exp(-t),t,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "6!"
+      },
+      "reference": "Gamma recurrence or integration by parts. Exponential decay gives vanishing upper endpoint."
+    },
+    {
+      "id": "integral-log-subtraction-06",
+      "operation": "integral",
+      "family": "log-subtraction",
+      "domain": "0 <= x <= 1/6",
+      "input": "integrate(ln(1+x)/x,x,0,1/6)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Li_2(-1/6)"
+      },
+      "reference": "DLMF 25.12 dilogarithm derivative with the removable endpoint extended by continuity."
+    },
+    {
+      "id": "limit-removable-factor-06",
+      "operation": "limit",
+      "family": "removable-factor",
+      "domain": "real",
+      "input": "limit((x^2-36)/(x-6),x,6)",
+      "expected": {
+        "verdict": "proved",
+        "result": "12"
+      },
+      "reference": "Factor numerator and cancel on a punctured neighborhood."
+    },
+    {
+      "id": "limit-directional-pole-06",
+      "operation": "limit",
+      "family": "directional-pole",
+      "domain": "real",
+      "input": "limit(-6/(x-3),x,3,right)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Infinity"
+      },
+      "reference": "Denominator is eventually positive, with modulus tending to zero."
+    },
+    {
+      "id": "limit-sinc-scale-06",
+      "operation": "limit",
+      "family": "sinc-scale",
+      "domain": "real",
+      "input": "limit(sin(6*t)/t,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "6"
+      },
+      "reference": "Use sin(q)/q→1 by squeeze argument."
+    },
+    {
+      "id": "limit-cos-second-order-06",
+      "operation": "limit",
+      "family": "cos-second-order",
+      "domain": "real",
+      "input": "limit((1-cos(6*t))/t^2,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "36/2"
+      },
+      "reference": "Use 1-cos(q)=2 sin(q/2)^2 and the sinc limit."
+    },
+    {
+      "id": "limit-polynomial-exponential-06",
+      "operation": "limit",
+      "family": "polynomial-exponential",
+      "domain": "real",
+      "input": "limit(q^6/exp(q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "0"
+      },
+      "reference": "For q>0, exp(q)≥q^(a+1)/(a+1)!, so comparison proves the result."
+    },
+    {
+      "id": "limit-growing-oscillation-06",
+      "operation": "limit",
+      "family": "growing-oscillation",
+      "domain": "real",
+      "input": "limit(q*sin(6*q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "does not exist"
+      },
+      "reference": "Use q=(pi/2+2pi*n)/a and q=(3pi/2+2pi*n)/a as witnesses."
+    },
+    {
+      "id": "series-geometric-06",
+      "operation": "series",
+      "family": "geometric",
+      "domain": "real",
+      "input": "sum((6/7)^j,j,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "7"
+      },
+      "reference": "Finite geometric sum and a/(a+1)<1."
+    },
+    {
+      "id": "series-telescoping-06",
+      "operation": "series",
+      "family": "telescoping",
+      "domain": "real",
+      "input": "sum(1/((j+6)*(j+7)),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "1/7"
+      },
+      "reference": "Term equals 1/(j+a)−1/(j+a+1)."
+    },
+    {
+      "id": "series-basel-tail-06",
+      "operation": "series",
+      "family": "basel-tail",
+      "domain": "real",
+      "input": "sum(1/j^2,j,7,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "pi^2/6-sum(1/j^2,j,1,6)"
+      },
+      "reference": "DLMF 25.6 at ζ(2), minus the finite initial segment."
+    },
+    {
+      "id": "series-harmonic-shift-06",
+      "operation": "series",
+      "family": "harmonic-shift",
+      "domain": "real",
+      "input": "sum(1/(j+6),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "diverges to +Infinity"
+      },
+      "reference": "Deleting finitely many terms preserves harmonic divergence."
+    },
+    {
+      "id": "series-alternating-log-06",
+      "operation": "series",
+      "family": "alternating-log",
+      "domain": "real",
+      "input": "sum((-1)^(j-1)/(7^j*j),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(8/7) (absolute convergence)"
+      },
+      "reference": "Integrate geometric series on [0,1/(a+1)]."
+    },
+    {
+      "id": "series-log-power-radius-06",
+      "operation": "series",
+      "family": "log-power-radius",
+      "domain": "real z",
+      "input": "sum((6*z)^j/j,j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-ln(1-6*z); radius=1/6; converges conditionally at -1/6; diverges at 1/6"
+      },
+      "reference": "Ratio test inside/outside, harmonic and alternating harmonic at endpoints."
+    },
+    {
+      "id": "ode-scalar-linear-06",
+      "operation": "ode",
+      "family": "scalar-linear",
+      "domain": "real",
+      "input": "u'(t)=6*u(t); u(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=2*exp(6*t)"
+      },
+      "reference": "Differentiate, verify initial condition, and use linear uniqueness."
+    },
+    {
+      "id": "ode-second-order-oscillator-06",
+      "operation": "ode",
+      "family": "second-order-oscillator",
+      "domain": "real",
+      "input": "w''(s)=-36*w(s); w(0)=1; w'(0)=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "w(s)=cos(6*s)"
+      },
+      "reference": "Differentiate twice, verify both ICs, and use linear uniqueness."
+    },
+    {
+      "id": "ode-third-order-zero-06",
+      "operation": "ode",
+      "family": "third-order-zero",
+      "domain": "real",
+      "input": "v'''(t)=0; v(0)=6; v'(0)=1; v''(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "v(t)=6+t+t^2"
+      },
+      "reference": "Integrate successively, using each initial condition."
+    },
+    {
+      "id": "ode-quadratic-blowup-06",
+      "operation": "ode",
+      "family": "quadratic-blowup",
+      "domain": "real",
+      "input": "u'(t)=6*u(t)^2; u(0)=1",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=1/(1-6*t); maximal interval t<1/6"
+      },
+      "reference": "Separate variables and check the pole at t=1/a."
+    },
+    {
+      "id": "ode-coupled-rotation-06",
+      "operation": "ode",
+      "family": "coupled-rotation",
+      "domain": "real",
+      "input": "u'=-6*v; v'=6*u; (u(0),v(0))=(1,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "(u(t),v(t))=(cos(6*t),sin(6*t))"
+      },
+      "reference": "Substitute both derivatives and initial data, then apply linear system uniqueness."
+    },
+    {
+      "id": "ode-fractional-nonunique-06",
+      "operation": "ode",
+      "family": "fractional-nonunique",
+      "domain": "t >= 0",
+      "input": "u'=6*abs(u)^(1/2); u(0)=0; find u(t) on t>=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "nonunique: zero, and u(t)=0 for t<=c, 36*(t-c)^2/4 for t>=c, c>=0"
+      },
+      "reference": "Both types satisfy the differential equation at t=c as well as away from it."
+    },
+    {
+      "id": "pde-heat-mode-06",
+      "operation": "pde",
+      "family": "heat-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(6*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-36*t)*sin(6*x)"
+      },
+      "reference": "Sine eigenmode, verify PDE, IC, and both BCs. Heat uniqueness by energy."
+    },
+    {
+      "id": "pde-heat-two-modes-06",
+      "operation": "pde",
+      "family": "heat-two-modes",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=6*u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(x)+sin(2*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-6*t)*sin(x)+exp(-24*t)*sin(2*x)"
+      },
+      "reference": "Verify by linear superposition and heat uniqueness."
+    },
+    {
+      "id": "pde-wave-mode-06",
+      "operation": "pde",
+      "family": "wave-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_tt=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=0; u_t(x,0)=sin(6*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=sin(6*t)*sin(6*x)/6"
+      },
+      "reference": "Verify mode, both initial data and both boundaries. Wave uniqueness by energy."
+    },
+    {
+      "id": "pde-transport-06",
+      "operation": "pde",
+      "family": "transport",
+      "domain": "real x, t >= 0",
+      "input": "u_t+6*u_x=0; u(x,0)=exp(-x^2)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-(x-6*t)^2)"
+      },
+      "reference": "u is constant along lines x−a*t = constant."
+    },
+    {
+      "id": "pde-laplace-strip-06",
+      "operation": "pde",
+      "family": "laplace-strip",
+      "domain": "0 <= x <= pi, 0 <= y <= 1",
+      "input": "u_xx+u_yy=0 on [0,pi]×[0,1]; u zero on sides/bottom; u(x,1)=sin(6*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=sin(6*x)*sinh(6*y)/sinh(6)"
+      },
+      "reference": "Substitute Laplace operator and all boundary values. Uniqueness by maximum principle."
+    },
+    {
+      "id": "pde-poisson-polynomial-06",
+      "operation": "pde",
+      "family": "poisson-polynomial",
+      "domain": "0 <= x,y <= 1",
+      "input": "Delta u=-2*6*[x*(1-x)+y*(1-y)] on [0,1]^2; zero boundary values",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=6*x*(1-x)*y*(1-y)"
+      },
+      "reference": "Manufacture source by differentiating u. Difference of solutions is harmonic with zero boundary."
+    },
+    {
+      "id": "integral-monomial-07",
+      "operation": "integral",
+      "family": "monomial",
+      "domain": "real",
+      "input": "integrate(q^7,q)",
+      "expected": {
+        "verdict": "proved",
+        "result": "q^8/8+C"
+      },
+      "reference": "Differentiate by the power rule."
+    },
+    {
+      "id": "integral-reciprocal-shift-07",
+      "operation": "integral",
+      "family": "reciprocal-shift",
+      "domain": "w != 7",
+      "input": "integrate(1/(w-7),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(abs(w-7))+C"
+      },
+      "reference": "Differentiate on each connected component. Integration constants can differ."
+    },
+    {
+      "id": "integral-quadratic-reciprocal-07",
+      "operation": "integral",
+      "family": "quadratic-reciprocal",
+      "domain": "real",
+      "input": "integrate(1/(w^2+49),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "atan(w/7)/7+C"
+      },
+      "reference": "Differentiate arctangent or substitute w=a*t."
+    },
+    {
+      "id": "integral-exponential-gaussian-07",
+      "operation": "integral",
+      "family": "exponential-gaussian",
+      "domain": "real",
+      "input": "integrate(exp(-7*z^2),z)",
+      "expected": {
+        "verdict": "proved",
+        "result": "sqrt(pi)/(2*sqrt(7))*erf(sqrt(7)*z)+C"
+      },
+      "reference": "DLMF 7.2 definition of erf and chain rule."
+    },
+    {
+      "id": "integral-improper-gamma-07",
+      "operation": "integral",
+      "family": "improper-gamma",
+      "domain": "t >= 0",
+      "input": "integrate(t^7*exp(-t),t,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "7!"
+      },
+      "reference": "Gamma recurrence or integration by parts. Exponential decay gives vanishing upper endpoint."
+    },
+    {
+      "id": "integral-log-subtraction-07",
+      "operation": "integral",
+      "family": "log-subtraction",
+      "domain": "0 <= x <= 1/7",
+      "input": "integrate(ln(1+x)/x,x,0,1/7)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Li_2(-1/7)"
+      },
+      "reference": "DLMF 25.12 dilogarithm derivative with the removable endpoint extended by continuity."
+    },
+    {
+      "id": "limit-removable-factor-07",
+      "operation": "limit",
+      "family": "removable-factor",
+      "domain": "real",
+      "input": "limit((x^2-49)/(x-7),x,7)",
+      "expected": {
+        "verdict": "proved",
+        "result": "14"
+      },
+      "reference": "Factor numerator and cancel on a punctured neighborhood."
+    },
+    {
+      "id": "limit-directional-pole-07",
+      "operation": "limit",
+      "family": "directional-pole",
+      "domain": "real",
+      "input": "limit(-7/(x-3),x,3,right)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Infinity"
+      },
+      "reference": "Denominator is eventually positive, with modulus tending to zero."
+    },
+    {
+      "id": "limit-sinc-scale-07",
+      "operation": "limit",
+      "family": "sinc-scale",
+      "domain": "real",
+      "input": "limit(sin(7*t)/t,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "7"
+      },
+      "reference": "Use sin(q)/q→1 by squeeze argument."
+    },
+    {
+      "id": "limit-cos-second-order-07",
+      "operation": "limit",
+      "family": "cos-second-order",
+      "domain": "real",
+      "input": "limit((1-cos(7*t))/t^2,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "49/2"
+      },
+      "reference": "Use 1-cos(q)=2 sin(q/2)^2 and the sinc limit."
+    },
+    {
+      "id": "limit-polynomial-exponential-07",
+      "operation": "limit",
+      "family": "polynomial-exponential",
+      "domain": "real",
+      "input": "limit(q^7/exp(q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "0"
+      },
+      "reference": "For q>0, exp(q)≥q^(a+1)/(a+1)!, so comparison proves the result."
+    },
+    {
+      "id": "limit-growing-oscillation-07",
+      "operation": "limit",
+      "family": "growing-oscillation",
+      "domain": "real",
+      "input": "limit(q*sin(7*q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "does not exist"
+      },
+      "reference": "Use q=(pi/2+2pi*n)/a and q=(3pi/2+2pi*n)/a as witnesses."
+    },
+    {
+      "id": "series-geometric-07",
+      "operation": "series",
+      "family": "geometric",
+      "domain": "real",
+      "input": "sum((7/8)^j,j,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "8"
+      },
+      "reference": "Finite geometric sum and a/(a+1)<1."
+    },
+    {
+      "id": "series-telescoping-07",
+      "operation": "series",
+      "family": "telescoping",
+      "domain": "real",
+      "input": "sum(1/((j+7)*(j+8)),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "1/8"
+      },
+      "reference": "Term equals 1/(j+a)−1/(j+a+1)."
+    },
+    {
+      "id": "series-basel-tail-07",
+      "operation": "series",
+      "family": "basel-tail",
+      "domain": "real",
+      "input": "sum(1/j^2,j,8,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "pi^2/6-sum(1/j^2,j,1,7)"
+      },
+      "reference": "DLMF 25.6 at ζ(2), minus the finite initial segment."
+    },
+    {
+      "id": "series-harmonic-shift-07",
+      "operation": "series",
+      "family": "harmonic-shift",
+      "domain": "real",
+      "input": "sum(1/(j+7),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "diverges to +Infinity"
+      },
+      "reference": "Deleting finitely many terms preserves harmonic divergence."
+    },
+    {
+      "id": "series-alternating-log-07",
+      "operation": "series",
+      "family": "alternating-log",
+      "domain": "real",
+      "input": "sum((-1)^(j-1)/(8^j*j),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(9/8) (absolute convergence)"
+      },
+      "reference": "Integrate geometric series on [0,1/(a+1)]."
+    },
+    {
+      "id": "series-log-power-radius-07",
+      "operation": "series",
+      "family": "log-power-radius",
+      "domain": "real z",
+      "input": "sum((7*z)^j/j,j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-ln(1-7*z); radius=1/7; converges conditionally at -1/7; diverges at 1/7"
+      },
+      "reference": "Ratio test inside/outside, harmonic and alternating harmonic at endpoints."
+    },
+    {
+      "id": "ode-scalar-linear-07",
+      "operation": "ode",
+      "family": "scalar-linear",
+      "domain": "real",
+      "input": "u'(t)=7*u(t); u(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=2*exp(7*t)"
+      },
+      "reference": "Differentiate, verify initial condition, and use linear uniqueness."
+    },
+    {
+      "id": "ode-second-order-oscillator-07",
+      "operation": "ode",
+      "family": "second-order-oscillator",
+      "domain": "real",
+      "input": "w''(s)=-49*w(s); w(0)=1; w'(0)=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "w(s)=cos(7*s)"
+      },
+      "reference": "Differentiate twice, verify both ICs, and use linear uniqueness."
+    },
+    {
+      "id": "ode-third-order-zero-07",
+      "operation": "ode",
+      "family": "third-order-zero",
+      "domain": "real",
+      "input": "v'''(t)=0; v(0)=7; v'(0)=1; v''(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "v(t)=7+t+t^2"
+      },
+      "reference": "Integrate successively, using each initial condition."
+    },
+    {
+      "id": "ode-quadratic-blowup-07",
+      "operation": "ode",
+      "family": "quadratic-blowup",
+      "domain": "real",
+      "input": "u'(t)=7*u(t)^2; u(0)=1",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=1/(1-7*t); maximal interval t<1/7"
+      },
+      "reference": "Separate variables and check the pole at t=1/a."
+    },
+    {
+      "id": "ode-coupled-rotation-07",
+      "operation": "ode",
+      "family": "coupled-rotation",
+      "domain": "real",
+      "input": "u'=-7*v; v'=7*u; (u(0),v(0))=(1,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "(u(t),v(t))=(cos(7*t),sin(7*t))"
+      },
+      "reference": "Substitute both derivatives and initial data, then apply linear system uniqueness."
+    },
+    {
+      "id": "ode-fractional-nonunique-07",
+      "operation": "ode",
+      "family": "fractional-nonunique",
+      "domain": "t >= 0",
+      "input": "u'=7*abs(u)^(1/2); u(0)=0; find u(t) on t>=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "nonunique: zero, and u(t)=0 for t<=c, 49*(t-c)^2/4 for t>=c, c>=0"
+      },
+      "reference": "Both types satisfy the differential equation at t=c as well as away from it."
+    },
+    {
+      "id": "pde-heat-mode-07",
+      "operation": "pde",
+      "family": "heat-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(7*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-49*t)*sin(7*x)"
+      },
+      "reference": "Sine eigenmode, verify PDE, IC, and both BCs. Heat uniqueness by energy."
+    },
+    {
+      "id": "pde-heat-two-modes-07",
+      "operation": "pde",
+      "family": "heat-two-modes",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=7*u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(x)+sin(2*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-7*t)*sin(x)+exp(-28*t)*sin(2*x)"
+      },
+      "reference": "Verify by linear superposition and heat uniqueness."
+    },
+    {
+      "id": "pde-wave-mode-07",
+      "operation": "pde",
+      "family": "wave-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_tt=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=0; u_t(x,0)=sin(7*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=sin(7*t)*sin(7*x)/7"
+      },
+      "reference": "Verify mode, both initial data and both boundaries. Wave uniqueness by energy."
+    },
+    {
+      "id": "pde-transport-07",
+      "operation": "pde",
+      "family": "transport",
+      "domain": "real x, t >= 0",
+      "input": "u_t+7*u_x=0; u(x,0)=exp(-x^2)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-(x-7*t)^2)"
+      },
+      "reference": "u is constant along lines x−a*t = constant."
+    },
+    {
+      "id": "pde-laplace-strip-07",
+      "operation": "pde",
+      "family": "laplace-strip",
+      "domain": "0 <= x <= pi, 0 <= y <= 1",
+      "input": "u_xx+u_yy=0 on [0,pi]×[0,1]; u zero on sides/bottom; u(x,1)=sin(7*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=sin(7*x)*sinh(7*y)/sinh(7)"
+      },
+      "reference": "Substitute Laplace operator and all boundary values. Uniqueness by maximum principle."
+    },
+    {
+      "id": "pde-poisson-polynomial-07",
+      "operation": "pde",
+      "family": "poisson-polynomial",
+      "domain": "0 <= x,y <= 1",
+      "input": "Delta u=-2*7*[x*(1-x)+y*(1-y)] on [0,1]^2; zero boundary values",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=7*x*(1-x)*y*(1-y)"
+      },
+      "reference": "Manufacture source by differentiating u. Difference of solutions is harmonic with zero boundary."
+    },
+    {
+      "id": "integral-monomial-08",
+      "operation": "integral",
+      "family": "monomial",
+      "domain": "real",
+      "input": "integrate(q^8,q)",
+      "expected": {
+        "verdict": "proved",
+        "result": "q^9/9+C"
+      },
+      "reference": "Differentiate by the power rule."
+    },
+    {
+      "id": "integral-reciprocal-shift-08",
+      "operation": "integral",
+      "family": "reciprocal-shift",
+      "domain": "w != 8",
+      "input": "integrate(1/(w-8),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(abs(w-8))+C"
+      },
+      "reference": "Differentiate on each connected component. Integration constants can differ."
+    },
+    {
+      "id": "integral-quadratic-reciprocal-08",
+      "operation": "integral",
+      "family": "quadratic-reciprocal",
+      "domain": "real",
+      "input": "integrate(1/(w^2+64),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "atan(w/8)/8+C"
+      },
+      "reference": "Differentiate arctangent or substitute w=a*t."
+    },
+    {
+      "id": "integral-exponential-gaussian-08",
+      "operation": "integral",
+      "family": "exponential-gaussian",
+      "domain": "real",
+      "input": "integrate(exp(-8*z^2),z)",
+      "expected": {
+        "verdict": "proved",
+        "result": "sqrt(pi)/(2*sqrt(8))*erf(sqrt(8)*z)+C"
+      },
+      "reference": "DLMF 7.2 definition of erf and chain rule."
+    },
+    {
+      "id": "integral-improper-gamma-08",
+      "operation": "integral",
+      "family": "improper-gamma",
+      "domain": "t >= 0",
+      "input": "integrate(t^8*exp(-t),t,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "8!"
+      },
+      "reference": "Gamma recurrence or integration by parts. Exponential decay gives vanishing upper endpoint."
+    },
+    {
+      "id": "integral-log-subtraction-08",
+      "operation": "integral",
+      "family": "log-subtraction",
+      "domain": "0 <= x <= 1/8",
+      "input": "integrate(ln(1+x)/x,x,0,1/8)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Li_2(-1/8)"
+      },
+      "reference": "DLMF 25.12 dilogarithm derivative with the removable endpoint extended by continuity."
+    },
+    {
+      "id": "limit-removable-factor-08",
+      "operation": "limit",
+      "family": "removable-factor",
+      "domain": "real",
+      "input": "limit((x^2-64)/(x-8),x,8)",
+      "expected": {
+        "verdict": "proved",
+        "result": "16"
+      },
+      "reference": "Factor numerator and cancel on a punctured neighborhood."
+    },
+    {
+      "id": "limit-directional-pole-08",
+      "operation": "limit",
+      "family": "directional-pole",
+      "domain": "real",
+      "input": "limit(-8/(x-3),x,3,right)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Infinity"
+      },
+      "reference": "Denominator is eventually positive, with modulus tending to zero."
+    },
+    {
+      "id": "limit-sinc-scale-08",
+      "operation": "limit",
+      "family": "sinc-scale",
+      "domain": "real",
+      "input": "limit(sin(8*t)/t,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "8"
+      },
+      "reference": "Use sin(q)/q→1 by squeeze argument."
+    },
+    {
+      "id": "limit-cos-second-order-08",
+      "operation": "limit",
+      "family": "cos-second-order",
+      "domain": "real",
+      "input": "limit((1-cos(8*t))/t^2,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "64/2"
+      },
+      "reference": "Use 1-cos(q)=2 sin(q/2)^2 and the sinc limit."
+    },
+    {
+      "id": "limit-polynomial-exponential-08",
+      "operation": "limit",
+      "family": "polynomial-exponential",
+      "domain": "real",
+      "input": "limit(q^8/exp(q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "0"
+      },
+      "reference": "For q>0, exp(q)≥q^(a+1)/(a+1)!, so comparison proves the result."
+    },
+    {
+      "id": "limit-growing-oscillation-08",
+      "operation": "limit",
+      "family": "growing-oscillation",
+      "domain": "real",
+      "input": "limit(q*sin(8*q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "does not exist"
+      },
+      "reference": "Use q=(pi/2+2pi*n)/a and q=(3pi/2+2pi*n)/a as witnesses."
+    },
+    {
+      "id": "series-geometric-08",
+      "operation": "series",
+      "family": "geometric",
+      "domain": "real",
+      "input": "sum((8/9)^j,j,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "9"
+      },
+      "reference": "Finite geometric sum and a/(a+1)<1."
+    },
+    {
+      "id": "series-telescoping-08",
+      "operation": "series",
+      "family": "telescoping",
+      "domain": "real",
+      "input": "sum(1/((j+8)*(j+9)),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "1/9"
+      },
+      "reference": "Term equals 1/(j+a)−1/(j+a+1)."
+    },
+    {
+      "id": "series-basel-tail-08",
+      "operation": "series",
+      "family": "basel-tail",
+      "domain": "real",
+      "input": "sum(1/j^2,j,9,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "pi^2/6-sum(1/j^2,j,1,8)"
+      },
+      "reference": "DLMF 25.6 at ζ(2), minus the finite initial segment."
+    },
+    {
+      "id": "series-harmonic-shift-08",
+      "operation": "series",
+      "family": "harmonic-shift",
+      "domain": "real",
+      "input": "sum(1/(j+8),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "diverges to +Infinity"
+      },
+      "reference": "Deleting finitely many terms preserves harmonic divergence."
+    },
+    {
+      "id": "series-alternating-log-08",
+      "operation": "series",
+      "family": "alternating-log",
+      "domain": "real",
+      "input": "sum((-1)^(j-1)/(9^j*j),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(10/9) (absolute convergence)"
+      },
+      "reference": "Integrate geometric series on [0,1/(a+1)]."
+    },
+    {
+      "id": "series-log-power-radius-08",
+      "operation": "series",
+      "family": "log-power-radius",
+      "domain": "real z",
+      "input": "sum((8*z)^j/j,j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-ln(1-8*z); radius=1/8; converges conditionally at -1/8; diverges at 1/8"
+      },
+      "reference": "Ratio test inside/outside, harmonic and alternating harmonic at endpoints."
+    },
+    {
+      "id": "ode-scalar-linear-08",
+      "operation": "ode",
+      "family": "scalar-linear",
+      "domain": "real",
+      "input": "u'(t)=8*u(t); u(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=2*exp(8*t)"
+      },
+      "reference": "Differentiate, verify initial condition, and use linear uniqueness."
+    },
+    {
+      "id": "ode-second-order-oscillator-08",
+      "operation": "ode",
+      "family": "second-order-oscillator",
+      "domain": "real",
+      "input": "w''(s)=-64*w(s); w(0)=1; w'(0)=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "w(s)=cos(8*s)"
+      },
+      "reference": "Differentiate twice, verify both ICs, and use linear uniqueness."
+    },
+    {
+      "id": "ode-third-order-zero-08",
+      "operation": "ode",
+      "family": "third-order-zero",
+      "domain": "real",
+      "input": "v'''(t)=0; v(0)=8; v'(0)=1; v''(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "v(t)=8+t+t^2"
+      },
+      "reference": "Integrate successively, using each initial condition."
+    },
+    {
+      "id": "ode-quadratic-blowup-08",
+      "operation": "ode",
+      "family": "quadratic-blowup",
+      "domain": "real",
+      "input": "u'(t)=8*u(t)^2; u(0)=1",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=1/(1-8*t); maximal interval t<1/8"
+      },
+      "reference": "Separate variables and check the pole at t=1/a."
+    },
+    {
+      "id": "ode-coupled-rotation-08",
+      "operation": "ode",
+      "family": "coupled-rotation",
+      "domain": "real",
+      "input": "u'=-8*v; v'=8*u; (u(0),v(0))=(1,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "(u(t),v(t))=(cos(8*t),sin(8*t))"
+      },
+      "reference": "Substitute both derivatives and initial data, then apply linear system uniqueness."
+    },
+    {
+      "id": "ode-fractional-nonunique-08",
+      "operation": "ode",
+      "family": "fractional-nonunique",
+      "domain": "t >= 0",
+      "input": "u'=8*abs(u)^(1/2); u(0)=0; find u(t) on t>=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "nonunique: zero, and u(t)=0 for t<=c, 64*(t-c)^2/4 for t>=c, c>=0"
+      },
+      "reference": "Both types satisfy the differential equation at t=c as well as away from it."
+    },
+    {
+      "id": "pde-heat-mode-08",
+      "operation": "pde",
+      "family": "heat-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(8*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-64*t)*sin(8*x)"
+      },
+      "reference": "Sine eigenmode, verify PDE, IC, and both BCs. Heat uniqueness by energy."
+    },
+    {
+      "id": "pde-heat-two-modes-08",
+      "operation": "pde",
+      "family": "heat-two-modes",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=8*u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(x)+sin(2*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-8*t)*sin(x)+exp(-32*t)*sin(2*x)"
+      },
+      "reference": "Verify by linear superposition and heat uniqueness."
+    },
+    {
+      "id": "pde-wave-mode-08",
+      "operation": "pde",
+      "family": "wave-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_tt=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=0; u_t(x,0)=sin(8*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=sin(8*t)*sin(8*x)/8"
+      },
+      "reference": "Verify mode, both initial data and both boundaries. Wave uniqueness by energy."
+    },
+    {
+      "id": "pde-transport-08",
+      "operation": "pde",
+      "family": "transport",
+      "domain": "real x, t >= 0",
+      "input": "u_t+8*u_x=0; u(x,0)=exp(-x^2)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-(x-8*t)^2)"
+      },
+      "reference": "u is constant along lines x−a*t = constant."
+    },
+    {
+      "id": "pde-laplace-strip-08",
+      "operation": "pde",
+      "family": "laplace-strip",
+      "domain": "0 <= x <= pi, 0 <= y <= 1",
+      "input": "u_xx+u_yy=0 on [0,pi]×[0,1]; u zero on sides/bottom; u(x,1)=sin(8*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=sin(8*x)*sinh(8*y)/sinh(8)"
+      },
+      "reference": "Substitute Laplace operator and all boundary values. Uniqueness by maximum principle."
+    },
+    {
+      "id": "pde-poisson-polynomial-08",
+      "operation": "pde",
+      "family": "poisson-polynomial",
+      "domain": "0 <= x,y <= 1",
+      "input": "Delta u=-2*8*[x*(1-x)+y*(1-y)] on [0,1]^2; zero boundary values",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=8*x*(1-x)*y*(1-y)"
+      },
+      "reference": "Manufacture source by differentiating u. Difference of solutions is harmonic with zero boundary."
+    },
+    {
+      "id": "integral-monomial-09",
+      "operation": "integral",
+      "family": "monomial",
+      "domain": "real",
+      "input": "integrate(q^9,q)",
+      "expected": {
+        "verdict": "proved",
+        "result": "q^10/10+C"
+      },
+      "reference": "Differentiate by the power rule."
+    },
+    {
+      "id": "integral-reciprocal-shift-09",
+      "operation": "integral",
+      "family": "reciprocal-shift",
+      "domain": "w != 9",
+      "input": "integrate(1/(w-9),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(abs(w-9))+C"
+      },
+      "reference": "Differentiate on each connected component. Integration constants can differ."
+    },
+    {
+      "id": "integral-quadratic-reciprocal-09",
+      "operation": "integral",
+      "family": "quadratic-reciprocal",
+      "domain": "real",
+      "input": "integrate(1/(w^2+81),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "atan(w/9)/9+C"
+      },
+      "reference": "Differentiate arctangent or substitute w=a*t."
+    },
+    {
+      "id": "integral-exponential-gaussian-09",
+      "operation": "integral",
+      "family": "exponential-gaussian",
+      "domain": "real",
+      "input": "integrate(exp(-9*z^2),z)",
+      "expected": {
+        "verdict": "proved",
+        "result": "sqrt(pi)/(2*sqrt(9))*erf(sqrt(9)*z)+C"
+      },
+      "reference": "DLMF 7.2 definition of erf and chain rule."
+    },
+    {
+      "id": "integral-improper-gamma-09",
+      "operation": "integral",
+      "family": "improper-gamma",
+      "domain": "t >= 0",
+      "input": "integrate(t^9*exp(-t),t,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "9!"
+      },
+      "reference": "Gamma recurrence or integration by parts. Exponential decay gives vanishing upper endpoint."
+    },
+    {
+      "id": "integral-log-subtraction-09",
+      "operation": "integral",
+      "family": "log-subtraction",
+      "domain": "0 <= x <= 1/9",
+      "input": "integrate(ln(1+x)/x,x,0,1/9)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Li_2(-1/9)"
+      },
+      "reference": "DLMF 25.12 dilogarithm derivative with the removable endpoint extended by continuity."
+    },
+    {
+      "id": "limit-removable-factor-09",
+      "operation": "limit",
+      "family": "removable-factor",
+      "domain": "real",
+      "input": "limit((x^2-81)/(x-9),x,9)",
+      "expected": {
+        "verdict": "proved",
+        "result": "18"
+      },
+      "reference": "Factor numerator and cancel on a punctured neighborhood."
+    },
+    {
+      "id": "limit-directional-pole-09",
+      "operation": "limit",
+      "family": "directional-pole",
+      "domain": "real",
+      "input": "limit(-9/(x-3),x,3,right)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Infinity"
+      },
+      "reference": "Denominator is eventually positive, with modulus tending to zero."
+    },
+    {
+      "id": "limit-sinc-scale-09",
+      "operation": "limit",
+      "family": "sinc-scale",
+      "domain": "real",
+      "input": "limit(sin(9*t)/t,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "9"
+      },
+      "reference": "Use sin(q)/q→1 by squeeze argument."
+    },
+    {
+      "id": "limit-cos-second-order-09",
+      "operation": "limit",
+      "family": "cos-second-order",
+      "domain": "real",
+      "input": "limit((1-cos(9*t))/t^2,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "81/2"
+      },
+      "reference": "Use 1-cos(q)=2 sin(q/2)^2 and the sinc limit."
+    },
+    {
+      "id": "limit-polynomial-exponential-09",
+      "operation": "limit",
+      "family": "polynomial-exponential",
+      "domain": "real",
+      "input": "limit(q^9/exp(q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "0"
+      },
+      "reference": "For q>0, exp(q)≥q^(a+1)/(a+1)!, so comparison proves the result."
+    },
+    {
+      "id": "limit-growing-oscillation-09",
+      "operation": "limit",
+      "family": "growing-oscillation",
+      "domain": "real",
+      "input": "limit(q*sin(9*q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "does not exist"
+      },
+      "reference": "Use q=(pi/2+2pi*n)/a and q=(3pi/2+2pi*n)/a as witnesses."
+    },
+    {
+      "id": "series-geometric-09",
+      "operation": "series",
+      "family": "geometric",
+      "domain": "real",
+      "input": "sum((9/10)^j,j,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "10"
+      },
+      "reference": "Finite geometric sum and a/(a+1)<1."
+    },
+    {
+      "id": "series-telescoping-09",
+      "operation": "series",
+      "family": "telescoping",
+      "domain": "real",
+      "input": "sum(1/((j+9)*(j+10)),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "1/10"
+      },
+      "reference": "Term equals 1/(j+a)−1/(j+a+1)."
+    },
+    {
+      "id": "series-basel-tail-09",
+      "operation": "series",
+      "family": "basel-tail",
+      "domain": "real",
+      "input": "sum(1/j^2,j,10,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "pi^2/6-sum(1/j^2,j,1,9)"
+      },
+      "reference": "DLMF 25.6 at ζ(2), minus the finite initial segment."
+    },
+    {
+      "id": "series-harmonic-shift-09",
+      "operation": "series",
+      "family": "harmonic-shift",
+      "domain": "real",
+      "input": "sum(1/(j+9),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "diverges to +Infinity"
+      },
+      "reference": "Deleting finitely many terms preserves harmonic divergence."
+    },
+    {
+      "id": "series-alternating-log-09",
+      "operation": "series",
+      "family": "alternating-log",
+      "domain": "real",
+      "input": "sum((-1)^(j-1)/(10^j*j),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(11/10) (absolute convergence)"
+      },
+      "reference": "Integrate geometric series on [0,1/(a+1)]."
+    },
+    {
+      "id": "series-log-power-radius-09",
+      "operation": "series",
+      "family": "log-power-radius",
+      "domain": "real z",
+      "input": "sum((9*z)^j/j,j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-ln(1-9*z); radius=1/9; converges conditionally at -1/9; diverges at 1/9"
+      },
+      "reference": "Ratio test inside/outside, harmonic and alternating harmonic at endpoints."
+    },
+    {
+      "id": "ode-scalar-linear-09",
+      "operation": "ode",
+      "family": "scalar-linear",
+      "domain": "real",
+      "input": "u'(t)=9*u(t); u(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=2*exp(9*t)"
+      },
+      "reference": "Differentiate, verify initial condition, and use linear uniqueness."
+    },
+    {
+      "id": "ode-second-order-oscillator-09",
+      "operation": "ode",
+      "family": "second-order-oscillator",
+      "domain": "real",
+      "input": "w''(s)=-81*w(s); w(0)=1; w'(0)=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "w(s)=cos(9*s)"
+      },
+      "reference": "Differentiate twice, verify both ICs, and use linear uniqueness."
+    },
+    {
+      "id": "ode-third-order-zero-09",
+      "operation": "ode",
+      "family": "third-order-zero",
+      "domain": "real",
+      "input": "v'''(t)=0; v(0)=9; v'(0)=1; v''(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "v(t)=9+t+t^2"
+      },
+      "reference": "Integrate successively, using each initial condition."
+    },
+    {
+      "id": "ode-quadratic-blowup-09",
+      "operation": "ode",
+      "family": "quadratic-blowup",
+      "domain": "real",
+      "input": "u'(t)=9*u(t)^2; u(0)=1",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=1/(1-9*t); maximal interval t<1/9"
+      },
+      "reference": "Separate variables and check the pole at t=1/a."
+    },
+    {
+      "id": "ode-coupled-rotation-09",
+      "operation": "ode",
+      "family": "coupled-rotation",
+      "domain": "real",
+      "input": "u'=-9*v; v'=9*u; (u(0),v(0))=(1,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "(u(t),v(t))=(cos(9*t),sin(9*t))"
+      },
+      "reference": "Substitute both derivatives and initial data, then apply linear system uniqueness."
+    },
+    {
+      "id": "ode-fractional-nonunique-09",
+      "operation": "ode",
+      "family": "fractional-nonunique",
+      "domain": "t >= 0",
+      "input": "u'=9*abs(u)^(1/2); u(0)=0; find u(t) on t>=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "nonunique: zero, and u(t)=0 for t<=c, 81*(t-c)^2/4 for t>=c, c>=0"
+      },
+      "reference": "Both types satisfy the differential equation at t=c as well as away from it."
+    },
+    {
+      "id": "pde-heat-mode-09",
+      "operation": "pde",
+      "family": "heat-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(9*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-81*t)*sin(9*x)"
+      },
+      "reference": "Sine eigenmode, verify PDE, IC, and both BCs. Heat uniqueness by energy."
+    },
+    {
+      "id": "pde-heat-two-modes-09",
+      "operation": "pde",
+      "family": "heat-two-modes",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=9*u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(x)+sin(2*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-9*t)*sin(x)+exp(-36*t)*sin(2*x)"
+      },
+      "reference": "Verify by linear superposition and heat uniqueness."
+    },
+    {
+      "id": "pde-wave-mode-09",
+      "operation": "pde",
+      "family": "wave-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_tt=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=0; u_t(x,0)=sin(9*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=sin(9*t)*sin(9*x)/9"
+      },
+      "reference": "Verify mode, both initial data and both boundaries. Wave uniqueness by energy."
+    },
+    {
+      "id": "pde-transport-09",
+      "operation": "pde",
+      "family": "transport",
+      "domain": "real x, t >= 0",
+      "input": "u_t+9*u_x=0; u(x,0)=exp(-x^2)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-(x-9*t)^2)"
+      },
+      "reference": "u is constant along lines x−a*t = constant."
+    },
+    {
+      "id": "pde-laplace-strip-09",
+      "operation": "pde",
+      "family": "laplace-strip",
+      "domain": "0 <= x <= pi, 0 <= y <= 1",
+      "input": "u_xx+u_yy=0 on [0,pi]×[0,1]; u zero on sides/bottom; u(x,1)=sin(9*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=sin(9*x)*sinh(9*y)/sinh(9)"
+      },
+      "reference": "Substitute Laplace operator and all boundary values. Uniqueness by maximum principle."
+    },
+    {
+      "id": "pde-poisson-polynomial-09",
+      "operation": "pde",
+      "family": "poisson-polynomial",
+      "domain": "0 <= x,y <= 1",
+      "input": "Delta u=-2*9*[x*(1-x)+y*(1-y)] on [0,1]^2; zero boundary values",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=9*x*(1-x)*y*(1-y)"
+      },
+      "reference": "Manufacture source by differentiating u. Difference of solutions is harmonic with zero boundary."
+    },
+    {
+      "id": "integral-monomial-10",
+      "operation": "integral",
+      "family": "monomial",
+      "domain": "real",
+      "input": "integrate(q^10,q)",
+      "expected": {
+        "verdict": "proved",
+        "result": "q^11/11+C"
+      },
+      "reference": "Differentiate by the power rule."
+    },
+    {
+      "id": "integral-reciprocal-shift-10",
+      "operation": "integral",
+      "family": "reciprocal-shift",
+      "domain": "w != 10",
+      "input": "integrate(1/(w-10),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(abs(w-10))+C"
+      },
+      "reference": "Differentiate on each connected component. Integration constants can differ."
+    },
+    {
+      "id": "integral-quadratic-reciprocal-10",
+      "operation": "integral",
+      "family": "quadratic-reciprocal",
+      "domain": "real",
+      "input": "integrate(1/(w^2+100),w)",
+      "expected": {
+        "verdict": "proved",
+        "result": "atan(w/10)/10+C"
+      },
+      "reference": "Differentiate arctangent or substitute w=a*t."
+    },
+    {
+      "id": "integral-exponential-gaussian-10",
+      "operation": "integral",
+      "family": "exponential-gaussian",
+      "domain": "real",
+      "input": "integrate(exp(-10*z^2),z)",
+      "expected": {
+        "verdict": "proved",
+        "result": "sqrt(pi)/(2*sqrt(10))*erf(sqrt(10)*z)+C"
+      },
+      "reference": "DLMF 7.2 definition of erf and chain rule."
+    },
+    {
+      "id": "integral-improper-gamma-10",
+      "operation": "integral",
+      "family": "improper-gamma",
+      "domain": "t >= 0",
+      "input": "integrate(t^10*exp(-t),t,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "10!"
+      },
+      "reference": "Gamma recurrence or integration by parts. Exponential decay gives vanishing upper endpoint."
+    },
+    {
+      "id": "integral-log-subtraction-10",
+      "operation": "integral",
+      "family": "log-subtraction",
+      "domain": "0 <= x <= 1/10",
+      "input": "integrate(ln(1+x)/x,x,0,1/10)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Li_2(-1/10)"
+      },
+      "reference": "DLMF 25.12 dilogarithm derivative with the removable endpoint extended by continuity."
+    },
+    {
+      "id": "limit-removable-factor-10",
+      "operation": "limit",
+      "family": "removable-factor",
+      "domain": "real",
+      "input": "limit((x^2-100)/(x-10),x,10)",
+      "expected": {
+        "verdict": "proved",
+        "result": "20"
+      },
+      "reference": "Factor numerator and cancel on a punctured neighborhood."
+    },
+    {
+      "id": "limit-directional-pole-10",
+      "operation": "limit",
+      "family": "directional-pole",
+      "domain": "real",
+      "input": "limit(-10/(x-3),x,3,right)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-Infinity"
+      },
+      "reference": "Denominator is eventually positive, with modulus tending to zero."
+    },
+    {
+      "id": "limit-sinc-scale-10",
+      "operation": "limit",
+      "family": "sinc-scale",
+      "domain": "real",
+      "input": "limit(sin(10*t)/t,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "10"
+      },
+      "reference": "Use sin(q)/q→1 by squeeze argument."
+    },
+    {
+      "id": "limit-cos-second-order-10",
+      "operation": "limit",
+      "family": "cos-second-order",
+      "domain": "real",
+      "input": "limit((1-cos(10*t))/t^2,t,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "100/2"
+      },
+      "reference": "Use 1-cos(q)=2 sin(q/2)^2 and the sinc limit."
+    },
+    {
+      "id": "limit-polynomial-exponential-10",
+      "operation": "limit",
+      "family": "polynomial-exponential",
+      "domain": "real",
+      "input": "limit(q^10/exp(q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "0"
+      },
+      "reference": "For q>0, exp(q)≥q^(a+1)/(a+1)!, so comparison proves the result."
+    },
+    {
+      "id": "limit-growing-oscillation-10",
+      "operation": "limit",
+      "family": "growing-oscillation",
+      "domain": "real",
+      "input": "limit(q*sin(10*q),q,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "does not exist"
+      },
+      "reference": "Use q=(pi/2+2pi*n)/a and q=(3pi/2+2pi*n)/a as witnesses."
+    },
+    {
+      "id": "series-geometric-10",
+      "operation": "series",
+      "family": "geometric",
+      "domain": "real",
+      "input": "sum((10/11)^j,j,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "11"
+      },
+      "reference": "Finite geometric sum and a/(a+1)<1."
+    },
+    {
+      "id": "series-telescoping-10",
+      "operation": "series",
+      "family": "telescoping",
+      "domain": "real",
+      "input": "sum(1/((j+10)*(j+11)),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "1/11"
+      },
+      "reference": "Term equals 1/(j+a)−1/(j+a+1)."
+    },
+    {
+      "id": "series-basel-tail-10",
+      "operation": "series",
+      "family": "basel-tail",
+      "domain": "real",
+      "input": "sum(1/j^2,j,11,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "pi^2/6-sum(1/j^2,j,1,10)"
+      },
+      "reference": "DLMF 25.6 at ζ(2), minus the finite initial segment."
+    },
+    {
+      "id": "series-harmonic-shift-10",
+      "operation": "series",
+      "family": "harmonic-shift",
+      "domain": "real",
+      "input": "sum(1/(j+10),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "diverges to +Infinity"
+      },
+      "reference": "Deleting finitely many terms preserves harmonic divergence."
+    },
+    {
+      "id": "series-alternating-log-10",
+      "operation": "series",
+      "family": "alternating-log",
+      "domain": "real",
+      "input": "sum((-1)^(j-1)/(11^j*j),j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "ln(12/11) (absolute convergence)"
+      },
+      "reference": "Integrate geometric series on [0,1/(a+1)]."
+    },
+    {
+      "id": "series-log-power-radius-10",
+      "operation": "series",
+      "family": "log-power-radius",
+      "domain": "real z",
+      "input": "sum((10*z)^j/j,j,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "-ln(1-10*z); radius=1/10; converges conditionally at -1/10; diverges at 1/10"
+      },
+      "reference": "Ratio test inside/outside, harmonic and alternating harmonic at endpoints."
+    },
+    {
+      "id": "ode-scalar-linear-10",
+      "operation": "ode",
+      "family": "scalar-linear",
+      "domain": "real",
+      "input": "u'(t)=10*u(t); u(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=2*exp(10*t)"
+      },
+      "reference": "Differentiate, verify initial condition, and use linear uniqueness."
+    },
+    {
+      "id": "ode-second-order-oscillator-10",
+      "operation": "ode",
+      "family": "second-order-oscillator",
+      "domain": "real",
+      "input": "w''(s)=-100*w(s); w(0)=1; w'(0)=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "w(s)=cos(10*s)"
+      },
+      "reference": "Differentiate twice, verify both ICs, and use linear uniqueness."
+    },
+    {
+      "id": "ode-third-order-zero-10",
+      "operation": "ode",
+      "family": "third-order-zero",
+      "domain": "real",
+      "input": "v'''(t)=0; v(0)=10; v'(0)=1; v''(0)=2",
+      "expected": {
+        "verdict": "proved",
+        "result": "v(t)=10+t+t^2"
+      },
+      "reference": "Integrate successively, using each initial condition."
+    },
+    {
+      "id": "ode-quadratic-blowup-10",
+      "operation": "ode",
+      "family": "quadratic-blowup",
+      "domain": "real",
+      "input": "u'(t)=10*u(t)^2; u(0)=1",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(t)=1/(1-10*t); maximal interval t<1/10"
+      },
+      "reference": "Separate variables and check the pole at t=1/a."
+    },
+    {
+      "id": "ode-coupled-rotation-10",
+      "operation": "ode",
+      "family": "coupled-rotation",
+      "domain": "real",
+      "input": "u'=-10*v; v'=10*u; (u(0),v(0))=(1,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "(u(t),v(t))=(cos(10*t),sin(10*t))"
+      },
+      "reference": "Substitute both derivatives and initial data, then apply linear system uniqueness."
+    },
+    {
+      "id": "ode-fractional-nonunique-10",
+      "operation": "ode",
+      "family": "fractional-nonunique",
+      "domain": "t >= 0",
+      "input": "u'=10*abs(u)^(1/2); u(0)=0; find u(t) on t>=0",
+      "expected": {
+        "verdict": "proved",
+        "result": "nonunique: zero, and u(t)=0 for t<=c, 100*(t-c)^2/4 for t>=c, c>=0"
+      },
+      "reference": "Both types satisfy the differential equation at t=c as well as away from it."
+    },
+    {
+      "id": "pde-heat-mode-10",
+      "operation": "pde",
+      "family": "heat-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(10*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-100*t)*sin(10*x)"
+      },
+      "reference": "Sine eigenmode, verify PDE, IC, and both BCs. Heat uniqueness by energy."
+    },
+    {
+      "id": "pde-heat-two-modes-10",
+      "operation": "pde",
+      "family": "heat-two-modes",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=10*u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=sin(x)+sin(2*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-10*t)*sin(x)+exp(-40*t)*sin(2*x)"
+      },
+      "reference": "Verify by linear superposition and heat uniqueness."
+    },
+    {
+      "id": "pde-wave-mode-10",
+      "operation": "pde",
+      "family": "wave-mode",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_tt=u_xx, x∈[0,pi]; u(0,t)=u(pi,t)=0; u(x,0)=0; u_t(x,0)=sin(10*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=sin(10*t)*sin(10*x)/10"
+      },
+      "reference": "Verify mode, both initial data and both boundaries. Wave uniqueness by energy."
+    },
+    {
+      "id": "pde-transport-10",
+      "operation": "pde",
+      "family": "transport",
+      "domain": "real x, t >= 0",
+      "input": "u_t+10*u_x=0; u(x,0)=exp(-x^2)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,t)=exp(-(x-10*t)^2)"
+      },
+      "reference": "u is constant along lines x−a*t = constant."
+    },
+    {
+      "id": "pde-laplace-strip-10",
+      "operation": "pde",
+      "family": "laplace-strip",
+      "domain": "0 <= x <= pi, 0 <= y <= 1",
+      "input": "u_xx+u_yy=0 on [0,pi]×[0,1]; u zero on sides/bottom; u(x,1)=sin(10*x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=sin(10*x)*sinh(10*y)/sinh(10)"
+      },
+      "reference": "Substitute Laplace operator and all boundary values. Uniqueness by maximum principle."
+    },
+    {
+      "id": "pde-poisson-polynomial-10",
+      "operation": "pde",
+      "family": "poisson-polynomial",
+      "domain": "0 <= x,y <= 1",
+      "input": "Delta u=-2*10*[x*(1-x)+y*(1-y)] on [0,1]^2; zero boundary values",
+      "expected": {
+        "verdict": "proved",
+        "result": "u(x,y)=10*x*(1-x)*y*(1-y)"
+      },
+      "reference": "Manufacture source by differentiating u. Difference of solutions is harmonic with zero boundary."
+    },
+    {
+      "id": "integral-scaled-bose",
+      "operation": "integral",
+      "family": "scaled-bose",
+      "domain": "real",
+      "input": "integrate(x/(exp(2*x)-1),x,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "pi^2/24"
+      },
+      "reference": "Substitute s=2*x and expand the denominator into positive exponentials. Tonelli and ζ(2)."
+    },
+    {
+      "id": "integral-bose-half",
+      "operation": "integral",
+      "family": "bose-half",
+      "domain": "real",
+      "input": "integrate(sqrt(x)/(exp(x)-1),x,0,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "Gamma(3/2)*zeta(3/2)"
+      },
+      "reference": "Same positive expansion and gamma substitution; near 0 behaves as x^(-1/2)."
+    },
+    {
+      "id": "integral-cauchy-tail",
+      "operation": "integral",
+      "family": "cauchy-tail",
+      "domain": "real",
+      "input": "integrate(1/(x*(1+ln(x)^2)),x,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "pi/2"
+      },
+      "reference": "Substitute s=ln x and integrate arctangent."
+    },
+    {
+      "id": "integral-principal-value",
+      "operation": "integral",
+      "family": "principal-value",
+      "domain": "real",
+      "input": "integrate(1/x,x,-1,1)",
+      "expected": {
+        "verdict": "proved",
+        "result": "diverges improperly; Cauchy principal value 0 if requested separately"
+      },
+      "reference": "One-sided improper integrals are separately divergent."
+    },
+    {
+      "id": "integral-arcsec-branches",
+      "operation": "integral",
+      "family": "arcsec-branches",
+      "domain": "abs(x)>1",
+      "input": "integrate(1/(x*sqrt(x^2-1)),x)",
+      "expected": {
+        "verdict": "proved",
+        "result": "sgn(x)*acos(1/x)+C separately on both components"
+      },
+      "reference": "Differentiate on x>1 and x<−1; sqrt(x^2)=abs(x)."
+    },
+    {
+      "id": "integral-log-quadratic-symmetry",
+      "operation": "integral",
+      "family": "log-quadratic-symmetry",
+      "domain": "real",
+      "input": "integrate(ln(1+x)/(1+x^2),x,0,1)",
+      "expected": {
+        "verdict": "proved",
+        "result": "pi*ln(2)/8"
+      },
+      "reference": "x=tan t, then pair the integrand with t→pi/4−t; the log arguments multiply to 2."
+    },
+    {
+      "id": "series-half-harmonic-neighbor",
+      "operation": "series",
+      "family": "half-harmonic-neighbor",
+      "domain": "real",
+      "input": "sum(1/(n*(2*n+1)),n,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "2-2*ln(2)"
+      },
+      "reference": "Partial fractions give 2H_N−2H_(2N+1)+2; take the harmonic difference limit."
+    },
+    {
+      "id": "series-terms-do-not-vanish",
+      "operation": "series",
+      "family": "terms-do-not-vanish",
+      "domain": "real",
+      "input": "sum((-1)^n*n/(n+1),n,1,Infinity)",
+      "expected": {
+        "verdict": "proved",
+        "result": "diverges"
+      },
+      "reference": "The sequence of terms has two alternating nonzero limit points."
+    },
+    {
+      "id": "limit-zeta-removable",
+      "operation": "limit",
+      "family": "zeta-removable",
+      "domain": "real",
+      "input": "limit(zeta(s)-1/(s-1),s,1)",
+      "expected": {
+        "verdict": "proved",
+        "result": "EulerGamma"
+      },
+      "reference": "Constant term of ζ’s Laurent expansion, DLMF 25.2."
+    },
+    {
+      "id": "limit-signed-corner",
+      "operation": "limit",
+      "family": "signed-corner",
+      "domain": "real",
+      "input": "limit(abs(z)/z,z,0)",
+      "expected": {
+        "verdict": "proved",
+        "result": "does not exist"
+      },
+      "reference": "The left-side value is −1 and the right-side value is +1."
+    },
+    {
+      "id": "ode-variable-coefficient",
+      "operation": "ode",
+      "family": "variable-coefficient",
+      "domain": "x>0",
+      "input": "y'+y/x=x^2; y(1)=1",
+      "expected": {
+        "verdict": "proved",
+        "result": "y=x^3/4+3/(4*x), x>0"
+      },
+      "reference": "Multiply by integrating factor x on the component of the IC. Verify residual, IC and domain."
+    },
+    {
+      "id": "pde-sine-cubed-data",
+      "operation": "pde",
+      "family": "sine-cubed-data",
+      "domain": "0 <= x <= pi, t >= 0",
+      "input": "u_t=u_xx on [0,pi]; zero Dirichlet; u(x,0)=sin(x)^3",
+      "expected": {
+        "verdict": "proved",
+        "result": "(3*exp(-t)*sin(x)-exp(-9*t)*sin(3*x))/4"
+      },
+      "reference": "Triple-angle identity makes it an exact two-mode solution."
+    },
+    {
+      "id": "precise-basel-40",
+      "operation": "precise",
+      "family": "basel-40",
+      "domain": "real",
+      "input": "analyze sum(1/n^2,n,1,40) as partial sums with proposed target pi^2/6",
+      "expected": {
+        "verdict": "proved",
+        "result": "tail lies in [1/41,1/40]; limit pi^2/6"
+      },
+      "reference": "Integral test tail enclosure and ζ(2)."
+    },
+    {
+      "id": "precise-lone-decimal",
+      "operation": "precise",
+      "family": "lone-decimal",
+      "domain": "real",
+      "input": "infer the series limit from standalone value 1.6202",
+      "expected": {
+        "verdict": "indeterminate",
+        "result": "the limit is underdetermined; decimal comparison remains possible"
+      },
+      "reference": "Distinct subsequent sequences can share a single partial sum."
+    }
+  ]
+}
