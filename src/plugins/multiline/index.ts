@@ -46,9 +46,41 @@ export default class Multiline extends PluginController<Config> {
 
   lastRememberedCursorX: number | undefined = 0;
 
-  multilineIntervalID: ReturnType<typeof setInterval> | undefined;
+  multilineTimeoutID: ReturnType<typeof setTimeout> | undefined;
+
+  /** Between afterEnable and afterDisable: no timer outlives the plugin. */
+  isEnabled = false;
 
   lastEditTime: number = Date.now();
+
+  /**
+   * Runs the queue once the user has stopped editing for
+   * `multilinifyDelayAfterEdit`. This used to be a `setInterval` of 0 ms
+   * that asked the same question every 4 ms for as long as the plugin was
+   * on, queue empty or not. Only {@link enqueueVerticalifyOperation} adds
+   * work, so a timer armed there (and re-armed while edits keep coming)
+   * does the same thing and sleeps when there is nothing to do.
+   */
+  scheduleDequeue() {
+    if (this.multilineTimeoutID !== undefined) return;
+    if (!this.settings.automaticallyMultilinify) return;
+    const wait = Math.max(
+      0,
+      this.lastEditTime + this.settings.multilinifyDelayAfterEdit - Date.now()
+    );
+    this.multilineTimeoutID = setTimeout(() => {
+      this.multilineTimeoutID = undefined;
+      if (this.pendingMultilinifications.size === 0) return;
+      if (
+        Date.now() - this.lastEditTime <
+        this.settings.multilinifyDelayAfterEdit
+      ) {
+        this.scheduleDequeue();
+        return;
+      }
+      this.dequeueAllMultilinifications();
+    }, wait);
+  }
 
   afterConfigChange(): void {
     this.unmultilineExpressions(true);
@@ -69,6 +101,7 @@ export default class Multiline extends PluginController<Config> {
 
   enqueueVerticalifyOperation(root: HTMLElement) {
     this.pendingMultilinifications.add(root);
+    if (this.isEnabled) this.scheduleDequeue();
   }
 
   multilineExpressions(e: DispatchedEvent) {
@@ -293,16 +326,7 @@ export default class Multiline extends PluginController<Config> {
     this.afterConfigChange();
     this.dequeueAllMultilinifications();
 
-    this.multilineIntervalID = setInterval(() => {
-      if (
-        Date.now() - this.lastEditTime <
-          this.settings.multilinifyDelayAfterEdit ||
-        !this.settings.automaticallyMultilinify
-      )
-        return;
-
-      this.dequeueAllMultilinifications();
-    }, 0);
+    this.isEnabled = true;
 
     this.dispatcherID = this.cc.dispatcher.register((e) => {
       if (
@@ -360,8 +384,10 @@ export default class Multiline extends PluginController<Config> {
 
     if (this.dispatcherID) this.cc.dispatcher.unregister(this.dispatcherID);
 
-    if (this.multilineIntervalID !== undefined)
-      clearInterval(this.multilineIntervalID);
+    this.isEnabled = false;
+    if (this.multilineTimeoutID !== undefined)
+      clearTimeout(this.multilineTimeoutID);
+    this.multilineTimeoutID = undefined;
   }
 
   // navigates up/down through a multiline expression

@@ -74,22 +74,37 @@ export default class SyntaxHighlighting extends PluginController<Config> {
     this.changeMouseOverElement(null);
   };
 
-  highlightedRangeInterval!: ReturnType<typeof setInterval>;
+  caretFrame: number | undefined = undefined;
+
+  /**
+   * Follows the caret once a frame, but only while some element on the page
+   * holds focus. This was a `setInterval` with no delay — a document query
+   * every 4 ms for as long as the plugin was on, whether or not anything was
+   * being typed. MathQuill only draws a caret in a focused field, so with
+   * nothing focused there is nothing to follow; the loop runs one last check
+   * after focus leaves (which clears the highlight) and then stops.
+   */
+  followCaret = () => {
+    this.caretFrame = undefined;
+    if (this.settings.highlightBracketBlocks) {
+      const cursor = document.querySelector(".dcg-mq-cursor");
+      const newCursorEl = cursor?.closest(".dcg-mq-bracket-container");
+      this.changeCaretElement((newCursorEl as HTMLElement | null) ?? null);
+    }
+    if (document.activeElement && document.activeElement !== document.body)
+      this.caretFrame = requestAnimationFrame(this.followCaret);
+  };
+
+  onFocusChange = () => {
+    this.caretFrame ??= requestAnimationFrame(this.followCaret);
+  };
 
   afterEnable(): void {
     this.afterConfigChange();
 
-    this.highlightedRangeInterval = setInterval(() => {
-      if (!this.settings.highlightBracketBlocks) return;
-
-      const cursor = document.querySelector(".dcg-mq-cursor");
-      if (cursor) {
-        const newCursorEl = cursor.closest(".dcg-mq-bracket-container");
-        this.changeCaretElement(newCursorEl as HTMLElement | null);
-      } else {
-        this.changeCaretElement(null);
-      }
-    });
+    document.addEventListener("focusin", this.onFocusChange);
+    document.addEventListener("focusout", this.onFocusChange);
+    this.onFocusChange();
 
     document.addEventListener("mouseover", this.onMouseOver);
     document.addEventListener("keydown", this.onKeyDown);
@@ -98,7 +113,10 @@ export default class SyntaxHighlighting extends PluginController<Config> {
   }
 
   afterDisable(): void {
-    clearInterval(this.highlightedRangeInterval);
+    if (this.caretFrame !== undefined) cancelAnimationFrame(this.caretFrame);
+    this.caretFrame = undefined;
+    document.removeEventListener("focusin", this.onFocusChange);
+    document.removeEventListener("focusout", this.onFocusChange);
     bpcStyleSheet.disabled = true;
     document.removeEventListener("mouseover", this.onMouseOver);
     document.removeEventListener("keydown", this.onKeyDown);
