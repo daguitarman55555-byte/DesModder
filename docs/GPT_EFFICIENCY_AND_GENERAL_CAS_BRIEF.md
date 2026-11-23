@@ -374,6 +374,34 @@ the tabs too rigid. The target is:
    (GPL engines and this repository's licence), and how its answers would
    be converted back into Desmos LaTeX.
 
+10. **Three capabilities Rafael wants the design to leave room for**
+    (added 2026-11-23, after the mock-up in `docs/mockups/calculus-tab/`):
+    - **Fractional derivatives and integrals**, D^α for real α. Which
+      definitions to offer (Riemann–Liouville, Caputo, Grünwald–Letnikov,
+      Weyl) and how the choice is shown — the conventions disagree on
+      constants and on what the lower limit is, so it is a labelled control,
+      not a silent default. Closed forms where they exist (x^k through Γ,
+      e^{ax}, sin and cos, Mittag-Leffler functions for fractional ODEs),
+      numerics with an error bound where they do not, and how each is
+      graphed in Desmos (its factorial accepts non-integers, so Γ is
+      available). How a fractional order is typed in one input.
+    - **Higher-order and nonlinear ODEs, solved and drawn.** Any order,
+      lowered to a first-order system; exact solutions where a method
+      applies, a validated numerical one otherwise. A slope field exists only
+      for first order, so say what replaces it: the phase plane for an
+      autonomous second-order equation (Physics Lab already draws one), a
+      3D phase portrait on Desmos 3D for third order (Vector Tools already
+      draws 3D arrows and streamlines), solution curves through
+      user-placed initial conditions for any order, and what can be shown
+      for order four and up.
+    - **Simplifying hard.** A Simplify operation that goes well past
+      today's `fold`/`condense`: rational functions to lowest terms, trig,
+      exponential and log identities, radicals, and assumptions that change
+      the answer (√(x²) = |x|, or x with x > 0). How "simplest" is chosen
+      when forms compete (shortest, factored, expanded, the form a course
+      expects), and how every rewrite stays proved, with the assumptions it
+      used shown.
+
 ### What to send back
 
 For each question: the recommendation, the evidence (code read, papers,

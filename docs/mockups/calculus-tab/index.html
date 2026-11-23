@@ -354,6 +354,18 @@
       .readback .dcg-mq-empty {
         display: none !important;
       }
+      /* In the input they collapse too, until the cursor goes into one (arrow
+         keys from beside the ∫): typing there makes the integral definite.
+         MathQuill navigates by structure, not position, so a slot of no
+         width is still reachable. */
+      .field .dcg-mq-int .dcg-mq-empty:not(.dcg-mq-hasCursor) {
+        background: none !important;
+        min-width: 0 !important;
+        width: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        outline: 0 !important;
+      }
       #toast {
         position: absolute;
         left: 50%;
@@ -436,7 +448,7 @@
       };
 
       const state = {
-        icon: "area",
+        icon: "integral",
         tab: "calculus",
         depth: "standard",
         useSliderValues: false,

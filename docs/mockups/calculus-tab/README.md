@@ -42,10 +42,19 @@ New, and what is being judged:
   Kahan compensation, accelerated (Richardson or Wynn ε, whichever is more
   stable), and the limit matched — labelled as evidence, not proof. The
   nth-term test proves divergence.
-- Three candidate icons, switchable at the bottom right.
+- Three candidate icons, switchable at the bottom right. Rafael picked the
+  integral sign on 2026-11-23.
 
 Not in the mock-up: PDEs on Desmos 3D, custom operators beyond `lim`,
 non-elementary functions as answers (erf, Si, …), and convergence proofs.
+Also wanted, and asked of GPT in the brief's Part 2 question 10: fractional
+derivatives and integrals, higher-order and nonlinear ODEs solved and drawn
+(phase plane, 3D phase portrait, solution curves), and a Simplify operation
+that goes far beyond today's.
+
+An indefinite ∫ has empty bound slots in Desmos's MathQuill. They are hidden
+until the cursor goes into one (arrow right from beside the ∫), and typing
+there makes the integral definite.
 
 ## Checks
 
