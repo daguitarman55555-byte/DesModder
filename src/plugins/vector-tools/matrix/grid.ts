@@ -200,43 +200,53 @@ export function keptRuns(
 ): GridRun[] {
   const finite = (p: Vec2 | undefined): p is Vec2 =>
     p !== undefined && Number.isFinite(p[0]) && Number.isFinite(p[1]);
-  const toPixels = (p: Vec2): Vec2 => [p[0] * scale[0], p[1] * scale[1]];
-  /** Distance in pixels from p to the segment a–b. */
-  const toSegment = (p: Vec2, a: Vec2, b: Vec2) => {
-    const [px, py] = toPixels(p);
-    const [ax, ay] = toPixels(a);
-    const [bx, by] = toPixels(b);
-    const dx = bx - ax;
-    const dy = by - ay;
+  const [sx, sy] = scale;
+  const gap2 = minGap * minGap;
+  // This runs for every crossing of every line on every frame the map is
+  // drawn, so it allocates nothing and compares squared pixel distances:
+  // the tuples and Math.hypot it used to build were most of its time, and a
+  // visible share of a frame while panning a fisheye.
+  /** Squared distance in pixels from p to the segment a–b. */
+  const toSegment2 = (p: Vec2, a: Vec2, b: Vec2) => {
+    const px = p[0] * sx;
+    const py = p[1] * sy;
+    const ax = a[0] * sx;
+    const ay = a[1] * sy;
+    const dx = b[0] * sx - ax;
+    const dy = b[1] * sy - ay;
     const l = dx * dx + dy * dy;
     const t =
       l === 0
         ? 0
         : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l));
-    return Math.hypot(ax + t * dx - px, ay + t * dy - py);
+    const ex = ax + t * dx - px;
+    const ey = ay + t * dy - py;
+    return ex * ex + ey * ey;
   };
   /**
-   * Distance from p to line j's curve near crossing k: its segments six
-   * crossings either side. Six, because the arcs that pile up at a rim are
-   * each the last slid along itself by a factor of a few in the other
-   * coordinate, which the doubled spacing of far lines puts a couple of
-   * crossings away; looking further costs time on every frame and finds
-   * nothing nearer.
+   * Whether p is within `minGap` pixels of line j's curve near crossing k:
+   * its segments six crossings either side. Six, because the arcs that pile
+   * up at a rim are each the last slid along itself by a factor of a few in
+   * the other coordinate, which the doubled spacing of far lines puts a
+   * couple of crossings away; looking further costs time on every frame and
+   * finds nothing nearer.
    */
-  const toLine = (p: Vec2, j: number, k: number) => {
-    let best = Infinity;
+  const crowds = (p: Vec2, j: number, k: number) => {
     const from = Math.max(0, k - 6);
     const to = Math.min(crossings - 1, k + 6);
     let previous = at(j, from);
-    if (finite(previous))
-      best = Math.hypot(...toPixels([previous[0] - p[0], previous[1] - p[1]]));
+    if (finite(previous)) {
+      const ex = (previous[0] - p[0]) * sx;
+      const ey = (previous[1] - p[1]) * sy;
+      if (ex * ex + ey * ey < gap2) return true;
+    }
     for (let other = from + 1; other <= to; other++) {
       const there = at(j, other);
       if (finite(previous) && finite(there))
-        best = Math.min(best, toSegment(p, previous, there));
+        if (toSegment2(p, previous, there) < gap2) return true;
       previous = there;
     }
-    return best;
+    return false;
   };
   const order = positions
     .map((position, i) => ({ i, n: Math.round(position / step) }))
@@ -251,11 +261,11 @@ export function keptRuns(
       const p = at(i, k);
       if (!finite(p)) continue;
       let room = true;
-      for (const direction of [-1, 1]) {
+      for (let direction = -1; room && direction <= 1; direction += 2) {
         let j = i + direction;
         while (j >= 0 && j < positions.length && !kept[j][k]) j += direction;
         if (j < 0 || j >= positions.length) continue;
-        if (toLine(p, j, k) < minGap) room = false;
+        if (crowds(p, j, k)) room = false;
       }
       kept[i][k] = room;
     }

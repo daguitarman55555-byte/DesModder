@@ -1046,6 +1046,34 @@ export class MatrixSession {
     this.unwatchBounds ??= this.host.watchBounds(() => this.schedule());
     this.layer.requestRedraw();
     this.syncField();
+    this.changedIfShown();
+  }
+
+  private lastShown = "";
+
+  /**
+   * Tells the panel to re-render, but only when something it shows from this
+   * session has changed. A sync follows every pan, and each `changed()` is
+   * a Desmos `tick` dispatch that re-renders every Desmos view: while
+   * panning, that was a second full view update per frame for a panel whose
+   * contents were the same, and the largest single cost the Matrix tab added
+   * to a pan. A pan already dispatches Desmos's own `render`, which
+   * re-renders the panel anyway, so nothing that changes during one is missed.
+   */
+  private changedIfShown() {
+    const shown = JSON.stringify([
+      this.config.on,
+      this.skipped,
+      this.shownLines,
+      this.installError,
+      this.drawError,
+      this.inverseCopies,
+      this.deferred,
+      this.t,
+      this.writes,
+    ]);
+    if (shown === this.lastShown) return;
+    this.lastShown = shown;
     this.host.changed();
   }
 

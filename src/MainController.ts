@@ -78,13 +78,26 @@ export default class DSM extends TransparentPlugins {
     this.cc.dsmHooks = makeControllerHooks(this);
   }
 
-  enabledPluginsSorted() {
+  /**
+   * Rebuilt only when a plugin is enabled or disabled. It is read four times
+   * for every action Desmos dispatches and every world update — dozens a
+   * second while a graph pans — and building it each time (keys, sort,
+   * array) showed in profiles. Invalidation replaces it rather than
+   * mutating it, so a handler that enables a plugin mid-loop leaves the loop
+   * walking the list it started with, as before.
+   */
+  private enabledPluginsSortedCache: [PluginID, PluginInstance][] | undefined;
+
+  enabledPluginsSorted(): readonly [PluginID, PluginInstance][] {
+    if (this.enabledPluginsSortedCache !== undefined)
+      return this.enabledPluginsSortedCache;
     const enabledPluginIDs = Object.keys(this.enabledPlugins) as PluginID[];
     enabledPluginIDs.sort();
     const plugins: [PluginID, PluginInstance][] = [];
     for (const id of enabledPluginIDs) {
       plugins.push([id, this.enabledPlugins[id]!]);
     }
+    this.enabledPluginsSortedCache = plugins;
     return plugins;
   }
 
@@ -249,6 +262,7 @@ export default class DSM extends TransparentPlugins {
         this.pluginsEnabled.delete(id);
         // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
         delete this.enabledPlugins[id];
+        this.enabledPluginsSortedCache = undefined;
         this._setPluginEnabled(id, false);
         plugin?.afterDisable();
       }
@@ -265,6 +279,7 @@ export default class DSM extends TransparentPlugins {
       const res = new Plugin(this, this.pluginSettings[id] as any as never);
       const ep = this.enabledPlugins as Record<PluginID, PluginInstance>;
       ep[Plugin.id] = res;
+      this.enabledPluginsSortedCache = undefined;
       (res as PluginInstance).settings = this.pluginSettings[id];
       this._setPluginEnabled(id, true);
       res.afterEnable();
