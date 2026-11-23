@@ -214,3 +214,15 @@ describe("a function of its own inverse", () => {
     check(node, emit(node));
   });
 });
+
+describe("a minus sign moved out of an even or odd function", () => {
+  test("cos is even and sin is odd", () => {
+    check(fn("cos", mul(number(-2), x)), "\\cos\\left(2x\\right)");
+    check(fn("sin", negative(x)), "-\\sin\\left(x\\right)");
+    check(fn("cos", number(-1)), "\\cos\\left(1\\right)");
+  });
+
+  test("ln is neither, and keeps its argument", () => {
+    check(fn("ln", negative(x)), "\\ln\\left(-x\\right)");
+  });
+});

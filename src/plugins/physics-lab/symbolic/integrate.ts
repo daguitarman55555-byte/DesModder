@@ -112,6 +112,7 @@ export const TECHNIQUES = {
   cyclic: "Solving for the integral that reappears",
   partialFractions: "Partial fractions",
   completingSquare: "Completing the square",
+  splitNumerator: "Splitting the fraction term by term",
   trigIdentity: "Trigonometric identities",
   reduction: "Reduction formula",
   trigSubstitution: "Trigonometric substitution",
@@ -792,6 +793,41 @@ function antiderivative(node: Node, variable: string, depth = 0): Node {
   }
 }
 
+/** `(a + b)/d` integrated as `a/d` and `b/d`, or undefined. */
+function byNumeratorTerms(
+  node: Node,
+  variable: string,
+  depth: number
+): Node | undefined {
+  if (
+    node.type !== "BinaryOperator" ||
+    node.name !== "Divide" ||
+    !dependsOn(node.right, variable)
+  )
+    return undefined;
+  const terms = topLevelTerms(node.left);
+  if (terms.length < 2) return undefined;
+  const mark = trace.length;
+  try {
+    return recorded(TECHNIQUES.splitNumerator, () =>
+      joinSums(
+        terms.map(({ term, negated }) => {
+          const part = antiderivative(
+            divide(term, node.right),
+            variable,
+            depth + 1
+          );
+          return negated ? negative(part) : part;
+        })
+      )
+    );
+  } catch (error) {
+    if (!(error instanceof IntegrationError)) throw error;
+    trace.length = mark;
+    return undefined;
+  }
+}
+
 /**
  * The rewrites, tried in the order that gives the tidiest answer.
  *
@@ -833,6 +869,14 @@ function byRewrite(
       if (!(error instanceof IntegrationError)) throw error;
     }
   }
+
+  // A sum over one denominator, split into a fraction per term: (x + 1)/√(x²+4)
+  // is x/√(x²+4), a u-substitution, plus 1/√(x²+4), a table entry. Before the
+  // trigonometric substitution, which does the whole at once and brings back
+  // tan(arctan(x/2)/2) in an answer that should say √(x² + 4). Every term has
+  // to integrate, or the split is dropped.
+  const split = byNumeratorTerms(node, variable, depth);
+  if (split !== undefined) return split;
 
   // A root of a sum of squares is the one shape no substitution can clear,
   // because what is in the way is not a composition. Tried after the search,

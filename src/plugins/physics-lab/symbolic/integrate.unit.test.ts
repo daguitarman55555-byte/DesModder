@@ -339,3 +339,14 @@ describe("a doubled angle beside the single one", () => {
     expect(isAntiderivativeOf(result, integrand)).toBe(true);
   });
 });
+
+describe("a sum over one denominator, split term by term", () => {
+  test("(x + 1)/√(x² + 4) comes back in √ and arcsinh, not tan(arctan(…))", () => {
+    const radical = fn("sqrt", add(pow(x, number(2)), number(4)));
+    const integrand = div(add(x, number(1)), radical);
+    const result = integrate(integrand, "x");
+    expect(isAntiderivativeOf(result, integrand)).toBe(true);
+    expect(emit(result)).not.toContain("tan");
+    expect(emit(result)).toContain("\\sqrt{x^{2}+4}");
+  });
+});

@@ -3582,7 +3582,7 @@ var CalcEngine = (() => {
       }
       case "FunctionCall": {
         const args = node.args.map(fold);
-        const folded = foldKnownValue(node.callee.symbol, args) ?? foldInverse(node.callee.symbol, args);
+        const folded = foldKnownValue(node.callee.symbol, args) ?? foldInverse(node.callee.symbol, args) ?? foldParity(node.callee.symbol, args);
         return folded ?? { ...node, args };
       }
       case "BinaryOperator":
@@ -3590,6 +3590,43 @@ var CalcEngine = (() => {
       default:
         return node;
     }
+  }
+  var PARITY = {
+    cos: "even",
+    sec: "even",
+    cosh: "even",
+    sin: "odd",
+    tan: "odd",
+    csc: "odd",
+    cot: "odd",
+    sinh: "odd",
+    tanh: "odd",
+    arcsin: "odd",
+    arctan: "odd"
+  };
+  function foldParity(name, args) {
+    const parity = PARITY[name];
+    if (parity === void 0 || args.length !== 1)
+      return void 0;
+    const [arg] = args;
+    let positive3;
+    if (arg.type === "Negative")
+      positive3 = arg.arg;
+    else if (arg.type === "Constant" && arg.value < 0)
+      positive3 = number2(-arg.value);
+    else if (arg.type === "BinaryOperator" && (arg.name === "Multiply" || arg.name === "Divide")) {
+      const coefficient = constantValue(arg.left);
+      if (coefficient !== void 0 && coefficient < 0)
+        positive3 = fold(binop2(arg.name, number2(-coefficient), arg.right));
+    }
+    if (positive3 === void 0)
+      return void 0;
+    const mirrored = {
+      type: "FunctionCall",
+      callee: id3(name),
+      args: [positive3]
+    };
+    return parity === "even" ? mirrored : negative2(mirrored);
   }
   function isFractionLike(node) {
     if (node.type === "Negative")
@@ -11050,6 +11087,7 @@ var CalcEngine = (() => {
     cyclic: "Solving for the integral that reappears",
     partialFractions: "Partial fractions",
     completingSquare: "Completing the square",
+    splitNumerator: "Splitting the fraction term by term",
     trigIdentity: "Trigonometric identities",
     reduction: "Reduction formula",
     trigSubstitution: "Trigonometric substitution",
@@ -11435,6 +11473,34 @@ var CalcEngine = (() => {
       throw error2;
     }
   }
+  function byNumeratorTerms(node, variable, depth2) {
+    if (node.type !== "BinaryOperator" || node.name !== "Divide" || !dependsOn(node.right, variable))
+      return void 0;
+    const terms = topLevelTerms(node.left);
+    if (terms.length < 2)
+      return void 0;
+    const mark = trace.length;
+    try {
+      return recorded(
+        TECHNIQUES.splitNumerator,
+        () => joinSums(
+          terms.map(({ term: term2, negated }) => {
+            const part = antiderivative(
+              divide(term2, node.right),
+              variable,
+              depth2 + 1
+            );
+            return negated ? negative2(part) : part;
+          })
+        )
+      );
+    } catch (error2) {
+      if (!(error2 instanceof IntegrationError))
+        throw error2;
+      trace.length = mark;
+      return void 0;
+    }
+  }
   function byRewrite(node, variable, depth2) {
     if (depth2 >= MAX_SUBSTITUTION_DEPTH)
       return void 0;
@@ -11465,6 +11531,9 @@ var CalcEngine = (() => {
           throw error2;
       }
     }
+    const split4 = byNumeratorTerms(node, variable, depth2);
+    if (split4 !== void 0)
+      return split4;
     const trig = findTrigSubstitution(node, variable);
     if (trig !== void 0) {
       try {
@@ -14198,12 +14267,35 @@ var CalcEngine = (() => {
         const inner = exactConstant(node.args[0]);
         if (inner === void 0)
           return void 0;
-        return special(node.callee.symbol, inner);
+        const name = node.callee.symbol;
+        const found = special(name, inner);
+        if (found !== void 0)
+          return found;
+        const parity = PARITY2[name];
+        if (parity === void 0 || !(toNumber2(inner) < 0))
+          return void 0;
+        const mirrored = exactConstant(call(name, toNode(negate2(inner))));
+        if (mirrored === void 0)
+          return void 0;
+        return parity === "odd" ? negate2(mirrored) : mirrored;
       }
       default:
         return void 0;
     }
   }
+  var PARITY2 = {
+    cos: "even",
+    sec: "even",
+    cosh: "even",
+    sin: "odd",
+    tan: "odd",
+    csc: "odd",
+    cot: "odd",
+    sinh: "odd",
+    tanh: "odd",
+    arcsin: "odd",
+    arctan: "odd"
+  };
   function exponential2(v) {
     let total = fromInteger(1);
     for (const t of v) {
@@ -15255,6 +15347,293 @@ var CalcEngine = (() => {
     if (found.length > MAX_BREAKS)
       return void 0;
     return found.sort((p, q) => p.value - q.value).map(({ exact, value }) => ({ node: toNode(exact), value }));
+  }
+
+  // src/plugins/physics-lab/symbolic/absolute.ts
+  function rootsOf(factor) {
+    if (factor.length === 2)
+      return [rationalNode2(negate(factor[0]))];
+    if (factor.length !== 3)
+      return void 0;
+    const [c, b] = factor;
+    const D = subtract3(multiply3(b, b), multiply3(rational(4n), c));
+    if (!(D.n > 0n))
+      return [];
+    const half = rational(1n, 2n);
+    const centre = rationalNode2(multiply3(negate(b), half));
+    const spread = divide(power2(rationalNode2(D), rationalNode2(half)), number2(2));
+    return [
+      fold(add(centre, { type: "Negative", arg: spread })),
+      fold(add(centre, spread))
+    ];
+  }
+  function splitAbsolute(integrand, variable, lower, upper) {
+    const insides = [];
+    visit(integrand, (child) => {
+      if (child.type === "FunctionCall" && child.callee.symbol === "abs" && child.args.length === 1 && dependsOn(child.args[0], variable))
+        insides.push(child.args[0]);
+    });
+    if (insides.length === 0)
+      return void 0;
+    const a = lower.kind === "finite" ? lower.value : lower.sign * Infinity;
+    const b = upper.kind === "finite" ? upper.value : upper.sign * Infinity;
+    const [lo, hi] = a <= b ? [a, b] : [b, a];
+    const cuts = [];
+    for (const inside of insides) {
+      const poly = asQPoly(inside, variable);
+      if (poly === void 0 || poly.length < 2)
+        return void 0;
+      const factors = factorOverQ(poly);
+      if (factors === void 0)
+        return void 0;
+      for (const factor of factors) {
+        const roots = rootsOf(factor);
+        if (roots === void 0) {
+          const f = (x) => factor.reduce((s, q, i) => s + toNumber(q) * x ** i, 0);
+          const ends = [lo, hi].map((x) => Number.isFinite(x) ? x : 1e6 * x);
+          for (let i = 0; i < 400; i += 1) {
+            const x = ends[0] + (ends[1] - ends[0]) * i / 400;
+            const y = ends[0] + (ends[1] - ends[0]) * (i + 1) / 400;
+            if (f(x) * f(y) <= 0)
+              return void 0;
+          }
+          continue;
+        }
+        for (const node of roots) {
+          const value = evaluate(node, {});
+          if (!(value > lo && value < hi))
+            continue;
+          if (cuts.some((cut) => Math.abs(cut.value - value) < 1e-12))
+            continue;
+          cuts.push({ node, value });
+        }
+      }
+    }
+    cuts.sort((p, q) => p.value - q.value);
+    const low = a <= b ? lower : upper;
+    const high = a <= b ? upper : lower;
+    const points = [
+      low,
+      ...cuts.map((cut) => ({ kind: "finite", ...cut })),
+      high
+    ];
+    const at = (bound) => bound.kind === "finite" ? bound.value : bound.sign * Infinity;
+    const pieces = [];
+    for (let i = 0; i + 1 < points.length; i += 1) {
+      const p = at(points[i]);
+      const q = at(points[i + 1]);
+      const middle = Number.isFinite(p) && Number.isFinite(q) ? (p + q) / 2 : Number.isFinite(p) ? p + 1 : Number.isFinite(q) ? q - 1 : 0;
+      let body = integrand;
+      for (const inside of insides) {
+        const sign3 = evaluate(inside, { [variable]: middle });
+        const replaced = sign3 >= 0 ? inside : { type: "Negative", arg: inside };
+        body = replaceSubtree(body, call("abs", inside), replaced);
+      }
+      pieces.push({
+        lower: a <= b ? points[i] : points[i + 1],
+        upper: a <= b ? points[i + 1] : points[i],
+        integrand: body
+      });
+    }
+    return a <= b ? pieces : pieces.reverse();
+  }
+  function absoluteDefinite(integrand, variable, lower, upper) {
+    const pieces = splitAbsolute(integrand, variable, lower, upper);
+    if (pieces === void 0)
+      return void 0;
+    let exact = ZERO2;
+    let improper = false;
+    try {
+      for (const piece of pieces) {
+        const result = definiteIntegral(
+          piece.integrand,
+          integrate(piece.integrand, variable),
+          variable,
+          piece.lower,
+          piece.upper
+        );
+        if (result.exact === void 0)
+          return void 0;
+        exact = add5(exact, result.exact);
+        improper ||= result.improper;
+      }
+    } catch {
+      return void 0;
+    }
+    const value = toNumber2(exact);
+    const f = (x) => evaluate(integrand, { [variable]: x });
+    let check = 0;
+    for (const piece of pieces) {
+      const p = piece.lower.kind === "finite" ? piece.lower.value : piece.lower.sign * Infinity;
+      const q = piece.upper.kind === "finite" ? piece.upper.value : piece.upper.sign * Infinity;
+      const part = p <= q ? quadrature(f, p, q) : quadrature(f, q, p);
+      if (part === void 0)
+        return void 0;
+      check += p <= q ? part : -part;
+    }
+    if (Math.abs(check - value) > 1e-6 * Math.max(1, Math.abs(value)))
+      return void 0;
+    return { exact, value, improper };
+  }
+
+  // src/plugins/physics-lab/symbolic/quadrature.ts
+  var WORKING = 50;
+  var MAX_LEVEL = 8;
+  var SMALLEST_GAP_DIGITS = 300;
+  function preciseIntegral(node, variable, lower, upper, target = 32) {
+    const steps = quadratureSteps(node, variable, lower, upper, target);
+    for (; ; ) {
+      const next = steps.next();
+      if (next.done === true)
+        return next.value;
+    }
+  }
+  function* quadratureSteps(node, variable, lower, upper, target = 32) {
+    const D = decimalContext(WORKING);
+    const valueOf2 = (b, digits) => {
+      const Dd = decimalContext(digits);
+      if (b.kind === "infinite")
+        return new Dd(NaN);
+      const exact = exactConstant(b.node);
+      return exact === void 0 ? new Dd(b.value) : new Dd(toDecimal(exact, digits));
+    };
+    const halfPi = D.acos(-1).div(2);
+    let rule2;
+    let sign3 = 1;
+    let lo = lower;
+    let hi = upper;
+    const order = (b) => b.kind === "infinite" ? b.sign * Infinity : b.value;
+    if (order(lo) > order(hi)) {
+      [lo, hi] = [hi, lo];
+      sign3 = -1;
+    }
+    if (order(lo) === order(hi))
+      return { value: new D(0), digits: target };
+    if (lo.kind === "finite" && hi.kind === "finite") {
+      const half = valueOf2(hi, WORKING).minus(valueOf2(lo, WORKING)).div(2);
+      rule2 = (t) => {
+        const u = halfPi.times(sinh3(D, t));
+        const gap = half.times(2).div(D.exp(u.abs().times(2)).plus(1));
+        const c = cosh3(D, u);
+        const weight = half.times(halfPi).times(cosh3(D, t)).div(c.times(c));
+        return t.isNegative() ? { from: lo, offset: gap, weight } : { from: hi, offset: gap.neg(), weight };
+      };
+    } else if (lo.kind === "finite" || hi.kind === "finite") {
+      const end = lo.kind === "finite" ? lo : hi;
+      const towards = lo.kind === "finite" ? 1 : -1;
+      rule2 = (t) => {
+        const u = halfPi.times(sinh3(D, t));
+        const e = D.exp(u);
+        return {
+          from: end,
+          offset: e.times(towards),
+          weight: halfPi.times(cosh3(D, t)).times(e)
+        };
+      };
+    } else {
+      rule2 = (t) => {
+        const u = halfPi.times(sinh3(D, t));
+        return {
+          offset: sinh3(D, u),
+          weight: halfPi.times(cosh3(D, t)).times(cosh3(D, u))
+        };
+      };
+    }
+    const term2 = (t) => {
+      const { from, offset, weight } = rule2(t);
+      if (!offset.isFinite() || !weight.isFinite() || weight.isZero())
+        return new D(0);
+      let x;
+      let digits = WORKING;
+      if (from === void 0)
+        x = offset;
+      else {
+        const below = Math.max(0, -offset.abs().e);
+        if (below > SMALLEST_GAP_DIGITS)
+          return new D(0);
+        digits = WORKING + below;
+        x = valueOf2(from, digits).plus(offset);
+      }
+      let y;
+      try {
+        y = evaluatePrecise(node, { [variable]: x }, digits);
+      } catch {
+        return void 0;
+      }
+      if (!y.isFinite())
+        return void 0;
+      return new D(y).times(weight);
+    };
+    const negligible = new D(10).pow(-(WORKING - 5));
+    let mass = new D(0);
+    function* sideSum(h2, start, step) {
+      let total = new D(0);
+      for (const direction of [1, -1]) {
+        let small = 0;
+        for (let k = start; ; k += step) {
+          const t = h2.times(k * direction);
+          if (t.abs().gt(6.5))
+            break;
+          const value = term2(t);
+          yield;
+          if (value === void 0)
+            return void 0;
+          total = total.plus(value);
+          mass = mass.plus(value.abs());
+          if (value.abs().lte(negligible.times(total.abs().plus(1)))) {
+            small += 1;
+            if (small >= 3)
+              break;
+          } else
+            small = 0;
+        }
+      }
+      return total;
+    }
+    let h = new D(1);
+    const centre = term2(new D(0));
+    const first = yield* sideSum(h, 1, 1);
+    if (centre === void 0 || first === void 0)
+      return void 0;
+    mass = mass.plus(centre.abs());
+    let sum3 = centre.plus(first);
+    let estimate = sum3.times(h);
+    let previousDifference;
+    for (let level = 1; level <= MAX_LEVEL; level++) {
+      h = h.div(2);
+      const odd = yield* sideSum(h, 1, 2);
+      if (odd === void 0)
+        return void 0;
+      sum3 = sum3.plus(odd);
+      const next = sum3.times(h);
+      const difference = next.minus(estimate).abs();
+      estimate = next;
+      const scale = D.max(estimate.abs(), new D(10).pow(-WORKING));
+      const relative = difference.div(scale);
+      const digits = relative.isZero() ? WORKING - 10 : Math.floor(-relative.log(10).toNumber());
+      const converging = previousDifference !== void 0 && difference.lte(previousDifference);
+      if (digits >= target && converging)
+        return {
+          value: sign3 < 0 ? estimate.neg() : estimate,
+          digits: Math.min(digits, WORKING - 10)
+        };
+      const resolution = mass.times(h);
+      const settled = difference.isZero() ? WORKING - 10 : Math.floor(-difference.div(resolution).log(10).toNumber());
+      if (settled >= target && converging && estimate.abs().lte(resolution.times(new D(10).pow(-target))))
+        return { value: new D(0), digits: Math.min(settled, WORKING - 10) };
+      previousDifference = difference;
+    }
+    return void 0;
+  }
+  function sinh3(D, x) {
+    if (x.abs().lt(0.5))
+      return D.sinh(x);
+    const e = D.exp(x);
+    return e.minus(new D(1).div(e)).div(2);
+  }
+  function cosh3(D, x) {
+    const e = D.exp(x.abs());
+    return e.plus(new D(1).div(e)).div(2);
   }
 
   // src/plugins/physics-lab/symbolic/limit.ts
@@ -17590,9 +17969,7 @@ var CalcEngine = (() => {
         order: m[2].length,
         bodyLatex: m[3]
       };
-    m = new RegExp(
-      String.raw`^\\frac\{d(${NAME})\}\{d(${NAME})\}=(.+)$`
-    ).exec(s);
+    m = new RegExp(String.raw`^\\frac\{d(${NAME})\}\{d(${NAME})\}=(.+)$`).exec(s);
     if (m)
       return {
         operation: "ode",
@@ -17835,7 +18212,7 @@ var CalcEngine = (() => {
     );
   }
   function integralAnswer(body, variable, options) {
-    const integrand = implicitProducts2(body, variable);
+    const integrand = normsToAbs(implicitProducts2(body, variable));
     try {
       const found = integrateWithMethod(integrand, variable);
       const constant3 = freshName(integrand, ["C", "K", "D"]);
@@ -17886,30 +18263,14 @@ var CalcEngine = (() => {
       };
     }
   }
-  function simpson(f, a, b) {
-    const rec = (a2, b2, fa2, fm2, fb2, whole, eps, depth2) => {
-      const m = (a2 + b2) / 2;
-      const lm = (a2 + m) / 2;
-      const rm = (m + b2) / 2;
-      const flm = f(lm);
-      const frm = f(rm);
-      const left = (m - a2) / 6 * (fa2 + 4 * flm + fm2);
-      const right = (b2 - m) / 6 * (fm2 + 4 * frm + fb2);
-      if (depth2 <= 0 || Math.abs(left + right - whole) <= 15 * eps)
-        return left + right + (left + right - whole) / 15;
-      return rec(a2, m, fa2, flm, fm2, left, eps / 2, depth2 - 1) + rec(m, b2, fm2, frm, fb2, right, eps / 2, depth2 - 1);
-    };
-    const fa = f(a);
-    const fb = f(b);
-    const fm = f((a + b) / 2);
-    return rec(a, b, fa, fm, fb, (b - a) / 6 * (fa + 4 * fm + fb), 1e-12, 40);
-  }
   function definiteAnswer(body, variable, lowerLatex, upperLatex) {
     const lower = readBound(lowerLatex);
     const upper = readBound(upperLatex);
     if (!lower || !upper)
-      throw new Error("Each bound has to be a number, an expression in numbers, or \u221E.");
-    const integrand = implicitProducts2(body, variable);
+      throw new Error(
+        "Each bound has to be a number, an expression in numbers, or \u221E."
+      );
+    const integrand = normsToAbs(implicitProducts2(body, variable));
     const statement = `\\int_{${lowerLatex}}^{${upperLatex}}`;
     try {
       const F = integrateWithMethod(integrand, variable);
@@ -17938,46 +18299,80 @@ var CalcEngine = (() => {
           }
         ],
         notes: [],
-        graph: [{ latex: `${statement}${emit(integrand)}d${latexOfName(variable)}` }]
+        graph: [
+          { latex: `${statement}${emit(integrand)}d${latexOfName(variable)}` }
+        ]
       };
     } catch (error2) {
       if (!(error2 instanceof IntegrationError) && !(error2 instanceof DefiniteError))
         throw error2;
-      if (lower.kind !== "finite" || upper.kind !== "finite")
+      const cut = absoluteDefinite(integrand, variable, lower, upper);
+      if (cut?.exact !== void 0)
         return {
-          latex: "",
-          verdict: "Not decided",
-          method: `${error2.message} An infinite bound needs a proof this mock-up does not attempt numerically.`,
+          latex: emit(toNode(cut.exact)),
+          decimal: fmt(cut.value),
+          verdict: "Proved",
+          method: "The absolute value has no single antiderivative, so the interval was cut where what is inside it changes sign, and each piece integrated exactly.",
           steps: [],
           notes: [],
-          graph: []
+          graph: [
+            { latex: `${statement}${emit(integrand)}d${latexOfName(variable)}` }
+          ]
         };
-      const nudge = 1e-9 * Math.max(1, Math.abs(upper.value - lower.value));
-      const at = (x) => {
-        const y = evaluate(integrand, { [variable]: x });
-        if (Number.isFinite(y))
-          return y;
-        return (evaluate(integrand, { [variable]: x + nudge }) + evaluate(integrand, { [variable]: x - nudge })) / 2;
-      };
-      const value = simpson(at, lower.value, upper.value);
-      const recognized = recognizeDecimal(value.toPrecision(13));
+      const refuse = (why) => ({
+        latex: "",
+        verdict: "Not decided",
+        method: `${error2.message} ${why}`,
+        steps: [],
+        notes: [],
+        graph: []
+      });
+      const a = lower.kind === "finite" ? lower.value : lower.sign * Infinity;
+      const b = upper.kind === "finite" ? upper.value : upper.sign * Infinity;
+      if (interiorSingularity(
+        (x) => evaluate(integrand, { [variable]: x }),
+        Math.min(a, b),
+        Math.max(a, b)
+      ))
+        return refuse(
+          "There is a point inside the interval where the integrand has no value, so it was not integrated numerically."
+        );
+      let found;
+      try {
+        found = preciseIntegral(integrand, variable, lower, upper);
+      } catch {
+        found = void 0;
+      }
+      if (found === void 0 || !found.value.isFinite())
+        return refuse(
+          "Integrating numerically did not settle: it may diverge, or oscillate out to infinity in a way this cannot follow."
+        );
+      const value = found.value.toNumber();
+      const digits = Math.min(found.digits, 30);
+      const recognized = recognizeDecimal(
+        found.value.toSignificantDigits(digits).toFixed()
+      );
       return {
         latex: recognized ? emit(recognized.node) : fmt(value),
         decimal: fmt(value),
         verdict: "Checked numerically, not proved",
-        method: `${error2 instanceof NonElementaryError ? `No elementary antiderivative (${error2.special}), so it` : "It"} was integrated numerically.${recognized ? " The digits match the closed form shown." : ""}`,
+        method: `${error2 instanceof NonElementaryError ? `No elementary antiderivative (${error2.special}), so it` : "It"} was integrated numerically, to ${found.digits} digits.${recognized ? " The digits match the closed form shown." : ""}`,
         steps: [],
         notes: recognized ? [
           `Matches to ${recognized.digits} significant digits; a match is evidence, not a proof.`
         ] : [],
-        graph: [{ latex: `${statement}${emit(integrand)}d${latexOfName(variable)}` }]
+        graph: [
+          { latex: `${statement}${emit(integrand)}d${latexOfName(variable)}` }
+        ]
       };
     }
   }
   function limitAnswer(body, variable, pointLatex, side) {
     const at = readBound(pointLatex);
     if (!at)
-      throw new Error("The point has to be a number, an expression in numbers, or \u221E.");
+      throw new Error(
+        "The point has to be a number, an expression in numbers, or \u221E."
+      );
     const node = normsToAbs(implicitProducts2(body, variable));
     const found = findLimit(node, variable, at, side);
     const a = found.answer;
@@ -18112,7 +18507,12 @@ var CalcEngine = (() => {
     return Math.max(0, Math.min(15, Math.floor(-Math.log10(rel))));
   }
   function sumAnswer(body, variable, request) {
-    const r = preciseSum(body, variable, request.lowerLatex ?? "1", request.upperLatex ?? "\\infty");
+    const r = preciseSum(
+      body,
+      variable,
+      request.lowerLatex ?? "1",
+      request.upperLatex ?? "\\infty"
+    );
     if (r.status !== "ok")
       throw new Error(r.error);
     return {
@@ -18132,11 +18532,21 @@ var CalcEngine = (() => {
   function preciseSum(body, variable, lowerLatex, upperLatex) {
     const start = readBound(lowerLatex);
     if (!start || start.kind !== "finite" || !Number.isInteger(start.value))
-      return { status: "error", error: "The sum has to start at a whole number.", rows: [], verdict: "" };
+      return {
+        status: "error",
+        error: "The sum has to start at a whole number.",
+        rows: [],
+        verdict: ""
+      };
     const term2 = (n2) => evaluate(body, { [variable]: n2 });
     const rows = [];
     try {
-      const tail = findLimit(normsToAbs(body), variable, { kind: "infinite", sign: 1 }, "both");
+      const tail = findLimit(
+        normsToAbs(body),
+        variable,
+        { kind: "infinite", sign: 1 },
+        "both"
+      );
       const a = tail.answer;
       if (a.kind === "value" && (a.limit.kind === "infinite" || toNumber2(a.limit.value) !== 0) || a.kind === "oscillates")
         return {
@@ -18178,7 +18588,12 @@ var CalcEngine = (() => {
       partials.push(s);
     }
     if (!partials.every(Number.isFinite))
-      return { status: "error", error: "A term is undefined.", rows: [], verdict: "" };
+      return {
+        status: "error",
+        error: "A term is undefined.",
+        rows: [],
+        verdict: ""
+      };
     const raw = partials[partials.length - 1];
     const rich = richardson(partials);
     const eps = wynn(partials.slice(-9));
@@ -18218,11 +18633,19 @@ var CalcEngine = (() => {
       let value;
       let text3 = latex.trim();
       try {
-        value = evaluate(substitute(parseLatex(cfg, latex), /* @__PURE__ */ new Map(), defs.functions), {});
+        value = evaluate(
+          substitute(parseLatex(cfg, latex), /* @__PURE__ */ new Map(), defs.functions),
+          {}
+        );
         if (!/^-?[\d.]+$/.test(text3))
           text3 = value.toPrecision(15);
       } catch {
-        return { status: "error", error: "This doesn't read as a number.", rows: [], verdict: "" };
+        return {
+          status: "error",
+          error: "This doesn't read as a number.",
+          rows: [],
+          verdict: ""
+        };
       }
       const recognized = recognizeDecimal(text3);
       return {
@@ -18234,15 +18657,34 @@ var CalcEngine = (() => {
     }
     const request = readRequest(latex);
     if (request.operation !== "sum")
-      return { status: "error", error: "Write a sum: \\sum_{n=1}^{\\infty}\u2026", rows: [], verdict: "" };
+      return {
+        status: "error",
+        error: "Write a sum: \\sum_{n=1}^{\\infty}\u2026",
+        rows: [],
+        verdict: ""
+      };
     let body;
     try {
-      body = substitute(parseLatex(cfg, request.bodyLatex), /* @__PURE__ */ new Map(), defs.functions);
+      body = substitute(
+        parseLatex(cfg, request.bodyLatex),
+        /* @__PURE__ */ new Map(),
+        defs.functions
+      );
     } catch {
-      return { status: "error", error: "The summand doesn't read as maths yet.", rows: [], verdict: "" };
+      return {
+        status: "error",
+        error: "The summand doesn't read as maths yet.",
+        rows: [],
+        verdict: ""
+      };
     }
     const variable = canonical(request.binder ?? "n") ?? "n";
-    return preciseSum(body, variable, request.lowerLatex ?? "1", request.upperLatex ?? "\\infty");
+    return preciseSum(
+      body,
+      variable,
+      request.lowerLatex ?? "1",
+      request.upperLatex ?? "\\infty"
+    );
   }
   return __toCommonJS(engine_exports);
 })();

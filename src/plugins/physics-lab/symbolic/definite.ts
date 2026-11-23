@@ -234,12 +234,37 @@ function reduce(node: Node): X.ExactValue | undefined {
       if (node.args.length !== 1) return undefined;
       const inner = exactConstant(node.args[0]);
       if (inner === undefined) return undefined;
-      return special(node.callee.symbol, inner);
+      const name = node.callee.symbol;
+      const found = special(name, inner);
+      if (found !== undefined) return found;
+      // cos(−1) and cos 1 would otherwise be two opaque atoms for one number,
+      // and F(1) − F(−1) for an even F would print as a sum that is 0 instead
+      // of as 0. The argument is turned positive by the function's parity.
+      const parity = PARITY[name];
+      if (parity === undefined || !(X.toNumber(inner) < 0)) return undefined;
+      const mirrored = exactConstant(call(name, X.toNode(X.negate(inner))));
+      if (mirrored === undefined) return undefined;
+      return parity === "odd" ? X.negate(mirrored) : mirrored;
     }
     default:
       return undefined;
   }
 }
+
+/** Functions with f(−a) = f(a) or f(−a) = −f(a) on the whole real line. */
+const PARITY: Record<string, "even" | "odd" | undefined> = {
+  cos: "even",
+  sec: "even",
+  cosh: "even",
+  sin: "odd",
+  tan: "odd",
+  csc: "odd",
+  cot: "odd",
+  sinh: "odd",
+  tanh: "odd",
+  arcsin: "odd",
+  arctan: "odd",
+};
 
 /** `e^v`, which reduces when `v` is a rational plus logarithms of primes. */
 function exponential(v: X.ExactValue): X.ExactValue | undefined {

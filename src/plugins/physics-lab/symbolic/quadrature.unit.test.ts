@@ -69,3 +69,28 @@ describe("what does not settle is not a number", () => {
     ).toBeUndefined();
   });
 });
+
+describe("an integral whose value is 0", () => {
+  // Relative to itself it never settles: every estimate is rounding noise
+  // round 0. Relative to the integral of |f| it does.
+  test("an odd integrand with no antiderivative, x√(x² + cos x) on [−1, 1]", () => {
+    const radical = fn("sqrt", add(pow(x, n(2)), fn("cos", x)));
+    const found = preciseIntegral(
+      binop("Multiply", x, radical),
+      "x",
+      at(-1),
+      at(1)
+    );
+    expect(found?.value.isZero()).toBe(true);
+  });
+
+  test("ln x/(x² + 1) on [0, ∞), cancelling across x = 1", () => {
+    const found = preciseIntegral(
+      div(fn("ln", x), add(pow(x, n(2)), n(1))),
+      "x",
+      at(0),
+      INF
+    );
+    expect(found?.value.isZero()).toBe(true);
+  });
+});

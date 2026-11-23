@@ -55,6 +55,20 @@ describe("exact values at the bounds", () => {
     exactly(pow(x, number(2)), n(0), n(1), "\\frac{1}{3}");
   });
 
+  test("an odd integrand on a symmetric interval folds to 0", () => {
+    // Its antiderivative is even, but in sin(−1) and cos(−1), which used to be
+    // atoms of their own: the 0 printed as 3cos(−1) + −(3cos 1) + ….
+    exactly(mul(pow(x, number(3)), fn("cos", x)), n(-1), n(1), "0");
+  });
+
+  test("sin(−2) is −sin 2, so the two bounds combine", () => {
+    const result = definite(fn("cos", x), n(-2), n(2));
+    const single = X.atomsOf(result.exact!);
+    expect(single?.factors.size).toBe(1);
+    expect(single?.coeff).toEqual({ n: 2n, d: 1n });
+    expect(result.value).toBeCloseTo(2 * Math.sin(2), 12);
+  });
+
   test("an arctangent at 1 is a quarter of pi", () => {
     exactly(
       div(number(1), add(pow(x, number(2)), number(1))),

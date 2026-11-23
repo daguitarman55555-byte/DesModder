@@ -42,7 +42,7 @@ const SMALLEST_GAP_DIGITS = 300;
 
 export interface QuadratureResult {
   value: Decimal;
-  /** Significant digits on which the last two steps agree. */
+  /** Significant digits on which the last two steps agree; for a value of 0, digits of ∫|f| they agree to. */
   digits: number;
 }
 
@@ -167,6 +167,9 @@ export function* quadratureSteps(
   };
 
   const negligible = new D(10).pow(-(WORKING - 5));
+  // The sum of |terms| as well as the sum: what the cancellation is measured
+  // against when the integral itself is 0.
+  let mass = new D(0);
   function* sideSum(
     h: Decimal,
     start: number,
@@ -183,6 +186,7 @@ export function* quadratureSteps(
         yield;
         if (value === undefined) return undefined;
         total = total.plus(value);
+        mass = mass.plus(value.abs());
         if (value.abs().lte(negligible.times(total.abs().plus(1)))) {
           small += 1;
           if (small >= 3) break;
@@ -196,6 +200,7 @@ export function* quadratureSteps(
   const centre = term(new D(0));
   const first = yield* sideSum(h, 1, 1);
   if (centre === undefined || first === undefined) return undefined;
+  mass = mass.plus(centre.abs());
   let sum = centre.plus(first);
   let estimate = sum.times(h);
   let previousDifference: Decimal | undefined;
@@ -215,15 +220,27 @@ export function* quadratureSteps(
       : Math.floor(-relative.log(10).toNumber());
     // Converged, and converging: the difference fell on the last step too,
     // which is what separates settling from creeping.
-    if (
-      digits >= target &&
-      previousDifference !== undefined &&
-      difference.lte(previousDifference)
-    )
+    const converging =
+      previousDifference !== undefined && difference.lte(previousDifference);
+    if (digits >= target && converging)
       return {
         value: sign < 0 ? estimate.neg() : estimate,
         digits: Math.min(digits, WORKING - 10),
       };
+    // An integral that is 0, ∫₋₁¹ x√(x² + cos x) dx, never agrees with itself
+    // to any significant digit: the estimates are rounding noise around 0.
+    // Measured against ∫|f| instead, the steps agree to `target` digits and
+    // the estimate is below what they resolve, so the value is 0.
+    const resolution = mass.times(h);
+    const settled = difference.isZero()
+      ? WORKING - 10
+      : Math.floor(-difference.div(resolution).log(10).toNumber());
+    if (
+      settled >= target &&
+      converging &&
+      estimate.abs().lte(resolution.times(new D(10).pow(-target)))
+    )
+      return { value: new D(0), digits: Math.min(settled, WORKING - 10) };
     previousDifference = difference;
   }
   return undefined;

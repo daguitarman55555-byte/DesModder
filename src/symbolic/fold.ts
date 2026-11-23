@@ -96,7 +96,8 @@ export function fold(node: Node): Node {
       const args = node.args.map(fold);
       const folded =
         foldKnownValue(node.callee.symbol, args) ??
-        foldInverse(node.callee.symbol, args);
+        foldInverse(node.callee.symbol, args) ??
+        foldParity(node.callee.symbol, args);
       return folded ?? { ...node, args };
     }
     case "BinaryOperator":
@@ -104,6 +105,51 @@ export function fold(node: Node): Node {
     default:
       return node;
   }
+}
+
+/** Functions with f(−u) = f(u), or f(−u) = −f(u), for every real u. */
+const PARITY: Record<string, "even" | "odd" | undefined> = {
+  cos: "even",
+  sec: "even",
+  cosh: "even",
+  sin: "odd",
+  tan: "odd",
+  csc: "odd",
+  cot: "odd",
+  sinh: "odd",
+  tanh: "odd",
+  arcsin: "odd",
+  arctan: "odd",
+};
+
+/**
+ * A minus sign moved out of an even or odd function: `cos(−2x)` is `cos 2x`
+ * and `sin(−x)` is `−sin x`. Product-to-sum formulas produce the first
+ * whenever the larger frequency comes second, and nobody writes it that way.
+ */
+function foldParity(name: string, args: Node[]): Node | undefined {
+  const parity = PARITY[name];
+  if (parity === undefined || args.length !== 1) return undefined;
+  const [arg] = args;
+  let positive: Node | undefined;
+  if (arg.type === "Negative") positive = arg.arg;
+  else if (arg.type === "Constant" && arg.value < 0)
+    positive = number(-arg.value);
+  else if (
+    arg.type === "BinaryOperator" &&
+    (arg.name === "Multiply" || arg.name === "Divide")
+  ) {
+    const coefficient = constantValue(arg.left);
+    if (coefficient !== undefined && coefficient < 0)
+      positive = fold(binop(arg.name, number(-coefficient), arg.right));
+  }
+  if (positive === undefined) return undefined;
+  const mirrored: Node = {
+    type: "FunctionCall",
+    callee: id(name),
+    args: [positive],
+  };
+  return parity === "even" ? mirrored : negative(mirrored);
 }
 
 /** Whether a term already has a fraction bar in it, ignoring signs. */

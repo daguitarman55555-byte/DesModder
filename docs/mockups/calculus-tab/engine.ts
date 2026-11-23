@@ -31,9 +31,12 @@ import {
 import {
   definiteIntegral,
   DefiniteError,
+  interiorSingularity,
   type Bound,
   type Limit,
 } from "../../../src/plugins/physics-lab/symbolic/definite";
+import { absoluteDefinite } from "../../../src/plugins/physics-lab/symbolic/absolute";
+import { preciseIntegral } from "../../../src/plugins/physics-lab/symbolic/quadrature";
 import {
   describeLimitMethod,
   findLimit,
@@ -682,7 +685,7 @@ function integralAnswer(
   variable: string,
   options: Options
 ): Answer {
-  const integrand = implicitProducts(body, variable);
+  const integrand = normsToAbs(implicitProducts(body, variable));
   try {
     const found = integrateWithMethod(integrand, variable);
     const constant = freshName(integrand, ["C", "K", "D"]);
@@ -743,38 +746,6 @@ function integralAnswer(
   }
 }
 
-/** Adaptive Simpson, for a definite integral with no antiderivative. */
-function simpson(f: (x: number) => number, a: number, b: number) {
-  const rec = (
-    a: number,
-    b: number,
-    fa: number,
-    fm: number,
-    fb: number,
-    whole: number,
-    eps: number,
-    depth: number
-  ): number => {
-    const m = (a + b) / 2;
-    const lm = (a + m) / 2;
-    const rm = (m + b) / 2;
-    const flm = f(lm);
-    const frm = f(rm);
-    const left = ((m - a) / 6) * (fa + 4 * flm + fm);
-    const right = ((b - m) / 6) * (fm + 4 * frm + fb);
-    if (depth <= 0 || Math.abs(left + right - whole) <= 15 * eps)
-      return left + right + (left + right - whole) / 15;
-    return (
-      rec(a, m, fa, flm, fm, left, eps / 2, depth - 1) +
-      rec(m, b, fm, frm, fb, right, eps / 2, depth - 1)
-    );
-  };
-  const fa = f(a);
-  const fb = f(b);
-  const fm = f((a + b) / 2);
-  return rec(a, b, fa, fm, fb, ((b - a) / 6) * (fa + 4 * fm + fb), 1e-12, 40);
-}
-
 function definiteAnswer(
   body: Node,
   variable: string,
@@ -787,7 +758,7 @@ function definiteAnswer(
     throw new Error(
       "Each bound has to be a number, an expression in numbers, or ∞."
     );
-  const integrand = implicitProducts(body, variable);
+  const integrand = normsToAbs(implicitProducts(body, variable));
   const statement = `\\int_{${lowerLatex}}^{${upperLatex}}`;
   try {
     const F = integrateWithMethod(integrand, variable);
@@ -836,34 +807,65 @@ function definiteAnswer(
       !(error instanceof DefiniteError)
     )
       throw error;
-    if (lower.kind !== "finite" || upper.kind !== "finite")
+    const cut = absoluteDefinite(integrand, variable, lower, upper);
+    if (cut?.exact !== undefined)
       return {
-        latex: "",
-        verdict: "Not decided",
-        method: `${error.message} An infinite bound needs a proof this mock-up does not attempt numerically.`,
+        latex: emit(exactToNode(cut.exact)),
+        decimal: fmt(cut.value),
+        verdict: "Proved",
+        method:
+          "The absolute value has no single antiderivative, so the interval was cut where what is inside it changes sign, and each piece integrated exactly.",
         steps: [],
         notes: [],
-        graph: [],
+        graph: [
+          { latex: `${statement}${emit(integrand)}d${latexOfName(variable)}` },
+        ],
       };
-    // Nudged off a point where the integrand is 0/0, like ln(1+x)/x at 0: a
-    // removable gap that Simpson's rule would otherwise read as NaN.
-    const nudge = 1e-9 * Math.max(1, Math.abs(upper.value - lower.value));
-    const at = (x: number) => {
-      const y = evaluate(integrand, { [variable]: x });
-      if (Number.isFinite(y)) return y;
-      return (
-        (evaluate(integrand, { [variable]: x + nudge }) +
-          evaluate(integrand, { [variable]: x - nudge })) /
-        2
+    const refuse = (why: string): Answer => ({
+      latex: "",
+      verdict: "Not decided",
+      method: `${error.message} ${why}`,
+      steps: [],
+      notes: [],
+      graph: [],
+    });
+    // The panel's own numerical route: refuse a point inside where the
+    // integrand has no value (∫₋₁¹ dx/x would otherwise come back 0), then the
+    // double-exponential rules, whose nodes never land on an endpoint, so
+    // ln(sin x) at 0 or 1/√x at 0 costs nothing, and which cover infinite
+    // bounds too.
+    const a = lower.kind === "finite" ? lower.value : lower.sign * Infinity;
+    const b = upper.kind === "finite" ? upper.value : upper.sign * Infinity;
+    if (
+      interiorSingularity(
+        (x) => evaluate(integrand, { [variable]: x }),
+        Math.min(a, b),
+        Math.max(a, b)
+      )
+    )
+      return refuse(
+        "There is a point inside the interval where the integrand has no value, so it was not integrated numerically."
       );
-    };
-    const value = simpson(at, lower.value, upper.value);
-    const recognized = recognizeDecimal(value.toPrecision(13));
+    let found;
+    try {
+      found = preciseIntegral(integrand, variable, lower, upper);
+    } catch {
+      found = undefined;
+    }
+    if (found === undefined || !found.value.isFinite())
+      return refuse(
+        "Integrating numerically did not settle: it may diverge, or oscillate out to infinity in a way this cannot follow."
+      );
+    const value = found.value.toNumber();
+    const digits = Math.min(found.digits, 30);
+    const recognized = recognizeDecimal(
+      found.value.toSignificantDigits(digits).toFixed()
+    );
     return {
       latex: recognized ? emit(recognized.node) : fmt(value),
       decimal: fmt(value),
       verdict: "Checked numerically, not proved",
-      method: `${error instanceof NonElementaryError ? `No elementary antiderivative (${error.special}), so it` : "It"} was integrated numerically.${recognized ? " The digits match the closed form shown." : ""}`,
+      method: `${error instanceof NonElementaryError ? `No elementary antiderivative (${error.special}), so it` : "It"} was integrated numerically, to ${found.digits} digits.${recognized ? " The digits match the closed form shown." : ""}`,
       steps: [],
       notes: recognized
         ? [

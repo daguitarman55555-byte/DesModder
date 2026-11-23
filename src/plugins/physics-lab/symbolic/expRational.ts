@@ -103,7 +103,7 @@ function powP(p: QPoly, k: number): QPoly {
 }
 
 /** A node as a polynomial with rational coefficients, or undefined. */
-function asQPoly(node: Node, variable: string): QPoly | undefined {
+export function asQPoly(node: Node, variable: string): QPoly | undefined {
   const parts = coefficientsIn(node, variable, MAX_DEGREE);
   if (parts === undefined) return undefined;
   const out: QPoly = [];

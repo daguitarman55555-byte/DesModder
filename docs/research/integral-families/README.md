@@ -17,13 +17,13 @@ node docs/mockups/calculus-tab/build.mjs
 node docs/research/integral-families/bench.cjs
 ```
 
-## What the first run showed (2026-11-23)
+## First run (2026-11-23)
 
 64 pass, 9 numeric only, 4 series only, 5 misses, 1 timeout and 1 wrong value,
 out of 84. Families F01, F02, F04–F15, F20 and F21 pass every indefinite case,
 including #347, #386, #405, #420 and √tan.
 
-Bugs:
+Bugs it found:
 
 - **∫₀^{π/2} ln(sin x) dx comes back as NaN.** It is shown as an answer
   ("checked numerically"). The 0/0 nudge in the mock-up's Simpson fallback
@@ -36,15 +36,43 @@ Bugs:
 - **One substitution is not undone.** For (x+1)/√(x²+4) the answer is correct
   but still contains `tan(arctan(x/2)…)`.
 
-Gaps, ordered by how many book exercises they block:
+## After the fixes (same day)
+
+65 pass, 14 numeric only, 4 series only, 1 miss, out of 84. Nothing is wrong
+and nothing hangs. The fixes:
+
+- **ln(sin x) and every numeric fallback.** The mock-up now uses the panel's
+  own route: refuse an interior singularity, then the 40-digit
+  double-exponential rules (`quadrature.ts`), whose nodes never land on an
+  endpoint. These also handle infinite bounds, so #423, #425 and
+  ∫₀^∞ ln(1+e^{−x}) (named as π²/12) now get values instead of being
+  refused.
+- **|g| with g a polynomial** (`absolute.ts`). The interval is cut at g's
+  exact roots, found by factoring over Q, and each piece is integrated
+  exactly, then checked numerically: ∫₀³ |x²−3x+2| dx = 11/6 in 9 ms. This is
+  in the shipping panel too. It also found that the panel never turned typed
+  bars (a `Norm` node) into `abs` on its integral path, so |x| could not be
+  integrated at all.
+- **Parity.** cos(−a) = cos a and sin(−a) = −sin a, in the exact values
+  (`definite.ts`) and in `fold`. ∫₋₁¹ x³cos x dx prints 0.
+- **A sum over one denominator, split term by term,** before trying a trig
+  substitution: (x+1)/√(x²+4) gives √(x²+4) + arcsinh(x/2).
+- **An integral equal to 0 settles.** The 40-digit rule measured agreement
+  against the value itself, which never happens at 0. It now also measures
+  it against ∫|f|, which gives 0 for #409 and #424.
+
+## Gaps still open
+
+Ordered by how many book exercises they block:
 
 1. **√(g²) = |g|.** Not recognised (#31, #52, #380 and the four-factor
    square), so a series answer is given where a piecewise elementary one
    exists. The guide says this is the trap the key itself falls into.
-2. **Infinite bounds with no antiderivative.** This affects F22 and F24
-   (#423, #424, #425, ∫₀^∞ ln(1+e^{−x})). These need Frullani,
-   differentiation under the integral, or Li₂ special values. The engine
-   currently refuses them and does not guess.
+2. **Exact values for infinite bounds with no antiderivative.** F22 and F24
+   (#423, #424, #425, ∫₀^∞ ln(1+e^{−x})) now get the right number, but no
+   proof. That needs Frullani, differentiation under the integral sign, or
+   Li₂ special values. #423 is π ln 2 / 2, a product, which the linear
+   recogniser cannot name.
 3. **Symmetry proofs.** F17 and F18 (#258, #329, #409, sin³/(sin³+cos³)) get
    the right value only numerically. The recogniser then names the constant,
    but nothing proves it.

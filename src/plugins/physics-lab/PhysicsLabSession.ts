@@ -64,6 +64,7 @@ import {
 } from "./symbolic/integrate";
 import { seriesFallback, type PartKind } from "./symbolic/seriesSum";
 import { quadratureSteps, type QuadratureResult } from "./symbolic/quadrature";
+import { absoluteDefinite } from "./symbolic/absolute";
 import {
   definiteIntegral,
   DefiniteError,
@@ -1726,10 +1727,11 @@ export default class PhysicsLabSession {
     try {
       // `x(x)` parses as a call of a function named x; see implicitProducts.
       // Normalised here as well as inside the integrator, because the numeric
-      // check below evaluates the integrand too.
-      integrand = implicitProducts(
-        parseLatex(this.textModeConfig, fLatex),
-        variable
+      // check below evaluates the integrand too. Bars typed as |x| arrive as
+      // a Norm node, which nothing below evaluates or integrates; as abs(x)
+      // they do.
+      integrand = normsToAbs(
+        implicitProducts(parseLatex(this.textModeConfig, fLatex), variable)
       );
     } catch {
       // Half-typed LaTeX does not parse, and that is the normal state of an
@@ -1816,6 +1818,18 @@ export default class PhysicsLabSession {
         ok: false,
         error: `A value needs numbers, and ${free[0]} has none here.`,
       };
+    const statementLatex = `\\int_{${lowerLatex.trim()}}^{${upperLatex.trim()}}${fLatex}d${variable}`;
+    // |g| with g a polynomial: cut where g changes sign, exactly, before
+    // falling back to digits.
+    const cut = absoluteDefinite(integrand, variable, lower, upper);
+    if (cut?.exact !== undefined)
+      return {
+        ok: true,
+        statementLatex,
+        valueLatex: toLatexTree(this.textModeConfig, exactToNode(cut.exact)),
+        decimal: exactDecimal(cut.exact),
+        note: "The absolute value has no single antiderivative, so the interval was cut where what is inside it changes sign, and each piece integrated exactly. Checked against a numerical integration.",
+      };
     const key = `${variable}|${fLatex}|${lowerLatex}|${upperLatex}`;
     const done = this.numericDefinite.get(key);
     if (done === undefined) {
@@ -1828,7 +1842,6 @@ export default class PhysicsLabSession {
         error:
           "No antiderivative was found to evaluate, and integrating numerically to thirty digits did not settle: the integral may diverge, have a point inside the interval where it is undefined, or oscillate out to infinity in a way this cannot follow.",
       };
-    const statementLatex = `\\int_{${lowerLatex.trim()}}^{${upperLatex.trim()}}${fLatex}d${variable}`;
     const shown = Math.min(done.digits, 34);
     const text = done.value.toSignificantDigits(shown).toFixed();
     const match = recognizeDecimal(text);
