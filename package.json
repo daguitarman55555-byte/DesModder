@@ -31,7 +31,7 @@
     "fix": "npm run fix:eslint && npm run fix:prettier",
     "lint": "npm run lint:formatting && npm run lint:types && npm run lint:eslint",
     "prettier": "prettier",
-    "lint:formatting": "prettier --check .",
+    "lint:formatting": "prettier --cache --check .",
     "lint:types": "tsc --build",
     "eslint": "eslint",
     "lint:eslint": "eslint \"**\"",

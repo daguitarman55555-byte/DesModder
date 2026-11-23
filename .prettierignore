@@ -12,3 +12,7 @@ docs/mockups/vector-3d-arrows.html
 
 # vendored graphify skill, rewritten by its installer
 .claude/skills/
+
+# Agent worktrees: whole checkouts of this repository, excluded from git
+# through .git/info/exclude, which Prettier does not read.
+.claude/worktrees/
