@@ -19,3 +19,5 @@ docs/mockups/vector-3d-arrows.html
 
 # Built from docs/mockups/calculus-tab/engine.ts by its build.mjs
 docs/mockups/calculus-tab/engine.js
+docs/research/integral-families/GUIDE.md
+docs/research/integral-families/RESULTS.md
