@@ -282,6 +282,12 @@ function atoms(): { node: Node; cost: number; special?: boolean }[] {
   list.push({ node: e, cost: 1 });
   list.push({ node: power(e, number(2)), cost: 1.5 });
   list.push({ node: divide(number(1), e), cost: 1.5 });
+  // Logarithms of the small primes, and of ten. They were in the sum bases
+  // only, and a sum must use two constants, so ln 2 on its own -- the
+  // alternating harmonic series, a half-life -- could never be named. A
+  // rational multiple covers ln 4 = 2 ln 2 and ln √2 = ½ ln 2.
+  for (const n of [2, 3, 5, 10])
+    list.push({ node: call("ln", number(n)), cost: 1.5 });
   // Square roots of the squarefree integers. A non-squarefree one reduces to a
   // multiple of a smaller root, which the rational factor already covers.
   for (let n = 2; n <= 50; n++)

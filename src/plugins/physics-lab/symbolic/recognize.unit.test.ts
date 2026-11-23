@@ -91,6 +91,15 @@ describe("with more digits, more shapes", () => {
     );
   });
 
+  test("a logarithm on its own, and its rational multiples", () => {
+    // ln 2 was only ever in the sum bases, which need two constants, so the
+    // alternating harmonic series' value could not be named.
+    expect(shown("0.693147180560")).toBe(String.raw`\ln\left(2\right)`);
+    expect(shown("1.38629436112")).toBe(String.raw`2\ln\left(2\right)`);
+    expect(shown("1.09861228867")).toBe(String.raw`\ln\left(3\right)`);
+    expect(shown("2.30258509299")).toBe(String.raw`\ln\left(10\right)`);
+  });
+
   test("a product of powers", () => {
     expect(shown("18.970519737161744759052")).toBe(
       String.raw`\frac{\pi^{2}e}{\sqrt{2}}`
