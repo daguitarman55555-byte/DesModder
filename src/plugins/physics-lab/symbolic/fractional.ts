@@ -922,7 +922,7 @@ export function desmosForm(latex: string): string {
     const rest = out.slice(end + 1);
     const open = "\\left(";
     if (comma < 0 || !rest.startsWith(open)) break;
-    out = `${out.slice(0, at)}E${open}${subscript.slice(0, comma)},${subscript.slice(comma + 1)},${rest.slice(open.length)}`;
+    out = `${out.slice(0, at)}E_{ML}${open}${subscript.slice(0, comma)},${subscript.slice(comma + 1)},${rest.slice(open.length)}`;
   }
   return out;
 }

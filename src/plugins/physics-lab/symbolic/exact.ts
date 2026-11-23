@@ -641,6 +641,23 @@ function atomsNode(entries: [string, Rational][]): Node | undefined {
       continue;
     }
     if (atom === PI || atom === E || isOpaque(atom)) {
+      // √π, as Γ(1/2) is written, rather than π^{1/2}; π^{3/2} as π√π.
+      if (exponent.d === 2n) {
+        const whole = (exponent.n - 1n) / 2n;
+        const root = functionCall(id("sqrt"), base);
+        plain.push(
+          whole === 0n
+            ? root
+            : binop(
+                "Multiply",
+                whole === 1n
+                  ? base
+                  : binop("Exponent", base, number(Number(whole))),
+                root
+              )
+        );
+        continue;
+      }
       plain.push(
         binop(
           "Exponent",

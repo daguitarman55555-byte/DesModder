@@ -464,6 +464,8 @@
         },
       ]);
       CalcEngine.init(Desmos, calc);
+      // As Physics Lab does when enabled: Ei, Li_2, Gamma, psi … can be typed.
+      CalcEngine.installSpecialFunctionNames(calc);
 
       const MQ = Desmos.MathQuill.getInterface
         ? Desmos.MathQuill.getInterface(2)
@@ -1068,24 +1070,14 @@
                 sliderBounds: { min: -5, max: 5 },
               });
           }
-          // A definition like \Gamma\left(z\right)=…, added once however
-          // many answers use it.
+          // A special function's definition is not added as a line of its
+          // own: the answer's line brings what it calls into the locked,
+          // hidden folder instead (definitionFolderItems in special.ts).
           const isDefinition =
             /^[^=]*\\left\([a-z,]+\\right\)=/.test(g.latex ?? "") &&
             !g.latex.startsWith("y=");
-          if (isDefinition) {
-            const head = g.latex.slice(0, g.latex.indexOf("="));
-            const exists = calc
-              .getState()
-              .expressions.list.some((e) => e.latex?.startsWith(head + "="));
-            if (exists) continue;
-            calc.setExpression({
-              id: `def${added++}`,
-              latex: g.latex,
-              color: "#888",
-            });
-            continue;
-          }
+          if (isDefinition) continue;
+          if (g.latex) CalcEngine.defineSpecialFunctionsFor(calc, g.latex);
           if (g.latex)
             calc.setExpression({
               id: `r${added++}`,

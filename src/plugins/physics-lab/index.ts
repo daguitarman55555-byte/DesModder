@@ -20,6 +20,13 @@ import type { ConfigItem } from "..";
 import { PluginController } from "../PluginController";
 import { PhysicsLabPanelFunc } from "./components/PhysicsLabPanel";
 import PhysicsLabSession from "./PhysicsLabSession";
+import type { Calc } from "#globals";
+import {
+  SPECIAL_FUNCTIONS,
+  ensureSpecialFunctions,
+  specialFunctionsIn,
+  withSpecialFunctionNames,
+} from "../../symbolic";
 
 interface PhysicsLabSettings {
   /**
@@ -78,7 +85,93 @@ export default class PhysicsLab extends PluginController<PhysicsLabSettings> {
     return this.currentSession;
   }
 
+  /** The calculator's own MathQuill config, and the wrapper put over it. */
+  private mathquillConfig?: {
+    original: Calc["controller"]["getMathquillConfig"];
+    wrapped: Calc["controller"]["getMathquillConfig"];
+  };
+
+  /**
+   * Teaches the expression list the special functions' names: typing E then
+   * i writes \operatorname{Ei}, Gamma writes Γ. Without this a definition
+   * like Ei(z) = … survives being pasted but breaks into E·i the first time
+   * its line is edited.
+   */
+  private addSpecialFunctionNames() {
+    const original = this.cc.getMathquillConfig;
+    const wrapped: typeof original = function (this: unknown, e) {
+      return withSpecialFunctionNames(original.call(this, e));
+    };
+    this.cc.getMathquillConfig = wrapped;
+    this.mathquillConfig = { original, wrapped };
+  }
+
+  private removeSpecialFunctionNames() {
+    // Only our own wrapper is undone: another plugin that wrapped it since
+    // (custom-mathquill-config does) keeps its chain.
+    if (this.cc.getMathquillConfig === this.mathquillConfig?.wrapped)
+      this.cc.getMathquillConfig = this.mathquillConfig.original;
+    this.mathquillConfig = undefined;
+  }
+
+  private unsubscribeSpecialFunctions?: () => void;
+  private specialFunctionTimer?: ReturnType<typeof setTimeout>;
+
+  /**
+   * Whenever a line calls a special function — typed by hand, or written by
+   * an answer — its definitions go into the graph's locked, hidden folder
+   * (special.ts, definitionFolderItems), so Γ(0.5) is √π rather than
+   * "too many variables". Checked shortly after a change rather than during
+   * it: a state change inside Desmos's own dispatch throws.
+   */
+  private watchSpecialFunctions() {
+    const check = () => {
+      this.specialFunctionTimer = undefined;
+      const used = new Set<string>();
+      for (const e of this.calc.getExpressions())
+        if ("latex" in e && typeof e.latex === "string")
+          for (const s of specialFunctionsIn(e.latex)) used.add(s);
+      if (used.size === 0) return;
+      // The whole library, once one is in use: typing the next works too.
+      // While a line has the cursor, the definitions go in without moving it;
+      // the next change after the cursor leaves tidies them into the folder.
+      ensureSpecialFunctions(
+        this.calc as unknown as Parameters<typeof ensureSpecialFunctions>[0],
+        SPECIAL_FUNCTIONS.map((f) => f.symbol),
+        {
+          // Keyboard focus in an expression line, not Desmos's notion of a
+          // selected item, which outlives Escape.
+          editing:
+            document.activeElement?.closest(".dcg-expressionitem") != null,
+        }
+      );
+    };
+    const schedule = () => {
+      if (this.specialFunctionTimer !== undefined) return;
+      this.specialFunctionTimer = setTimeout(check, 400);
+    };
+    const unsubscribe = this.cc.subscribeToChanges(schedule);
+    // Leaving a line changes nothing in the graph, so it is watched on its
+    // own: that is when the definitions move into their folder.
+    document.addEventListener("focusout", schedule);
+    this.unsubscribeSpecialFunctions = () => {
+      unsubscribe();
+      document.removeEventListener("focusout", schedule);
+    };
+    schedule();
+  }
+
+  private unwatchSpecialFunctions() {
+    this.unsubscribeSpecialFunctions?.();
+    this.unsubscribeSpecialFunctions = undefined;
+    if (this.specialFunctionTimer !== undefined)
+      clearTimeout(this.specialFunctionTimer);
+    this.specialFunctionTimer = undefined;
+  }
+
   afterEnable() {
+    this.addSpecialFunctionNames();
+    this.watchSpecialFunctions();
     this.dsm.pillboxMenus?.addPillboxButton({
       id: "dsm-physics-lab-menu",
       tooltip: "physics-lab-name",
@@ -94,6 +187,8 @@ export default class PhysicsLab extends PluginController<PhysicsLabSettings> {
     this.currentSession?.destroy();
     this.currentSession = undefined;
     this.dsm.pillboxMenus?.removePillboxButton("dsm-physics-lab-menu");
+    this.removeSpecialFunctionNames();
+    this.unwatchSpecialFunctions();
   }
 
   /**

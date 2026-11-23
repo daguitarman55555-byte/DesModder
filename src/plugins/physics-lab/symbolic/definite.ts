@@ -50,6 +50,7 @@ import {
   type Node,
 } from "../../../symbolic";
 import * as X from "./exact";
+import { SPECIAL_VALUE_FUNCTIONS, specialValue } from "./specialValues";
 import * as Q from "./rational";
 import { coefficientsIn, linearIn } from "./integrate";
 import { factorOverQ } from "./factor";
@@ -231,6 +232,13 @@ function reduce(node: Node): X.ExactValue | undefined {
       return undefined;
     }
     case "FunctionCall": {
+      // Γ(1/2) = √π, ζ(2) = π²/6 and the other special values
+      // (specialValues.ts), for any number of arguments.
+      if (SPECIAL_VALUE_FUNCTIONS.has(node.callee.symbol)) {
+        const args = node.args.map((arg) => exactConstant(arg));
+        if (args.some((a) => a === undefined)) return undefined;
+        return specialValue(node.callee.symbol, args as X.ExactValue[]);
+      }
       if (node.args.length !== 1) return undefined;
       const inner = exactConstant(node.args[0]);
       if (inner === undefined) return undefined;

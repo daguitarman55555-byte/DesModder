@@ -218,7 +218,7 @@ function shape(
     ) {
       const k = pureSquare(t.args[0], variable);
       if (k !== undefined && k > 0) {
-        const name = t.callee.symbol === "sin" ? "S" : "C";
+        const name = t.callee.symbol === "sin" ? "FresnelS" : "FresnelC";
         const half = divide(number(1), number(2));
         // √(π/(2k)) · F(√(2k/π) x)
         return {

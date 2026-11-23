@@ -680,7 +680,9 @@ var CalcEngine = (() => {
   __export(engine_exports, {
     OPERATION_LABELS: () => OPERATION_LABELS,
     analyze: () => analyze,
+    defineSpecialFunctionsFor: () => defineSpecialFunctionsFor,
     init: () => init,
+    installSpecialFunctionNames: () => installSpecialFunctionNames,
     precise: () => precise,
     readGraph: () => readGraph
   });
@@ -4838,10 +4840,14 @@ var CalcEngine = (() => {
     return total;
   }
   function lambertW(x) {
-    if (x < -1 / Math.E)
+    const branch = -1 / Math.E;
+    if (x < branch - 1e-16)
       return NaN;
     if (x === 0)
       return 0;
+    const p = Math.sqrt(Math.max(0, 2 * (Math.E * x + 1)));
+    if (p < 1e-3)
+      return -1 + p - p * p / 3 + 11 / 72 * p ** 3 - 43 / 540 * p ** 4;
     let w = x < 1 ? x * (1 - x) : Math.log(x) - Math.log(Math.log(x) + 1);
     if (x < 0)
       w = -0.5;
@@ -4880,6 +4886,8 @@ var CalcEngine = (() => {
     return sum3;
   }
   var L = (s) => `\\left(${s}\\right)`;
+  var T = "t_{sf}";
+  var U = "u_{sf}";
   var SPECIAL_FUNCTIONS = [
     {
       symbol: "Gamma",
@@ -4902,13 +4910,13 @@ var CalcEngine = (() => {
       needs: []
     },
     {
-      symbol: "B",
-      name: "the beta function",
-      notation: `B${L("#1,#2")}`,
+      symbol: "Beta",
+      name: "the beta function B",
+      notation: `\\operatorname{Beta}${L("#1,#2")}`,
       arity: 2,
       evaluate: beta,
       definitions: [
-        `B${L("a,b")}=\\frac{\\Gamma${L("a")}\\Gamma${L("b")}}{\\Gamma${L("a+b")}}`
+        `\\operatorname{Beta}${L("a,b")}=\\frac{\\Gamma${L("a")}\\Gamma${L("b")}}{\\Gamma${L("a+b")}}`
       ],
       needs: ["Gamma"]
     },
@@ -4962,7 +4970,7 @@ var CalcEngine = (() => {
       arity: 1,
       evaluate: erfi,
       definitions: [
-        `\\operatorname{erfi}${L("z")}=\\frac{2}{\\sqrt{\\pi}}\\int_{0}^{z}e^{t^{2}}dt`
+        `\\operatorname{erfi}${L("z")}=\\frac{2}{\\sqrt{\\pi}}\\int_{0}^{z}e^{${T}^{2}}d${T}`
       ],
       needs: []
     },
@@ -4973,7 +4981,7 @@ var CalcEngine = (() => {
       arity: 1,
       evaluate: Si,
       definitions: [
-        `\\operatorname{Si}${L("z")}=\\int_{0}^{z}\\frac{\\sin${L("t")}}{t}dt`
+        `\\operatorname{Si}${L("z")}=\\int_{0}^{z}\\frac{\\sin${L(T)}}{${T}}d${T}`
       ],
       needs: []
     },
@@ -4984,7 +4992,7 @@ var CalcEngine = (() => {
       arity: 1,
       evaluate: Ci,
       definitions: [
-        `\\operatorname{Ci}${L("z")}=${EULER}+\\ln${L("z")}+\\int_{0}^{z}\\frac{\\cos${L("t")}-1}{t}dt`
+        `\\operatorname{Ci}${L("z")}=${EULER}+\\ln${L("z")}+\\int_{0}^{z}\\frac{\\cos${L(T)}-1}{${T}}d${T}`
       ],
       needs: [],
       domain: "z > 0"
@@ -4996,7 +5004,7 @@ var CalcEngine = (() => {
       arity: 1,
       evaluate: Shi,
       definitions: [
-        `\\operatorname{Shi}${L("z")}=\\int_{0}^{z}\\frac{\\sinh${L("t")}}{t}dt`
+        `\\operatorname{Shi}${L("z")}=\\int_{0}^{z}\\frac{\\sinh${L(T)}}{${T}}d${T}`
       ],
       needs: []
     },
@@ -5007,7 +5015,7 @@ var CalcEngine = (() => {
       arity: 1,
       evaluate: Chi,
       definitions: [
-        `\\operatorname{Chi}${L("z")}=${EULER}+\\ln${L("z")}+\\int_{0}^{z}\\frac{\\cosh${L("t")}-1}{t}dt`
+        `\\operatorname{Chi}${L("z")}=${EULER}+\\ln${L("z")}+\\int_{0}^{z}\\frac{\\cosh${L(T)}-1}{${T}}d${T}`
       ],
       needs: [],
       domain: "z > 0"
@@ -5019,7 +5027,7 @@ var CalcEngine = (() => {
       arity: 1,
       evaluate: Ei,
       definitions: [
-        `\\operatorname{Ei}${L("z")}=${EULER}+\\ln${L("\\left|z\\right|")}+\\int_{0}^{z}\\frac{e^{t}-1}{t}dt`
+        `\\operatorname{Ei}${L("z")}=${EULER}+\\ln${L("\\left|z\\right|")}+\\int_{0}^{z}\\frac{e^{${T}}-1}{${T}}d${T}`
       ],
       needs: [],
       domain: "z \u2260 0"
@@ -5043,80 +5051,80 @@ var CalcEngine = (() => {
       arity: 1,
       evaluate: dilog,
       definitions: [
-        `\\operatorname{Li}_{2}${L("z")}=-\\int_{0}^{z}\\frac{\\ln${L("1-t")}}{t}dt`
+        `\\operatorname{Li}_{2}${L("z")}=-\\int_{0}^{z}\\frac{\\ln${L(`1-${T}`)}}{${T}}d${T}`
       ],
       needs: [],
       domain: "z \u2264 1 (beyond 1 it is complex)"
     },
     {
-      symbol: "S",
-      name: "the Fresnel sine integral",
-      notation: `S${L("#1")}`,
+      symbol: "FresnelS",
+      name: "the Fresnel sine integral S",
+      notation: `\\operatorname{FresnelS}${L("#1")}`,
       arity: 1,
       evaluate: fresnelS,
       definitions: [
-        `S${L("z")}=\\int_{0}^{z}\\sin${L("\\frac{\\pi t^{2}}{2}")}dt`
+        `\\operatorname{FresnelS}${L("z")}=\\int_{0}^{z}\\sin${L(`\\frac{\\pi ${T}^{2}}{2}`)}d${T}`
       ],
       needs: []
     },
     {
-      symbol: "C",
-      name: "the Fresnel cosine integral",
-      notation: `C${L("#1")}`,
+      symbol: "FresnelC",
+      name: "the Fresnel cosine integral C",
+      notation: `\\operatorname{FresnelC}${L("#1")}`,
       arity: 1,
       evaluate: fresnelC,
       definitions: [
-        `C${L("z")}=\\int_{0}^{z}\\cos${L("\\frac{\\pi t^{2}}{2}")}dt`
+        `\\operatorname{FresnelC}${L("z")}=\\int_{0}^{z}\\cos${L(`\\frac{\\pi ${T}^{2}}{2}`)}d${T}`
       ],
       needs: []
     },
     {
-      symbol: "J",
-      name: "the Bessel function of the first kind",
-      notation: `J${L("#1,#2")}`,
+      symbol: "BesselJ",
+      name: "the Bessel function of the first kind J",
+      notation: `\\operatorname{BesselJ}${L("#1,#2")}`,
       arity: 2,
       evaluate: besselJ,
       definitions: [
-        `J${L("n,z")}=\\frac{1}{\\pi}\\int_{0}^{\\pi}\\cos${L("nu-z\\sin" + L("u"))}du`
+        `\\operatorname{BesselJ}${L("n,z")}=\\frac{1}{\\pi}\\int_{0}^{\\pi}\\cos${L(`n${U}-z\\sin${L(U)}`)}d${U}`
       ],
       needs: [],
-      domain: "whole orders n (Bessel's integral); J(n, z) is J_n(z)"
+      domain: "whole orders n (Bessel's integral); BesselJ(n, z) is J_n(z)"
     },
     {
-      symbol: "W",
-      name: "the Lambert W function (principal branch)",
-      notation: `W${L("#1")}`,
+      symbol: "W_0",
+      name: "the Lambert W function, principal branch W\u2080",
+      notation: `W_{0}${L("#1")}`,
       arity: 1,
       evaluate: lambertW,
       definitions: [
-        `W${L("z")}=\\frac{1}{\\pi}\\int_{0}^{\\pi}\\ln${L("1+\\frac{z\\sin" + L("u") + "}{u}e^{u\\cot" + L("u") + "}")}du`
+        `W_{0}${L("z")}=\\frac{1}{\\pi}\\int_{0}^{\\pi}\\ln${L(`1+\\frac{z\\sin${L(U)}}{${U}}e^{${U}\\cot${L(U)}}`)}d${U}`
       ],
       needs: [],
       domain: "z \u2265 \u22121/e"
     },
     {
-      symbol: "K",
-      name: "the complete elliptic integral of the first kind",
-      notation: `K${L("#1")}`,
+      symbol: "EllipticK",
+      name: "the complete elliptic integral of the first kind K",
+      notation: `\\operatorname{EllipticK}${L("#1")}`,
       arity: 1,
       evaluate: ellipticK,
       definitions: [
-        `K${L("k")}=\\int_{0}^{\\frac{\\pi}{2}}\\frac{1}{\\sqrt{1-k^{2}\\sin^{2}${L("u")}}}du`
+        `\\operatorname{EllipticK}${L("k")}=\\int_{0}^{\\frac{\\pi}{2}}\\frac{1}{\\sqrt{1-k^{2}\\sin^{2}${L(U)}}}d${U}`
       ],
       needs: [],
       domain: "\u22121 < k < 1"
     },
     {
-      symbol: "E",
+      symbol: "E_ML",
       name: "the Mittag-Leffler function E_{a,b}",
-      notation: `E${L("#1,#2,#3")}`,
+      notation: `E_{ML}${L("#1,#2,#3")}`,
       arity: 3,
       evaluate: mittagLeffler,
       definitions: [
-        `E${L("a,b,z")}=\\sum_{k=0}^{100}z^{k}\\Gamma_{r}${L("ak+b")}`
+        `E_{ML}${L("a,b,z")}=\\sum_{k=0}^{100}z^{k}\\Gamma_{r}${L("ak+b")}`
       ],
       needs: ["Gamma_r"],
-      domain: "E(a, b, z) is E_{a,b}(z); |z| up to about 30"
+      domain: "E_ML(a, b, z) is E_{a,b}(z); |z| up to about 30"
     }
   ];
   var BY_SYMBOL = new Map(SPECIAL_FUNCTIONS.map((f) => [f.symbol, f]));
@@ -5124,6 +5132,9 @@ var CalcEngine = (() => {
     return BY_SYMBOL.get(symbol);
   }
   function desmosDefinitions(symbols) {
+    return definitionEntries(symbols).map((d) => d.latex);
+  }
+  function definitionEntries(symbols) {
     const out = [];
     const seen = /* @__PURE__ */ new Set();
     const add8 = (symbol) => {
@@ -5134,11 +5145,102 @@ var CalcEngine = (() => {
       if (f === void 0)
         return;
       f.needs.forEach(add8);
-      out.push(...f.definitions);
+      for (const latex of f.definitions)
+        out.push({ symbol, latex });
     };
     for (const symbol of symbols)
       add8(symbol);
     return out;
+  }
+  var DESMOS_OPERATOR_NAMES = [
+    // Not B, S, C, J, K: single letters a graph already uses for its own
+    // things (C is every integration constant).
+    "Beta",
+    "FresnelS",
+    "FresnelC",
+    "BesselJ",
+    "EllipticK",
+    "Ei",
+    "Si",
+    "Ci",
+    "Shi",
+    "Chi",
+    "li",
+    "Li",
+    "erfc",
+    "erfi"
+  ];
+  var DESMOS_AUTO_COMMANDS = ["Gamma", "psi", "zeta", "gamma"];
+  function withSpecialFunctionNames(config2) {
+    const extend = (list2, names) => {
+      const have = new Set((list2 ?? "").split(/\s+/).filter(Boolean));
+      const missing = names.filter((n) => !have.has(n));
+      return missing.length === 0 ? list2 : `${list2 ?? ""} ${missing.join(" ")}`.trim();
+    };
+    config2.autoOperatorNames = extend(
+      config2.autoOperatorNames,
+      DESMOS_OPERATOR_NAMES
+    );
+    config2.autoCommands = extend(config2.autoCommands, DESMOS_AUTO_COMMANDS);
+    return config2;
+  }
+  var SPECIAL_FUNCTIONS_FOLDER_ID = "dsm-special-functions";
+  function definitionFolderItems(symbols) {
+    const entries = definitionEntries(symbols);
+    const slug = (symbol, i) => `${SPECIAL_FUNCTIONS_FOLDER_ID}-${symbol.replace(/[^a-zA-Z0-9]/g, "")}-${i}`;
+    const counts = /* @__PURE__ */ new Map();
+    return {
+      folder: {
+        type: "folder",
+        id: SPECIAL_FUNCTIONS_FOLDER_ID,
+        title: "Special functions (Calculus Lab)",
+        collapsed: true,
+        secret: true
+      },
+      expressions: entries.map(({ symbol, latex }) => {
+        const i = counts.get(symbol) ?? 0;
+        counts.set(symbol, i + 1);
+        return {
+          type: "expression",
+          id: slug(symbol, i),
+          folderId: SPECIAL_FUNCTIONS_FOLDER_ID,
+          latex,
+          hidden: true,
+          readonly: true,
+          secret: true
+        };
+      })
+    };
+  }
+  function ensureSpecialFunctions(calc, symbols, options = {}) {
+    const { folder: folder3, expressions } = definitionFolderItems(symbols);
+    if (expressions.length === 0)
+      return 0;
+    const state = calc.getState();
+    const list2 = state.expressions.list;
+    const byId = new Map(list2.map((e) => [e.id, e]));
+    const missing = expressions.filter((e) => !byId.has(e.id));
+    if (options.editing) {
+      if (missing.length === 0 || calc.setExpressions === void 0)
+        return 0;
+      calc.setExpressions(
+        missing.map(({ folderId: _inFolder, ...loose2 }) => loose2)
+      );
+      return missing.length;
+    }
+    const loose = expressions.filter(
+      (e) => byId.has(e.id) && byId.get(e.id).folderId !== folder3.id
+    );
+    if (missing.length === 0 && loose.length === 0 && byId.has(folder3.id))
+      return 0;
+    const ours = /* @__PURE__ */ new Set([folder3.id, ...expressions.map((e) => e.id)]);
+    state.expressions.list = [
+      folder3,
+      ...expressions,
+      ...list2.filter((e) => !ours.has(e.id))
+    ];
+    calc.setState(state, { allowUndo: true });
+    return missing.length + loose.length;
   }
   var CALL_PATTERNS = SPECIAL_FUNCTIONS.map((f) => {
     const source = f.definitions[0] ?? f.notation;
@@ -9153,17 +9255,17 @@ var CalcEngine = (() => {
     const difference = fold(subtract(first.argument, second.argument));
     if (!dependsOn(sum3, variable) || !dependsOn(difference, variable))
       return void 0;
-    const half = (inner) => divide(inner, number2(2));
+    const half2 = (inner) => divide(inner, number2(2));
     if (first.name === "sin" && second.name === "cos") {
-      return half(add(call("sin", sum3), call("sin", difference)));
+      return half2(add(call("sin", sum3), call("sin", difference)));
     }
     if (first.name === "cos" && second.name === "sin") {
-      return half(subtract(call("sin", sum3), call("sin", difference)));
+      return half2(subtract(call("sin", sum3), call("sin", difference)));
     }
     if (first.name === "sin" && second.name === "sin") {
-      return half(subtract(call("cos", difference), call("cos", sum3)));
+      return half2(subtract(call("cos", difference), call("cos", sum3)));
     }
-    return half(add(call("cos", difference), call("cos", sum3)));
+    return half2(add(call("cos", difference), call("cos", sum3)));
   }
   function asWave(node, variable) {
     if (node.type !== "FunctionCall" || node.args.length !== 1)
@@ -9536,10 +9638,10 @@ var CalcEngine = (() => {
         );
         if (disc === void 0)
           return void 0;
-        const half = rational(1n, 2n);
+        const half2 = rational(1n, 2n);
         for (const P2 of [
-          multiply3(half, add4(x.a, disc)),
-          multiply3(half, subtract3(x.a, disc))
+          multiply3(half2, add4(x.a, disc)),
+          multiply3(half2, subtract3(x.a, disc))
         ]) {
           const p = exactSquareRoot(P2);
           if (p === void 0 || isZero(p))
@@ -9932,11 +10034,11 @@ var CalcEngine = (() => {
         addFactor({ kind: "quadratic", b, c, multiplicity: 1 });
         continue;
       }
-      const half = F.of(rational(1n, 2n));
+      const half2 = F.of(rational(1n, 2n));
       for (const signed of [F.negate(root2), root2]) {
         addFactor({
           kind: "linear",
-          root: F.multiply(half, F.add(F.negate(b), signed)),
+          root: F.multiply(half2, F.add(F.negate(b), signed)),
           multiplicity: 1
         });
       }
@@ -10015,7 +10117,7 @@ var CalcEngine = (() => {
   function pairsFor(A, q, r, s) {
     if (isNegative(A))
       return void 0;
-    const half = rational(1n, 2n);
+    const half2 = rational(1n, 2n);
     if (isZero(A)) {
       if (!isZero(r))
         return void 0;
@@ -10027,8 +10129,8 @@ var CalcEngine = (() => {
         return void 0;
       const G2 = root3.field;
       const qq = G2.of(q);
-      const b2 = G2.multiply(G2.of(half), G2.subtract(qq, root3.value));
-      const d2 = G2.multiply(G2.of(half), G2.add(qq, root3.value));
+      const b2 = G2.multiply(G2.of(half2), G2.subtract(qq, root3.value));
+      const d2 = G2.multiply(G2.of(half2), G2.add(qq, root3.value));
       return {
         field: G2,
         pairs: [
@@ -10044,8 +10146,8 @@ var CalcEngine = (() => {
     const a = root2.value;
     const base2 = G.of(add4(q, A));
     const skew = G.divide(G.of(r), a);
-    const b = G.multiply(G.of(half), G.subtract(base2, skew));
-    const d = G.multiply(G.of(half), G.add(base2, skew));
+    const b = G.multiply(G.of(half2), G.subtract(base2, skew));
+    const d = G.multiply(G.of(half2), G.add(base2, skew));
     return {
       field: G,
       pairs: [
@@ -10344,12 +10446,12 @@ var CalcEngine = (() => {
     const constantTerm = piece.numerator[0] ?? F.zero;
     const linearTerm = piece.numerator[1] ?? F.zero;
     const quadratic2 = quadraticNode(F, b, c, variable);
-    const half = F.of(rational(1n, 2n));
-    const h = F.multiply(half, b);
+    const half2 = F.of(rational(1n, 2n));
+    const h = F.multiply(half2, b);
     const K = F.subtract(c, F.multiply(h, h));
     if (F.isZero(K))
       return void 0;
-    const halfB = F.multiply(half, linearTerm);
+    const halfB = F.multiply(half2, linearTerm);
     const logarithmic = F.isZero(linearTerm) ? void 0 : m === 1 ? scaledBy(F, halfB, call("ln", call("abs", quadratic2))) : negative2(
       divide(
         F.toNode(F.divide(halfB, F.of(rational(BigInt(m - 1))))),
@@ -10645,9 +10747,9 @@ var CalcEngine = (() => {
     if (k === 1)
       return which === "sin" ? sin2 : cos2;
     if (k % 2 === 0) {
-      const half = k / 2;
-      const s2 = multipleAngle("sin", half, angle);
-      const c2 = multipleAngle("cos", half, angle);
+      const half2 = k / 2;
+      const s2 = multipleAngle("sin", half2, angle);
+      const c2 = multipleAngle("cos", half2, angle);
       return which === "sin" ? multiply(number2(2), multiply(s2, c2)) : subtract(number2(1), multiply(number2(2), power2(s2, number2(2))));
     }
     const s = multipleAngle("sin", k - 1, angle);
@@ -10876,8 +10978,8 @@ var CalcEngine = (() => {
     if (numeric(top) && numeric(bottom)) {
       return "Every rational function has an elementary antiderivative, and this one does too \u2014 but its denominator does not factor into pieces this can write exactly: the factors it would need involve cube roots or worse. So it is refused rather than shown in an approximate form.";
     }
-    const binomial2 = binomialParts(node, variable);
-    if (binomial2 !== void 0 && chebyshevElementary(binomial2)) {
+    const binomial3 = binomialParts(node, variable);
+    if (binomial3 !== void 0 && chebyshevElementary(binomial3)) {
       return "By Chebyshev's theorem this binomial differential has an elementary antiderivative, found by a substitution that makes it rational \u2014 but this could not carry that substitution through, so it is refused rather than guessed.";
     }
     return void 0;
@@ -11481,15 +11583,15 @@ var CalcEngine = (() => {
     const solution = solveSquare(rows);
     if (solution === void 0)
       return void 0;
-    const U = solution.slice(0, d + 1);
+    const U2 = solution.slice(0, d + 1);
     const V = solution.slice(d + 1);
     let common = 1n;
-    for (const c of [...U, ...V])
+    for (const c of [...U2, ...V])
       common = common / gcd5(common, c.d) * c.d;
     const scale = rational(common);
     const scaled2 = (p) => p.map((c) => multiply3(c, scale));
     const cosTerm = multiply(
-      polyNode(scaled2(U), variable),
+      polyNode(scaled2(U2), variable),
       callOf("cos", wave.argument)
     );
     const sinTerm = multiply(
@@ -11639,9 +11741,9 @@ var CalcEngine = (() => {
     const D = subtract3(multiply3(b, b), multiply3(rational(4n), c));
     if (!(D.n > 0n))
       return [];
-    const half = rational(1n, 2n);
-    const centre = rationalNode2(multiply3(negate(b), half));
-    const spread = divide(power2(rationalNode2(D), rationalNode2(half)), number2(2));
+    const half2 = rational(1n, 2n);
+    const centre = rationalNode2(multiply3(negate(b), half2));
+    const spread = divide(power2(rationalNode2(D), rationalNode2(half2)), number2(2));
     return [fold(add(centre, negative2(spread))), fold(add(centre, spread))];
   }
   function exactSignChanges(g, variable) {
@@ -11786,10 +11888,10 @@ var CalcEngine = (() => {
     const [, , b] = quartic;
     const k = subtract3(multiply3(rational(2n), c), b);
     const u = divide(root2.node, id3(variable));
-    const half = rationalNode2(rational(1n, 2n));
+    const half2 = rationalNode2(rational(1n, 2n));
     if (isZero(k))
       return fold(negative2(divide(number2(1), u)));
-    const m = power2(rationalNode2(isNegative(k) ? negate(k) : k), half);
+    const m = power2(rationalNode2(isNegative(k) ? negate(k) : k), half2);
     if (!isNegative(k))
       return fold(divide(call("arctan", divide(u, m)), m));
     return fold(
@@ -12682,12 +12784,12 @@ var CalcEngine = (() => {
           const name = n.callee.symbol;
           if (n.args.length !== 1 || name !== "sin" && name !== "cos")
             return { ...n, args: n.args.map(walk) };
-          const half = fold(divide(n.args[0], number2(2)));
-          if (!singles.some((single2) => sameTree(fold(single2), half)))
+          const half2 = fold(divide(n.args[0], number2(2)));
+          if (!singles.some((single2) => sameTree(fold(single2), half2)))
             return { ...n, args: n.args.map(walk) };
           changed = true;
-          const sin2 = call("sin", half);
-          const cos2 = call("cos", half);
+          const sin2 = call("sin", half2);
+          const cos2 = call("cos", half2);
           return name === "sin" ? multiply(number2(2), multiply(sin2, cos2)) : subtract(power2(cos2, number2(2)), power2(sin2, number2(2)));
         }
         default:
@@ -13406,16 +13508,16 @@ var CalcEngine = (() => {
       case "sinh":
       case "cosh": {
         const doubled = call("sinh", multiply(number2(2), argument));
-        const half = divide(x, number2(2));
+        const half2 = divide(x, number2(2));
         const wave = divide(doubled, multiply(number2(4), linear2.a));
-        return name === "sinh" ? subtract(wave, half) : add(wave, half);
+        return name === "sinh" ? subtract(wave, half2) : add(wave, half2);
       }
       case "sin":
       case "cos": {
         const doubled = call("sin", multiply(number2(2), argument));
-        const half = divide(x, number2(2));
+        const half2 = divide(x, number2(2));
         const wave = divide(doubled, multiply(number2(4), linear2.a));
-        return name === "sin" ? subtract(half, wave) : add(half, wave);
+        return name === "sin" ? subtract(half2, wave) : add(half2, wave);
       }
       default:
         return void 0;
@@ -14055,6 +14157,18 @@ var CalcEngine = (() => {
         continue;
       }
       if (atom === PI2 || atom === E || isOpaque(atom)) {
+        if (exponent2.d === 2n) {
+          const whole = (exponent2.n - 1n) / 2n;
+          const root2 = functionCall4(id5("sqrt"), base2);
+          plain.push(
+            whole === 0n ? root2 : binop4(
+              "Multiply",
+              whole === 1n ? base2 : binop4("Exponent", base2, number4(Number(whole))),
+              root2
+            )
+          );
+          continue;
+        }
         plain.push(
           binop4(
             "Exponent",
@@ -14182,6 +14296,231 @@ var CalcEngine = (() => {
         return void 0;
     }
   }
+
+  // src/plugins/physics-lab/symbolic/specialValues.ts
+  var EULER2 = 0.5772156649015329;
+  var gammaConstant = () => opaque(id3("gamma"), EULER2);
+  var half = rational(1n, 2n);
+  var sqrtPi = () => power5(PI_VALUE, half);
+  var ln2 = () => logarithm(rational(2n)) ?? ZERO2;
+  function factorial2(n) {
+    let out = 1n;
+    for (let k = 2n; k <= n; k += 1n)
+      out *= k;
+    return out;
+  }
+  function binomial(n, k) {
+    return factorial2(n) / (factorial2(k) * factorial2(n - k));
+  }
+  var bernoulliCache = [ONE];
+  function bernoulli(m) {
+    for (let n = bernoulliCache.length; n <= m; n += 1) {
+      let sum3 = ZERO;
+      for (let k = 0; k < n; k += 1)
+        sum3 = add4(
+          sum3,
+          multiply3(
+            rational(binomial(BigInt(n + 1), BigInt(k))),
+            bernoulliCache[k]
+          )
+        );
+      bernoulliCache.push(negate(divide5(sum3, rational(BigInt(n + 1)))));
+    }
+    return bernoulliCache[m];
+  }
+  function gammaAt(q) {
+    if (isInteger(q)) {
+      if (q.n <= 0n)
+        return void 0;
+      return fromRational(rational(factorial2(q.n - 1n)));
+    }
+    if (q.d !== 2n)
+      return void 0;
+    const n = (q.n - 1n) / 2n;
+    const root2 = sqrtPi();
+    if (root2 === void 0)
+      return void 0;
+    if (n >= 0n) {
+      const c2 = rational(factorial2(2n * n), 4n ** n * factorial2(n));
+      return multiply5(fromRational(c2), root2);
+    }
+    const m = -n;
+    const c = rational((-4n) ** m * factorial2(m), factorial2(2n * m));
+    return multiply5(fromRational(c), root2);
+  }
+  function digammaAt(q) {
+    if (!(q.n > 0n))
+      return void 0;
+    if (isInteger(q)) {
+      let harmonic = ZERO;
+      for (let k = 1n; k < q.n; k += 1n)
+        harmonic = add4(harmonic, rational(1n, k));
+      return add5(negate2(gammaConstant()), fromRational(harmonic));
+    }
+    if (q.d !== 2n)
+      return void 0;
+    const n = (q.n - 1n) / 2n;
+    let sum3 = ZERO;
+    for (let k = 1n; k <= n; k += 1n)
+      sum3 = add4(sum3, rational(2n, 2n * k - 1n));
+    return add5(
+      subtract4(negate2(gammaConstant()), multiply5(fromInteger(2), ln2())),
+      fromRational(sum3)
+    );
+  }
+  function zetaAt(q) {
+    if (!isInteger(q) || q.n === 1n)
+      return void 0;
+    const s = Number(q.n);
+    if (s <= 0) {
+      const n = -s;
+      const b = bernoulli(n + 1);
+      const sign3 = n % 2 === 0 ? ONE : rational(-1n);
+      return fromRational(
+        multiply3(sign3, divide5(b, rational(BigInt(n + 1))))
+      );
+    }
+    if (s % 2 === 0) {
+      const n = s / 2;
+      const c = multiply3(
+        multiply3(n % 2 === 0 ? rational(-1n) : ONE, bernoulli(s)),
+        rational(2n ** BigInt(s), 2n * factorial2(BigInt(s)))
+      );
+      const piPower = power5(PI_VALUE, rational(BigInt(s)));
+      return piPower === void 0 ? void 0 : multiply5(fromRational(c), piPower);
+    }
+    const named2 = {
+      3: 1.2020569031595942,
+      5: 1.03692775514337,
+      7: 1.008349277381923
+    };
+    return named2[s] === void 0 ? void 0 : opaque(id3(`zeta_${s}`), named2[s]);
+  }
+  function lambertAt(v) {
+    if (v.length === 0)
+      return ZERO2;
+    const single2 = atomsOf(v);
+    if (single2 === void 0 || single2.factors.size !== 1)
+      return void 0;
+    const [[atom, exponent2]] = [...single2.factors];
+    if (atom !== "e" || !equals(single2.coeff, exponent2))
+      return void 0;
+    if (compare(exponent2, rational(-1n)) < 0)
+      return void 0;
+    return fromRational(exponent2);
+  }
+  function specialValue(name, args) {
+    const r = args.map((a) => asRational(a));
+    const [q] = r;
+    const isZero4 = (i) => args[i]?.length === 0;
+    switch (name) {
+      case "Gamma":
+        return q === void 0 ? void 0 : gammaAt(q);
+      case "Gamma_r": {
+        if (q === void 0)
+          return void 0;
+        if (isInteger(q) && q.n <= 0n)
+          return ZERO2;
+        const g = gammaAt(q);
+        return g === void 0 ? void 0 : divide7(fromInteger(1), g);
+      }
+      case "psi":
+        return q === void 0 ? void 0 : digammaAt(q);
+      case "zeta":
+        return q === void 0 ? void 0 : zetaAt(q);
+      case "Beta": {
+        const [a, b] = r;
+        if (a === void 0 || b === void 0)
+          return void 0;
+        const ga = gammaAt(a);
+        const gb = gammaAt(b);
+        const gab = gammaAt(add4(a, b));
+        if (ga === void 0 || gb === void 0 || gab === void 0)
+          return void 0;
+        return divide7(multiply5(ga, gb), gab);
+      }
+      case "erf":
+      case "erfi":
+      case "Si":
+      case "Shi":
+      case "FresnelS":
+      case "FresnelC":
+        return isZero4(0) ? ZERO2 : void 0;
+      case "erfc":
+        return isZero4(0) ? fromInteger(1) : void 0;
+      case "Li_2": {
+        if (q === void 0)
+          return void 0;
+        const piSquared = power5(PI_VALUE, rational(2n));
+        if (piSquared === void 0)
+          return void 0;
+        const times2 = (c) => multiply5(fromRational(c), piSquared);
+        if (isZero(q))
+          return ZERO2;
+        if (isOne(q))
+          return times2(rational(1n, 6n));
+        if (equals(q, rational(-1n)))
+          return times2(rational(-1n, 12n));
+        if (equals(q, half))
+          return subtract4(
+            times2(rational(1n, 12n)),
+            multiply5(fromRational(half), multiply5(ln2(), ln2()))
+          );
+        return void 0;
+      }
+      case "W_0":
+        return args[0] === void 0 ? void 0 : lambertAt(args[0]);
+      case "EllipticK":
+        return isZero4(0) ? multiply5(PI_VALUE, fromRational(half)) : void 0;
+      case "BesselJ": {
+        const [n] = r;
+        if (n === void 0 || !isInteger(n) || !isZero4(1))
+          return void 0;
+        return fromInteger(n.n === 0n ? 1 : 0);
+      }
+      case "E_ML": {
+        const [a, b] = r;
+        const [, , z] = r;
+        if (a === void 0 || b === void 0)
+          return void 0;
+        if (isZero4(2)) {
+          const g = gammaAt(b);
+          return g === void 0 ? void 0 : divide7(fromInteger(1), g);
+        }
+        if (z === void 0 || !isOne(a))
+          return void 0;
+        const ez = power5(E_VALUE, z);
+        if (ez === void 0)
+          return void 0;
+        if (isOne(b))
+          return ez;
+        if (equals(b, rational(2n)))
+          return divide7(subtract4(ez, fromInteger(1)), fromRational(z));
+        return void 0;
+      }
+      default:
+        return void 0;
+    }
+  }
+  var SPECIAL_VALUE_FUNCTIONS = /* @__PURE__ */ new Set([
+    "Gamma",
+    "Gamma_r",
+    "psi",
+    "zeta",
+    "Beta",
+    "erf",
+    "erfi",
+    "erfc",
+    "Si",
+    "Shi",
+    "FresnelS",
+    "FresnelC",
+    "Li_2",
+    "W_0",
+    "EllipticK",
+    "BesselJ",
+    "E_ML"
+  ]);
 
   // src/plugins/physics-lab/symbolic/powerSeries.ts
   var PowerSeriesError = class extends Error {
@@ -14360,7 +14699,7 @@ var CalcEngine = (() => {
         },
         cap - s.v
       );
-      const body = this.compose((k) => binomial(r, k), w, cap);
+      const body = this.compose((k) => binomial2(r, k), w, cap);
       return this.normalise(
         { v: body.v + Number(shifted.n), c: this.scale(body, raised2).c },
         cap
@@ -14538,24 +14877,24 @@ var CalcEngine = (() => {
     }
   };
   var factorialCache = [1n];
-  function factorial2(k) {
+  function factorial3(k) {
     for (let i = factorialCache.length; i <= k; i += 1)
       factorialCache.push(factorialCache[i - 1] * BigInt(i));
     return factorialCache[k];
   }
   var alternate = (m) => m % 2 === 0 ? 1n : -1n;
-  function binomial(r, k) {
+  function binomial2(r, k) {
     let total = ONE;
     for (let i = 0; i < k; i += 1)
       total = multiply3(total, subtract3(r, rational(BigInt(i))));
-    return divide5(total, rational(factorial2(k)));
+    return divide5(total, rational(factorial3(k)));
   }
   var MACLAURIN = {
-    exp: (k) => rational(1n, factorial2(k)),
-    sin: (k) => k % 2 === 1 ? rational(alternate((k - 1) / 2), factorial2(k)) : ZERO,
-    cos: (k) => k % 2 === 0 ? rational(alternate(k / 2), factorial2(k)) : ZERO,
-    sinh: (k) => k % 2 === 1 ? rational(1n, factorial2(k)) : ZERO,
-    cosh: (k) => k % 2 === 0 ? rational(1n, factorial2(k)) : ZERO,
+    exp: (k) => rational(1n, factorial3(k)),
+    sin: (k) => k % 2 === 1 ? rational(alternate((k - 1) / 2), factorial3(k)) : ZERO,
+    cos: (k) => k % 2 === 0 ? rational(alternate(k / 2), factorial3(k)) : ZERO,
+    sinh: (k) => k % 2 === 1 ? rational(1n, factorial3(k)) : ZERO,
+    cosh: (k) => k % 2 === 0 ? rational(1n, factorial3(k)) : ZERO,
     arctan: (k) => k % 2 === 1 ? rational(alternate((k - 1) / 2), BigInt(k)) : ZERO,
     arctanh: (k) => k % 2 === 1 ? rational(1n, BigInt(k)) : ZERO,
     arcsin: (k) => {
@@ -14563,8 +14902,8 @@ var CalcEngine = (() => {
         return ZERO;
       const m = (k - 1) / 2;
       return rational(
-        factorial2(2 * m),
-        4n ** BigInt(m) * factorial2(m) * factorial2(m) * BigInt(2 * m + 1)
+        factorial3(2 * m),
+        4n ** BigInt(m) * factorial3(m) * factorial3(m) * BigInt(2 * m + 1)
       );
     },
     arcsinh: (k) => {
@@ -14572,8 +14911,8 @@ var CalcEngine = (() => {
         return ZERO;
       const m = (k - 1) / 2;
       return rational(
-        alternate(m) * factorial2(2 * m),
-        4n ** BigInt(m) * factorial2(m) * factorial2(m) * BigInt(2 * m + 1)
+        alternate(m) * factorial3(2 * m),
+        4n ** BigInt(m) * factorial3(m) * factorial3(m) * BigInt(2 * m + 1)
       );
     },
     /** ln(1 + u). */
@@ -14985,11 +15324,11 @@ var CalcEngine = (() => {
     if (to.kind === "finite" && certainlyZero(to.value) === true && LIKE_ARGUMENT_AT_ZERO.includes(name))
       return sizeOf(arg, variable);
     if (to.kind === "infinite" && (name === "sinh" || name === "cosh")) {
-      const half = fromRational(
+      const half2 = fromRational(
         rational(to.sign > 0 || name === "cosh" ? 1n : -1n, 2n)
       );
       const grows = to.sign > 0 ? arg : fold(multiply(number2(-1), arg));
-      return withExponential(constant2(half), grows, variable);
+      return withExponential(constant2(half2), grows, variable);
     }
     const whole = limitAtInfinity(node, variable);
     return whole?.kind === "finite" && certainlyZero(whole.value) === false ? constant2(whole.value) : void 0;
@@ -15008,11 +15347,11 @@ var CalcEngine = (() => {
       return { c: fromRational(inner.a), a: ZERO, b: ONE };
     if (!isZero(inner.b))
       return void 0;
-    const ln2 = exactConstant(call("ln", toNode(inner.c)));
-    if (ln2 === void 0)
+    const ln3 = exactConstant(call("ln", toNode(inner.c)));
+    if (ln3 === void 0)
       return void 0;
-    if (certainlyZero(ln2) === false)
-      return constant2(ln2);
+    if (certainlyZero(ln3) === false)
+      return constant2(ln3);
     return sizeOf(
       fold(tidySums(fold(subtract(arg, number2(1))))),
       variable
@@ -15150,6 +15489,12 @@ var CalcEngine = (() => {
         return void 0;
       }
       case "FunctionCall": {
+        if (SPECIAL_VALUE_FUNCTIONS.has(node.callee.symbol)) {
+          const args = node.args.map((arg) => exactConstant(arg));
+          if (args.some((a) => a === void 0))
+            return void 0;
+          return specialValue(node.callee.symbol, args);
+        }
         if (node.args.length !== 1)
           return void 0;
         const inner = exactConstant(node.args[0]);
@@ -15994,7 +16339,7 @@ var CalcEngine = (() => {
       a = 0;
       b = 1;
     }
-    const half = (b - a) / 2;
+    const half2 = (b - a) / 2;
     const middle = (a + b) / 2;
     let previous;
     for (let level = 0; level <= 7; level += 1) {
@@ -16006,7 +16351,7 @@ var CalcEngine = (() => {
         const weight = Math.PI / 2 * Math.cosh(t) / Math.pow(Math.cosh(u), 2);
         if (weight < 1e-300)
           continue;
-        const x = middle + half * Math.tanh(u);
+        const x = middle + half2 * Math.tanh(u);
         if (x <= a || x >= b)
           continue;
         const y = g(x);
@@ -16014,7 +16359,7 @@ var CalcEngine = (() => {
           continue;
         total += weight * y;
       }
-      const estimate = total * h * half;
+      const estimate = total * h * half2;
       if (previous !== void 0 && Math.abs(estimate - previous) <= 1e-10 * Math.max(1, Math.abs(estimate))) {
         return estimate;
       }
@@ -16570,13 +16915,13 @@ var CalcEngine = (() => {
     const trig = inside.type === "FunctionCall" && (inside.callee.symbol === "sin" || inside.callee.symbol === "cos") && isVariable2(inside.args[0], variable) ? inside.callee.symbol : void 0;
     if (trig === void 0)
       return void 0;
-    const half = isMultipleOfPi(upper, 0.5);
+    const half2 = isMultipleOfPi(upper, 0.5);
     const whole = isMultipleOfPi(upper, 1) && trig === "sin";
-    if (!half && !whole)
+    if (!half2 && !whole)
       return void 0;
     return {
       node: negative2(
-        multiply(divide(id3("pi"), number2(half ? 2 : 1)), call("ln", number2(2)))
+        multiply(divide(id3("pi"), number2(half2 ? 2 : 1)), call("ln", number2(2)))
       ),
       method: "\u222B\u2080^{\u03C0/2} ln sin x dx = \u222B\u2080^{\u03C0/2} ln cos x dx = \u2212(\u03C0/2) ln 2: adding the two gives the integral of ln(sin 2x / 2), which is the same integral again minus (\u03C0/2) ln 2."
     };
@@ -16652,7 +16997,7 @@ var CalcEngine = (() => {
     }
     const sum3 = fold(add(f, reflected));
     const h = (x) => fx(x) + fr(x);
-    const half = (v) => multiply5(v, fromRational(rational(1n, 2n)));
+    const half2 = (v) => multiply5(v, fromRational(rational(1n, 2n)));
     const values = points.map(h).filter(Number.isFinite);
     if (values.length >= SAMPLES2 / 2 && values.every(
       (v) => Math.abs(v - values[0]) < 1e-9 * Math.max(1, Math.abs(v))
@@ -16669,7 +17014,7 @@ var CalcEngine = (() => {
         if (width === void 0)
           break;
         return {
-          exact: half(multiply5(K, width)),
+          exact: half2(multiply5(K, width)),
           method: "King's rule: f(x) + f(a + b \u2212 x) is the same constant K everywhere on the interval, and \u222B\u2090\u1D47 f = \xBD\u222B\u2090\u1D47 (f(x) + f(a + b \u2212 x)) dx = K(b \u2212 a)/2. The sum was checked to be constant at sample points, not proved.",
           proved: false
         };
@@ -16687,7 +17032,7 @@ var CalcEngine = (() => {
         continue;
       const symbolic = sameTree(fold(candidate), sum3);
       return {
-        exact: half(whole),
+        exact: half2(whole),
         method: `Reflection: \u222B\u2090\u1D47 f(x) dx = \xBD\u222B\u2090\u1D47 (f(x) + f(a + b \u2212 x)) dx, and that sum is a function with an antiderivative.${symbolic ? "" : " The sum was matched to it at sample points, not proved."}`,
         proved: symbolic
       };
@@ -16858,12 +17203,12 @@ var CalcEngine = (() => {
       if (t.type === "FunctionCall" && (t.callee.symbol === "sin" || t.callee.symbol === "cos") && t.args.length === 1) {
         const k = pureSquare(t.args[0], variable);
         if (k !== void 0 && k > 0) {
-          const name = t.callee.symbol === "sin" ? "S" : "C";
-          const half = divide(number2(1), number2(2));
+          const name = t.callee.symbol === "sin" ? "FresnelS" : "FresnelC";
+          const half2 = divide(number2(1), number2(2));
           return {
             value: multiply(
-              power2(divide(id3("pi"), num(2 * k)), half),
-              call(name, multiply(power2(divide(num(2 * k), id3("pi")), half), x))
+              power2(divide(id3("pi"), num(2 * k)), half2),
+              call(name, multiply(power2(divide(num(2 * k), id3("pi")), half2), x))
             ),
             uses: [name]
           };
@@ -17515,7 +17860,7 @@ var CalcEngine = (() => {
       const open = "\\left(";
       if (comma < 0 || !rest.startsWith(open))
         break;
-      out = `${out.slice(0, at2)}E${open}${subscript.slice(0, comma)},${subscript.slice(comma + 1)},${rest.slice(open.length)}`;
+      out = `${out.slice(0, at2)}E_{ML}${open}${subscript.slice(0, comma)},${subscript.slice(comma + 1)},${rest.slice(open.length)}`;
     }
     return out;
   }
@@ -17583,12 +17928,12 @@ var CalcEngine = (() => {
     if (order(lo) === order(hi))
       return { value: new D(0), digits: target };
     if (lo.kind === "finite" && hi.kind === "finite") {
-      const half = valueOf2(hi, WORKING).minus(valueOf2(lo, WORKING)).div(2);
+      const half2 = valueOf2(hi, WORKING).minus(valueOf2(lo, WORKING)).div(2);
       rule2 = (t) => {
         const u = halfPi.times(sinh3(D, t));
-        const gap = half.times(2).div(D.exp(u.abs().times(2)).plus(1));
+        const gap = half2.times(2).div(D.exp(u.abs().times(2)).plus(1));
         const c = cosh3(D, u);
-        const weight = half.times(halfPi).times(cosh3(D, t)).div(c.times(c));
+        const weight = half2.times(halfPi).times(cosh3(D, t)).div(c.times(c));
         return t.isNegative() ? { from: lo, offset: gap, weight } : { from: hi, offset: gap.neg(), weight };
       };
     } else if (lo.kind === "finite" || hi.kind === "finite") {
@@ -18194,7 +18539,7 @@ var CalcEngine = (() => {
     const separated = separable(emit2, f, independent, dependent);
     if (separated.ok)
       return separated;
-    return bernoulli(cfg2, emit2, f, independent, dependent) ?? homogeneous(emit2, f, independent, dependent) ?? separated;
+    return bernoulli2(cfg2, emit2, f, independent, dependent) ?? homogeneous(emit2, f, independent, dependent) ?? separated;
   }
   function withoutLogBars(node) {
     switch (node.type) {
@@ -18217,7 +18562,7 @@ var CalcEngine = (() => {
         return node;
     }
   }
-  function bernoulli(cfg2, emit2, f, independent, dependent) {
+  function bernoulli2(cfg2, emit2, f, independent, dependent) {
     const byPower = /* @__PURE__ */ new Map();
     for (const { term: term2, negated } of topLevelTerms(f)) {
       const split4 = separate(term2, independent, dependent);
@@ -18817,8 +19162,8 @@ var CalcEngine = (() => {
       };
     }
     const discriminant = add4(multiply3(p, p), multiply3(rational(4n), q));
-    const half = rational(1n, 2n);
-    const halfP = multiply3(p, half);
+    const half2 = rational(1n, 2n);
+    const halfP = multiply3(p, half2);
     let equilibrium;
     if (!isZero(r)) {
       if (isZero(q)) {
@@ -18829,7 +19174,7 @@ var CalcEngine = (() => {
       }
       equilibrium = toNode(fromRational(negate(divide5(r, q))));
     }
-    const built = isZero(discriminant) ? repeatedRoot(halfP) : compare(discriminant, ZERO) > 0 ? distinctRealRoots(halfP, discriminant, half) : complexRoots(halfP, discriminant, half);
+    const built = isZero(discriminant) ? repeatedRoot(halfP) : compare(discriminant, ZERO) > 0 ? distinctRealRoots(halfP, discriminant, half2) : complexRoots(halfP, discriminant, half2);
     if (built === void 0) {
       return {
         ok: false,
@@ -18851,11 +19196,11 @@ var CalcEngine = (() => {
       dependent
     );
   }
-  function distinctRealRoots(halfP, discriminant, half) {
-    const root2 = power5(fromRational(discriminant), half);
+  function distinctRealRoots(halfP, discriminant, half2) {
+    const root2 = power5(fromRational(discriminant), half2);
     if (root2 === void 0)
       return void 0;
-    const spread = multiply5(fromRational(half), root2);
+    const spread = multiply5(fromRational(half2), root2);
     const centre = fromRational(halfP);
     const first = toNode(add5(centre, spread));
     const second = toNode(subtract4(centre, spread));
@@ -18877,11 +19222,11 @@ var CalcEngine = (() => {
       method: "A repeated characteristic root, critically damped"
     };
   }
-  function complexRoots(halfP, discriminant, half) {
-    const magnitude = power5(fromRational(negate(discriminant)), half);
+  function complexRoots(halfP, discriminant, half2) {
+    const magnitude = power5(fromRational(negate(discriminant)), half2);
     if (magnitude === void 0)
       return void 0;
-    const beta2 = toNode(multiply5(fromRational(half), magnitude));
+    const beta2 = toNode(multiply5(fromRational(half2), magnitude));
     const oscillation = add7(
       multiply7(id7(FIRST), call3("cos", multiply7(beta2, id7("x")))),
       multiply7(id7(SECOND), call3("sin", multiply7(beta2, id7("x"))))
@@ -18939,37 +19284,37 @@ var CalcEngine = (() => {
   // src/plugins/physics-lab/symbolic/series.ts
   var SeriesError = class extends Error {
   };
-  var factorial3 = (arg) => ({ type: "Factorial", arg });
+  var factorial4 = (arg) => ({ type: "Factorial", arg });
   var alternating = (n) => power2(number2(-1), n);
   var twice = (n) => multiply(number2(2), n);
   var twicePlusOne = (n) => add(twice(n), number2(1));
   var SERIES = {
     exp: {
-      coefficient: (n) => divide(number2(1), factorial3(n)),
+      coefficient: (n) => divide(number2(1), factorial4(n)),
       exponent: (n) => n,
       from: 0,
       interval: "every x"
     },
     sin: {
-      coefficient: (n) => divide(alternating(n), factorial3(twicePlusOne(n))),
+      coefficient: (n) => divide(alternating(n), factorial4(twicePlusOne(n))),
       exponent: twicePlusOne,
       from: 0,
       interval: "every x"
     },
     cos: {
-      coefficient: (n) => divide(alternating(n), factorial3(twice(n))),
+      coefficient: (n) => divide(alternating(n), factorial4(twice(n))),
       exponent: twice,
       from: 0,
       interval: "every x"
     },
     sinh: {
-      coefficient: (n) => divide(number2(1), factorial3(twicePlusOne(n))),
+      coefficient: (n) => divide(number2(1), factorial4(twicePlusOne(n))),
       exponent: twicePlusOne,
       from: 0,
       interval: "every x"
     },
     cosh: {
-      coefficient: (n) => divide(number2(1), factorial3(twice(n))),
+      coefficient: (n) => divide(number2(1), factorial4(twice(n))),
       exponent: twice,
       from: 0,
       interval: "every x"
@@ -19866,8 +20211,47 @@ var CalcEngine = (() => {
 
   // docs/mockups/calculus-tab/engine.ts
   var cfg;
+  var desmosGlobal;
   function init(Desmos, calc) {
+    desmosGlobal = Desmos;
     cfg = buildConfigFromGlobals(Desmos, calc);
+  }
+  function installSpecialFunctionNames(calc) {
+    const original = calc.controller.getMathquillConfig;
+    calc.controller.getMathquillConfig = function(e) {
+      return withSpecialFunctionNames(original.call(this, e));
+    };
+    calc.setState(calc.getState());
+    const watched = calc;
+    let timer;
+    const check = () => {
+      timer = void 0;
+      const used = watched.getExpressions().some((e) => specialFunctionsIn(e.latex ?? "").length > 0);
+      if (!used)
+        return;
+      const active = document.activeElement;
+      ensureSpecialFunctions(
+        calc,
+        SPECIAL_FUNCTIONS.map((f) => f.symbol),
+        { editing: active?.closest(".dcg-expressionlist") != null }
+      );
+    };
+    watched.observeEvent("change.special-functions", () => {
+      timer ??= setTimeout(check, 400);
+    });
+    document.addEventListener("focusout", () => {
+      timer ??= setTimeout(check, 400);
+    });
+    if (desmosGlobal !== void 0)
+      cfg = buildConfigFromGlobals(desmosGlobal, calc);
+  }
+  function defineSpecialFunctionsFor(calc, latex) {
+    if (specialFunctionsIn(latex).length === 0)
+      return 0;
+    return ensureSpecialFunctions(
+      calc,
+      SPECIAL_FUNCTIONS.map((f) => f.symbol)
+    );
   }
   var emit = (node) => toLatex(cfg, node);
   var NAME = String.raw`(?:[a-zA-Z]|\\[a-zA-Z]+)(?:_\{[a-zA-Z0-9]+\}|_[a-zA-Z0-9])?`;
@@ -20196,6 +20580,26 @@ var CalcEngine = (() => {
       variable = "x";
     if (variable === void 0 && free.length === 1)
       variable = free[0];
+    if (variable === void 0 && operation === "none" && free.length === 0) {
+      const exact = exactConstant(fold(normsToAbs(body)));
+      if (exact !== void 0) {
+        const latex2 = emit(tidySigns(fold(toNode(exact))));
+        return {
+          ...base2,
+          status: "ok",
+          summary: "The exact value.",
+          answer: {
+            latex: latex2,
+            decimal: fmt(toNumber2(exact)),
+            verdict: "Proved",
+            method: "Special values and their families: \u0393 at whole and half-integer points, \u03B6 at even and negative integers, \u03C8, B, Li\u2082, W\u2080 and the rest; anything else is kept exactly as it is.",
+            steps: [],
+            notes: [],
+            graph: [{ latex: latex2 }]
+          }
+        };
+      }
+    }
     if (variable === void 0 && operation === "none") {
       return {
         ...base2,

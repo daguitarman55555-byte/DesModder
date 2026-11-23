@@ -148,9 +148,9 @@ describe("graphing with the special functions defined", () => {
       request(f, Math.PI, String.raw`\pi`, 2)
     );
     const rl = answer(result, "riemannLiouville");
-    expect(rl.graphLatex).toContain(String.raw`E\left(`);
+    expect(rl.graphLatex).toContain(String.raw`E_{ML}\left(`);
     expect(
-      rl.definitions.some((d) => d.startsWith(String.raw`E\left(a,b,z`))
+      rl.definitions.some((d) => d.startsWith(String.raw`E_{ML}\left(a,b,z`))
     ).toBe(true);
     expect(
       rl.definitions.some((d) => d.startsWith(String.raw`\Gamma_{r}`))

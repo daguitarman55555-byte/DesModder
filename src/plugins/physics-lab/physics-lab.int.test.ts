@@ -1809,3 +1809,122 @@ testWithPage(
   },
   50000
 );
+
+testWithPage(
+  "special functions typed letter by letter work, and their definitions stay locked away",
+  async (driver) => {
+    await driver.enablePlugin("physics-lab");
+    await driver.setBlank();
+    await driver.focusIndex(0);
+    // Typed, not pasted: E then i must become one name and stay one.
+    for (const key of "Gamma(0.5") await driver.keyboard.type(key);
+    for (let i = 0; i < 6; i += 1) await driver.keyboard.press("ArrowLeft");
+    for (let i = 0; i < 6; i += 1) await driver.keyboard.press("ArrowRight");
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    const whileTyping = await driver.evaluate(() => {
+      const { list } = Calc.getState().expressions;
+      // The line typed in, not the last one: definitions arriving while it
+      // is typed go to the end of the list.
+      const typed = list.find(
+        (e) =>
+          "latex" in e &&
+          typeof e.latex === "string" &&
+          e.latex.startsWith(String.raw`\Gamma\left(`)
+      );
+      return {
+        latex: typed && "latex" in typed ? typed.latex : undefined,
+        // The cursor is still in the line: setting the state would move it.
+        focused: Calc.controller.getFocusLocation() !== undefined,
+        shown: document.querySelectorAll(".dcg-expressionitem").length,
+      };
+    });
+    expect(whileTyping.latex).toBe(String.raw`\Gamma\left(0.5\right)`);
+    expect(whileTyping.focused).toBe(true);
+
+    await driver.keyboard.press("Escape");
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    await driver.waitForSync();
+    const after = await driver.evaluate(() => {
+      const list = Calc.getState().expressions.list as {
+        id: string;
+        type: string;
+        latex?: string;
+        folderId?: string;
+        secret?: boolean;
+        readonly?: boolean;
+        hidden?: boolean;
+        collapsed?: boolean;
+      }[];
+      const folder = list.find((e) => e.id === "dsm-special-functions");
+      const definitions = list.filter(
+        (e) => e.folderId === "dsm-special-functions"
+      );
+      const typed = list.find(
+        (e) => e.latex === String.raw`\Gamma\left(0.5\right)`
+      )!;
+      const analysis = (
+        Calc.expressionAnalysis as Record<
+          string,
+          { evaluation?: { value?: number }; isError?: boolean }
+        >
+      )[typed.id];
+      return {
+        folderFirst: list[0]?.id === "dsm-special-functions",
+        folder: folder && {
+          secret: folder.secret,
+          collapsed: folder.collapsed,
+        },
+        definitions: definitions.length,
+        allLocked: definitions.every((d) => d.secret && d.readonly && d.hidden),
+        value: analysis?.evaluation?.value,
+        error: analysis?.isError,
+        // Only the typed line and the blank one after it are listed.
+        listed: [...document.querySelectorAll(".dcg-expressionitem")].filter(
+          (n) => !n.classList.contains("dcg-new-expression")
+        ).length,
+      };
+    });
+    expect(after.folderFirst).toBe(true);
+    expect(after.folder).toEqual({ secret: true, collapsed: true });
+    expect(after.definitions).toBeGreaterThanOrEqual(20);
+    expect(after.allLocked).toBe(true);
+    expect(after.error).toBeFalsy();
+    expect(after.value).toBeCloseTo(Math.sqrt(Math.PI), 10);
+    expect(after.listed).toBe(1);
+
+    // A name that used to break apart into E·i, typed into a fresh line.
+    await driver.evaluate(() =>
+      Calc.setExpression({ id: "typed-ei", latex: "" })
+    );
+    await driver.waitForSync();
+    await driver.evaluate(() =>
+      Calc.controller.dispatch({ type: "move-focus-to-item", id: "typed-ei" })
+    );
+    for (const key of "Ei(2") await driver.keyboard.type(key);
+    await driver.keyboard.press("ArrowLeft");
+    await driver.keyboard.press("ArrowLeft");
+    await driver.keyboard.press("Escape");
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const ei = await driver.evaluate(() => {
+      const e = Calc.getState().expressions.list.find(
+        (x) => x.id === "typed-ei"
+      );
+      const a = (
+        Calc.expressionAnalysis as Record<
+          string,
+          { evaluation?: { value?: number }; isError?: boolean }
+        >
+      )["typed-ei"];
+      return {
+        latex: e && "latex" in e ? e.latex : "",
+        value: a?.evaluation?.value,
+      };
+    });
+    expect(ei.latex).toBe(String.raw`\operatorname{Ei}\left(2\right)`);
+    expect(ei.value).toBeCloseTo(4.954234356001891, 8);
+
+    await driver.setBlank();
+    await driver.disablePlugin("physics-lab");
+  },
+  60000
+);

@@ -65,7 +65,7 @@ describe("special-function antiderivatives", () => {
   test("e^{x²} through erfi", () =>
     check(pow(id("e"), pow(x, number(2))), "erfi"));
   test("sin(x²) through the Fresnel S", () =>
-    check(fn("sin", pow(x, number(2))), "S"));
+    check(fn("sin", pow(x, number(2))), "FresnelS"));
   test("ln(1 + x)/x = −Li₂(−x)", () =>
     check(div(fn("ln", add(number(1), x)), x), "Li_2"));
   test("(eˣ − 1)/x: Ei(x) − ln|x|, a special term and an elementary one", () => {

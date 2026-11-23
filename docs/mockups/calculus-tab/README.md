@@ -63,11 +63,23 @@ New, and what is being judged:
   - **The library** (`src/symbolic/special.ts`): Γ, 1/Γ, B, ψ, ζ, erfc, erfi,
     Si, Ci, Shi, Chi, Ei, li, Li₂, the Fresnel S and C, Bessel J, Lambert W,
     elliptic K, and the Mittag-Leffler E.
-  - **In Desmos:** each one is defined in Desmos, and its definition is added
-    to the graph with any answer that uses it. Desmos accepts `\Gamma`, `\psi`,
-    `\zeta`, `\operatorname{Li}_{2}`, `\operatorname{Ei}` and the rest as names
-    of functions the user defines. The one exception is E\_{a,b}(z), which has
-    to be E(a,b,z) because a subscript cannot hold a comma.
+  - **Typing them:** the expression list learns the names, so typing
+    `Gamma(0.5`, `Ei(2` or `zeta(3` key by key gives Γ, Ei and ζ, and the names
+    survive arrow keys and editing. Names with more than one letter that
+    Desmos lacks become operator names (Beta, FresnelS, FresnelC, BesselJ,
+    EllipticK, Ei, Si, Ci, Shi, Chi, li, Li₂, erfc, erfi). The others are
+    W₀ and E\_{ML}(a,b,z); a subscript cannot hold a comma. No name is a
+    single letter, so `+C` is never taken.
+  - **The locked folder:** once any line calls one of them, the whole library
+    goes into a folder that is first in the list, collapsed, secret (Desmos
+    does not show it), with each definition read-only and hidden so nothing
+    plots. While a line is being typed the definitions go in without moving
+    the cursor, and they move into the folder when the line is left.
+  - **Special values:** asking for a bare value answers with the exact
+    constant: Γ(½) = √π, Γ(7/2) = 15√π/8, ζ(2n) through Bernoulli numbers,
+    ζ(−1) = −1/12, ζ(3) as Apéry's constant, ψ(n) and ψ(n+½) through γ and
+    ln 2, B(a,b) through Γ, Li₂(½) = π²/12 − (ln 2)²/2, W₀(a·eᵃ) = a,
+    K(0) = π/2, and the Mittag-Leffler cases that are exponentials.
   - **Checking:** `node scripts/check-special-functions.cjs` compares every
     Desmos definition with the JavaScript value in live Desmos (worst
     relative error 3×10⁻¹⁴ on 2026-11-23).

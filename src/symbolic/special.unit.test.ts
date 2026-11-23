@@ -73,11 +73,13 @@ describe("the catalogue", () => {
   });
 
   test("definitions come with what they depend on, first and once", () => {
-    const defs = desmosDefinitions(["B", "psi", "E"]);
+    const defs = desmosDefinitions(["Beta", "psi", "E_ML"]);
     const gammaAt = defs.findIndex((d) =>
       d.startsWith(String.raw`\Gamma\left(`)
     );
-    const betaAt = defs.findIndex((d) => d.startsWith(String.raw`B\left(`));
+    const betaAt = defs.findIndex((d) =>
+      d.startsWith(String.raw`\operatorname{Beta}\left(`)
+    );
     expect(gammaAt).toBeGreaterThanOrEqual(0);
     expect(gammaAt).toBeLessThan(betaAt);
     expect(
@@ -89,9 +91,9 @@ describe("the catalogue", () => {
   test("calls are found in an answer, and not inside other names", () => {
     expect(
       specialFunctionsIn(
-        String.raw`x^{-\pi}E\left(1,1-\pi,x\right)+\operatorname{Ei}\left(x\right)`
+        String.raw`x^{-\pi}E_{ML}\left(1,1-\pi,x\right)+\operatorname{Ei}\left(x\right)`
       ).sort()
-    ).toEqual(["E", "Ei"]);
+    ).toEqual(["E_ML", "Ei"]);
     expect(specialFunctionsIn(String.raw`\Gamma_{r}\left(x\right)`)).toEqual([
       "Gamma_r",
     ]);

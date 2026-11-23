@@ -105,7 +105,13 @@ export {
 } from "./precise";
 
 export {
+  DESMOS_AUTO_COMMANDS,
+  DESMOS_OPERATOR_NAMES,
   SPECIAL_FUNCTIONS,
+  SPECIAL_FUNCTIONS_FOLDER_ID,
+  definitionFolderItems,
+  ensureSpecialFunctions,
+  withSpecialFunctionNames,
   desmosDefinitions,
   digamma,
   mittagLeffler,

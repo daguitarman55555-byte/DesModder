@@ -31,6 +31,7 @@ import {
 import {
   definiteIntegral,
   DefiniteError,
+  exactConstant,
   interiorSingularity,
   type Bound,
   type Limit,
@@ -63,7 +64,12 @@ import {
   agreesOnSamples,
   condense,
   desmosDefinitions,
+  ensureSpecialFunctions,
+  SPECIAL_FUNCTIONS,
+  specialFunctionsIn,
+  withSpecialFunctionNames,
   evaluate,
+  fold,
   freshName,
   id,
   identifiersIn,
@@ -78,8 +84,72 @@ type Node = Aug.Latex.AnyChild;
 
 let cfg: Config;
 
+let desmosGlobal: unknown;
+
 export function init(Desmos: unknown, calc: unknown) {
+  desmosGlobal = Desmos;
   cfg = buildConfigFromGlobals(Desmos, calc);
+}
+
+/**
+ * What Physics Lab's afterEnable does in the extension: the calculator's
+ * expression fields learn the special functions' names, so Ei, Li_2, Gamma
+ * and the rest can be typed letter by letter. The state is set again so that
+ * fields already on screen are rebuilt with the new config.
+ */
+export function installSpecialFunctionNames(calc: {
+  controller: { getMathquillConfig: (e: unknown) => object };
+  getState: () => unknown;
+  setState: (s: unknown) => void;
+}) {
+  const original = calc.controller.getMathquillConfig;
+  calc.controller.getMathquillConfig = function (this: unknown, e: unknown) {
+    return withSpecialFunctionNames(original.call(this, e));
+  };
+  calc.setState(calc.getState());
+  // As Physics Lab's watcher does: a line that calls a special function
+  // brings the whole library into the hidden folder, without moving the
+  // cursor while it is being typed.
+  const watched = calc as unknown as {
+    observeEvent: (name: string, cb: () => void) => void;
+    getExpressions: () => { latex?: string }[];
+  };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const check = () => {
+    timer = undefined;
+    const used = watched
+      .getExpressions()
+      .some((e) => specialFunctionsIn(e.latex ?? "").length > 0);
+    if (!used) return;
+    const active = document.activeElement;
+    ensureSpecialFunctions(
+      calc as unknown as Parameters<typeof ensureSpecialFunctions>[0],
+      SPECIAL_FUNCTIONS.map((f) => f.symbol),
+      { editing: active?.closest(".dcg-expressionlist") != null }
+    );
+  };
+  watched.observeEvent("change.special-functions", () => {
+    timer ??= setTimeout(check, 400);
+  });
+  document.addEventListener("focusout", () => {
+    timer ??= setTimeout(check, 400);
+  });
+  // And the answers are written with them: γ, not g·a·m·m·a.
+  if (desmosGlobal !== undefined)
+    cfg = buildConfigFromGlobals(desmosGlobal, calc);
+}
+
+/**
+ * The locked definitions folder, with the whole library in it, the first
+ * time an answer calls any special function: once one is in the graph,
+ * typing any of the others should work too.
+ */
+export function defineSpecialFunctionsFor(calc: unknown, latex: string) {
+  if (specialFunctionsIn(latex).length === 0) return 0;
+  return ensureSpecialFunctions(
+    calc as Parameters<typeof ensureSpecialFunctions>[0],
+    SPECIAL_FUNCTIONS.map((f) => f.symbol)
+  );
 }
 
 const emit = (node: Node) => toLatexTree(cfg, node);
@@ -567,6 +637,29 @@ export function analyze(
   let variable = options.variable ?? binderName;
   if (variable === undefined && operation === "ode") variable = "x";
   if (variable === undefined && free.length === 1) variable = free[0];
+  // A constant on its own, Γ(1/2) or ζ(2): its exact value, the known
+  // constant where it is one.
+  if (variable === undefined && operation === "none" && free.length === 0) {
+    const exact = exactConstant(fold(normsToAbs(body)));
+    if (exact !== undefined) {
+      const latex = emit(tidySigns(fold(exactToNode(exact))));
+      return {
+        ...base,
+        status: "ok",
+        summary: "The exact value.",
+        answer: {
+          latex,
+          decimal: fmt(exactToNumber(exact)),
+          verdict: "Proved",
+          method:
+            "Special values and their families: Γ at whole and half-integer points, ζ at even and negative integers, ψ, B, Li₂, W₀ and the rest; anything else is kept exactly as it is.",
+          steps: [],
+          notes: [],
+          graph: [{ latex }],
+        },
+      };
+    }
+  }
   if (variable === undefined && operation === "none") {
     return {
       ...base,

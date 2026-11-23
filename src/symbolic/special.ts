@@ -178,8 +178,14 @@ export function besselJ(nu: number, x: number): number {
 
 /** Lambert W, the principal branch, by Halley's iteration. */
 export function lambertW(x: number): number {
-  if (x < -1 / Math.E) return NaN;
+  const branch = -1 / Math.E;
+  if (x < branch - 1e-16) return NaN;
   if (x === 0) return 0;
+  // Near the branch point Halley's iteration crawls (W′ is infinite there),
+  // so the series in p = √(2(ex + 1)) is used instead.
+  const p = Math.sqrt(Math.max(0, 2 * (Math.E * x + 1)));
+  if (p < 1e-3)
+    return -1 + p - (p * p) / 3 + (11 / 72) * p ** 3 - (43 / 540) * p ** 4;
   let w = x < 1 ? x * (1 - x) : Math.log(x) - Math.log(Math.log(x) + 1);
   if (x < 0) w = -0.5;
   for (let i = 0; i < 60; i += 1) {
@@ -237,6 +243,13 @@ export interface SpecialFunction {
 }
 
 const L = (s: string) => `\\left(${s}\\right)`;
+/**
+ * Integration variables nobody's graph is likely to define: Desmos refuses an
+ * integral over a name already defined, so with a slider called t every
+ * definition written over plain t would break.
+ */
+const T = "t_{sf}";
+const U = "u_{sf}";
 
 export const SPECIAL_FUNCTIONS: readonly SpecialFunction[] = [
   {
@@ -260,13 +273,13 @@ export const SPECIAL_FUNCTIONS: readonly SpecialFunction[] = [
     needs: [],
   },
   {
-    symbol: "B",
-    name: "the beta function",
-    notation: `B${L("#1,#2")}`,
+    symbol: "Beta",
+    name: "the beta function B",
+    notation: `\\operatorname{Beta}${L("#1,#2")}`,
     arity: 2,
     evaluate: beta,
     definitions: [
-      `B${L("a,b")}=\\frac{\\Gamma${L("a")}\\Gamma${L("b")}}{\\Gamma${L("a+b")}}`,
+      `\\operatorname{Beta}${L("a,b")}=\\frac{\\Gamma${L("a")}\\Gamma${L("b")}}{\\Gamma${L("a+b")}}`,
     ],
     needs: ["Gamma"],
   },
@@ -320,7 +333,7 @@ export const SPECIAL_FUNCTIONS: readonly SpecialFunction[] = [
     arity: 1,
     evaluate: erfi,
     definitions: [
-      `\\operatorname{erfi}${L("z")}=\\frac{2}{\\sqrt{\\pi}}\\int_{0}^{z}e^{t^{2}}dt`,
+      `\\operatorname{erfi}${L("z")}=\\frac{2}{\\sqrt{\\pi}}\\int_{0}^{z}e^{${T}^{2}}d${T}`,
     ],
     needs: [],
   },
@@ -331,7 +344,7 @@ export const SPECIAL_FUNCTIONS: readonly SpecialFunction[] = [
     arity: 1,
     evaluate: Si,
     definitions: [
-      `\\operatorname{Si}${L("z")}=\\int_{0}^{z}\\frac{\\sin${L("t")}}{t}dt`,
+      `\\operatorname{Si}${L("z")}=\\int_{0}^{z}\\frac{\\sin${L(T)}}{${T}}d${T}`,
     ],
     needs: [],
   },
@@ -342,7 +355,7 @@ export const SPECIAL_FUNCTIONS: readonly SpecialFunction[] = [
     arity: 1,
     evaluate: Ci,
     definitions: [
-      `\\operatorname{Ci}${L("z")}=${EULER}+\\ln${L("z")}+\\int_{0}^{z}\\frac{\\cos${L("t")}-1}{t}dt`,
+      `\\operatorname{Ci}${L("z")}=${EULER}+\\ln${L("z")}+\\int_{0}^{z}\\frac{\\cos${L(T)}-1}{${T}}d${T}`,
     ],
     needs: [],
     domain: "z > 0",
@@ -354,7 +367,7 @@ export const SPECIAL_FUNCTIONS: readonly SpecialFunction[] = [
     arity: 1,
     evaluate: Shi,
     definitions: [
-      `\\operatorname{Shi}${L("z")}=\\int_{0}^{z}\\frac{\\sinh${L("t")}}{t}dt`,
+      `\\operatorname{Shi}${L("z")}=\\int_{0}^{z}\\frac{\\sinh${L(T)}}{${T}}d${T}`,
     ],
     needs: [],
   },
@@ -365,7 +378,7 @@ export const SPECIAL_FUNCTIONS: readonly SpecialFunction[] = [
     arity: 1,
     evaluate: Chi,
     definitions: [
-      `\\operatorname{Chi}${L("z")}=${EULER}+\\ln${L("z")}+\\int_{0}^{z}\\frac{\\cosh${L("t")}-1}{t}dt`,
+      `\\operatorname{Chi}${L("z")}=${EULER}+\\ln${L("z")}+\\int_{0}^{z}\\frac{\\cosh${L(T)}-1}{${T}}d${T}`,
     ],
     needs: [],
     domain: "z > 0",
@@ -377,7 +390,7 @@ export const SPECIAL_FUNCTIONS: readonly SpecialFunction[] = [
     arity: 1,
     evaluate: Ei,
     definitions: [
-      `\\operatorname{Ei}${L("z")}=${EULER}+\\ln${L("\\left|z\\right|")}+\\int_{0}^{z}\\frac{e^{t}-1}{t}dt`,
+      `\\operatorname{Ei}${L("z")}=${EULER}+\\ln${L("\\left|z\\right|")}+\\int_{0}^{z}\\frac{e^{${T}}-1}{${T}}d${T}`,
     ],
     needs: [],
     domain: "z ≠ 0",
@@ -401,80 +414,80 @@ export const SPECIAL_FUNCTIONS: readonly SpecialFunction[] = [
     arity: 1,
     evaluate: dilog,
     definitions: [
-      `\\operatorname{Li}_{2}${L("z")}=-\\int_{0}^{z}\\frac{\\ln${L("1-t")}}{t}dt`,
+      `\\operatorname{Li}_{2}${L("z")}=-\\int_{0}^{z}\\frac{\\ln${L(`1-${T}`)}}{${T}}d${T}`,
     ],
     needs: [],
     domain: "z ≤ 1 (beyond 1 it is complex)",
   },
   {
-    symbol: "S",
-    name: "the Fresnel sine integral",
-    notation: `S${L("#1")}`,
+    symbol: "FresnelS",
+    name: "the Fresnel sine integral S",
+    notation: `\\operatorname{FresnelS}${L("#1")}`,
     arity: 1,
     evaluate: fresnelS,
     definitions: [
-      `S${L("z")}=\\int_{0}^{z}\\sin${L("\\frac{\\pi t^{2}}{2}")}dt`,
+      `\\operatorname{FresnelS}${L("z")}=\\int_{0}^{z}\\sin${L(`\\frac{\\pi ${T}^{2}}{2}`)}d${T}`,
     ],
     needs: [],
   },
   {
-    symbol: "C",
-    name: "the Fresnel cosine integral",
-    notation: `C${L("#1")}`,
+    symbol: "FresnelC",
+    name: "the Fresnel cosine integral C",
+    notation: `\\operatorname{FresnelC}${L("#1")}`,
     arity: 1,
     evaluate: fresnelC,
     definitions: [
-      `C${L("z")}=\\int_{0}^{z}\\cos${L("\\frac{\\pi t^{2}}{2}")}dt`,
+      `\\operatorname{FresnelC}${L("z")}=\\int_{0}^{z}\\cos${L(`\\frac{\\pi ${T}^{2}}{2}`)}d${T}`,
     ],
     needs: [],
   },
   {
-    symbol: "J",
-    name: "the Bessel function of the first kind",
-    notation: `J${L("#1,#2")}`,
+    symbol: "BesselJ",
+    name: "the Bessel function of the first kind J",
+    notation: `\\operatorname{BesselJ}${L("#1,#2")}`,
     arity: 2,
     evaluate: besselJ,
     definitions: [
-      `J${L("n,z")}=\\frac{1}{\\pi}\\int_{0}^{\\pi}\\cos${L("nu-z\\sin" + L("u"))}du`,
+      `\\operatorname{BesselJ}${L("n,z")}=\\frac{1}{\\pi}\\int_{0}^{\\pi}\\cos${L(`n${U}-z\\sin${L(U)}`)}d${U}`,
     ],
     needs: [],
-    domain: "whole orders n (Bessel's integral); J(n, z) is J_n(z)",
+    domain: "whole orders n (Bessel's integral); BesselJ(n, z) is J_n(z)",
   },
   {
-    symbol: "W",
-    name: "the Lambert W function (principal branch)",
-    notation: `W${L("#1")}`,
+    symbol: "W_0",
+    name: "the Lambert W function, principal branch W₀",
+    notation: `W_{0}${L("#1")}`,
     arity: 1,
     evaluate: lambertW,
     definitions: [
-      `W${L("z")}=\\frac{1}{\\pi}\\int_{0}^{\\pi}\\ln${L("1+\\frac{z\\sin" + L("u") + "}{u}e^{u\\cot" + L("u") + "}")}du`,
+      `W_{0}${L("z")}=\\frac{1}{\\pi}\\int_{0}^{\\pi}\\ln${L(`1+\\frac{z\\sin${L(U)}}{${U}}e^{${U}\\cot${L(U)}}`)}d${U}`,
     ],
     needs: [],
     domain: "z ≥ −1/e",
   },
   {
-    symbol: "K",
-    name: "the complete elliptic integral of the first kind",
-    notation: `K${L("#1")}`,
+    symbol: "EllipticK",
+    name: "the complete elliptic integral of the first kind K",
+    notation: `\\operatorname{EllipticK}${L("#1")}`,
     arity: 1,
     evaluate: ellipticK,
     definitions: [
-      `K${L("k")}=\\int_{0}^{\\frac{\\pi}{2}}\\frac{1}{\\sqrt{1-k^{2}\\sin^{2}${L("u")}}}du`,
+      `\\operatorname{EllipticK}${L("k")}=\\int_{0}^{\\frac{\\pi}{2}}\\frac{1}{\\sqrt{1-k^{2}\\sin^{2}${L(U)}}}d${U}`,
     ],
     needs: [],
     domain: "−1 < k < 1",
   },
   {
-    symbol: "E",
+    symbol: "E_ML",
     name: "the Mittag-Leffler function E_{a,b}",
-    notation: `E${L("#1,#2,#3")}`,
+    notation: `E_{ML}${L("#1,#2,#3")}`,
     arity: 3,
     evaluate: mittagLeffler,
     definitions: [
-      `E${L("a,b,z")}=\\sum_{k=0}^{100}z^{k}\\Gamma_{r}${L("ak+b")}`,
+      `E_{ML}${L("a,b,z")}=\\sum_{k=0}^{100}z^{k}\\Gamma_{r}${L("ak+b")}`,
     ],
     needs: ["Gamma_r"],
-    domain: "E(a, b, z) is E_{a,b}(z); |z| up to about 30",
+    domain: "E_ML(a, b, z) is E_{a,b}(z); |z| up to about 30",
   },
 ];
 
@@ -489,7 +502,14 @@ export function specialFunction(symbol: string): SpecialFunction | undefined {
  * they depend on first, each once.
  */
 export function desmosDefinitions(symbols: Iterable<string>): string[] {
-  const out: string[] = [];
+  return definitionEntries(symbols).map((d) => d.latex);
+}
+
+/** As {@link desmosDefinitions}, with the symbol each definition belongs to. */
+export function definitionEntries(
+  symbols: Iterable<string>
+): { symbol: string; latex: string }[] {
+  const out: { symbol: string; latex: string }[] = [];
   const seen = new Set<string>();
   const add = (symbol: string) => {
     if (seen.has(symbol)) return;
@@ -497,10 +517,158 @@ export function desmosDefinitions(symbols: Iterable<string>): string[] {
     const f = BY_SYMBOL.get(symbol);
     if (f === undefined) return;
     f.needs.forEach(add);
-    out.push(...f.definitions);
+    for (const latex of f.definitions) out.push({ symbol, latex });
   };
   for (const symbol of symbols) add(symbol);
   return out;
+}
+
+// ---- typing them in Desmos -------------------------------------------------------
+
+/**
+ * Names Desmos must know as operator names for the functions to be typed.
+ *
+ * Without them, `\operatorname{Ei}` survives being pasted, but the moment the
+ * line is edited Desmos's MathQuill writes it back as the letters E·i, and
+ * the definition becomes "too many variables". Added to the calculator's
+ * MathQuill config, typing E then i makes `\operatorname{Ei}` itself, and it
+ * stays that way through arrow keys and edits (measured key by key in live
+ * Desmos, 2026-11-23). `Li` covers `\operatorname{Li}_{2}`.
+ */
+export const DESMOS_OPERATOR_NAMES = [
+  // Not B, S, C, J, K: single letters a graph already uses for its own
+  // things (C is every integration constant).
+  "Beta",
+  "FresnelS",
+  "FresnelC",
+  "BesselJ",
+  "EllipticK",
+  "Ei",
+  "Si",
+  "Ci",
+  "Shi",
+  "Chi",
+  "li",
+  "Li",
+  "erfc",
+  "erfi",
+];
+
+/** Greek names typed as words: Gamma becomes Γ, psi ψ, zeta ζ, gamma γ (Euler's constant). */
+export const DESMOS_AUTO_COMMANDS = ["Gamma", "psi", "zeta", "gamma"];
+
+/** A MathQuill config with the special functions' names added, once. */
+export function withSpecialFunctionNames<
+  T extends { autoOperatorNames?: string; autoCommands?: string },
+>(config: T): T {
+  const extend = (list: string | undefined, names: string[]) => {
+    const have = new Set((list ?? "").split(/\s+/).filter(Boolean));
+    const missing = names.filter((n) => !have.has(n));
+    return missing.length === 0
+      ? list
+      : `${list ?? ""} ${missing.join(" ")}`.trim();
+  };
+  config.autoOperatorNames = extend(
+    config.autoOperatorNames,
+    DESMOS_OPERATOR_NAMES
+  );
+  config.autoCommands = extend(config.autoCommands, DESMOS_AUTO_COMMANDS);
+  return config;
+}
+
+// ---- the folder the definitions live in ------------------------------------------
+
+export const SPECIAL_FUNCTIONS_FOLDER_ID = "dsm-special-functions";
+
+/**
+ * Graph-state items that define `symbols` out of the way: one folder,
+ * collapsed and secret (Desmos does not list a secret folder outside
+ * author mode, on desmos.com or the API), holding each definition read-only
+ * and hidden, so it neither plots (Desmos graphs any one-variable function
+ * definition) nor can be edited by accident. The functions still work
+ * everywhere else in the graph.
+ */
+export function definitionFolderItems(symbols: Iterable<string>) {
+  const entries = definitionEntries(symbols);
+  const slug = (symbol: string, i: number) =>
+    `${SPECIAL_FUNCTIONS_FOLDER_ID}-${symbol.replace(/[^a-zA-Z0-9]/g, "")}-${i}`;
+  const counts = new Map<string, number>();
+  return {
+    folder: {
+      type: "folder" as const,
+      id: SPECIAL_FUNCTIONS_FOLDER_ID,
+      title: "Special functions (Calculus Lab)",
+      collapsed: true,
+      secret: true,
+    },
+    expressions: entries.map(({ symbol, latex }) => {
+      const i = counts.get(symbol) ?? 0;
+      counts.set(symbol, i + 1);
+      return {
+        type: "expression" as const,
+        id: slug(symbol, i),
+        folderId: SPECIAL_FUNCTIONS_FOLDER_ID,
+        latex,
+        hidden: true,
+        readonly: true,
+        secret: true,
+      };
+    }),
+  };
+}
+
+/** The minimal calculator surface {@link ensureSpecialFunctions} needs. */
+interface StateCalculator {
+  getState: () => { expressions: { list: { id: string }[] } };
+  setState: (state: never, options?: { allowUndo?: boolean }) => void;
+  setExpressions?: (items: never[]) => void;
+}
+
+/**
+ * Puts the definitions `symbols` need into the graph, out of sight.
+ *
+ * Two ways, because of the cursor. While somebody is typing in a line
+ * (`editing`), setting the state would take the cursor out of it mid-word
+ * (measured: typing "Gamma(0.5" stopped at "Gam"). So missing definitions are
+ * added with setExpressions instead, which leaves the cursor alone; each is
+ * secret, and Desmos does not list a secret expression even outside a folder,
+ * so nothing appears and the function works at once. When nobody is typing,
+ * the state is set once with every definition in the collapsed, secret
+ * folder, first in the list, so it is never between the user's lines.
+ *
+ * Returns how many definitions were added or moved.
+ */
+export function ensureSpecialFunctions(
+  calc: StateCalculator,
+  symbols: Iterable<string>,
+  options: { editing?: boolean } = {}
+): number {
+  const { folder, expressions } = definitionFolderItems(symbols);
+  if (expressions.length === 0) return 0;
+  const state = calc.getState();
+  const list = state.expressions.list as { id: string; folderId?: string }[];
+  const byId = new Map(list.map((e) => [e.id, e]));
+  const missing = expressions.filter((e) => !byId.has(e.id));
+  if (options.editing) {
+    if (missing.length === 0 || calc.setExpressions === undefined) return 0;
+    calc.setExpressions(
+      missing.map(({ folderId: _inFolder, ...loose }) => loose) as never[]
+    );
+    return missing.length;
+  }
+  const loose = expressions.filter(
+    (e) => byId.has(e.id) && byId.get(e.id)!.folderId !== folder.id
+  );
+  if (missing.length === 0 && loose.length === 0 && byId.has(folder.id))
+    return 0;
+  const ours = new Set<string>([folder.id, ...expressions.map((e) => e.id)]);
+  state.expressions.list = [
+    folder,
+    ...expressions,
+    ...list.filter((e) => !ours.has(e.id)),
+  ];
+  calc.setState(state as never, { allowUndo: true });
+  return missing.length + loose.length;
 }
 
 /** How each function is called in Desmos LaTeX, for finding it in an answer. */
