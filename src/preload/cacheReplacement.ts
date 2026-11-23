@@ -34,7 +34,8 @@ async function deleteOldDB() {
 export async function fullReplacementCached(
   calcDesktop: string,
   enabledReplacements: Block[],
-  replOpts: ReplacementOpts
+  replOpts: ReplacementOpts,
+  srcURL?: string
 ): Promise<string> {
   void deleteOldDB();
   const db = await openDB("cached-replacement-store", 1, {
@@ -44,7 +45,7 @@ export async function fullReplacementCached(
   });
   const cached = await getCache(db);
   const hashRepls = cyrb53(JSON.stringify(enabledReplacements));
-  const hashFile = cyrb53(calcDesktop);
+  const hashFile = cyrb53(fileIdentity(calcDesktop, srcURL));
   const hashAppend = cyrb53(replOpts.workerAppend);
   if (
     cached !== undefined &&
@@ -78,6 +79,20 @@ export async function fullReplacementCached(
       result: result.newCode,
     });
   return result.newCode;
+}
+
+/**
+ * What identifies the calculator source for the cache key. Desmos names its
+ * bundles by a hash of their content
+ * (`shared_calculator_desktop-2721427c….js`), so that name with the length
+ * identifies the file, and hashing it costs nothing — where hashing the 3 MB
+ * source itself took about 20 ms of every page load. A URL without such a
+ * hash falls back to the content.
+ */
+function fileIdentity(calcDesktop: string, srcURL: string | undefined) {
+  if (srcURL !== undefined && /[0-9a-f]{20,}/.test(srcURL))
+    return `${srcURL}\n${calcDesktop.length}`;
+  return calcDesktop;
 }
 
 interface Cached {

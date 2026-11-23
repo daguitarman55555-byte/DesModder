@@ -67,14 +67,45 @@ export const FIELD_GALLERY: readonly GalleryPreset[] = [
   ...AP_NEXT,
 ].map((preset) => {
   const handles = handlesFor(preset.id);
-  return tidied({
-    ...preset,
+  // A preset may define a property as a getter, to put off an expensive
+  // build until somebody opens it (the Lorenz butterfly integrates its
+  // comets' orbits, ~150 ms). Spreading it here would run every one at page
+  // load, so plain values are tidied now and getters stay getters, tidied on
+  // first read.
+  const descriptors = Object.getOwnPropertyDescriptors(preset);
+  const plain = Object.fromEntries(
+    Object.entries(descriptors)
+      .filter(([, d]) => d.get === undefined)
+      .map(([key, d]) => [key, d.value as unknown])
+  ) as unknown as GalleryPreset;
+  const out = tidied({
+    ...plain,
     meaning: preset.meaning ?? COLOR_MEANINGS[preset.id],
     takeaway: preset.takeaway ?? TAKEAWAYS[preset.id],
     ...(handles.length > 0
       ? { scene: [...(preset.scene ?? []), ...handles] }
       : {}),
   });
+  for (const [key, d] of Object.entries(descriptors)) {
+    if (d.get === undefined || Object.prototype.hasOwnProperty.call(out, key))
+      continue;
+    let value: unknown;
+    let read = false;
+    Object.defineProperty(out, key, {
+      enumerable: true,
+      get() {
+        if (!read) {
+          value = tidied(
+            (preset as unknown as Record<string, unknown>)[key],
+            key
+          );
+          read = true;
+        }
+        return value;
+      },
+    });
+  }
+  return out;
 });
 
 /** Where a preset keeps LaTeX: every one of these goes through `tidy`. */

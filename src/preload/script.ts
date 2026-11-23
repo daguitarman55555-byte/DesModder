@@ -88,7 +88,8 @@ async function load(pluginsForceDisabled: Set<string>) {
   const newCode = await fullReplacementCached(
     calcDesktop,
     enabledReplacements,
-    { addPanic, workerAppend }
+    { addPanic, workerAppend },
+    srcURL
   );
   // tryRunDesModder polls until the following eval'd code is done.
   tryRunDesModder();

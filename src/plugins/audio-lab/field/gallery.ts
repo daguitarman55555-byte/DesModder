@@ -40,9 +40,14 @@ import {
  * The shared presets, a physics preset's variables written in as their
  * values: Audio Lab has no sliders to give them, and its field is the music's.
  */
-const FIELD_GALLERY = SHARED_GALLERY.map(withVariablesInlined);
-
-export { FIELD_GALLERY };
+let galleryCache: readonly GalleryPreset[] | undefined;
+/**
+ * Built on first use rather than at module load: inlining reads every
+ * preset, and one of them (the Lorenz butterfly) is computed when read.
+ */
+export function fieldGallery(): readonly GalleryPreset[] {
+  return (galleryCache ??= SHARED_GALLERY.map(withVariablesInlined));
+}
 export type { GalleryPreset };
 
 /**
@@ -164,7 +169,7 @@ export function galleryPresetFromConfigId(
 ): GalleryPreset | undefined {
   if (!presetId.startsWith("gallery:")) return undefined;
   const id = presetId.slice("gallery:".length);
-  return FIELD_GALLERY.find((preset) => preset.id === id);
+  return fieldGallery().find((preset) => preset.id === id);
 }
 
 /**
@@ -192,7 +197,7 @@ export function identifyPreset(config: AudioFieldConfig): string {
 
 /** Every starting point, in the order the panel offers them. */
 export function galleryChoices() {
-  return FIELD_GALLERY.map(
+  return fieldGallery().map(
     (preset) => [galleryConfigId(preset.id), preset.name] as const
   );
 }

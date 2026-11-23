@@ -53,7 +53,15 @@ function settled(start: readonly number[]) {
   return run[run.length - 1].slice(0, 3);
 }
 
-const lorenzPlane = (() => {
+/**
+ * Built on first use, not when the module loads. The comets' orbits are an
+ * RK4 run of several thousand steps each, and as an immediately-invoked
+ * function that cost about 75 ms of every page load, gallery opened or not.
+ */
+let lorenzPlaneCache: ReturnType<typeof buildLorenzPlane> | undefined;
+const lorenzPlane = () => (lorenzPlaneCache ??= buildLorenzPlane());
+
+function buildLorenzPlane() {
   const runs = Array.from({ length: LORENZ_COMETS }, (_, i) =>
     lorenzRun(
       settled([1 + 0.7 * i, 1 - 0.4 * i, 20 + 1.5 * i]),
@@ -125,7 +133,7 @@ const lorenzPlane = (() => {
     },
   ];
   return { x: field.x!, y: field.y!, seed, clock, scene };
-})();
+}
 
 export const CHAOS: readonly GalleryPreset[] = [
   {
@@ -134,11 +142,21 @@ export const CHAOS: readonly GalleryPreset[] = [
     category: "chaos",
     blurb:
       "Lorenz's equations, σ = 10, ρ = 28, β = 8/3, seen from the side: five comets on the strange attractor, each swinging round one wing and then the other, never repeating, their gas drawing the butterfly. Two that start a hair apart are soon on different wings: sensitive dependence on initial conditions, the butterfly effect.",
-    xLatex: lorenzPlane.x,
-    yLatex: lorenzPlane.y,
-    seedLatex: lorenzPlane.seed,
-    clockParameters: lorenzPlane.clock,
-    scene: lorenzPlane.scene,
+    get xLatex() {
+      return lorenzPlane().x;
+    },
+    get yLatex() {
+      return lorenzPlane().y;
+    },
+    get seedLatex() {
+      return lorenzPlane().seed;
+    },
+    get clockParameters() {
+      return lorenzPlane().clock;
+    },
+    get scene() {
+      return lorenzPlane().scene;
+    },
     colorScale: 2.5,
     backdrop: "#05030a",
     extent: 10,

@@ -9,7 +9,7 @@
  * the picture is wrong.
  */
 import {
-  FIELD_GALLERY,
+  fieldGallery,
   GALLERY_GAIN,
   configFromGalleryPreset,
   galleryChoices,
@@ -22,7 +22,7 @@ import { cloneAudioFieldConfig, configFromPreset } from "./model";
 import { mentions } from "../../../field-rendering/identifiers";
 
 describe("every gallery field arrives usable", () => {
-  test.each(FIELD_GALLERY.map((preset) => [preset.id, preset] as const))(
+  test.each(fieldGallery().map((preset) => [preset.id, preset] as const))(
     "%s compiles once the gain is written into it",
     (_id, preset) => {
       const compiled = compileAudioField(configFromGalleryPreset(preset));
@@ -30,7 +30,7 @@ describe("every gallery field arrives usable", () => {
     }
   );
 
-  test.each(FIELD_GALLERY.map((preset) => [preset.id, preset] as const))(
+  test.each(fieldGallery().map((preset) => [preset.id, preset] as const))(
     "%s reads loudness in both components",
     (_id, preset) => {
       const config = configFromGalleryPreset(preset);
@@ -47,7 +47,7 @@ describe("every gallery field arrives usable", () => {
   );
 
   test("the gain is the same one everywhere, so it can be recognised", () => {
-    for (const preset of FIELD_GALLERY) {
+    for (const preset of fieldGallery()) {
       const config = configFromGalleryPreset(preset);
       expect(config.p.startsWith(GALLERY_GAIN)).toBe(true);
       expect(config.q.startsWith(GALLERY_GAIN)).toBe(true);
@@ -62,7 +62,7 @@ describe("every gallery field arrives usable", () => {
   });
 
   test("a preset's colours and look come across", () => {
-    for (const preset of FIELD_GALLERY) {
+    for (const preset of fieldGallery()) {
       const config = configFromGalleryPreset(preset);
       expect(config.look.palette).toBe(preset.palette);
       // The backdrop is not optional for these: their ramps run from near-black
@@ -77,10 +77,10 @@ describe("every gallery field arrives usable", () => {
 
   test("ripples and the cursor are scaled to the field's own size", () => {
     const small = configFromGalleryPreset(
-      FIELD_GALLERY.find((preset) => preset.extent === 6)!
+      fieldGallery().find((preset) => preset.extent === 6)!
     );
     const large = configFromGalleryPreset(
-      FIELD_GALLERY.find((preset) => preset.extent === 10)!
+      fieldGallery().find((preset) => preset.extent === 10)!
     );
     // A ring 1.6 units across is most of a dipole and a detail in a galaxy.
     expect(large.ripples.wavelength).toBeGreaterThan(small.ripples.wavelength);
@@ -90,7 +90,7 @@ describe("every gallery field arrives usable", () => {
 
 describe("the clock speed, baked in", () => {
   test("a preset that slows its clock says so in the expression", () => {
-    const pulsar = FIELD_GALLERY.find((preset) => preset.id === "pulsar")!;
+    const pulsar = fieldGallery().find((preset) => preset.id === "pulsar")!;
     expect(pulsar.timeSpeed).toBeLessThan(1);
     const config = configFromGalleryPreset(pulsar);
     // Bracketed, because `\cos 0.35t` is ambiguous where `\cos(0.35t)` is
@@ -100,7 +100,7 @@ describe("the clock speed, baked in", () => {
   });
 
   test("a preset at normal speed is left exactly alone", () => {
-    const lattice = FIELD_GALLERY.find((preset) => preset.id === "cellular")!;
+    const lattice = fieldGallery().find((preset) => preset.id === "cellular")!;
     expect(lattice.timeSpeed).toBeUndefined();
     const config = configFromGalleryPreset(lattice);
     expect(config.p).toBe(`${GALLERY_GAIN}\\left(${lattice.xLatex}\\right)`);
@@ -131,24 +131,24 @@ describe("the clock speed, baked in", () => {
 
 describe("which preset a configuration is", () => {
   test("a gallery field, untouched, is still that gallery field", () => {
-    for (const preset of FIELD_GALLERY) {
+    for (const preset of fieldGallery()) {
       const config = configFromGalleryPreset(preset);
       expect(identifyPreset(config)).toBe(galleryConfigId(preset.id));
     }
   });
 
   test("changing how it is drawn does not make it a different field", () => {
-    const config = configFromGalleryPreset(FIELD_GALLERY[0]);
+    const config = configFromGalleryPreset(fieldGallery()[0]);
     config.look.palette = "turbo";
     config.ripples.strength = 9;
-    expect(identifyPreset(config)).toBe(galleryConfigId(FIELD_GALLERY[0].id));
+    expect(identifyPreset(config)).toBe(galleryConfigId(fieldGallery()[0].id));
   });
 
   test("deleting the gain makes it yours", () => {
     // Which is the point of writing the gain into the box: taking it out is an
     // edit, and an edit is what makes a field the user's.
-    const config = configFromGalleryPreset(FIELD_GALLERY[0]);
-    config.p = FIELD_GALLERY[0].xLatex;
+    const config = configFromGalleryPreset(fieldGallery()[0]);
+    config.p = fieldGallery()[0].xLatex;
     expect(identifyPreset(config)).toBe("custom");
   });
 
@@ -168,6 +168,6 @@ describe("which preset a configuration is", () => {
   test("the two lists cannot collide on an id", () => {
     const gallery = new Set(galleryChoices().map(([id]) => id));
     for (const id of gallery) expect(id.startsWith("gallery:")).toBe(true);
-    expect(gallery.size).toBe(FIELD_GALLERY.length);
+    expect(gallery.size).toBe(fieldGallery().length);
   });
 });

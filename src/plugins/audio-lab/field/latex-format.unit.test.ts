@@ -10,7 +10,7 @@
  * Both lists are checked here because both end up in the same box: this
  * plugin's own presets and the shared gallery's.
  */
-import { FIELD_GALLERY, configFromGalleryPreset } from "./gallery";
+import { fieldGallery, configFromGalleryPreset } from "./gallery";
 import { AUDIO_FIELD_PRESETS } from "./model";
 import { compileAudioField } from "./compile";
 
@@ -66,7 +66,7 @@ const everyEquation: ReadonlyArray<readonly [string, string]> = [
         [`${preset.id} Q`, preset.config.q],
       ] as const
   ),
-  ...FIELD_GALLERY.flatMap((preset) => {
+  ...fieldGallery().flatMap((preset) => {
     const config = configFromGalleryPreset(preset);
     return [
       [`gallery ${preset.id} P`, config.p],
@@ -80,7 +80,7 @@ describe("the equations are in Desmos's own format", () => {
     // A guard on the list itself: the per-equation checks below would all pass
     // on an empty list.
     expect(everyEquation.length).toBe(
-      (AUDIO_FIELD_PRESETS.length + FIELD_GALLERY.length) * 2
+      (AUDIO_FIELD_PRESETS.length + fieldGallery().length) * 2
     );
   });
 
@@ -106,7 +106,7 @@ describe("what the boxes hold still compiles", () => {
   test.each(everyEquation)("%s", (_name, latex) => {
     // The rules above are about how it is spelled. This is the other half: a
     // spelling the compiler cannot read is worse than an untidy one.
-    const config = configFromGalleryPreset(FIELD_GALLERY[0]);
+    const config = configFromGalleryPreset(fieldGallery()[0]);
     config.p = latex;
     config.q = "0";
     const compiled = compileAudioField(config);
