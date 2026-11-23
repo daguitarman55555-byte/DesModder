@@ -1421,6 +1421,13 @@ testWithPage(
       )
     ).toContain("diverges");
 
+    // Bars typed the way everybody types them arrive as a Norm node, and used
+    // to be integrable nowhere. Now the interval is cut where x² − 3x + 2
+    // changes sign, at 1 and 2, and each piece is integrated exactly.
+    await setDefinite("\\left|x^{2}-3x+2\\right|", "0", "3");
+    await driver.assertSelectorEventually(`${DEFINITE}:not([data-latex=""])`);
+    expect(await value()).toBe("\\frac{11}{6}");
+
     // No antiderivative at all: integrated numerically to thirty digits, and
     // the digits read back as the constant they are. The Gaussian is √π, and
     // Desmos's own integral agrees with the closed form it parses.
