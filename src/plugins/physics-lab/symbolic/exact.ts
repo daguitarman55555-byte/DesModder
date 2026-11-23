@@ -90,7 +90,7 @@ function lnPrime(p: bigint): ExactValue {
   const key = `@ln:${p}`;
   if (!OPAQUE.has(key)) {
     OPAQUE.set(key, {
-      node: functionCall(id("ln"), [number(Number(p))]),
+      node: functionCall(id("ln"), number(Number(p))),
       value: Math.log(Number(p)),
       latex: `\\ln\\left(${p}\\right)`,
     });
@@ -120,7 +120,7 @@ export function logarithm(q: Rational): ExactValue | undefined {
 export function logarithmOfAtom(atom: string): ExactValue | undefined {
   if (atom === E) return fromInteger(1);
   if (atom === PI)
-    return opaque(functionCall(id("ln"), [id("pi")]), Math.log(Math.PI));
+    return opaque(functionCall(id("ln"), id("pi")), Math.log(Math.PI));
   if (isOpaque(atom)) return undefined;
   return lnPrime(BigInt(atom));
 }
@@ -664,7 +664,7 @@ function atomsNode(entries: [string, Rational][]): Node | undefined {
     const inner = number(Number(radicand));
     plain.push(
       index === 2n
-        ? functionCall(id("sqrt"), [inner])
+        ? functionCall(id("sqrt"), inner)
         : binop(
             "Exponent",
             inner,

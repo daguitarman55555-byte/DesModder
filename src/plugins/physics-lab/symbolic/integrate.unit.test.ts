@@ -36,7 +36,7 @@ const div = (a: Node, b: Node) => binop("Divide", a, b);
 const add = (a: Node, b: Node) => binop("Add", a, b);
 const sub = (a: Node, b: Node) => binop("Subtract", a, b);
 const pow = (a: Node, b: Node) => binop("Exponent", a, b);
-const fn = (name: string, arg: Node) => functionCall(id(name), [arg]);
+const fn = (name: string, arg: Node) => functionCall(id(name), arg);
 
 const SAMPLES = [0.3, 0.7, 1.1, 1.9, 2.6, 3.3].map((value) => ({ x: value }));
 

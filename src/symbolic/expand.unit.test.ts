@@ -28,7 +28,7 @@ const div = (a: Node, b: Node) => binop("Divide", a, b);
 const add = (a: Node, b: Node) => binop("Add", a, b);
 const sub = (a: Node, b: Node) => binop("Subtract", a, b);
 const pow = (a: Node, b: Node) => binop("Exponent", a, b);
-const fn = (name: string, arg: Node) => functionCall(id(name), [arg]);
+const fn = (name: string, arg: Node) => functionCall(id(name), arg);
 
 /** Away from zero, so a split fraction's denominator is never sampled at it. */
 const SAMPLES = [0.37, 0.81, 1.23, 1.7, 2.41, 3.05].map((v) => ({ x: v }));

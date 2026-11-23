@@ -17,7 +17,7 @@ const mul = (a: Node, b: Node) => binop("Multiply", a, b);
 const div = (a: Node, b: Node) => binop("Divide", a, b);
 const add = (a: Node, b: Node) => binop("Add", a, b);
 const pow = (a: Node, b: Node) => binop("Exponent", a, b);
-const fn = (name: string, arg: Node) => functionCall(id(name), [arg]);
+const fn = (name: string, arg: Node) => functionCall(id(name), arg);
 const neg = (a: Node): Node => ({ type: "Negative", arg: a });
 
 const finite = (node: Node, value: number): Bound => ({

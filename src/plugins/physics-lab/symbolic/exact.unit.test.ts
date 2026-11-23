@@ -27,7 +27,7 @@ const { binop, functionCall, id, negative, number } = AugBuilders;
 
 type Node = Aug.Latex.AnyChild;
 
-const sqrt = (n: Node) => functionCall(id("sqrt"), [n]);
+const sqrt = (n: Node) => functionCall(id("sqrt"), n);
 const pow = (a: Node, b: Node) => binop("Exponent", a, b);
 const div = (a: Node, b: Node) => binop("Divide", a, b);
 const mul = (a: Node, b: Node) => binop("Multiply", a, b);
@@ -127,7 +127,7 @@ describe("exact constants — the forms Desmos only ever shows as decimals", () 
       exact(div(number(1), plus(number(1), sqrt(number(2)))))
     ).toBeUndefined();
     // An unknown function is not guessed at.
-    expect(exact(functionCall(id("sin"), [pi]))).toBeUndefined();
+    expect(exact(functionCall(id("sin"), pi))).toBeUndefined();
   });
 });
 

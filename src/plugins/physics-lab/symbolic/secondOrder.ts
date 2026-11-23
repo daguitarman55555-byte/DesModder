@@ -68,7 +68,7 @@ type Node = Aug.Latex.AnyChild;
 const add = (a: Node, b: Node) => binop("Add", a, b);
 const multiply = (a: Node, b: Node) => binop("Multiply", a, b);
 const power = (a: Node, b: Node) => binop("Exponent", a, b);
-const call = (name: string, arg: Node) => functionCall(id(name), [arg]);
+const call = (name: string, arg: Node) => functionCall(id(name), arg);
 
 /** The two constants a second-order solution needs. Desmos gives each a slider. */
 const FIRST = "C_1";

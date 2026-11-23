@@ -395,6 +395,13 @@ export interface Negative extends Expression {
   args: [ChildExprNode];
   type: "Negative";
 }
+
+export interface Positive extends Base {
+  // "+x"
+  type: "Positive";
+  args: [ChildExprNode];
+}
+
 export interface Or extends Expression {
   // "\\{x<1,y>2\\}"
   args: [ChildExprNode, ChildExprNode];
@@ -700,6 +707,7 @@ export type ChildExprNode =
   | Divide
   | Exponent
   | Negative
+  | Positive
   | Or
   | Comparator
   | ComparatorChain

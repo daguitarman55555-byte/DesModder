@@ -1,5 +1,5 @@
-import { sendHeartbeat } from "./plugins/wakatime/heartbeat";
 import "./globals/env";
+import { sendHeartbeat } from "./plugins/wakatime/heartbeat.ts";
 import {
   spotifyIsSignedIn,
   spotifyNext,

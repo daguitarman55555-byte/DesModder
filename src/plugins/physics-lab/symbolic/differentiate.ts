@@ -78,7 +78,7 @@ const subtract = (a: Node, b: Node) => binop("Subtract", a, b);
 const multiply = (a: Node, b: Node) => binop("Multiply", a, b);
 const divide = (a: Node, b: Node) => binop("Divide", a, b);
 const power = (a: Node, b: Node) => binop("Exponent", a, b);
-const call = (name: string, arg: Node) => functionCall(id(name), [arg]);
+const call = (name: string, arg: Node) => functionCall(id(name), arg);
 const square = (node: Node) => power(node, number(2));
 
 /**
@@ -965,7 +965,7 @@ function functionCallRule(
       intermediate: multiply(outer, pending(argument, variable)),
       after: multiply(outer, inner.derivative),
       substitutions: [
-        { symbol: "outer", value: functionCall(node.callee, [id("u")]) },
+        { symbol: "outer", value: functionCall(node.callee, id("u")) },
         { symbol: "u", value: argument },
       ],
       childRoles: ["u"],

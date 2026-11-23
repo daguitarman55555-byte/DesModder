@@ -23,7 +23,7 @@ export const subtract = (a: Node, b: Node) => binop("Subtract", a, b);
 export const multiply = (a: Node, b: Node) => binop("Multiply", a, b);
 export const divide = (a: Node, b: Node) => binop("Divide", a, b);
 export const power = (a: Node, b: Node) => binop("Exponent", a, b);
-export const call = (name: string, arg: Node) => functionCall(id(name), [arg]);
+export const call = (name: string, arg: Node) => functionCall(id(name), arg);
 
 /**
  * Every node in the tree, parents before children.

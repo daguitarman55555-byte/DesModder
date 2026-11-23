@@ -78,7 +78,7 @@ function randomTree(next: () => number, depth: number): Node {
   if (pick < 0.78)
     return binop("Exponent", child(), number(Math.floor(next() * 5) - 1));
   if (pick < 0.88) return negative(child());
-  return functionCall(id(CALLS[Math.floor(next() * CALLS.length)]), [child()]);
+  return functionCall(id(CALLS[Math.floor(next() * CALLS.length)]), child());
 }
 
 /** Points spread over a range where the ordinary functions are defined. */
@@ -308,7 +308,7 @@ describe("the tree utilities agree with each other", () => {
     // The concrete case the structural walk fixed: `{ ...node, args }` rebuilds
     // a call with its fields in a different order, and the two are the same
     // expression.
-    const call = functionCall(id("sin"), [id("x")]);
+    const call = functionCall(id("sin"), id("x"));
     const reordered = { args: call.args, callee: call.callee, type: call.type };
     expect(Object.keys(call)).not.toEqual(Object.keys(reordered));
     expect(sameTree(call, reordered as Node)).toBe(true);

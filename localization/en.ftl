@@ -249,8 +249,11 @@ better-evaluation-view-opt-colors-name = Show colors
 better-evaluation-view-opt-colors-desc = Show colors as rgb values
 better-evaluation-view-opt-colorLists-name = Show lists of colors
 better-evaluation-view-opt-colorLists-desc = Show lists of colors as lists of rgb values
-better-evaluation-view-opt-fractions-name = Better Fractions
-better-evaluation-view-opt-fractions-desc = Show the decimal → fraction toggle for matrices and lists of numbers
+better-evaluation-view-opt-colorModel-name = Color model
+better-evaluation-view-opt-colorModel-desc = Select which color model to display
+better-evaluation-view-opt-colorModel-rgb = RGB
+better-evaluation-view-opt-colorModel-hsv = HSV
+better-evaluation-view-opt-colorModel-hex = Hex code
 
 ## Pillbox Menus
 pillbox-menus-name = Pillbox Menus (Core)
@@ -333,6 +336,10 @@ custom-mathquill-config-opt-extendedGreek-desc = Enables replacements for all su
 custom-mathquill-config-opt-lessFSpacing-name = Less Spacing Around "f"
 custom-mathquill-config-opt-lessFSpacing-desc = Reduces extra spacing around the letter "f"
 
+## Backslash Commands
+backslash-commands-name = Backslash Commands
+backslash-commands-desc = Lets you enter LaTeX after typing a backslash.
+
 ## Code Golf
 code-golf-name = Code Golf
 code-golf-desc = Tools for helping Desmos Code Golfers. Press Alt+Q to enable/disable.
@@ -398,3 +405,7 @@ audio-lab-desc = Play or capture audio, inspect its live waveform and spectrum, 
 ## Physics Lab
 physics-lab-name = Physics Lab
 physics-lab-desc = Tools for AP Physics 1 and 2 and AP Calculus AB and BC: exact constants, slope fields, and differential equations.
+
+## Color Input
+color-input-name = Color Input
+color-input-desc = Edit expressions' colors directly.

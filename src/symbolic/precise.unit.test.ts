@@ -9,7 +9,7 @@ import type { Node } from "./tree";
 
 const { binop, functionCall, id, number: n } = AugBuilders;
 const x = id("x");
-const fn = (name: string, a: Node) => functionCall(id(name), [a]);
+const fn = (name: string, a: Node) => functionCall(id(name), a);
 const pow = (a: Node, b: Node) => binop("Exponent", a, b);
 const sub = (a: Node, b: Node) => binop("Subtract", a, b);
 const D = decimalContext();

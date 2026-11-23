@@ -590,7 +590,7 @@ describe("explicit curves drawn forwards", () => {
 
 describe("a compiled T means what the evaluator means", () => {
   const { binop, functionCall, id, negative, number } = AugBuilders;
-  const fn = (name: string, arg: Node) => functionCall(id(name), [arg]);
+  const fn = (name: string, arg: Node) => functionCall(id(name), arg);
   // The fisheye's x′ = x / (1 + √(x² + y²)/4), and a wave with π and a minus.
   const fisheye = binop(
     "Divide",

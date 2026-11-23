@@ -40,7 +40,7 @@ const div = (a: Node, b: Node) => binop("Divide", a, b);
 const add = (a: Node, b: Node) => binop("Add", a, b);
 const sub = (a: Node, b: Node) => binop("Subtract", a, b);
 const pow = (a: Node, b: Node) => binop("Exponent", a, b);
-const fn = (name: string, arg: Node) => functionCall(id(name), [arg]);
+const fn = (name: string, arg: Node) => functionCall(id(name), arg);
 const neg = (arg: Node): Node => ({ type: "Negative", arg });
 
 /** Well inside `|x| < 1`, which is the narrowest interval in the table. */

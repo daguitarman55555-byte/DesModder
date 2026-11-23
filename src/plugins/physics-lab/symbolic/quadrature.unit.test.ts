@@ -10,7 +10,7 @@ import type { Node } from "../../../symbolic";
 
 const { binop, functionCall, id, number: n } = AugBuilders;
 const x = id("x");
-const fn = (name: string, a: Node) => functionCall(id(name), [a]);
+const fn = (name: string, a: Node) => functionCall(id(name), a);
 const div = (a: Node, b: Node) => binop("Divide", a, b);
 const add = (a: Node, b: Node) => binop("Add", a, b);
 const sub = (a: Node, b: Node) => binop("Subtract", a, b);

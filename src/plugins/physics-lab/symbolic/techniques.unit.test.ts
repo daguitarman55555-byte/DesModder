@@ -45,7 +45,7 @@ const div = (a: Node, b: Node) => binop("Divide", a, b);
 const add = (a: Node, b: Node) => binop("Add", a, b);
 const sub = (a: Node, b: Node) => binop("Subtract", a, b);
 const pow = (a: Node, b: Node) => binop("Exponent", a, b);
-const fn = (name: string, arg: Node) => functionCall(id(name), [arg]);
+const fn = (name: string, arg: Node) => functionCall(id(name), arg);
 
 /**
  * Close to the origin and strictly inside every domain used here: the circle

@@ -39,7 +39,7 @@ const add = (a: Node, b: Node) => binop("Add", a, b);
 const sub = (a: Node, b: Node) => binop("Subtract", a, b);
 const div = (a: Node, b: Node) => binop("Divide", a, b);
 const pow = (a: Node, b: Node) => binop("Exponent", a, b);
-const fn = (name: string, arg: Node) => functionCall(id(name), [arg]);
+const fn = (name: string, arg: Node) => functionCall(id(name), arg);
 
 describe("Vector Tools symbolic differentiation", () => {
   test("holds every other variable constant, which is what makes it partial", () => {

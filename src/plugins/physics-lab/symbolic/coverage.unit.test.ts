@@ -41,7 +41,7 @@ const div = (a: Node, b: Node) => binop("Divide", a, b);
 const add = (a: Node, b: Node) => binop("Add", a, b);
 const sub = (a: Node, b: Node) => binop("Subtract", a, b);
 const pow = (a: Node, b: Node) => binop("Exponent", a, b);
-const fn = (n: string, a: Node) => functionCall(id(n), [a]);
+const fn = (n: string, a: Node) => functionCall(id(n), a);
 const neg = (a: Node): Node => ({ type: "Negative", arg: a });
 const n = number;
 

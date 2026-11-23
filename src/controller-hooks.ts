@@ -16,6 +16,8 @@ export function makeControllerHooks(dsm: DSM): DesModderHooks {
           return dsm.vectorTools?.isFocused(location.kind) ?? false;
         case "physics-lab":
           return dsm.physicsLab?.isFocused(location.kind) ?? false;
+        case "color-input":
+          return true;
         default:
           location satisfies never;
           return false;
@@ -43,6 +45,8 @@ export function makeControllerHooks(dsm: DSM): DesModderHooks {
           return true;
         case "physics-lab":
           // So are the slope-field and exact-value inputs.
+          return true;
+        case "color-input":
           return true;
         default:
           location satisfies never;

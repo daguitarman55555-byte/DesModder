@@ -26,7 +26,7 @@ const div = (a: Node, b: Node) => binop("Divide", a, b);
 const add = (a: Node, b: Node) => binop("Add", a, b);
 const sub = (a: Node, b: Node) => binop("Subtract", a, b);
 const pow = (a: Node, b: Node) => binop("Exponent", a, b);
-const fn = (name: string, arg: Node) => functionCall(id(name), [arg]);
+const fn = (name: string, arg: Node) => functionCall(id(name), arg);
 
 const solve = (f: Node) => solveFirstOrder(cfg, f);
 const solved = (f: Node) => {
@@ -122,20 +122,17 @@ describe("the logistic equation, which BC examines and AB draws", () => {
     // resolves juxtaposition before a bracket as application — so it arrives
     // as y applied to (1-y). Without rewriting that, the logistic equation is
     // refused in the only form anybody types it in.
-    const asCall = functionCall(id("y"), [sub(number(1), y)]);
+    const asCall = functionCall(id("y"), sub(number(1), y));
     expect(solved(asCall).latex).toBe("y=\\frac{1}{1+Ce^{-x}}");
     // With a coefficient in front, which is how it actually turns up.
-    const withRate = mul(
-      number(0.6),
-      functionCall(id("y"), [sub(number(1), y)])
-    );
+    const withRate = mul(number(0.6), functionCall(id("y"), sub(number(1), y)));
     expect(solved(withRate).method).toMatch(/carrying capacity 1/);
   });
 
   test("a genuine function call is left alone", () => {
     // `g` might be a function the graph defines, and rewriting it as
     // multiplication would silently answer a different question.
-    const result = solve(functionCall(id("g"), [y]));
+    const result = solve(functionCall(id("g"), y));
     expect(result.ok).toBe(false);
   });
 

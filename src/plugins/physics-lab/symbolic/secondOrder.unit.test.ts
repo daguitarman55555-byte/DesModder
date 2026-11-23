@@ -113,7 +113,7 @@ describe("what it will not pretend to solve", () => {
   });
 
   test("a right-hand side that is not linear in y", () => {
-    const result = solve(functionCall(id("sin"), [y]));
+    const result = solve(functionCall(id("sin"), y));
     expect(result.ok).toBe(false);
   });
 });

@@ -27,7 +27,8 @@ const sub = (a: Node, b: Node) => binop("Subtract", a, b);
 const add = (a: Node, b: Node) => binop("Add", a, b);
 const mul = (a: Node, b: Node) => binop("Multiply", a, b);
 const pow = (a: Node, b: Node) => binop("Exponent", a, b);
-const callOf = (name: string, ...args: Node[]) => functionCall(id(name), args);
+const callOf = (name: string, ...args: Node[]) =>
+  functionCall(id(name), ...args);
 const bracketed = (call: Aug.Latex.FunctionCall) => ({
   ...call,
   parenWrapped: true,

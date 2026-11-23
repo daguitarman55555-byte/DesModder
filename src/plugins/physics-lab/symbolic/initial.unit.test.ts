@@ -78,7 +78,7 @@ describe("the constant that puts a solution through a point", () => {
 
   test("the condition may itself be exact", () => {
     // dy/dx = cos(x) gives y = sin(x) + C; through (0, pi) needs C = pi.
-    const found = constantOf(functionCall(id("cos"), [x]), number(0), id("pi"));
+    const found = constantOf(functionCall(id("cos"), x), number(0), id("pi"));
     expect(found.latex).toBe("C=\\pi");
   });
 });
