@@ -245,6 +245,7 @@ const CASES = [
     "(e^x-1)/x on [0,1]",
     r`\int_{0}^{1}\frac{e^{x}-1}{x}dx`,
     1.3179021514544038,
+    "special",
   ],
   ["F24", "ln(1+x)/x", r`\int\frac{\ln\left(1+x\right)}{x}dx`, "series"],
   [
@@ -258,6 +259,7 @@ const CASES = [
     "arctan x / x on [0,1]",
     r`\int_{0}^{1}\frac{\arctan\left(x\right)}{x}dx`,
     0.915965594177219,
+    "special",
   ],
 ];
 
@@ -324,7 +326,7 @@ const html = `<div id=c style="width:600px;height:400px"></div><script src="http
   }
   await browser.close();
 
-  const rows = CASES.map(([family, label, latex, expected], i) => {
+  const rows = CASES.map(([family, label, latex, expected, special], i) => {
     const o = out[i];
     let result;
     if (o.status === "timeout") result = "timeout";
@@ -337,7 +339,11 @@ const html = `<div id=c style="width:600px;height:400px"></div><script src="http
           : Number.isFinite(v) && Math.abs(v - expected) < 1e-6
             ? o.verdict === "Proved"
               ? "pass"
-              : "numeric"
+              : special === "special"
+                ? "pass (special constant)"
+                : /sample points/.test(o.method ?? "")
+                  ? "exact (identity checked numerically)"
+                  : "numeric"
             : "WRONG";
     } else if (o.verdict === "Proved, checked by differentiating back")
       result = expected === "closed" ? "pass" : "pass (closed beats series)";
@@ -369,6 +375,8 @@ const html = `<div id=c style="width:600px;height:400px"></div><script src="http
     "",
     "- **pass**: closed form whose derivative matched, the expected series, or a proved definite value.",
     "- **numeric**: right definite value, but found by quadrature, not proved.",
+    "- **exact (identity checked numerically)**: an exact value from a symmetry whose identity was checked at sample points rather than proved.",
+    "- **pass (special constant)**: a value with no elementary closed form, computed to 30+ digits and named where it is a known constant.",
     "- **series only**: an elementary antiderivative exists, but only a series came back.",
     "- **CHECK FAILED**: a formula came back whose derivative did not match at the sample points (wrong, or right only on part of the domain).",
     "- **WRONG**: a definite value that disagrees with the known one.",

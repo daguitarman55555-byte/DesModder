@@ -65,6 +65,7 @@ import {
 import { seriesFallback, type PartKind } from "./symbolic/seriesSum";
 import { quadratureSteps, type QuadratureResult } from "./symbolic/quadrature";
 import { absoluteDefinite } from "./symbolic/absolute";
+import { theoremDefinite } from "./symbolic/definiteTheorems";
 import {
   definiteIntegral,
   DefiniteError,
@@ -1819,17 +1820,14 @@ export default class PhysicsLabSession {
         error: `A value needs numbers, and ${free[0]} has none here.`,
       };
     const statementLatex = `\\int_{${lowerLatex.trim()}}^{${upperLatex.trim()}}${fLatex}d${variable}`;
-    // |g| with g a polynomial: cut where g changes sign, exactly, before
-    // falling back to digits.
-    const cut = absoluteDefinite(integrand, variable, lower, upper);
-    if (cut?.exact !== undefined)
-      return {
-        ok: true,
-        statementLatex,
-        valueLatex: toLatexTree(this.textModeConfig, exactToNode(cut.exact)),
-        decimal: exactDecimal(cut.exact),
-        note: "The absolute value has no single antiderivative, so the interval was cut where what is inside it changes sign, and each piece integrated exactly. Checked against a numerical integration.",
-      };
+    const exact = this.exactWithoutAntiderivative(
+      integrand,
+      variable,
+      lower,
+      upper,
+      statementLatex
+    );
+    if (exact !== undefined) return exact;
     const key = `${variable}|${fLatex}|${lowerLatex}|${upperLatex}`;
     const done = this.numericDefinite.get(key);
     if (done === undefined) {
@@ -2056,8 +2054,55 @@ export default class PhysicsLabSession {
       };
     } catch (error) {
       if (!(error instanceof DefiniteError)) throw error;
-      return { ok: false, error: error.message };
+      // F(b) − F(a) refused, as for a sign(g) in an antiderivative of |g|:
+      // the interval can still be cut, or a theorem can still apply.
+      return (
+        this.exactWithoutAntiderivative(
+          integrand,
+          variable,
+          lower,
+          upper,
+          statementLatex
+        ) ?? { ok: false, error: error.message }
+      );
     }
+  }
+
+  /**
+   * An exact `∫_a^b` without evaluating an antiderivative at the bounds: `|g|`
+   * cut where `g` changes sign, or a theorem about the interval (symmetry,
+   * Frullani and the other named results). Each is checked against a
+   * numerical integration before it is shown.
+   */
+  private exactWithoutAntiderivative(
+    integrand: Node,
+    variable: string,
+    lower: Bound,
+    upper: Bound,
+    statementLatex: string
+  ): DefiniteView | undefined {
+    const cut = absoluteDefinite(integrand, variable, lower, upper);
+    if (cut?.exact !== undefined)
+      return {
+        ok: true,
+        statementLatex,
+        valueLatex: toLatexTree(this.textModeConfig, exactToNode(cut.exact)),
+        decimal: exactDecimal(cut.exact),
+        note: "The interval was cut where what is inside the absolute value changes sign, and each piece integrated exactly. Checked against a numerical integration.",
+      };
+    const theorem = theoremDefinite(integrand, variable, lower, upper);
+    if (theorem !== undefined)
+      return {
+        ok: true,
+        statementLatex,
+        valueLatex: toLatexTree(
+          this.textModeConfig,
+          exactToNode(theorem.exact)
+        ),
+        decimal: exactDecimal(theorem.exact),
+        note: `${theorem.method} Checked against a numerical integration.`,
+      };
+    return undefined;
   }
 
   /** A bound as typed: `\infty`, `-\infty`, or a constant expression. */

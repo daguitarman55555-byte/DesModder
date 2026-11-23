@@ -6,27 +6,20 @@
  * outside them it is `x² − 3x + 2`, and each of those is a polynomial. So
  * `∫₀³` is cut at 1 and 2 and each piece integrated exactly.
  *
- * Only an inside that is a polynomial with rational coefficients is cut: its
- * roots are found exactly, by factoring over Q, as rationals or as
- * `(−b ± √D)/2` from a quadratic factor. A cut at a root known only as a
- * decimal would turn an exact answer into a guess, so anything else is
- * refused and left to numerical integration.
+ * Only an inside whose sign changes are known exactly is cut (see
+ * `signChanges.ts`: a polynomial over Q, or one in e^{cx}). A cut at a root
+ * known only as a decimal would turn an exact answer into a guess, so anything
+ * else is refused and left to numerical integration.
  */
 import {
-  add,
   call,
   dependsOn,
-  divide,
   evaluate,
-  fold,
   negative,
-  number,
-  power,
   replaceSubtree,
   visit,
   type Node,
 } from "../../../symbolic";
-import * as Q from "./rational";
 import {
   definiteIntegral,
   quadrature,
@@ -35,29 +28,13 @@ import {
 } from "./definite";
 import * as X from "./exact";
 import { integrate } from "./integrate";
-import { asQPoly } from "./expRational";
-import { factorOverQ, type QPoly } from "./factor";
-import { rationalNode } from "./field";
+import { exactSignChanges } from "./signChanges";
 
 export interface AbsolutePiece {
   lower: Bound;
   upper: Bound;
   /** The integrand on this piece, with every `|g|` replaced by `±g`. */
   integrand: Node;
-}
-
-/** The real roots of one irreducible monic factor, as exact nodes. */
-function rootsOf(factor: QPoly): Node[] | undefined {
-  if (factor.length === 2) return [rationalNode(Q.negate(factor[0]))];
-  if (factor.length !== 3) return undefined;
-  // x² + bx + c, monic, irreducible over Q: roots (−b ± √D)/2 when D > 0.
-  const [c, b] = factor;
-  const D = Q.subtract(Q.multiply(b, b), Q.multiply(Q.rational(4n), c));
-  if (!(D.n > 0n)) return [];
-  const half = Q.rational(1n, 2n);
-  const centre = rationalNode(Q.multiply(Q.negate(b), half));
-  const spread = divide(power(rationalNode(D), rationalNode(half)), number(2));
-  return [fold(add(centre, negative(spread))), fold(add(centre, spread))];
 }
 
 /**
@@ -88,31 +65,12 @@ export function splitAbsolute(
 
   const cuts: { node: Node; value: number }[] = [];
   for (const inside of insides) {
-    const poly = asQPoly(inside, variable);
-    if (poly === undefined || poly.length < 2) return undefined;
-    const factors = factorOverQ(poly);
-    if (factors === undefined) return undefined;
-    for (const factor of factors) {
-      const roots = rootsOf(factor);
-      if (roots === undefined) {
-        // A cubic or higher factor with a root inside cannot be cut exactly.
-        // One with no sign change inside does not need cutting at all.
-        const f = (x: number) =>
-          factor.reduce((s, q, i) => s + Q.toNumber(q) * x ** i, 0);
-        const ends = [lo, hi].map((x) => (Number.isFinite(x) ? x : 1e6 * x));
-        for (let i = 0; i < 400; i += 1) {
-          const x = ends[0] + ((ends[1] - ends[0]) * i) / 400;
-          const y = ends[0] + ((ends[1] - ends[0]) * (i + 1)) / 400;
-          if (f(x) * f(y) <= 0) return undefined;
-        }
-        continue;
-      }
-      for (const node of roots) {
-        const value = evaluate(node, {});
-        if (!(value > lo && value < hi)) continue;
-        if (cuts.some((cut) => Math.abs(cut.value - value) < 1e-12)) continue;
-        cuts.push({ node, value });
-      }
+    const changes = exactSignChanges(inside, variable);
+    if (changes === undefined) return undefined;
+    for (const { node, value } of changes) {
+      if (!(value > lo && value < hi)) continue;
+      if (cuts.some((cut) => Math.abs(cut.value - value) < 1e-12)) continue;
+      cuts.push({ node, value });
     }
   }
   cuts.sort((p, q) => p.value - q.value);

@@ -57,6 +57,12 @@ import {
 } from "./nonElementary";
 import { integrateExpRational } from "./expRational";
 import { expTrigPolynomial } from "./expTrig";
+import { exactSignChanges, rootsOfSquares } from "./signChanges";
+import {
+  byConjugate,
+  reciprocalQuartic,
+  reversedProductRule,
+} from "./specialForms";
 import {
   add,
   binop,
@@ -121,6 +127,10 @@ export const TECHNIQUES = {
   expSubstitution: "Substitution u = e^{kx}",
   hyperbolic: "Hyperbolic functions as exponentials",
   absolute: "Splitting at the corner of |u|",
+  rootOfSquare: "√(g²) = |g|",
+  conjugate: "Multiplying by the conjugate",
+  reciprocalQuartic: "Substitution u = √(x⁴ + bx² + c²)/x",
+  reversedProduct: "The product rule backwards: (e^{ax}H)′ = e^{ax}(aH + H′)",
   halfAngle: "Tangent half-angle substitution",
   liouville: "Solving y′ + g′y = f for y·e^g (Liouville)",
   expTrig: "Undetermined coefficients for e^{ax}(U cos bx + V sin bx)",
@@ -774,6 +784,19 @@ function antiderivative(node: Node, variable: string, depth = 0): Node {
   // Bars first: parts on x·|x| succeeds too, by integrating |x| inside it,
   // and comes back three times the length of x²|x|/3.
   if (depth < MAX_SUBSTITUTION_DEPTH) {
+    // √(g²) is |g|, never g: √(e^{2x} − 6eˣ + 9) is |eˣ − 3|, and a printed
+    // answer of eˣ − 3x is right on only half the line.
+    const unrooted = rootsOfSquares(node, variable);
+    if (unrooted !== node) {
+      try {
+        return recorded(TECHNIQUES.rootOfSquare, () =>
+          antiderivative(unrooted, variable, depth + 1)
+        );
+      } catch (error) {
+        if (!(error instanceof IntegrationError)) throw error;
+        trace.length = mark;
+      }
+    }
     const signed = bySign(node, variable, depth);
     if (signed !== undefined) return signed;
   }
@@ -877,6 +900,16 @@ function byRewrite(
   // to integrate, or the split is dropped.
   const split = byNumeratorTerms(node, variable, depth);
   if (split !== undefined) return split;
+
+  // Shapes with one move each (specialForms.ts). The callers check every
+  // answer by differentiating it back, so a shape read wrongly is refused
+  // there rather than shown.
+  const product = reversedProductRule(node, variable);
+  if (product !== undefined)
+    return recorded(TECHNIQUES.reversedProduct, () => product);
+  const quartic = reciprocalQuartic(node, variable);
+  if (quartic !== undefined)
+    return recorded(TECHNIQUES.reciprocalQuartic, () => quartic);
 
   // A root of a sum of squares is the one shape no substitution can clear,
   // because what is in the way is not a composition. Tried after the search,
@@ -1078,6 +1111,19 @@ function byRewrite(
     }
   }
 
+  // Last: a root in a two-term denominator, multiplied by its conjugate.
+  // After the root substitutions, which give 2ln|√x + 1| for 1/(x + √x)
+  // where this gives three logarithms.
+  const conjugated = byConjugate(node, variable);
+  if (conjugated !== undefined) {
+    try {
+      return recorded(TECHNIQUES.conjugate, () =>
+        antiderivative(conjugated, variable, depth + 1)
+      );
+    } catch (error) {
+      if (!(error instanceof IntegrationError)) throw error;
+    }
+  }
   return undefined;
 }
 
@@ -1102,7 +1148,6 @@ function bySign(node: Node, variable: string, depth: number): Node | undefined {
   const call0 = marked[0].node as Aug.Latex.FunctionCall;
   const [u] = call0.args;
   const linear = linearIn(u, variable);
-  if (linear === undefined) return undefined;
   // Anything else with bars in it is not this shape.
   let otherBars = false;
   visit(node, (child) => {
@@ -1115,6 +1160,10 @@ function bySign(node: Node, variable: string, depth: number): Node | undefined {
       otherBars = true;
   });
   if (otherBars) return undefined;
+  if (linear === undefined)
+    return call0.callee.symbol === "abs"
+      ? byExactSignChanges(node, call0, variable, depth)
+      : undefined;
   const smooth = replaceSubtree(
     node,
     call0,
@@ -1138,6 +1187,67 @@ function bySign(node: Node, variable: string, depth: number): Node | undefined {
       const quotient = dividedByLinear(piece, linear, variable);
       if (quotient === undefined) return signed;
       return fold(multiply(call("abs", u), quotient));
+    });
+  } catch (error) {
+    if (!(error instanceof IntegrationError)) throw error;
+    return undefined;
+  }
+}
+
+/**
+ * `∫ … |g| …` for a `g` whose sign changes are known exactly, as one formula
+ * continuous across every change:
+ *
+ *   F = sign(g)·G − Σᵣ s⁺ᵣ·G(r)·sign(x − r)
+ *
+ * where `G` integrates the integrand with `|g|` read as `g`, and `s⁺ᵣ` is the
+ * sign of `g` just after `r`. At each `r` the first term jumps by `2s⁺ᵣG(r)`
+ * and the matching term in the sum by exactly the opposite. With no change
+ * at all, `|g|` is `g` or `−g` everywhere and the sum is empty.
+ */
+function byExactSignChanges(
+  node: Node,
+  bars: Aug.Latex.FunctionCall,
+  variable: string,
+  depth: number
+): Node | undefined {
+  const [g] = bars.args;
+  const changes = exactSignChanges(g, variable);
+  if (changes === undefined) return undefined;
+  const signAt = (x: number) => Math.sign(evaluate(g, { [variable]: x }));
+  try {
+    return recorded(TECHNIQUES.absolute, () => {
+      const G = antiderivative(
+        fold(replaceSubtree(node, bars, g)),
+        variable,
+        depth + 1
+      );
+      if (changes.length === 0) {
+        const sample = [0, 1, 0.5, -1, 2].find(
+          (x) => signAt(x) !== 0 && !Number.isNaN(signAt(x))
+        );
+        if (sample === undefined)
+          throw new IntegrationError("The sign inside the bars is unknown.");
+        return signAt(sample) > 0 ? G : fold(negative(G));
+      }
+      let F: Node = multiply(call("sign", g), G);
+      changes.forEach((change, i) => {
+        const next = changes[i + 1]?.value ?? change.value + 2;
+        const after = signAt((change.value + next) / 2);
+        const at = fold(replaceIdentifier(G, variable, change.node));
+        if (!Number.isFinite(evaluate(at, {})))
+          throw new IntegrationError(
+            "The antiderivative has no value where the sign changes."
+          );
+        F = subtract(
+          F,
+          multiply(
+            multiply(number(after), at),
+            call("sign", subtract(id(variable), change.node))
+          )
+        );
+      });
+      return fold(F);
     });
   } catch (error) {
     if (!(error instanceof IntegrationError)) throw error;

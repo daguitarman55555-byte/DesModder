@@ -3585,8 +3585,17 @@ var CalcEngine = (() => {
         const folded = foldKnownValue(node.callee.symbol, args) ?? foldInverse(node.callee.symbol, args) ?? foldParity(node.callee.symbol, args);
         return folded ?? { ...node, args };
       }
-      case "BinaryOperator":
+      case "BinaryOperator": {
+        if (node.name === "Exponent") {
+          const base2 = fold(node.left);
+          const n = constantValue(fold(node.right));
+          if (base2.type === "Negative" && n !== void 0 && Number.isInteger(n)) {
+            const inner = fold(binop2("Exponent", base2.arg, number2(n)));
+            return n % 2 === 0 ? inner : fold(negative2(inner));
+          }
+        }
         return foldBinary(node);
+      }
       default:
         return node;
     }
@@ -4311,19 +4320,19 @@ var CalcEngine = (() => {
 
   // src/symbolic/products.ts
   function implicitProducts(node, values) {
-    const rewrite2 = (child) => implicitProducts(child, values);
+    const rewrite3 = (child) => implicitProducts(child, values);
     const isProduct = (child) => child.type === "FunctionCall" && child.args.length === 1 && values.has(child.callee.symbol);
     if (node.type === "BinaryOperator" && node.name === "Exponent" && isProduct(node.left) && node.left.parenWrapped !== true)
       return multiply(
         node.left.callee,
-        power2(rewrite2(node.left.args[0]), rewrite2(node.right))
+        power2(rewrite3(node.left.args[0]), rewrite3(node.right))
       );
     if (node.type === "Factorial" && isProduct(node.arg) && node.arg.parenWrapped !== true)
       return multiply(node.arg.callee, {
         ...node,
-        arg: rewrite2(node.arg.args[0])
+        arg: rewrite3(node.arg.args[0])
       });
-    const mapped = mapChildNodes(node, rewrite2);
+    const mapped = mapChildNodes(node, rewrite3);
     if (isProduct(mapped))
       return multiply(mapped.callee, mapped.args[0]);
     return mapped;
@@ -4866,18 +4875,18 @@ var CalcEngine = (() => {
     );
   }
   function numericDerivative(node, variable, bindings) {
-    const at = bindings[variable];
-    const h = 606e-8 * Math.max(1, Math.abs(at));
-    const forward = evaluate(node, { ...bindings, [variable]: at + h });
-    const backward = evaluate(node, { ...bindings, [variable]: at - h });
+    const at2 = bindings[variable];
+    const h = 606e-8 * Math.max(1, Math.abs(at2));
+    const forward = evaluate(node, { ...bindings, [variable]: at2 + h });
+    const backward = evaluate(node, { ...bindings, [variable]: at2 - h });
     return (forward - backward) / (2 * h);
   }
   function numericSecondDerivative(node, variable, bindings) {
-    const at = bindings[variable];
-    const h = 122e-6 * Math.max(1, Math.abs(at));
-    const forward = evaluate(node, { ...bindings, [variable]: at + h });
+    const at2 = bindings[variable];
+    const h = 122e-6 * Math.max(1, Math.abs(at2));
+    const forward = evaluate(node, { ...bindings, [variable]: at2 + h });
     const middle = evaluate(node, bindings);
-    const backward = evaluate(node, { ...bindings, [variable]: at - h });
+    const backward = evaluate(node, { ...bindings, [variable]: at2 - h });
     return (forward - 2 * middle + backward) / (h * h);
   }
   function agreesOnSamples(left, right, samples2, tolerance = 1e-4) {
@@ -8106,7 +8115,7 @@ var CalcEngine = (() => {
       return node;
     const base2 = u.left;
     const step = u.right;
-    const rewrite2 = (child) => {
+    const rewrite3 = (child) => {
       if (child.type !== "BinaryOperator" || child.name !== "Exponent" || !sameTree(child.left, base2)) {
         return child;
       }
@@ -8127,7 +8136,7 @@ var CalcEngine = (() => {
         right: { type: "Constant", value: ratio }
       };
     };
-    return mapTree(node, rewrite2);
+    return mapTree(node, rewrite3);
   }
   function candidates(node, variable) {
     const found = [];
@@ -8196,7 +8205,7 @@ var CalcEngine = (() => {
   }
   function asSinesAndCosines(node, variable) {
     let rewrote = false;
-    const rewrite2 = (child) => {
+    const rewrite3 = (child) => {
       if (child.type !== "FunctionCall" || child.args.length !== 1)
         return child;
       const [argument] = child.args;
@@ -8221,7 +8230,7 @@ var CalcEngine = (() => {
           return child;
       }
     };
-    const rewritten = mapTree(node, rewrite2);
+    const rewritten = mapTree(node, rewrite3);
     return rewrote ? rewritten : void 0;
   }
   function one() {
@@ -8672,9 +8681,9 @@ var CalcEngine = (() => {
       const isPower = factor.type === "BinaryOperator" && factor.name === "Exponent";
       const base2 = isPower ? factor.left : factor;
       const rawExponent = isPower ? constantValue(fold(factor.right)) : 1;
-      const isCall = base2.type === "FunctionCall" && base2.args.length === 1;
-      const spelling = isCall ? AS_POWERS[base2.callee.symbol] : void 0;
-      if (!isCall || spelling === void 0 || rawExponent === void 0 || !Number.isInteger(rawExponent)) {
+      const isCall2 = base2.type === "FunctionCall" && base2.args.length === 1;
+      const spelling = isCall2 ? AS_POWERS[base2.callee.symbol] : void 0;
+      if (!isCall2 || spelling === void 0 || rawExponent === void 0 || !Number.isInteger(rawExponent)) {
         rest = inNumerator ? multiply(rest, factor) : divide(rest, factor);
         continue;
       }
@@ -9380,10 +9389,10 @@ var CalcEngine = (() => {
     const leading = x[degreeOf2(F, x)];
     return x.map((value) => F.divide(value, leading));
   }
-  function evaluatePoly(F, poly, at) {
+  function evaluatePoly(F, poly, at2) {
     let total = F.zero;
     for (let i = poly.length - 1; i >= 0; i -= 1)
-      total = F.add(F.multiply(total, at), poly[i]);
+      total = F.add(F.multiply(total, at2), poly[i]);
     return total;
   }
   function shiftPoly(F, poly, shift) {
@@ -9706,17 +9715,17 @@ var CalcEngine = (() => {
     const columns = [];
     for (const factor of factors) {
       const base2 = factorPoly(F, factor);
-      for (let at = 1; at <= factor.multiplicity; at += 1) {
+      for (let at2 = 1; at2 <= factor.multiplicity; at2 += 1) {
         let divisorPower = [F.one];
-        for (let i = 0; i < at; i += 1)
+        for (let i = 0; i < at2; i += 1)
           divisorPower = polyMultiply(F, divisorPower, base2);
         const { quotient, remainder } = polyDivide(F, denominator, divisorPower);
         if (!isZeroPoly(F, remainder))
           return void 0;
-        columns.push({ piece: { factor, at }, multiplier: quotient });
+        columns.push({ piece: { factor, at: at2 }, multiplier: quotient });
         if (factor.kind === "quadratic") {
           columns.push({
-            piece: { factor, at },
+            piece: { factor, at: at2 },
             multiplier: polyMultiply(F, [F.zero, F.one], quotient)
           });
         }
@@ -10692,14 +10701,14 @@ var CalcEngine = (() => {
         continue;
       if (n !== void 0)
         return void 0;
-      let power8;
+      let power9;
       if (node.type === "Identifier" && node.symbol === variable)
-        power8 = ONE;
+        power9 = ONE;
       else if (node.type === "BinaryOperator" && node.name === "Exponent" && node.left.type === "Identifier" && node.left.symbol === variable)
-        power8 = exactRational(node.right);
-      if (power8 === void 0)
+        power9 = exactRational(node.right);
+      if (power9 === void 0)
         return void 0;
-      n = inNumerator ? power8 : negate(power8);
+      n = inNumerator ? power9 : negate(power9);
     }
     return n === void 0 || isZero(n) ? void 0 : n;
   }
@@ -11070,6 +11079,359 @@ var CalcEngine = (() => {
     return x;
   }
 
+  // src/plugins/physics-lab/symbolic/signChanges.ts
+  var PLACEHOLDER = "u_{sgn}";
+  function rateOf(node, variable) {
+    const at1 = evaluate(node, { [variable]: 1 });
+    const at0 = evaluate(node, { [variable]: 0 });
+    const at2 = evaluate(node, { [variable]: 2 });
+    if (!Number.isFinite(at1) || at0 !== 0 || Math.abs(at2 - 2 * at1) > 1e-12)
+      return void 0;
+    return fromNumber(at1);
+  }
+  function exponentials(node, variable, out) {
+    if (node.type === "BinaryOperator" && node.name === "Exponent" && node.left.type === "Identifier" && node.left.symbol === "e" && dependsOn(node.right, variable)) {
+      const rate = rateOf(node.right, variable);
+      if (rate === void 0 || isZero(rate))
+        return false;
+      out.push({ node, rate });
+      return true;
+    }
+    if (node.type === "FunctionCall" && node.callee.symbol === "exp" && node.args.length === 1) {
+      const rate = rateOf(node.args[0], variable);
+      if (rate === void 0 || isZero(rate))
+        return false;
+      out.push({ node, rate });
+      return true;
+    }
+    switch (node.type) {
+      case "BinaryOperator":
+        return exponentials(node.left, variable, out) && exponentials(node.right, variable, out);
+      case "Negative":
+        return exponentials(node.arg, variable, out);
+      case "FunctionCall":
+        return node.args.every((arg) => exponentials(arg, variable, out));
+      default:
+        return true;
+    }
+  }
+  function rationalGcd(a, b) {
+    const g = (x, y) => {
+      x = x < 0n ? -x : x;
+      y = y < 0n ? -y : y;
+      while (y !== 0n)
+        [x, y] = [y, x % y];
+      return x;
+    };
+    return rational(g(a.n * b.d, b.n * a.d), a.d * b.d);
+  }
+  function rewrite2(node, swaps) {
+    const swapped = swaps.get(node);
+    if (swapped !== void 0)
+      return swapped;
+    switch (node.type) {
+      case "BinaryOperator":
+        return {
+          ...node,
+          left: rewrite2(node.left, swaps),
+          right: rewrite2(node.right, swaps)
+        };
+      case "Negative":
+        return { ...node, arg: rewrite2(node.arg, swaps) };
+      case "FunctionCall":
+        return { ...node, args: node.args.map((arg) => rewrite2(arg, swaps)) };
+      default:
+        return node;
+    }
+  }
+  function basePolynomial(node, variable) {
+    const plain = asQPoly(node, variable);
+    if (plain !== void 0)
+      return { poly: plain, base: id3(variable) };
+    const found = [];
+    if (!exponentials(node, variable, found) || found.length === 0)
+      return void 0;
+    const negativeRates = found.filter((f) => isNegative(f.rate)).length;
+    if (negativeRates !== 0 && negativeRates !== found.length)
+      return void 0;
+    let [{ rate }] = found;
+    for (const f of found.slice(1))
+      rate = rationalGcd(rate, f.rate);
+    if (negativeRates > 0)
+      rate = negate(rate);
+    const swaps = /* @__PURE__ */ new Map();
+    for (const f of found) {
+      const k = divide5(f.rate, rate);
+      if (!isInteger(k))
+        return void 0;
+      swaps.set(f.node, power2(id3(PLACEHOLDER), number2(Number(k.n))));
+    }
+    const rewritten = rewrite2(node, swaps);
+    if (dependsOn(rewritten, variable))
+      return void 0;
+    const poly = asQPoly(fold(rewritten), PLACEHOLDER);
+    if (poly === void 0)
+      return void 0;
+    const base2 = isOne(rate) ? power2(id3("e"), id3(variable)) : power2(id3("e"), fold(multiply(rationalNode2(rate), id3(variable))));
+    return { poly, base: base2, rate };
+  }
+  function polynomialNode(poly, base2) {
+    let out = number2(0);
+    poly.forEach((c, i) => {
+      if (isZero(c))
+        return;
+      const term2 = i === 0 ? rationalNode2(c) : multiply(rationalNode2(c), i === 1 ? base2 : power2(base2, number2(i)));
+      out = add(out, term2);
+    });
+    return fold(out);
+  }
+  function factorRoots(factor) {
+    if (factor.length === 2)
+      return [rationalNode2(negate(factor[0]))];
+    if (factor.length !== 3)
+      return void 0;
+    const [c, b] = factor;
+    const D = subtract3(multiply3(b, b), multiply3(rational(4n), c));
+    if (!(D.n > 0n))
+      return [];
+    const half = rational(1n, 2n);
+    const centre = rationalNode2(multiply3(negate(b), half));
+    const spread = divide(power2(rationalNode2(D), rationalNode2(half)), number2(2));
+    return [fold(add(centre, negative2(spread))), fold(add(centre, spread))];
+  }
+  function exactSignChanges(g, variable) {
+    const read = basePolynomial(g, variable);
+    if (read === void 0 || read.poly.length < 2)
+      return void 0;
+    const out = [];
+    for (const [layer, multiplicity] of squarefree(read.poly)) {
+      if (multiplicity % 2 === 0)
+        continue;
+      const factors = factorOverQ(layer);
+      if (factors === void 0)
+        return void 0;
+      for (const factor of factors) {
+        const roots = factorRoots(factor);
+        if (roots === void 0)
+          return void 0;
+        for (const root2 of roots) {
+          let node = root2;
+          if (read.rate !== void 0) {
+            if (!(evaluate(root2, {}) > 0))
+              continue;
+            node = fold(divide(call("ln", root2), rationalNode2(read.rate)));
+          }
+          out.push({ node, value: evaluate(node, {}) });
+        }
+      }
+    }
+    return out.sort((a, b) => a.value - b.value);
+  }
+  function exactSquareRootOf(radicand, variable) {
+    const read = basePolynomial(radicand, variable);
+    if (read === void 0 || read.poly.length < 3)
+      return void 0;
+    const layers = squarefree(read.poly);
+    if (layers.some(([, m]) => m % 2 !== 0))
+      return void 0;
+    let root2 = [ONE];
+    for (const [layer, m] of layers)
+      for (let i = 0; i < m / 2; i += 1)
+        root2 = multiplyPoly(root2, layer);
+    const lead = read.poly[read.poly.length - 1];
+    const scale = exactSquareRoot(lead);
+    if (scale === void 0)
+      return void 0;
+    return polynomialNode(
+      root2.map((c) => multiply3(c, scale)),
+      read.base
+    );
+  }
+  function multiplyPoly(a, b) {
+    const out = new Array(a.length + b.length - 1).fill(ZERO);
+    for (let i = 0; i < a.length; i += 1)
+      for (let j = 0; j < b.length; j += 1)
+        out[i + j] = add4(out[i + j], multiply3(a[i], b[j]));
+    return out;
+  }
+  function rootsOfSquares(node, variable) {
+    let changed = false;
+    const visit2 = (child) => {
+      if (child.type === "FunctionCall" && child.callee.symbol === "sqrt" && child.args.length === 1 && dependsOn(child.args[0], variable)) {
+        const g = exactSquareRootOf(child.args[0], variable);
+        if (g !== void 0) {
+          changed = true;
+          return call("abs", g);
+        }
+      }
+      switch (child.type) {
+        case "BinaryOperator":
+          return { ...child, left: visit2(child.left), right: visit2(child.right) };
+        case "Negative":
+          return { ...child, arg: visit2(child.arg) };
+        case "FunctionCall":
+          return { ...child, args: child.args.map(visit2) };
+        default:
+          return child;
+      }
+    };
+    const out = visit2(node);
+    return changed ? out : node;
+  }
+
+  // src/plugins/physics-lab/symbolic/specialForms.ts
+  var SAMPLES = [0.37, 0.81, 1.23, 1.94, 2.71, -0.58, -1.37];
+  function hasRoot(node, variable) {
+    let found = false;
+    visit(node, (child) => {
+      if (child.type === "FunctionCall" && child.callee.symbol === "sqrt" && dependsOn(child, variable))
+        found = true;
+    });
+    return found;
+  }
+  function byConjugate(node, variable) {
+    if (node.type !== "BinaryOperator" || node.name !== "Divide")
+      return void 0;
+    const terms = topLevelTerms(node.right);
+    if (terms.length !== 2 || !hasRoot(node.right, variable))
+      return void 0;
+    const [first, second] = terms.map(
+      ({ term: term2, negated }) => negated ? negative2(term2) : term2
+    );
+    const square4 = fold(
+      tidySums(
+        expand(subtract(power2(first, number2(2)), power2(second, number2(2)))).node
+      )
+    );
+    if (hasRoot(square4, variable))
+      return void 0;
+    const value = evaluate(square4, { [variable]: SAMPLES[0] });
+    if (!Number.isFinite(value) || value === 0)
+      return void 0;
+    return fold(divide(multiply(node.left, subtract(first, second)), square4));
+  }
+  function reciprocalQuartic(node, variable) {
+    const factors = [];
+    quotientFactors(node, true, factors);
+    const top = factors.filter((f) => f.inNumerator);
+    const bottom = factors.filter((f) => !f.inNumerator);
+    if (top.length !== 1 || bottom.length !== 2)
+      return void 0;
+    const root2 = bottom.find(
+      (f) => f.node.type === "FunctionCall" && f.node.callee.symbol === "sqrt"
+    );
+    const other = bottom.find((f) => f !== root2);
+    if (root2 === void 0 || other === void 0)
+      return void 0;
+    if (root2.node.type !== "FunctionCall")
+      return void 0;
+    const numerator = asQPoly(top[0].node, variable);
+    const plus = asQPoly(other.node, variable);
+    const quartic = asQPoly(root2.node.args[0], variable);
+    if (numerator === void 0 || plus === void 0 || quartic === void 0)
+      return void 0;
+    const shape = (p) => p.length === 3 && isZero(p[1]) && isOne(p[2]);
+    if (!shape(numerator) || !shape(plus))
+      return void 0;
+    const [c] = plus;
+    if (!equals(numerator[0], negate(c)) || !(c.n > 0n))
+      return void 0;
+    if (quartic.length !== 5 || !isZero(quartic[1]) || !isZero(quartic[3]) || !isOne(quartic[4]) || !equals(quartic[0], multiply3(c, c)))
+      return void 0;
+    const [, , b] = quartic;
+    const k = subtract3(multiply3(rational(2n), c), b);
+    const u = divide(root2.node, id3(variable));
+    const half = rationalNode2(rational(1n, 2n));
+    if (isZero(k))
+      return fold(negative2(divide(number2(1), u)));
+    const m = power2(rationalNode2(isNegative(k) ? negate(k) : k), half);
+    if (!isNegative(k))
+      return fold(divide(call("arctan", divide(u, m)), m));
+    return fold(
+      divide(
+        call("ln", call("abs", divide(subtract(u, m), add(u, m)))),
+        multiply(number2(2), m)
+      )
+    );
+  }
+  function exponentialFactor(node, variable) {
+    const factors = [];
+    quotientFactors(node, true, factors);
+    const index = factors.findIndex(
+      (f) => f.inNumerator && f.node.type === "BinaryOperator" && f.node.name === "Exponent" && f.node.left.type === "Identifier" && f.node.left.symbol === "e" && dependsOn(f.node.right, variable)
+    );
+    if (index < 0)
+      return void 0;
+    const exponent = factors[index].node;
+    if (exponent.type !== "BinaryOperator")
+      return void 0;
+    const rate = evaluate(exponent.right, { [variable]: 1 });
+    const at0 = evaluate(exponent.right, { [variable]: 0 });
+    if (!Number.isFinite(rate) || at0 !== 0 || rate === 0)
+      return void 0;
+    const q = fromNumber(rate);
+    if (q === void 0)
+      return void 0;
+    let top = number2(1);
+    let below = number2(1);
+    factors.forEach((f, i) => {
+      if (i === index)
+        return;
+      if (f.inNumerator)
+        top = multiply(top, f.node);
+      else
+        below = multiply(below, f.node);
+    });
+    return { rate, rateNode: rationalNode2(q), rest: fold(divide(top, below)) };
+  }
+  function reversedProductRule(node, variable) {
+    const found = exponentialFactor(node, variable);
+    if (found === void 0)
+      return void 0;
+    const { rate, rateNode, rest } = found;
+    const candidates2 = [];
+    const pushTerms = (sum3, over) => {
+      for (const { term: term2, negated } of topLevelTerms(sum3)) {
+        const signed = negated ? negative2(term2) : term2;
+        candidates2.push(over === void 0 ? signed : divide(signed, over));
+      }
+    };
+    pushTerms(rest);
+    if (rest.type === "BinaryOperator" && rest.name === "Divide")
+      pushTerms(expand(rest.left).node, rest.right);
+    const bindings = SAMPLES.map((x) => ({ [variable]: x }));
+    for (const term2 of candidates2) {
+      if (!dependsOn(term2, variable))
+        continue;
+      const H = fold(divide(term2, rateNode));
+      let dH;
+      try {
+        dH = differentiate(H, variable);
+      } catch {
+        continue;
+      }
+      const works = agreesOnSamples(
+        (b) => rate * evaluate(H, b) + evaluate(dH, b),
+        (b) => evaluate(rest, b),
+        bindings,
+        1e-9
+      );
+      if (works) {
+        const exponential3 = factorsExponential(node, variable);
+        if (exponential3 !== void 0)
+          return fold(multiply(exponential3, H));
+      }
+    }
+    return void 0;
+  }
+  function factorsExponential(node, variable) {
+    const factors = [];
+    quotientFactors(node, true, factors);
+    return factors.find(
+      (f) => f.inNumerator && f.node.type === "BinaryOperator" && f.node.name === "Exponent" && f.node.left.type === "Identifier" && f.node.left.symbol === "e" && dependsOn(f.node.right, variable)
+    )?.node;
+  }
+
   // src/plugins/physics-lab/symbolic/integrate.ts
   var IntegrationError = class extends Error {
   };
@@ -11096,6 +11458,10 @@ var CalcEngine = (() => {
     expSubstitution: "Substitution u = e^{kx}",
     hyperbolic: "Hyperbolic functions as exponentials",
     absolute: "Splitting at the corner of |u|",
+    rootOfSquare: "\u221A(g\xB2) = |g|",
+    conjugate: "Multiplying by the conjugate",
+    reciprocalQuartic: "Substitution u = \u221A(x\u2074 + bx\xB2 + c\xB2)/x",
+    reversedProduct: "The product rule backwards: (e^{ax}H)\u2032 = e^{ax}(aH + H\u2032)",
     halfAngle: "Tangent half-angle substitution",
     liouville: "Solving y\u2032 + g\u2032y = f for y\xB7e^g (Liouville)",
     expTrig: "Undetermined coefficients for e^{ax}(U cos bx + V sin bx)"
@@ -11456,6 +11822,19 @@ var CalcEngine = (() => {
   function antiderivative(node, variable, depth2 = 0) {
     const mark = trace.length;
     if (depth2 < MAX_SUBSTITUTION_DEPTH) {
+      const unrooted = rootsOfSquares(node, variable);
+      if (unrooted !== node) {
+        try {
+          return recorded(
+            TECHNIQUES.rootOfSquare,
+            () => antiderivative(unrooted, variable, depth2 + 1)
+          );
+        } catch (error2) {
+          if (!(error2 instanceof IntegrationError))
+            throw error2;
+          trace.length = mark;
+        }
+      }
       const signed = bySign(node, variable, depth2);
       if (signed !== void 0)
         return signed;
@@ -11534,6 +11913,12 @@ var CalcEngine = (() => {
     const split4 = byNumeratorTerms(node, variable, depth2);
     if (split4 !== void 0)
       return split4;
+    const product = reversedProductRule(node, variable);
+    if (product !== void 0)
+      return recorded(TECHNIQUES.reversedProduct, () => product);
+    const quartic = reciprocalQuartic(node, variable);
+    if (quartic !== void 0)
+      return recorded(TECHNIQUES.reciprocalQuartic, () => quartic);
     const trig = findTrigSubstitution(node, variable);
     if (trig !== void 0) {
       try {
@@ -11697,6 +12082,18 @@ var CalcEngine = (() => {
         }
       }
     }
+    const conjugated = byConjugate(node, variable);
+    if (conjugated !== void 0) {
+      try {
+        return recorded(
+          TECHNIQUES.conjugate,
+          () => antiderivative(conjugated, variable, depth2 + 1)
+        );
+      } catch (error2) {
+        if (!(error2 instanceof IntegrationError))
+          throw error2;
+      }
+    }
     return void 0;
   }
   function bySign(node, variable, depth2) {
@@ -11710,8 +12107,6 @@ var CalcEngine = (() => {
     const call0 = marked[0].node;
     const [u] = call0.args;
     const linear = linearIn(u, variable);
-    if (linear === void 0)
-      return void 0;
     let otherBars = false;
     visit(node, (child) => {
       if (child !== call0 && child.type === "FunctionCall" && (child.callee.symbol === "abs" || child.callee.symbol === "sign") && dependsOn(child, variable))
@@ -11719,6 +12114,8 @@ var CalcEngine = (() => {
     });
     if (otherBars)
       return void 0;
+    if (linear === void 0)
+      return call0.callee.symbol === "abs" ? byExactSignChanges(node, call0, variable, depth2) : void 0;
     const smooth = replaceSubtree(
       node,
       call0,
@@ -11741,6 +12138,52 @@ var CalcEngine = (() => {
         if (quotient === void 0)
           return signed;
         return fold(multiply(call("abs", u), quotient));
+      });
+    } catch (error2) {
+      if (!(error2 instanceof IntegrationError))
+        throw error2;
+      return void 0;
+    }
+  }
+  function byExactSignChanges(node, bars, variable, depth2) {
+    const [g] = bars.args;
+    const changes = exactSignChanges(g, variable);
+    if (changes === void 0)
+      return void 0;
+    const signAt = (x) => Math.sign(evaluate(g, { [variable]: x }));
+    try {
+      return recorded(TECHNIQUES.absolute, () => {
+        const G = antiderivative(
+          fold(replaceSubtree(node, bars, g)),
+          variable,
+          depth2 + 1
+        );
+        if (changes.length === 0) {
+          const sample = [0, 1, 0.5, -1, 2].find(
+            (x) => signAt(x) !== 0 && !Number.isNaN(signAt(x))
+          );
+          if (sample === void 0)
+            throw new IntegrationError("The sign inside the bars is unknown.");
+          return signAt(sample) > 0 ? G : fold(negative2(G));
+        }
+        let F = multiply(call("sign", g), G);
+        changes.forEach((change, i) => {
+          const next = changes[i + 1]?.value ?? change.value + 2;
+          const after = signAt((change.value + next) / 2);
+          const at2 = fold(replaceIdentifier(G, variable, change.node));
+          if (!Number.isFinite(evaluate(at2, {})))
+            throw new IntegrationError(
+              "The antiderivative has no value where the sign changes."
+            );
+          F = subtract(
+            F,
+            multiply(
+              multiply(number2(after), at2),
+              call("sign", subtract(id3(variable), change.node))
+            )
+          );
+        });
+        return fold(F);
       });
     } catch (error2) {
       if (!(error2 instanceof IntegrationError))
@@ -12669,11 +13112,11 @@ var CalcEngine = (() => {
           case "Exponent": {
             if (right.type !== "Constant")
               return void 0;
-            const power8 = right.value;
-            if (!Number.isInteger(power8) || power8 < 0 || power8 > maxDegree)
+            const power9 = right.value;
+            if (!Number.isInteger(power9) || power9 < 0 || power9 > maxDegree)
               return void 0;
             let out = [number2(1)];
-            for (let i = 0; i < power8; i++) {
+            for (let i = 0; i < power9; i++) {
               const next = coefficientsIn(
                 binop2("Multiply", rebuild(out, variable), left),
                 variable,
@@ -13559,7 +14002,7 @@ var CalcEngine = (() => {
       const c = this.coefficient(inner, 0);
       const w = this.add(inner, this.constant(c, wide), wide, -1);
       const shifted = !this.F.isZero(c);
-      const at = (fn) => {
+      const at2 = (fn) => {
         const value = this.F.apply(fn, c);
         if (value === void 0)
           throw new PowerSeriesError(
@@ -13576,15 +14019,15 @@ var CalcEngine = (() => {
       );
       switch (name) {
         case "exp":
-          return shifted ? this.normalise(this.scale(composed("exp"), at("exp")), cap) : this.compose(MACLAURIN.exp, inner, cap);
+          return shifted ? this.normalise(this.scale(composed("exp"), at2("exp")), cap) : this.compose(MACLAURIN.exp, inner, cap);
         case "sin":
-          return shifted ? pair("cos", "sin", at("sin"), at("cos"), 1) : this.compose(MACLAURIN.sin, inner, cap);
+          return shifted ? pair("cos", "sin", at2("sin"), at2("cos"), 1) : this.compose(MACLAURIN.sin, inner, cap);
         case "cos":
-          return shifted ? pair("cos", "sin", at("cos"), at("sin"), -1) : this.compose(MACLAURIN.cos, inner, cap);
+          return shifted ? pair("cos", "sin", at2("cos"), at2("sin"), -1) : this.compose(MACLAURIN.cos, inner, cap);
         case "sinh":
-          return shifted ? pair("cosh", "sinh", at("sinh"), at("cosh"), 1) : this.compose(MACLAURIN.sinh, inner, cap);
+          return shifted ? pair("cosh", "sinh", at2("sinh"), at2("cosh"), 1) : this.compose(MACLAURIN.sinh, inner, cap);
         case "cosh":
-          return shifted ? pair("cosh", "sinh", at("cosh"), at("sinh"), 1) : this.compose(MACLAURIN.cosh, inner, cap);
+          return shifted ? pair("cosh", "sinh", at2("cosh"), at2("sinh"), 1) : this.compose(MACLAURIN.cosh, inner, cap);
         case "ln": {
           if (!shifted)
             throw new PowerSeriesError(
@@ -13596,7 +14039,7 @@ var CalcEngine = (() => {
               "The logarithm's argument has no exact reciprocal here."
             );
           return this.add(
-            this.constant(at("ln"), cap),
+            this.constant(at2("ln"), cap),
             this.compose(MACLAURIN.ln1p, this.scale(w, reciprocal), wide),
             cap
           );
@@ -14480,8 +14923,8 @@ var CalcEngine = (() => {
         variable,
         divide(number2(approach.sign), h)
       );
-    const at = asRational(exactConstant(approach.node) ?? []);
-    const centre = at === void 0 ? approach.node : toNode(fromRational(at));
+    const at2 = asRational(exactConstant(approach.node) ?? []);
+    const centre = at2 === void 0 ? approach.node : toNode(fromRational(at2));
     return replaceIdentifier(
       node,
       variable,
@@ -14535,9 +14978,9 @@ var CalcEngine = (() => {
       return value === void 0 ? void 0 : { kind: "finite", value };
     }
     if (approach.kind === "point") {
-      const at = evaluate(node, { [variable]: approach.value });
+      const at2 = evaluate(node, { [variable]: approach.value });
       const beside = evaluate(node, { [variable]: near(approach) });
-      if (Number.isFinite(at) && Number.isFinite(beside) && Math.abs(at - beside) < 1e-4 * Math.max(1, Math.abs(at))) {
+      if (Number.isFinite(at2) && Number.isFinite(beside) && Math.abs(at2 - beside) < 1e-4 * Math.max(1, Math.abs(at2))) {
         const substituted = replaceIdentifier(node, variable, approach.node);
         const value = zeroToTheZero(substituted) ? void 0 : exactConstant(substituted);
         if (value !== void 0) {
@@ -15055,7 +15498,7 @@ var CalcEngine = (() => {
         record2
       );
     if (approach.kind === "point") {
-      const at = evaluate(factor, { [variable]: approach.value });
+      const at2 = evaluate(factor, { [variable]: approach.value });
       const exponent2 = factor.type === "BinaryOperator" && factor.name === "Exponent" ? asRational(exactConstant(factor.right) ?? []) : ONE;
       const base2 = factor.type === "BinaryOperator" && factor.name === "Exponent" ? factor.left : factor;
       if (exponent2 === void 0)
@@ -15063,7 +15506,7 @@ var CalcEngine = (() => {
       const baseAt = evaluate(base2, { [variable]: approach.value });
       if (baseAt === 0 && coefficientsIn(base2, variable, 1) !== void 0)
         return isNegative(exponent2) ? "exploding-power" : "vanishing";
-      if (!Number.isFinite(at) || at === 0)
+      if (!Number.isFinite(at2) || at2 === 0)
         return void 0;
       const settles = limitOf(factor, variable, approach, record2);
       return settles?.kind === "finite" && certainlyZero(settles.value) === false ? "polynomial" : void 0;
@@ -15350,23 +15793,6 @@ var CalcEngine = (() => {
   }
 
   // src/plugins/physics-lab/symbolic/absolute.ts
-  function rootsOf(factor) {
-    if (factor.length === 2)
-      return [rationalNode2(negate(factor[0]))];
-    if (factor.length !== 3)
-      return void 0;
-    const [c, b] = factor;
-    const D = subtract3(multiply3(b, b), multiply3(rational(4n), c));
-    if (!(D.n > 0n))
-      return [];
-    const half = rational(1n, 2n);
-    const centre = rationalNode2(multiply3(negate(b), half));
-    const spread = divide(power2(rationalNode2(D), rationalNode2(half)), number2(2));
-    return [
-      fold(add(centre, { type: "Negative", arg: spread })),
-      fold(add(centre, spread))
-    ];
-  }
   function splitAbsolute(integrand, variable, lower, upper) {
     const insides = [];
     visit(integrand, (child) => {
@@ -15380,33 +15806,15 @@ var CalcEngine = (() => {
     const [lo, hi] = a <= b ? [a, b] : [b, a];
     const cuts = [];
     for (const inside of insides) {
-      const poly = asQPoly(inside, variable);
-      if (poly === void 0 || poly.length < 2)
+      const changes = exactSignChanges(inside, variable);
+      if (changes === void 0)
         return void 0;
-      const factors = factorOverQ(poly);
-      if (factors === void 0)
-        return void 0;
-      for (const factor of factors) {
-        const roots = rootsOf(factor);
-        if (roots === void 0) {
-          const f = (x) => factor.reduce((s, q, i) => s + toNumber(q) * x ** i, 0);
-          const ends = [lo, hi].map((x) => Number.isFinite(x) ? x : 1e6 * x);
-          for (let i = 0; i < 400; i += 1) {
-            const x = ends[0] + (ends[1] - ends[0]) * i / 400;
-            const y = ends[0] + (ends[1] - ends[0]) * (i + 1) / 400;
-            if (f(x) * f(y) <= 0)
-              return void 0;
-          }
+      for (const { node, value } of changes) {
+        if (!(value > lo && value < hi))
           continue;
-        }
-        for (const node of roots) {
-          const value = evaluate(node, {});
-          if (!(value > lo && value < hi))
-            continue;
-          if (cuts.some((cut) => Math.abs(cut.value - value) < 1e-12))
-            continue;
-          cuts.push({ node, value });
-        }
+        if (cuts.some((cut) => Math.abs(cut.value - value) < 1e-12))
+          continue;
+        cuts.push({ node, value });
       }
     }
     cuts.sort((p, q) => p.value - q.value);
@@ -15417,16 +15825,16 @@ var CalcEngine = (() => {
       ...cuts.map((cut) => ({ kind: "finite", ...cut })),
       high
     ];
-    const at = (bound) => bound.kind === "finite" ? bound.value : bound.sign * Infinity;
+    const at2 = (bound) => bound.kind === "finite" ? bound.value : bound.sign * Infinity;
     const pieces = [];
     for (let i = 0; i + 1 < points.length; i += 1) {
-      const p = at(points[i]);
-      const q = at(points[i + 1]);
+      const p = at2(points[i]);
+      const q = at2(points[i + 1]);
       const middle = Number.isFinite(p) && Number.isFinite(q) ? (p + q) / 2 : Number.isFinite(p) ? p + 1 : Number.isFinite(q) ? q - 1 : 0;
       let body = integrand;
       for (const inside of insides) {
         const sign3 = evaluate(inside, { [variable]: middle });
-        const replaced = sign3 >= 0 ? inside : { type: "Negative", arg: inside };
+        const replaced = sign3 >= 0 ? inside : negative2(inside);
         body = replaceSubtree(body, call("abs", inside), replaced);
       }
       pieces.push({
@@ -15474,6 +15882,404 @@ var CalcEngine = (() => {
     if (Math.abs(check - value) > 1e-6 * Math.max(1, Math.abs(value)))
       return void 0;
     return { exact, value, improper };
+  }
+
+  // src/plugins/physics-lab/symbolic/definiteTheorems.ts
+  var SAMPLES2 = 24;
+  var at = (b) => b.kind === "finite" ? b.value : b.sign * Infinity;
+  function rateIn(node, variable) {
+    const at0 = evaluate(node, { [variable]: 0 });
+    const at1 = evaluate(node, { [variable]: 1 });
+    const at3 = evaluate(node, { [variable]: 3 });
+    if (at0 !== 0 || !Number.isFinite(at1) || Math.abs(at3 - 3 * at1) > 1e-12)
+      return void 0;
+    return fromNumber(at1) === void 0 ? void 0 : at1;
+  }
+  function rationalNodeOf(value) {
+    const q = fromNumber(value);
+    if (q === void 0)
+      return void 0;
+    const magnitude = number2(Math.abs(Number(q.n)));
+    const body = q.d === 1n ? magnitude : divide(magnitude, number2(Number(q.d)));
+    return q.n < 0n ? negative2(body) : body;
+  }
+  function factorList(node) {
+    const out = [];
+    quotientFactors(node, true, out);
+    return out;
+  }
+  var isCall = (node, name) => node.type === "FunctionCall" && node.callee.symbol === name && node.args.length === 1;
+  var isVariable2 = (node, variable) => node.type === "Identifier" && node.symbol === variable;
+  function exponentOf3(node) {
+    if (node.type === "BinaryOperator" && node.name === "Exponent" && node.left.type === "Identifier" && node.left.symbol === "e")
+      return node.right;
+    if (isCall(node, "exp") && node.type === "FunctionCall")
+      return node.args[0];
+    return void 0;
+  }
+  function exactOf2(node) {
+    return exactConstant(fold(node));
+  }
+  var isZeroBound = (b) => b.kind === "finite" && b.value === 0;
+  var isOneBound = (b) => b.kind === "finite" && b.value === 1;
+  var isPlusInfinity = (b) => b.kind === "infinite" && b.sign === 1;
+  var isMultipleOfPi = (b, k) => b.kind === "finite" && Math.abs(b.value - k * Math.PI) < 1e-14;
+  var powerOverLog = (f, variable, lower, upper) => {
+    if (!isZeroBound(lower) || !isOneBound(upper))
+      return void 0;
+    if (f.type !== "BinaryOperator" || f.name !== "Divide")
+      return void 0;
+    if (!isCall(f.right, "ln") || f.right.type !== "FunctionCall")
+      return void 0;
+    if (!isVariable2(f.right.args[0], variable))
+      return void 0;
+    const poly = asQPoly(f.left, variable);
+    if (poly === void 0)
+      return void 0;
+    let total = ZERO;
+    for (const c of poly)
+      total = add4(total, c);
+    if (!isZero(total))
+      return void 0;
+    let value = number2(0);
+    poly.forEach((c, p) => {
+      if (isZero(c) || p === 0)
+        return;
+      value = add(
+        value,
+        multiply(rationalNodeOf(toNumber(c)), call("ln", number2(p + 1)))
+      );
+    });
+    return {
+      node: value,
+      method: "\u222B\u2080\xB9 (x^p \u2212 1)/ln x dx = ln(p + 1), by differentiating under the integral sign in p; the numerator is a combination of these because its coefficients add up to 0."
+    };
+  };
+  var FRULLANI_TABLE = {
+    arctan: { atZero: number2(0), atInfinity: divide(id3("pi"), number2(2)) },
+    tanh: { atZero: number2(0), atInfinity: number2(1) }
+  };
+  var frullani = (f, variable, lower, upper) => {
+    if (!isZeroBound(lower) || !isPlusInfinity(upper))
+      return void 0;
+    if (f.type !== "BinaryOperator" || f.name !== "Divide")
+      return void 0;
+    if (!isVariable2(f.right, variable))
+      return void 0;
+    const terms = topLevelTerms(f.left);
+    if (terms.length !== 2 || terms[0].negated === terms[1].negated)
+      return void 0;
+    const [plus, minus] = terms[0].negated ? [terms[1], terms[0]] : terms;
+    const read = (term2) => {
+      if (term2.type === "FunctionCall" && term2.args.length === 1) {
+        const entry = FRULLANI_TABLE[term2.callee.symbol];
+        const rate = rateIn(term2.args[0], variable);
+        if (entry !== void 0 && rate !== void 0 && rate > 0)
+          return { key: term2.callee.symbol, rate, ...entry };
+      }
+      const exponent = exponentOf3(term2);
+      if (exponent !== void 0) {
+        const rate = rateIn(exponent, variable);
+        if (rate !== void 0 && rate < 0)
+          return {
+            key: "exp",
+            rate: -rate,
+            atZero: number2(1),
+            atInfinity: number2(0)
+          };
+      }
+      return void 0;
+    };
+    const p = read(plus.term);
+    const m = read(minus.term);
+    if (p === void 0 || m === void 0 || p.key !== m.key)
+      return void 0;
+    return {
+      node: multiply(
+        subtract(p.atZero, p.atInfinity),
+        call("ln", divide(rationalNodeOf(m.rate), rationalNodeOf(p.rate)))
+      ),
+      method: "Frullani's theorem: \u222B\u2080^\u221E (g(ax) \u2212 g(bx))/x dx = (g(0) \u2212 g(\u221E)) ln(b/a), for a, b > 0 and g with limits at 0 and \u221E."
+    };
+  };
+  var logOverSquare = (f, variable, lower, upper) => {
+    if (!isZeroBound(lower) || !isPlusInfinity(upper))
+      return void 0;
+    if (f.type !== "BinaryOperator" || f.name !== "Divide")
+      return void 0;
+    if (!isCall(f.left, "ln") || f.left.type !== "FunctionCall")
+      return void 0;
+    const k = rateIn(f.left.args[0], variable);
+    const q = asQPoly(f.right, variable);
+    if (k === void 0 || !(k > 0) || q === void 0)
+      return void 0;
+    if (q.length !== 3 || !isZero(q[1]) || !isOne(q[2]))
+      return void 0;
+    if (!(q[0].n > 0n))
+      return void 0;
+    const a = power2(
+      rationalNodeOf(toNumber(q[0])),
+      divide(number2(1), number2(2))
+    );
+    return {
+      node: divide(
+        multiply(id3("pi"), call("ln", multiply(rationalNodeOf(k), a))),
+        multiply(number2(2), a)
+      ),
+      method: "\u222B\u2080^\u221E ln(kx)/(x\xB2 + a\xB2) dx = \u03C0 ln(ka)/(2a): substituting x = a\xB2/t sends the integral of ln(x/a) to minus itself, so that part is 0."
+    };
+  };
+  var dampedSine = (f, variable, lower, upper) => {
+    if (!isZeroBound(lower) || !isPlusInfinity(upper))
+      return void 0;
+    const factors = factorList(f);
+    if (factors.length !== 3)
+      return void 0;
+    let s;
+    let b;
+    let overX = false;
+    let scale = 1;
+    for (const factor of factors) {
+      const exponent = exponentOf3(factor.node);
+      if (factor.inNumerator && exponent !== void 0) {
+        const rate = rateIn(exponent, variable);
+        if (rate !== void 0 && rate < 0)
+          s = -rate;
+      } else if (factor.inNumerator && factor.node.type === "FunctionCall" && factor.node.callee.symbol === "sin")
+        b = rateIn(factor.node.args[0], variable);
+      else if (!factor.inNumerator && isVariable2(factor.node, variable))
+        overX = true;
+      else if (!dependsOn(factor.node, variable)) {
+        const v = evaluate(factor.node, {});
+        scale = factor.inNumerator ? scale * v : scale / v;
+      }
+    }
+    if (s === void 0 || b === void 0 || !overX || scale !== 1)
+      return void 0;
+    return {
+      node: call("arctan", divide(rationalNodeOf(b), rationalNodeOf(s))),
+      method: "\u222B\u2080^\u221E e^{\u2212sx} sin(bx)/x dx = arctan(b/s), for s > 0: its derivative in s is \u2212b/(s\xB2 + b\xB2), and it tends to 0 as s \u2192 \u221E."
+    };
+  };
+  var logAffineCosine = (f, variable, lower, upper) => {
+    if (!isZeroBound(lower) || !isMultipleOfPi(upper, 1))
+      return void 0;
+    if (!isCall(f, "ln") || f.type !== "FunctionCall")
+      return void 0;
+    const [inside] = f.args;
+    const cosAt = (x) => evaluate(inside, { [variable]: x });
+    const A = cosAt(Math.PI / 2);
+    const B = cosAt(0) - A;
+    for (const x of [0.3, 1.1, 2.4])
+      if (Math.abs(cosAt(x) - (A + B * Math.cos(x))) > 1e-12)
+        return void 0;
+    const qa = fromNumber(A);
+    const qb = fromNumber(B);
+    if (qa === void 0 || qb === void 0 || !(A > Math.abs(B)))
+      return void 0;
+    const root2 = power2(
+      rationalNodeOf(A * A - B * B),
+      divide(number2(1), number2(2))
+    );
+    return {
+      node: multiply(
+        id3("pi"),
+        call("ln", divide(add(rationalNodeOf(A), root2), number2(2)))
+      ),
+      method: "\u222B\u2080^\u03C0 ln(A + B cos x) dx = \u03C0 ln((A + \u221A(A\xB2 \u2212 B\xB2))/2), for A > |B|, by differentiating under the integral sign in A."
+    };
+  };
+  var logOneExp = (f, variable, lower, upper) => {
+    if (!isZeroBound(lower) || !isPlusInfinity(upper))
+      return void 0;
+    if (!isCall(f, "ln") || f.type !== "FunctionCall")
+      return void 0;
+    const terms = topLevelTerms(f.args[0]);
+    if (terms.length !== 2)
+      return void 0;
+    const one2 = terms.find(
+      (t) => !dependsOn(t.term, variable) && evaluate(t.term, {}) === 1 && !t.negated
+    );
+    const other = terms.find((t) => t !== one2);
+    if (one2 === void 0 || other === void 0)
+      return void 0;
+    const exponent = exponentOf3(other.term);
+    if (exponent === void 0)
+      return void 0;
+    const rate = rateIn(exponent, variable);
+    if (rate === void 0 || !(rate < 0))
+      return void 0;
+    const k = rationalNodeOf(-rate);
+    const piSquared = power2(id3("pi"), number2(2));
+    return {
+      node: other.negated ? negative2(divide(piSquared, multiply(number2(6), k))) : divide(piSquared, multiply(number2(12), k)),
+      method: other.negated ? "\u222B\u2080^\u221E ln(1 \u2212 e^{\u2212kx}) dx = \u2212Li\u2082(1)/k = \u2212\u03C0\xB2/(6k): expand the logarithm as a series in e^{\u2212kx} and integrate term by term." : "\u222B\u2080^\u221E ln(1 + e^{\u2212kx}) dx = \u2212Li\u2082(\u22121)/k = \u03C0\xB2/(12k): expand the logarithm as a series in e^{\u2212kx} and integrate term by term."
+    };
+  };
+  var logSine = (f, variable, lower, upper) => {
+    if (!isZeroBound(lower))
+      return void 0;
+    if (!isCall(f, "ln") || f.type !== "FunctionCall")
+      return void 0;
+    const [inside] = f.args;
+    const trig = inside.type === "FunctionCall" && (inside.callee.symbol === "sin" || inside.callee.symbol === "cos") && isVariable2(inside.args[0], variable) ? inside.callee.symbol : void 0;
+    if (trig === void 0)
+      return void 0;
+    const half = isMultipleOfPi(upper, 0.5);
+    const whole = isMultipleOfPi(upper, 1) && trig === "sin";
+    if (!half && !whole)
+      return void 0;
+    return {
+      node: negative2(
+        multiply(divide(id3("pi"), number2(half ? 2 : 1)), call("ln", number2(2)))
+      ),
+      method: "\u222B\u2080^{\u03C0/2} ln sin x dx = \u222B\u2080^{\u03C0/2} ln cos x dx = \u2212(\u03C0/2) ln 2: adding the two gives the integral of ln(sin 2x / 2), which is the same integral again minus (\u03C0/2) ln 2."
+    };
+  };
+  var NAMED = [
+    powerOverLog,
+    frullani,
+    logOverSquare,
+    dampedSine,
+    logAffineCosine,
+    logOneExp,
+    logSine
+  ];
+  function samplesIn(a, b) {
+    const out = [];
+    for (let i = 1; i <= SAMPLES2; i += 1) {
+      const t = (i - 0.5 + 0.37 * Math.sin(i * 7.1)) / SAMPLES2;
+      out.push(a + (b - a) * Math.min(0.999, Math.max(1e-3, t)));
+    }
+    return out;
+  }
+  function agreeAt(left, right, points) {
+    let checked = 0;
+    for (const x of points) {
+      const l = left(x);
+      const r = right(x);
+      if (!Number.isFinite(l) || !Number.isFinite(r))
+        continue;
+      if (Math.abs(l - r) > 1e-9 * Math.max(1, Math.abs(l), Math.abs(r)))
+        return false;
+      checked += 1;
+    }
+    return checked >= SAMPLES2 / 2;
+  }
+  function exactly2(g, variable, lower, upper) {
+    try {
+      const result = definiteIntegral(
+        g,
+        integrate(g, variable),
+        variable,
+        lower,
+        upper
+      );
+      return result.exact;
+    } catch (error2) {
+      if (error2 instanceof IntegrationError || error2 instanceof Error)
+        return void 0;
+      throw error2;
+    }
+  }
+  function bySymmetry(f, variable, lower, upper) {
+    if (lower.kind !== "finite" || upper.kind !== "finite")
+      return void 0;
+    const a = lower.value;
+    const b = upper.value;
+    const reflected = fold(
+      replaceIdentifier(
+        f,
+        variable,
+        subtract(add(lower.node, upper.node), id3(variable))
+      )
+    );
+    const fx = (x) => evaluate(f, { [variable]: x });
+    const fr = (x) => evaluate(reflected, { [variable]: x });
+    const points = samplesIn(a, b);
+    if (agreeAt(fr, (x) => -fx(x), points)) {
+      const symbolic = sameTree(reflected, fold(negative2(f)));
+      return {
+        exact: ZERO2,
+        method: `The integrand is odd about the middle of the interval, f(${a + b === 0 ? "\u2212x" : "a + b \u2212 x"}) = \u2212f(x), so the two halves cancel.${symbolic ? "" : " The symmetry was checked at sample points, not proved."}`,
+        proved: symbolic
+      };
+    }
+    const sum3 = fold(add(f, reflected));
+    const h = (x) => fx(x) + fr(x);
+    const half = (v) => multiply5(v, fromRational(rational(1n, 2n)));
+    const values = points.map(h).filter(Number.isFinite);
+    if (values.length >= SAMPLES2 / 2 && values.every(
+      (v) => Math.abs(v - values[0]) < 1e-9 * Math.max(1, Math.abs(v))
+    )) {
+      for (const point of [
+        lower.node,
+        upper.node,
+        divide(add(lower.node, upper.node), number2(2))
+      ]) {
+        const K = exactOf2(replaceIdentifier(sum3, variable, point));
+        if (K === void 0 || Math.abs(toNumber2(K) - values[0]) > 1e-9)
+          continue;
+        const width = exactOf2(subtract(upper.node, lower.node));
+        if (width === void 0)
+          break;
+        return {
+          exact: half(multiply5(K, width)),
+          method: "King's rule: f(x) + f(a + b \u2212 x) is the same constant K everywhere on the interval, and \u222B\u2090\u1D47 f = \xBD\u222B\u2090\u1D47 (f(x) + f(a + b \u2212 x)) dx = K(b \u2212 a)/2. The sum was checked to be constant at sample points, not proved.",
+          proved: false
+        };
+      }
+    }
+    const candidates2 = [];
+    if (f.type === "BinaryOperator" && f.name === "Divide")
+      candidates2.push(f.left);
+    candidates2.push(sum3);
+    for (const candidate of candidates2) {
+      if (!agreeAt(h, (x) => evaluate(candidate, { [variable]: x }), points))
+        continue;
+      const whole = exactly2(candidate, variable, lower, upper);
+      if (whole === void 0)
+        continue;
+      const symbolic = sameTree(fold(candidate), sum3);
+      return {
+        exact: half(whole),
+        method: `Reflection: \u222B\u2090\u1D47 f(x) dx = \xBD\u222B\u2090\u1D47 (f(x) + f(a + b \u2212 x)) dx, and that sum is a function with an antiderivative.${symbolic ? "" : " The sum was matched to it at sample points, not proved."}`,
+        proved: symbolic
+      };
+    }
+    return void 0;
+  }
+  function theoremDefinite(f, variable, lower, upper) {
+    const integrand = fold(f);
+    let found;
+    for (const named2 of NAMED) {
+      const hit = named2(integrand, variable, lower, upper);
+      if (hit === void 0)
+        continue;
+      const exact = exactOf2(hit.node);
+      if (exact === void 0)
+        continue;
+      found = { exact, method: hit.method, proved: true };
+      break;
+    }
+    found ??= bySymmetry(integrand, variable, lower, upper);
+    if (found === void 0)
+      return void 0;
+    const value = toNumber2(found.exact);
+    const a = at(lower);
+    const b = at(upper);
+    const numeric = quadrature(
+      (x) => evaluate(integrand, { [variable]: x }),
+      Math.min(a, b),
+      Math.max(a, b)
+    );
+    if (numeric !== void 0) {
+      const signed = a <= b ? numeric : -numeric;
+      if (Math.abs(signed - value) > 1e-6 * Math.max(1, Math.abs(value)))
+        return void 0;
+    } else if (!found.proved)
+      return void 0;
+    return { ...found, value };
   }
 
   // src/plugins/physics-lab/symbolic/quadrature.ts
@@ -15638,15 +16444,15 @@ var CalcEngine = (() => {
 
   // src/plugins/physics-lab/symbolic/limit.ts
   var LHOPITAL_LIMIT = 4;
-  function findLimit(node, variable, at, side, convention = "bilateral") {
-    if (at.kind === "infinite") {
-      const approach = { kind: "infinite", sign: at.sign };
+  function findLimit(node, variable, at2, side, convention = "bilateral") {
+    if (at2.kind === "infinite") {
+      const approach = { kind: "infinite", sign: at2.sign };
       return single(oneSided(node, variable, approach), void 0);
     }
     const from = (s) => ({
       kind: "point",
-      node: at.node,
-      value: at.value,
+      node: at2.node,
+      value: at2.value,
       side: s
     });
     if (side !== "both") {
@@ -16096,11 +16902,11 @@ var CalcEngine = (() => {
   }
 
   // src/plugins/physics-lab/symbolic/ode.ts
-  var { number: number5, binop: binop5, id: id6, negative: negative5 } = augBuilders_exports;
-  var add6 = (a, b) => binop5("Add", a, b);
+  var { number: number6, binop: binop5, id: id6, negative: negative5 } = augBuilders_exports;
+  var add7 = (a, b) => binop5("Add", a, b);
   var multiply6 = (a, b) => binop5("Multiply", a, b);
-  var divide8 = (a, b) => binop5("Divide", a, b);
-  var power6 = (a, b) => binop5("Exponent", a, b);
+  var divide9 = (a, b) => binop5("Divide", a, b);
+  var power7 = (a, b) => binop5("Exponent", a, b);
   var subtract5 = (a, b) => binop5("Subtract", a, b);
   var CONSTANT = "C";
   var SAMPLE_XS = [-1.7, -0.6, 0.4, 1.3, 2.2, 3.1];
@@ -16160,9 +16966,9 @@ var CalcEngine = (() => {
       const coefficient = fold(
         multiply6(
           split4.g,
-          divide8(
-            number5(1),
-            multiply6(split4.hInverse, power6(id6(dependent), number5(rounded)))
+          divide9(
+            number6(1),
+            multiply6(split4.hInverse, power7(id6(dependent), number6(rounded)))
           )
         )
       );
@@ -16174,19 +16980,19 @@ var CalcEngine = (() => {
     const n = [...byPower.keys()].find((k) => k !== 1);
     if (n === 0)
       return void 0;
-    const sum3 = (terms) => terms.reduce((a, b) => add6(a, b));
+    const sum3 = (terms) => terms.reduce((a, b) => add7(a, b));
     const P2 = fold(sum3(byPower.get(1)));
     const Q = fold(sum3(byPower.get(n)));
     if (dependsOn(P2, dependent) || dependsOn(Q, dependent))
       return void 0;
     const v = "v";
-    const scale = number5(1 - n);
-    const linearInV = fold(multiply6(scale, add6(multiply6(P2, id6(v)), Q)));
+    const scale = number6(1 - n);
+    const linearInV = fold(multiply6(scale, add7(multiply6(P2, id6(v)), Q)));
     const inV = solveFirstOrder(cfg2, linearInV, independent, v);
     if (!inV.ok || inV.solution.tree === void 0)
       return void 0;
     const root2 = 1 / (1 - n);
-    const solution = fold(power6(inV.solution.tree, rationalExponent(root2)));
+    const solution = fold(power7(inV.solution.tree, rationalExponent(root2)));
     const evenRoot = rationalExponent(root2).type !== "Constant" && Math.round(Math.abs(1 - n)) % 2 === 0;
     return verified(
       {
@@ -16206,9 +17012,9 @@ var CalcEngine = (() => {
     for (let d = 1; d <= 12; d++) {
       const n = Math.round(value * d);
       if (Math.abs(n / d - value) < 1e-12)
-        return d === 1 ? number5(n) : divide8(number5(n), number5(d));
+        return d === 1 ? number6(n) : divide9(number6(n), number6(d));
     }
-    return number5(value);
+    return number6(value);
   }
   function powerWords(name, exponent) {
     const superscripts = {
@@ -16230,7 +17036,7 @@ var CalcEngine = (() => {
     return node.type === "BinaryOperator" && node.left.type === "Constant" && node.right.type === "Constant" ? `${name}^(${node.left.value}/${node.right.value})` : `${name}^${exponent}`;
   }
   function homogeneous(emit2, f, independent, dependent) {
-    const at = (x, y) => evaluate(f, { [independent]: x, [dependent]: y });
+    const at2 = (x, y) => evaluate(f, { [independent]: x, [dependent]: y });
     let compared = 0;
     for (const [x, y] of [
       [0.7, 1.3],
@@ -16238,8 +17044,8 @@ var CalcEngine = (() => {
       [-1.1, 2.3]
     ])
       for (const t of [2.5, -1.7, 0.3]) {
-        const a = at(x, y);
-        const b = at(t * x, t * y);
+        const a = at2(x, y);
+        const b = at2(t * x, t * y);
         if (!Number.isFinite(a) || !Number.isFinite(b))
           continue;
         compared++;
@@ -16250,7 +17056,7 @@ var CalcEngine = (() => {
       return void 0;
     const v = "v";
     const F = fold(
-      replaceName(replaceName(f, dependent, id6(v)), independent, number5(1))
+      replaceName(replaceName(f, dependent, id6(v)), independent, number6(1))
     );
     const denominator = fold(subtract5(F, id6(v)));
     if (isZero3(denominator))
@@ -16260,7 +17066,7 @@ var CalcEngine = (() => {
     try {
       left = integrate(
         fold(
-          divide8(
+          divide9(
             fold(tidySums(fold(expand(ratio.denominator).node))),
             fold(tidySums(fold(expand(ratio.numerator).node)))
           )
@@ -16270,10 +17076,10 @@ var CalcEngine = (() => {
     } catch {
       return void 0;
     }
-    const quotient = divide8(id6(dependent), id6(independent));
+    const quotient = divide9(id6(dependent), id6(independent));
     const leftInY = fold(replaceName(left, v, quotient));
     const right = fold(
-      add6(
+      add7(
         {
           type: "FunctionCall",
           callee: id6("ln"),
@@ -16349,7 +17155,7 @@ var CalcEngine = (() => {
     } catch (error2) {
       return failed(error2);
     }
-    const solution = fold(add6(antiderivative2, id6(CONSTANT)));
+    const solution = fold(add7(antiderivative2, id6(CONSTANT)));
     return verified(
       {
         // Written as `+C` on the end rather than emitted from the tree. The
@@ -16360,7 +17166,7 @@ var CalcEngine = (() => {
         latex: `${dependent}=${emit2(fold(antiderivative2))}+${CONSTANT}`,
         method: "Direct antiderivative",
         explicit: true,
-        tree: fold(add6(antiderivative2, id6(CONSTANT)))
+        tree: fold(add7(antiderivative2, id6(CONSTANT)))
       },
       solution,
       f,
@@ -16378,7 +17184,7 @@ var CalcEngine = (() => {
     } catch (error2) {
       return failed(error2);
     }
-    const growth2 = power6(id6("e"), antiderivativeOfA);
+    const growth2 = power7(id6("e"), antiderivativeOfA);
     if (bIsZero) {
       const solution2 = fold(multiply6(id6(CONSTANT), growth2));
       return verified(
@@ -16395,8 +17201,8 @@ var CalcEngine = (() => {
       );
     }
     if (!aHasX && !dependsOn(b, independent)) {
-      const equilibrium = divide8(negative5(b), a);
-      const solution2 = fold(add6(equilibrium, multiply6(id6(CONSTANT), growth2)));
+      const equilibrium = divide9(negative5(b), a);
+      const solution2 = fold(add7(equilibrium, multiply6(id6(CONSTANT), growth2)));
       return verified(
         {
           latex: `${dependent}=${emit2(solution2)}`,
@@ -16412,13 +17218,13 @@ var CalcEngine = (() => {
     }
     let particular;
     try {
-      const factor = power6(id6("e"), fold(negative5(antiderivativeOfA)));
+      const factor = power7(id6("e"), fold(negative5(antiderivativeOfA)));
       particular = integrate(fold(multiply6(b, factor)), independent);
     } catch (error2) {
       return failed(error2);
     }
     const solution = fold(
-      add6(distribute2(growth2, particular), multiply6(id6(CONSTANT), growth2))
+      add7(distribute2(growth2, particular), multiply6(id6(CONSTANT), growth2))
     );
     return verified(
       {
@@ -16446,15 +17252,15 @@ var CalcEngine = (() => {
       return void 0;
     if (dependsOn(linear, independent) || dependsOn(quadratic2, independent))
       return void 0;
-    const capacity = fold(divide8(negative5(linear), quadratic2));
+    const capacity = fold(divide9(negative5(linear), quadratic2));
     const solution = fold(
-      divide8(
+      divide9(
         capacity,
-        add6(
-          number5(1),
+        add7(
+          number6(1),
           multiply6(
             id6(CONSTANT),
-            power6(id6("e"), fold(multiply6(negative5(linear), id6(independent))))
+            power7(id6("e"), fold(multiply6(negative5(linear), id6(independent))))
           )
         )
       )
@@ -16497,7 +17303,7 @@ var CalcEngine = (() => {
     const implicit = {
       ok: true,
       solution: {
-        latex: `${emit2(left)}=${emit2(fold(add6(right, id6(CONSTANT))))}`,
+        latex: `${emit2(left)}=${emit2(fold(add7(right, id6(CONSTANT))))}`,
         method: "Separable, left as a relation between x and y",
         explicit: false,
         relation: { left, right }
@@ -16548,24 +17354,24 @@ var CalcEngine = (() => {
   }
   function invertedPower(left, right, dependent) {
     const parameters = parameterBindings([left], [dependent, CONSTANT]);
-    const at = (y) => evaluate(left, { ...parameters, [dependent]: y });
-    const n = Math.round(Math.log(at(2) / at(1)) / Math.log(2));
+    const at2 = (y) => evaluate(left, { ...parameters, [dependent]: y });
+    const n = Math.round(Math.log(at2(2) / at2(1)) / Math.log(2));
     if (!Number.isFinite(n) || n === 0 || n % 2 === 0)
       return void 0;
     for (const y of [0.5, 3]) {
-      const expected = at(1) * y ** n;
-      if (!(Math.abs(at(y) - expected) <= 1e-9 * Math.abs(expected)))
+      const expected = at2(1) * y ** n;
+      if (!(Math.abs(at2(y) - expected) <= 1e-9 * Math.abs(expected)))
         return void 0;
     }
-    const coefficient = fold(divide8(left, power6(id6(dependent), number5(n))));
+    const coefficient = fold(divide9(left, power7(id6(dependent), number6(n))));
     if (dependsOn(coefficient, dependent))
       return void 0;
     const negativeK = evaluate(coefficient, parameters) < 0;
-    const base2 = negativeK ? divide8(
-      add6(fold(negative5(right)), id6(CONSTANT)),
+    const base2 = negativeK ? divide9(
+      add7(fold(negative5(right)), id6(CONSTANT)),
       fold(negative5(coefficient))
-    ) : divide8(add6(right, id6(CONSTANT)), coefficient);
-    return fold(power6(base2, divide8(number5(1), number5(n))));
+    ) : divide9(add7(right, id6(CONSTANT)), coefficient);
+    return fold(power7(base2, divide9(number6(1), number6(n))));
   }
   function separate(f, independent, dependent) {
     const collected = [];
@@ -16591,10 +17397,10 @@ var CalcEngine = (() => {
     };
   }
   function assemble2(numerator, denominator) {
-    const product = (factors) => factors.length === 0 ? number5(1) : factors.reduce((left, right) => multiply6(left, right));
+    const product = (factors) => factors.length === 0 ? number6(1) : factors.reduce((left, right) => multiply6(left, right));
     if (denominator.length === 0)
       return product(numerator);
-    return divide8(product(numerator), product(denominator));
+    return divide9(product(numerator), product(denominator));
   }
   function collect2(node, inNumerator, out) {
     if (node.type === "BinaryOperator") {
@@ -16611,12 +17417,12 @@ var CalcEngine = (() => {
     }
     if (node.type === "BinaryOperator" && node.name === "Exponent" && node.left.type === "Identifier" && node.left.symbol === "e" && node.right.type === "BinaryOperator" && (node.right.name === "Add" || node.right.name === "Subtract")) {
       const second = node.right.name === "Add" ? node.right.right : negative5(node.right.right);
-      collect2(power6(node.left, node.right.left), inNumerator, out);
-      collect2(power6(node.left, second), inNumerator, out);
+      collect2(power7(node.left, node.right.left), inNumerator, out);
+      collect2(power7(node.left, second), inNumerator, out);
       return;
     }
     if (node.type === "Negative") {
-      out.push({ node: number5(-1), inNumerator });
+      out.push({ node: number6(-1), inNumerator });
       collect2(node.arg, inNumerator, out);
       return;
     }
@@ -16698,7 +17504,7 @@ var CalcEngine = (() => {
   function distribute2(factor, sum3) {
     if (sum3.type === "BinaryOperator") {
       if (sum3.name === "Add")
-        return add6(distribute2(factor, sum3.left), distribute2(factor, sum3.right));
+        return add7(distribute2(factor, sum3.left), distribute2(factor, sum3.right));
       if (sum3.name === "Subtract")
         return subtract5(
           distribute2(factor, sum3.left),
@@ -16710,9 +17516,9 @@ var CalcEngine = (() => {
 
   // src/plugins/physics-lab/symbolic/secondOrder.ts
   var { binop: binop6, functionCall: functionCall5, id: id7 } = augBuilders_exports;
-  var add7 = (a, b) => binop6("Add", a, b);
+  var add8 = (a, b) => binop6("Add", a, b);
   var multiply7 = (a, b) => binop6("Multiply", a, b);
-  var power7 = (a, b) => binop6("Exponent", a, b);
+  var power8 = (a, b) => binop6("Exponent", a, b);
   var call3 = (name, arg) => functionCall5(id7(name), arg);
   var FIRST = "C_1";
   var SECOND = "C_2";
@@ -16764,7 +17570,7 @@ var CalcEngine = (() => {
       };
     }
     const solution = fold(
-      equilibrium === void 0 ? built.tree : add7(equilibrium, built.tree)
+      equilibrium === void 0 ? built.tree : add8(equilibrium, built.tree)
     );
     return verifiedSecondOrder(
       {
@@ -16787,9 +17593,9 @@ var CalcEngine = (() => {
     const first = toNode(add5(centre, spread));
     const second = toNode(subtract4(centre, spread));
     return {
-      tree: add7(
-        multiply7(id7(FIRST), power7(id7("e"), multiply7(first, id7("x")))),
-        multiply7(id7(SECOND), power7(id7("e"), multiply7(second, id7("x"))))
+      tree: add8(
+        multiply7(id7(FIRST), power8(id7("e"), multiply7(first, id7("x")))),
+        multiply7(id7(SECOND), power8(id7("e"), multiply7(second, id7("x"))))
       ),
       method: "Two real characteristic roots"
     };
@@ -16798,8 +17604,8 @@ var CalcEngine = (() => {
     const root2 = toNode(fromRational(halfP));
     return {
       tree: multiply7(
-        add7(id7(FIRST), multiply7(id7(SECOND), id7("x"))),
-        power7(id7("e"), multiply7(root2, id7("x")))
+        add8(id7(FIRST), multiply7(id7(SECOND), id7("x"))),
+        power8(id7("e"), multiply7(root2, id7("x")))
       ),
       method: "A repeated characteristic root, critically damped"
     };
@@ -16809,7 +17615,7 @@ var CalcEngine = (() => {
     if (magnitude === void 0)
       return void 0;
     const beta = toNode(multiply5(fromRational(half), magnitude));
-    const oscillation = add7(
+    const oscillation = add8(
       multiply7(id7(FIRST), call3("cos", multiply7(beta, id7("x")))),
       multiply7(id7(SECOND), call3("sin", multiply7(beta, id7("x"))))
     );
@@ -16818,7 +17624,7 @@ var CalcEngine = (() => {
     }
     return {
       tree: multiply7(
-        power7(id7("e"), multiply7(toNode(fromRational(halfP)), id7("x"))),
+        power8(id7("e"), multiply7(toNode(fromRational(halfP)), id7("x"))),
         oscillation
       ),
       method: "Complex characteristic roots, a damped oscillation"
@@ -16944,7 +17750,7 @@ var CalcEngine = (() => {
     let { from } = entry;
     let logarithm3;
     if (zeros.length === 1 && zeros[0] === entry.from) {
-      const at = number2(entry.from);
+      const at2 = number2(entry.from);
       logarithm3 = fold(
         multiply(
           replaceIdentifier(
@@ -16955,7 +17761,7 @@ var CalcEngine = (() => {
               )
             ),
             index,
-            at
+            at2
           ),
           call("ln", call("abs", id3(variable)))
         )
@@ -17135,10 +17941,10 @@ var CalcEngine = (() => {
         scale = inNumerator ? multiply(scale, factor) : divide(scale, factor);
         continue;
       }
-      const power8 = asMonomialPower(factor, variable);
-      if (power8 === void 0 || monomialPower2 !== void 0)
+      const power9 = asMonomialPower(factor, variable);
+      if (power9 === void 0 || monomialPower2 !== void 0)
         return void 0;
-      monomialPower2 = inNumerator ? power8 : -power8;
+      monomialPower2 = inNumerator ? power9 : -power9;
     }
     if (monomialPower2 === void 0 || monomialPower2 <= 0)
       return void 0;
@@ -17987,10 +18793,10 @@ var CalcEngine = (() => {
     )
   );
   function latexOfName(name) {
-    const at = name.indexOf("_");
-    const base2 = at < 0 ? name : name.slice(0, at);
+    const at2 = name.indexOf("_");
+    const base2 = at2 < 0 ? name : name.slice(0, at2);
     const head = GREEK.has(base2) ? `\\${base2}` : base2;
-    return at < 0 ? head : `${head}_{${name.slice(at + 1)}}`;
+    return at2 < 0 ? head : `${head}_{${name.slice(at2 + 1)}}`;
   }
   function readBound(latex) {
     const t = latex.trim().replace(/\\left|\\right/g, "");
@@ -18319,6 +19125,21 @@ var CalcEngine = (() => {
             { latex: `${statement}${emit(integrand)}d${latexOfName(variable)}` }
           ]
         };
+      const theorem = theoremDefinite(integrand, variable, lower, upper);
+      if (theorem !== void 0)
+        return {
+          latex: emit(toNode(theorem.exact)),
+          decimal: fmt(theorem.value),
+          verdict: theorem.proved ? "Proved" : "Checked numerically, not proved",
+          method: `No antiderivative to evaluate. ${theorem.method}`,
+          steps: [],
+          notes: theorem.proved ? [] : [
+            "The exact form is right if the identity it rests on holds everywhere; that was checked at sample points."
+          ],
+          graph: [
+            { latex: `${statement}${emit(integrand)}d${latexOfName(variable)}` }
+          ]
+        };
       const refuse = (why) => ({
         latex: "",
         verdict: "Not decided",
@@ -18368,13 +19189,13 @@ var CalcEngine = (() => {
     }
   }
   function limitAnswer(body, variable, pointLatex, side) {
-    const at = readBound(pointLatex);
-    if (!at)
+    const at2 = readBound(pointLatex);
+    if (!at2)
       throw new Error(
         "The point has to be a number, an expression in numbers, or \u221E."
       );
     const node = normsToAbs(implicitProducts2(body, variable));
-    const found = findLimit(node, variable, at, side);
+    const found = findLimit(node, variable, at2, side);
     const a = found.answer;
     const base2 = { steps: [], notes: [], graph: [] };
     switch (a.kind) {

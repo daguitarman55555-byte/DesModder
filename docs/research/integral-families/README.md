@@ -61,26 +61,40 @@ and nothing hangs. The fixes:
   against the value itself, which never happens at 0. It now also measures
   it against ∫|f|, which gives 0 for #409 and #424.
 
-## Gaps still open
+## The gaps, closed (same day)
 
-Ordered by how many book exercises they block:
+79 pass, 3 exact by symmetry with the identity checked numerically, 2 special
+constants, out of 84. Every case now has the right value, and nothing hangs.
 
-1. **√(g²) = |g|.** Not recognised (#31, #52, #380 and the four-factor
-   square), so a series answer is given where a piecewise elementary one
-   exists. The guide says this is the trap the key itself falls into.
-2. **Exact values for infinite bounds with no antiderivative.** F22 and F24
-   (#423, #424, #425, ∫₀^∞ ln(1+e^{−x})) now get the right number, but no
-   proof. That needs Frullani, differentiation under the integral sign, or
-   Li₂ special values. #423 is π ln 2 / 2, a product, which the linear
-   recogniser cannot name.
-3. **Symmetry proofs.** F17 and F18 (#258, #329, #409, sin³/(sin³+cos³)) get
-   the right value only numerically. The recogniser then names the constant,
-   but nothing proves it.
-4. **Conjugate rationalisation and the reciprocal-quartic substitution** (F16,
-   #242).
-5. **Desmos rule, not a gap:** Desmos refuses `\sin^{3}(x)`. Only the powers 2
-   and −1 may sit on a trig name, so the cases are written `(\sin x)^{3}`. The
-   Calculus tab has to accept what Desmos accepts, and nothing more.
+- **√(g²) = |g|** (`signChanges.ts`). A radicand that is the square of a
+  polynomial, in x or in e^{cx}, is read as |g|. Any |g| whose sign changes
+  are known exactly then integrates to one formula that is continuous across
+  all of them: sign(g)·G − Σ s⁺ᵣ G(r) sign(x − r). This covers #31, #52, #380
+  and the four-factor square.
+- **Three one-move shapes** (`specialForms.ts`): multiplying by the conjugate
+  (F16), the reciprocal-quartic substitution u = √(x⁴ + bx² + c²)/x (#242),
+  and the product rule run backwards, e^{ax}(aH + H′) = (e^{ax}H)′ (#393, now
+  exactly e^{π/2}).
+- **Theorems about the interval** (`definiteTheorems.ts`), each checked
+  numerically before it is shown:
+  - Proved named results: ∫₀¹ (x^α − x^β)/ln x (#417), Frullani (#423),
+    ∫₀^∞ ln(kx)/(x² + a²) (#424), the damped sine (#425), ∫₀^π ln(A + B cos x)
+    (#426), ∫₀^∞ ln(1 ± e^{−kx}), and ln sin or ln cos on [0, π/2].
+  - Symmetry: an odd integrand on a symmetric interval is 0, proved
+    symbolically now that `fold` turns (−x)² into x² (#409). King's rule
+    (#258), and reflection to a simpler sum (#329, sin³/(sin³ + cos³)), give
+    exact values. Their identities are checked at 24 sample points, not
+    proved, and the panel says so.
+- **Two values with no elementary closed form:** ∫₀¹ (eˣ − 1)/x and
+  ∫₀¹ arctan x / x = G. The right answer is the number to 30+ digits, named
+  where it is a known constant.
+
+Still to do: a symbolic proof of King's rule and reflection identities, which
+needs trigonometric and exponential identity simplification beyond `fold`.
+
+**A Desmos rule, not a gap:** Desmos refuses `\sin^{3}(x)`. Only the powers 2
+and −1 may sit on a trig name, so the cases are written `(\sin x)^{3}`. The
+Calculus tab has to accept what Desmos accepts, and nothing more.
 
 The guide's protocol (record the domain, check the exceptional parameters,
 verify by differentiating back) matches how the engine already labels its

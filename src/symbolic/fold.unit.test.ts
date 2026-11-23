@@ -226,3 +226,10 @@ describe("a minus sign moved out of an even or odd function", () => {
     check(fn("ln", negative(x)), "\\ln\\left(-x\\right)");
   });
 });
+
+describe("a negative base to a whole power", () => {
+  test("(−x)² is x² and (−x)³ is −x³", () => {
+    check(pow(negative(x), number(2)), "x^{2}");
+    check(pow(negative(x), number(3)), "-x^{3}");
+  });
+});

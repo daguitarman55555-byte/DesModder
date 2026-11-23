@@ -36,6 +36,7 @@ import {
   type Limit,
 } from "../../../src/plugins/physics-lab/symbolic/definite";
 import { absoluteDefinite } from "../../../src/plugins/physics-lab/symbolic/absolute";
+import { theoremDefinite } from "../../../src/plugins/physics-lab/symbolic/definiteTheorems";
 import { preciseIntegral } from "../../../src/plugins/physics-lab/symbolic/quadrature";
 import {
   describeLimitMethod,
@@ -817,6 +818,23 @@ function definiteAnswer(
           "The absolute value has no single antiderivative, so the interval was cut where what is inside it changes sign, and each piece integrated exactly.",
         steps: [],
         notes: [],
+        graph: [
+          { latex: `${statement}${emit(integrand)}d${latexOfName(variable)}` },
+        ],
+      };
+    const theorem = theoremDefinite(integrand, variable, lower, upper);
+    if (theorem !== undefined)
+      return {
+        latex: emit(exactToNode(theorem.exact)),
+        decimal: fmt(theorem.value),
+        verdict: theorem.proved ? "Proved" : "Checked numerically, not proved",
+        method: `No antiderivative to evaluate. ${theorem.method}`,
+        steps: [],
+        notes: theorem.proved
+          ? []
+          : [
+              "The exact form is right if the identity it rests on holds everywhere; that was checked at sample points.",
+            ],
         graph: [
           { latex: `${statement}${emit(integrand)}d${latexOfName(variable)}` },
         ],

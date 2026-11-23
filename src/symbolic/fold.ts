@@ -100,8 +100,24 @@ export function fold(node: Node): Node {
         foldParity(node.callee.symbol, args);
       return folded ?? { ...node, args };
     }
-    case "BinaryOperator":
+    case "BinaryOperator": {
+      // (−u)ⁿ for a whole n: uⁿ when n is even, −uⁿ when odd. Substituting
+      // −x into x² otherwise leaves (−x)², and an even integrand never looks
+      // even.
+      if (node.name === "Exponent") {
+        const base = fold(node.left);
+        const n = constantValue(fold(node.right));
+        if (
+          base.type === "Negative" &&
+          n !== undefined &&
+          Number.isInteger(n)
+        ) {
+          const inner = fold(binop("Exponent", base.arg, number(n)));
+          return n % 2 === 0 ? inner : fold(negative(inner));
+        }
+      }
       return foldBinary(node);
+    }
     default:
       return node;
   }
