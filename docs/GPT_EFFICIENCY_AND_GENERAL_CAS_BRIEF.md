@@ -180,6 +180,51 @@ For each tool, ranked by expected speedup per day of work:
 8. **WebGPU.** Is it available enough in Chrome and Firefox today to be the
    primary path for the fluid and flow, with WebGL2 as the fallback? What
    speedup does a compute-shader version get on an integrated GPU?
+9. **Native-speed code, with an automatic converter back to Desmos.**
+   Rafael asked whether computations could run faster in a faster language
+   (Rust, C++, assembly, raw machine code) and be converted back into Desmos
+   automatically. Research this properly; do not assume the answer.
+   - In a browser the realistic route to native speed is WebAssembly
+     (Rust or C++ compiled to `.wasm`), with SIMD and, where the page is
+     cross-origin isolated, threads. Assembly or machine code for the CPU
+     cannot run in a web page; say plainly what is and is not possible
+     inside a browser extension, and whether a native-messaging helper
+     installed outside the browser is worth its install burden (it breaks
+     rule 1 above, so only if the gain is overwhelming).
+   - **Where would it pay?** Name the hot paths by measurement, not by
+     guess: the CPU parts of the fluid (the FLIP liquid's CPU path, the LBM
+     reference and validity checks), the Matrix redraw's polyline mapping
+     and grid thinning, the field compiler (`latexToGLSL.ts`) and its CPU
+     evaluators, the symbolic engines (`symbolic/`, `src/symbolic/`), PSLQ
+     and high-precision arithmetic (currently `decimal.js`), and the
+     slope-field and ODE integrators. For each, the expected speedup over
+     today's JavaScript on V8 (which is often within 1.5–3× of native for
+     numeric loops), the cost of copying data across the JS–WASM boundary,
+     and whether the GPU (WebGL2/WebGPU) is the better answer instead.
+   - **What the platform allows.** Our code runs in the desmos.com page,
+     not an extension page, so desmos.com's own Content-Security-Policy
+     decides whether `WebAssembly.compile` is allowed there; extension pages
+     need `'wasm-unsafe-eval'` (see `CAS_ENGINE_CHROME_PROBE.md`). DesModder
+     already sets COEP/COOP headers, so `SharedArrayBuffer` and WASM
+     threads may be available. Say how to check each in both Chrome and
+     Firefox, and give the probe to run.
+   - **The converter back to Desmos.** The result has to come back as
+     ordinary Desmos expressions that someone can read, edit and share:
+     lists of numbers (`L=[…]`), point lists, polygons, piecewise
+     definitions, or LaTeX formulas. Design that converter — what format
+     each kind of result takes, how large a list Desmos accepts and how fast
+     it re-plots one, how to update a list every frame without rewriting
+     the graph state (`setState` is atomic but heavy; a `HelperExpression`
+     or one `setExpression` per frame may not be), and how the formatting
+     stays in the repo's canonical Desmos LaTeX (`\left(…\right)`, `x^{2}`;
+     there is a test for it). Also the reverse: compiling Desmos LaTeX into
+     the fast code, the way `latexToGLSL.ts` compiles it to GLSL today.
+   - **Toolchain cost.** What adding Rust or C++ to this repository costs:
+     build steps beside esbuild, bundle size, CI, debugging, Firefox AMO
+     review of a `.wasm` binary (reviewers want reproducible source builds),
+     and who maintains it. Compare against simpler wins in JavaScript
+     (typed arrays, no allocation in hot loops, Web Workers) that get part
+     of the way for none of that cost.
 
 For every proposal: the bottleneck and how you measured it; the change,
 concretely enough to implement (files, data layout, shader sketch); the
@@ -316,6 +361,18 @@ the tabs too rigid. The target is:
    corpus of a few hundred problems across integration, limits, series, ODEs
    and PDEs, with the expected answer and the source of truth for each, so
    progress is measured rather than asserted.
+
+9. **Native speed for the engines.** Part 1, question 9 asks about
+   WebAssembly (Rust or C++) for computation generally. Answer it here for
+   the CAS in particular: which engine work is numeric and would gain
+   (quadrature, PSLQ, high-precision arithmetic, numeric ODE/PDE solvers,
+   series acceleration) and which is symbolic tree rewriting, where WASM
+   gains little. Also whether an existing native CAS compiled to WASM
+   (SymEngine, FLINT/Arb for rigorous numerics, Giac — the engine behind
+   GeoGebra's CAS, which already runs as WASM) is a fourth engine option
+   beside the three in question 1, with its size, startup time, licence
+   (GPL engines and this repository's licence), and how its answers would
+   be converted back into Desmos LaTeX.
 
 ### What to send back
 
