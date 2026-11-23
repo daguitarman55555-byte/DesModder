@@ -233,3 +233,9 @@ describe("a negative base to a whole power", () => {
     check(pow(negative(x), number(3)), "-x^{3}");
   });
 });
+
+describe("a power of a power, to a whole exponent", () => {
+  test("(x²)² is x⁴", () => {
+    check(pow(pow(x, number(2)), number(2)), "x^{4}");
+  });
+});

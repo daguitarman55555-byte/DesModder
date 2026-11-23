@@ -55,6 +55,7 @@ export {
   agreesOnSamples,
   conditionHolds,
   evaluate,
+  gamma,
   numericDerivative,
   numericSecondDerivative,
   type Bindings,
@@ -102,3 +103,14 @@ export {
   type Decimal,
   type PreciseBindings,
 } from "./precise";
+
+export {
+  SPECIAL_FUNCTIONS,
+  desmosDefinitions,
+  digamma,
+  mittagLeffler,
+  reciprocalGamma,
+  specialFunction,
+  specialFunctionsIn,
+  type SpecialFunction,
+} from "./special";

@@ -45,12 +45,44 @@ New, and what is being judged:
 - Three candidate icons, switchable at the bottom right. Rafael picked the
   integral sign on 2026-11-23.
 
-Not in the mock-up: PDEs on Desmos 3D, custom operators beyond `lim`,
-non-elementary functions as answers (erf, Si, …), and convergence proofs.
-Also wanted, and asked of GPT in the brief's Part 2 question 10: fractional
-derivatives and integrals, higher-order and nonlinear ODEs solved and drawn
-(phase plane, 3D phase portrait, solution curves), and a Simplify operation
-that goes far beyond today's.
+- **Fractional derivatives and integrals** (added 2026-11-23), typed as
+  `\frac{d^{\pi}}{dx^{\pi}}(…)` with any order, or picked with the dᵅ/dxᵅ
+  chip; a negative order is a fractional integral. The engine is
+  `src/plugins/physics-lab/symbolic/fractional.ts`. Every definition that
+  gives a different answer gets its own card, and a table compares their
+  values at a point:
+  - **Riemann–Liouville** and **Caputo**: closed forms in Γ, ψ and the
+    Mittag-Leffler function from 0. From another lower limit, or where there
+    is no closed form, an exact integral representation instead.
+  - **Grünwald–Letnikov**: the finite-difference limit, evaluated with
+    Richardson extrapolation. It agrees with Riemann–Liouville, as it must.
+  - **Conformable**: always elementary.
+  - **Caputo–Hadamard**: an exact integral with a logarithmic kernel.
+  - **Weyl**: from −∞, term by term, with the reason any term has none.
+- **Special functions with their real notation**:
+  - **The library** (`src/symbolic/special.ts`): Γ, 1/Γ, B, ψ, ζ, erfc, erfi,
+    Si, Ci, Shi, Chi, Ei, li, Li₂, the Fresnel S and C, Bessel J, Lambert W,
+    elliptic K, and the Mittag-Leffler E.
+  - **In Desmos:** each one is defined in Desmos, and its definition is added
+    to the graph with any answer that uses it. Desmos accepts `\Gamma`, `\psi`,
+    `\zeta`, `\operatorname{Li}_{2}`, `\operatorname{Ei}` and the rest as names
+    of functions the user defines. The one exception is E\_{a,b}(z), which has
+    to be E(a,b,z) because a subscript cannot hold a comma.
+  - **Checking:** `node scripts/check-special-functions.cjs` compares every
+    Desmos definition with the JavaScript value in live Desmos (worst
+    relative error 3×10⁻¹⁴ on 2026-11-23).
+  - **Antiderivatives:** integrals with no elementary antiderivative are now
+    answered in these functions (`specialIntegrals.ts`): ∫eˣ/x = Ei(x),
+    ∫ln(1+x)/x = −Li₂(−x), ∫sin(3x)/x = Si(3x), ∫e^{−x²}, ∫cos(x²), ∫1/ln x.
+    Each is checked by differentiating back.
+  - `node docs/mockups/calculus-tab/graph-check.cjs` puts each graphed answer
+    into a fresh Desmos page and compares Desmos's value with the panel's.
+
+Not in the mock-up yet: PDEs on Desmos 3D, custom operators beyond `lim`, and
+convergence proofs. Also wanted, and asked of GPT in the brief's Part 2
+question 10: higher-order and nonlinear ODEs solved and drawn (phase plane,
+3D phase portrait, solution curves), and a Simplify operation that goes far
+beyond today's.
 
 An indefinite ∫ has empty bound slots in Desmos's MathQuill. They are hidden
 until the cursor goes into one (arrow right from beside the ∫), and typing

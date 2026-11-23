@@ -37,6 +37,11 @@ import {
 } from "../../../src/plugins/physics-lab/symbolic/definite";
 import { absoluteDefinite } from "../../../src/plugins/physics-lab/symbolic/absolute";
 import { theoremDefinite } from "../../../src/plugins/physics-lab/symbolic/definiteTheorems";
+import { specialAntiderivative } from "../../../src/plugins/physics-lab/symbolic/specialIntegrals";
+import {
+  fractionalDerivatives,
+  type FractionalResult,
+} from "../../../src/plugins/physics-lab/symbolic/fractional";
 import { preciseIntegral } from "../../../src/plugins/physics-lab/symbolic/quadrature";
 import {
   describeLimitMethod,
@@ -57,11 +62,13 @@ import {
   add,
   agreesOnSamples,
   condense,
+  desmosDefinitions,
   evaluate,
   freshName,
   id,
   identifiersIn,
   normsToAbs,
+  specialFunction,
   toLatex as toLatexTree,
   type Bindings,
 } from "../../../src/symbolic";
@@ -171,6 +178,7 @@ function substitute(
 
 export type Operation =
   | "derivative"
+  | "fractional"
   | "integral"
   | "definite"
   | "limit"
@@ -180,6 +188,7 @@ export type Operation =
 
 export const OPERATION_LABELS: Record<Operation, string> = {
   derivative: "Differentiate",
+  fractional: "Fractional derivative",
   integral: "Integrate",
   definite: "Definite integral",
   limit: "Limit",
@@ -194,6 +203,8 @@ interface Parsed {
   binder?: string;
   bodyLatex: string;
   order?: number;
+  /** A fractional order as typed: \pi, \frac{1}{2}, -0.5. */
+  orderLatex?: string;
   lowerLatex?: string;
   upperLatex?: string;
   pointLatex?: string;
@@ -221,18 +232,51 @@ function group(s: string, i: number): { text: string; end: number } {
   return { text: s[i] ?? "", end: i + 1 };
 }
 
+/** `\frac{d^{α}}{dx^{α}}` at the start: the order as typed, the variable, the rest. */
+function derivativeHead(
+  s: string
+): { order: string; binder: string; body: string } | undefined {
+  const opening = String.raw`\frac{d`;
+  if (!s.startsWith(opening)) return undefined;
+  let i = opening.length;
+  let order = "";
+  if (s[i] === "^") {
+    const g = group(s, i + 1);
+    order = g.text.trim();
+    i = g.end;
+  }
+  if (s[i] !== "}" || s[i + 1] !== "{" || s[i + 2] !== "d") return undefined;
+  const below = closing(s, i + 1);
+  if (below < 0) return undefined;
+  const inside = s.slice(i + 3, below);
+  const hat = inside.indexOf("^");
+  const binder = (hat < 0 ? inside : inside.slice(0, hat)).trim();
+  if (binder === "") return undefined;
+  return { order, binder, body: s.slice(below + 1) };
+}
+
 function readRequest(raw: string): Parsed {
   const s = raw.replace(/\\ /g, " ").trim();
 
-  // d/dt or dⁿ/dtⁿ in front.
-  let m = /^\\frac\{d(?:\^\{?(\d+)\}?)?\}\{d([^}^]+)(?:\^\{?\d+\}?)?\}/.exec(s);
-  if (m)
-    return {
-      operation: "derivative",
-      order: m[1] ? Number(m[1]) : 1,
-      binder: m[2].trim(),
-      bodyLatex: s.slice(m[0].length),
-    };
+  // d/dt, dⁿ/dtⁿ, or d^α/dt^α for any order α in front.
+  const head = derivativeHead(s);
+  if (head !== undefined) {
+    // No order (plain d/dt) is order 1.
+    const whole = head.order === "" || /^\d+$/.test(head.order);
+    return whole
+      ? {
+          operation: "derivative",
+          order: head.order === "" ? 1 : Number(head.order),
+          binder: head.binder,
+          bodyLatex: head.body,
+        }
+      : {
+          operation: "fractional",
+          orderLatex: head.order,
+          binder: head.binder,
+          bodyLatex: head.body,
+        };
+  }
 
   // ∫, with or without bounds, ending in d(variable).
   if (s.startsWith("\\int")) {
@@ -265,7 +309,7 @@ function readRequest(raw: string): Parsed {
   }
 
   // lim_{t→a}, from MathQuill (\lim) or typed (\operatorname{lim}).
-  m = /^\\(?:lim|operatorname\{lim\})_\{/.exec(s);
+  let m = /^\\(?:lim|operatorname\{lim\})_\{/.exec(s);
   if (m) {
     const g = group(s, m[0].length - 1);
     const arrow = /^(.+?)\\(?:to|rightarrow)(.+)$/.exec(g.text);
@@ -367,6 +411,8 @@ export interface Analysis {
   /** Other letters, treated as constants. */
   parameters: string[];
   answer?: Answer;
+  /** For a fractional derivative: every definition's answer. */
+  fractional?: FractionalResult;
 }
 
 export interface Options {
@@ -568,6 +614,51 @@ export function analyze(
         base.answer = derivativeAnswer(body, variable, n, options.depth);
         break;
       }
+      case "fractional": {
+        const orderLatex = request.orderLatex ?? "";
+        const order = readBound(orderLatex);
+        if (order === undefined || order.kind !== "finite")
+          throw new Error(
+            "The order has to be a number, such as π, 1/2 or −0.5."
+          );
+        const lowerLatex = options.lowerLatex?.trim() || "0";
+        const lower = readBound(lowerLatex);
+        const pointLatex = options.pointLatex?.trim() || "2";
+        const point = readBound(pointLatex);
+        if (lower?.kind !== "finite" || point?.kind !== "finite")
+          throw new Error("The lower limit and the point have to be numbers.");
+        const result = fractionalDerivatives({
+          f: implicitProducts(normsToAbs(body), variable),
+          variable,
+          variableLatex: v,
+          order: order.value,
+          orderLatex,
+          lower: lower.value,
+          lowerLatex,
+          point: point.value,
+          emit,
+        });
+        base.fractional = result;
+        const what =
+          result.kind === "integral"
+            ? `The fractional integral of order \\(${orderLatex.replace(/^-/, "")}\\)`
+            : `The derivative of order \\(${orderLatex}\\)`;
+        base.summary = `${what} with respect to \\(${v}\\), under every definition that gives a different answer, from \\(${lowerLatex}\\) and evaluated at \\(${v}=${pointLatex}\\).${treat}${sliderWords}${inlinedWords}`;
+        const head = result.answers[0];
+        base.answer = {
+          latex: head.latex,
+          decimal: head.value === undefined ? undefined : fmt(head.value),
+          verdict: "Proved",
+          method: head.name,
+          steps: [],
+          notes: result.notes,
+          graph: [
+            ...head.definitions.map((d) => ({ latex: d })),
+            ...(head.graphLatex ? [{ latex: `y=${head.graphLatex}` }] : []),
+          ],
+        };
+        break;
+      }
       case "integral":
         base.summary = `Integrate with respect to \\(${v}\\).${treat}${sliderWords}${inlinedWords}`;
         base.answer = integralAnswer(body, variable, options);
@@ -705,6 +796,37 @@ function integralAnswer(
   } catch (error) {
     if (!(error instanceof IntegrationError)) throw error;
     const special = error instanceof NonElementaryError ? error.special : "";
+    // No elementary antiderivative, but an exact one in a special function
+    // (Ei, Si, erf, Li₂, …), defined in Desmos so it graphs as written.
+    const named = specialAntiderivative(integrand, variable, (term) => {
+      try {
+        return integrateWithMethod(term, variable).value;
+      } catch {
+        return undefined;
+      }
+    });
+    if (
+      named !== undefined &&
+      checkAntiderivative(named.value, integrand, variable)
+    ) {
+      const constant = freshName(integrand, ["C", "K", "D"]);
+      const latex = emit(add(named.value, id(constant)));
+      const definitions = desmosDefinitions(named.uses);
+      return {
+        latex,
+        verdict: "Proved, checked by differentiating back",
+        method: `No elementary antiderivative${special ? ` (${special})` : ""}, so it is written with ${named.uses.map((u) => specialFunction(u)?.name ?? u).join(" and ")}.`,
+        steps: [],
+        notes: named.uses
+          .map((u) => specialFunction(u))
+          .filter((f) => f?.domain !== undefined)
+          .map((f) => `${f!.name}: defined in Desmos for ${f!.domain}.`),
+        graph: [
+          ...definitions.map((d) => ({ latex: d })),
+          { latex: `y=${latex}`, slider: `${constant}=0` },
+        ],
+      };
+    }
     const series = seriesFallback(integrand, variable, options.seriesTerms);
     if (series === undefined)
       return {

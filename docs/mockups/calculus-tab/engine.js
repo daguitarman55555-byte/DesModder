@@ -1470,8 +1470,8 @@ var CalcEngine = (() => {
     hidden: "boolean",
     collapsed: "boolean"
   };
-  function enumL(L) {
-    return { type: "enum", enum: L };
+  function enumL(L2) {
+    return { type: "enum", enum: L2 };
   }
   function schemaL(s, t = {}) {
     return {
@@ -3509,19 +3509,19 @@ var CalcEngine = (() => {
               denominator: multiply(left.denominator, right.numerator)
             };
           case "Exponent": {
-            const exponent = constantValue(node.right);
-            if (exponent === void 0 || !Number.isInteger(exponent))
+            const exponent2 = constantValue(node.right);
+            if (exponent2 === void 0 || !Number.isInteger(exponent2))
               return whole(node);
             const raise2 = (value, to) => to === 1 ? value : binop2("Exponent", value, number2(to));
-            if (exponent >= 0) {
+            if (exponent2 >= 0) {
               return {
-                numerator: raise2(left.numerator, exponent),
-                denominator: raise2(left.denominator, exponent)
+                numerator: raise2(left.numerator, exponent2),
+                denominator: raise2(left.denominator, exponent2)
               };
             }
             return {
-              numerator: raise2(left.denominator, -exponent),
-              denominator: raise2(left.numerator, -exponent)
+              numerator: raise2(left.denominator, -exponent2),
+              denominator: raise2(left.numerator, -exponent2)
             };
           }
           default:
@@ -3589,6 +3589,11 @@ var CalcEngine = (() => {
         if (node.name === "Exponent") {
           const base2 = fold(node.left);
           const n = constantValue(fold(node.right));
+          if (base2.type === "BinaryOperator" && base2.name === "Exponent" && n !== void 0 && Number.isInteger(n)) {
+            const a = constantValue(base2.right);
+            if (a !== void 0)
+              return fold(binop2("Exponent", base2.left, number2(a * n)));
+          }
           if (base2.type === "Negative" && n !== void 0 && Number.isInteger(n)) {
             const inner = fold(binop2("Exponent", base2.arg, number2(n)));
             return n % 2 === 0 ? inner : fold(negative2(inner));
@@ -3878,10 +3883,10 @@ var CalcEngine = (() => {
           return right.args[0];
         }
         if (left.type === "Identifier" && left.symbol === "e") {
-          const scaled = right.type === "Negative" ? { k: -1, inner: right.arg } : right.type === "BinaryOperator" && right.name === "Multiply" && rationalOf(right.left) !== void 0 ? { k: rationalOf(right.left), inner: right.right } : void 0;
-          const k = scaled === void 0 ? void 0 : typeof scaled.k === "number" ? { n: scaled.k, d: 1 } : scaled.k;
-          if (scaled !== void 0 && k !== void 0 && scaled.inner.type === "FunctionCall" && scaled.inner.callee.symbol === "ln" && scaled.inner.args.length === 1)
-            return fold(binop2("Exponent", scaled.inner.args[0], rationalNode(k)));
+          const scaled2 = right.type === "Negative" ? { k: -1, inner: right.arg } : right.type === "BinaryOperator" && right.name === "Multiply" && rationalOf(right.left) !== void 0 ? { k: rationalOf(right.left), inner: right.right } : void 0;
+          const k = scaled2 === void 0 ? void 0 : typeof scaled2.k === "number" ? { n: scaled2.k, d: 1 } : scaled2.k;
+          if (scaled2 !== void 0 && k !== void 0 && scaled2.inner.type === "FunctionCall" && scaled2.inner.callee.symbol === "ln" && scaled2.inner.args.length === 1)
+            return fold(binop2("Exponent", scaled2.inner.args[0], rationalNode(k)));
         }
         if (rc !== void 0 && left.type === "BinaryOperator" && left.name === "Exponent" && (left.left.type === "Identifier" && left.left.symbol === "e" || (constantValue(left.left) ?? 0) > 0)) {
           return fold(
@@ -3889,8 +3894,8 @@ var CalcEngine = (() => {
           );
         }
         {
-          const exponent = rationalOf(right);
-          if (exponent !== void 0 && exponent.n === 1 && exponent.d === 2) {
+          const exponent2 = rationalOf(right);
+          if (exponent2 !== void 0 && exponent2.n === 1 && exponent2.d === 2) {
             return { type: "FunctionCall", callee: id3("sqrt"), args: [left] };
           }
         }
@@ -3923,12 +3928,12 @@ var CalcEngine = (() => {
       const { node: factor, inNumerator } = entry;
       const isPower = factor.type === "BinaryOperator" && factor.name === "Exponent";
       const base2 = isPower ? factor.left : factor;
-      const exponent = isPower ? factor.right : number2(1);
+      const exponent2 = isPower ? factor.right : number2(1);
       if (base2.type === "Constant") {
         others.push(entry);
         continue;
       }
-      const contribution = inNumerator ? exponent : negative2(exponent);
+      const contribution = inNumerator ? exponent2 : negative2(exponent2);
       const match = powers.findIndex((existing) => sameTree(existing.base, base2));
       if (match >= 0) {
         powers[match] = {
@@ -3944,8 +3949,8 @@ var CalcEngine = (() => {
       return void 0;
     let numerator = number2(1);
     let denominator = number2(1);
-    for (const { base: base2, exponent } of powers)
-      numerator = binop2("Multiply", numerator, binop2("Exponent", base2, exponent));
+    for (const { base: base2, exponent: exponent2 } of powers)
+      numerator = binop2("Multiply", numerator, binop2("Exponent", base2, exponent2));
     for (const { node: factor, inNumerator } of others) {
       if (inNumerator)
         numerator = binop2("Multiply", numerator, factor);
@@ -4175,24 +4180,24 @@ var CalcEngine = (() => {
         return exponentDerivative(left, right, dLeft, dRight, variable);
     }
   }
-  function exponentDerivative(base2, exponent, dBase, dExponent, variable) {
-    if (!dependsOn(exponent, variable)) {
+  function exponentDerivative(base2, exponent2, dBase, dExponent, variable) {
+    if (!dependsOn(exponent2, variable)) {
       return multiply(
-        multiply(exponent, power2(base2, subtract(exponent, number2(1)))),
+        multiply(exponent2, power2(base2, subtract(exponent2, number2(1)))),
         dBase
       );
     }
     if (!dependsOn(base2, variable)) {
       return multiply(
-        multiply(power2(base2, exponent), call("ln", base2)),
+        multiply(power2(base2, exponent2), call("ln", base2)),
         dExponent
       );
     }
     return multiply(
-      power2(base2, exponent),
+      power2(base2, exponent2),
       add(
         multiply(dExponent, call("ln", base2)),
-        divide(multiply(exponent, dBase), base2)
+        divide(multiply(exponent2, dBase), base2)
       )
     );
   }
@@ -4615,10 +4620,10 @@ var CalcEngine = (() => {
       }))
     );
   }
-  function raise(base2, exponent, notes) {
+  function raise(base2, exponent2, notes) {
     if (topLevelTerms(base2).length < 2)
       return void 0;
-    const n = constantValue(exponent);
+    const n = constantValue(exponent2);
     if (n === void 0 || !Number.isInteger(n) || n < 2 || n > MAX_POWER)
       return void 0;
     let sum3 = base2;
@@ -4717,6 +4722,434 @@ var CalcEngine = (() => {
     }
   }
 
+  // src/symbolic/special.ts
+  var EULER = 0.5772156649015329;
+  var GL_X = [
+    0.1488743389816312,
+    0.4333953941292472,
+    0.6794095682990244,
+    0.8650633666889845,
+    0.9739065285171717
+  ];
+  var GL_W = [
+    0.2955242247147529,
+    0.2692667193099963,
+    0.219086362515982,
+    0.1494513491505806,
+    0.0666713443086881
+  ];
+  function integrate(g, a, b, width = 0.5) {
+    if (a === b)
+      return 0;
+    const panels = Math.max(1, Math.ceil(Math.abs(b - a) / width));
+    const h = (b - a) / panels;
+    let total = 0;
+    for (let p = 0; p < panels; p += 1) {
+      const mid = a + (p + 0.5) * h;
+      for (let i = 0; i < 5; i += 1) {
+        const dx = h / 2 * GL_X[i];
+        total += GL_W[i] * (g(mid - dx) + g(mid + dx));
+      }
+    }
+    return total * h / 2;
+  }
+  var removable = (f, at0) => (t) => t === 0 ? at0 : (f(t) - f(0)) / t;
+  function reciprocalGamma(z) {
+    if (Number.isInteger(z) && z <= 0)
+      return 0;
+    return 1 / gamma(z);
+  }
+  function digamma(x) {
+    if (Number.isInteger(x) && x <= 0)
+      return NaN;
+    if (x < 0.5)
+      return digamma(1 - x) - Math.PI / Math.tan(Math.PI * x);
+    let shift = 0;
+    while (x < 16) {
+      shift -= 1 / x;
+      x += 1;
+    }
+    const inv = 1 / (x * x);
+    return shift + Math.log(x) - 0.5 / x - inv * (1 / 12 - inv * (1 / 120 - inv * (1 / 252 - inv / 240)));
+  }
+  var beta = (a, b) => gamma(a) * gamma(b) / gamma(a + b);
+  function zeta(s) {
+    if (s === 1)
+      return NaN;
+    const N = 10;
+    let total = 0;
+    for (let n = 1; n < N; n += 1)
+      total += n ** -s;
+    total += N ** (1 - s) / (s - 1) + N ** -s / 2;
+    const B = [1 / 12, -1 / 720, 1 / 30240, -1 / 1209600];
+    let rising = s;
+    for (let j = 0; j < B.length; j += 1) {
+      total += B[j] * rising * N ** (-s - 2 * j - 1);
+      rising *= (s + 2 * j + 1) * (s + 2 * j + 2);
+    }
+    return total;
+  }
+  function erf(x) {
+    if (Math.abs(x) > 6)
+      return Math.sign(x);
+    return 2 / Math.sqrt(Math.PI) * integrate((t) => Math.exp(-t * t), 0, x, 0.25);
+  }
+  var erfc = (x) => 1 - erf(x);
+  var erfi = (x) => 2 / Math.sqrt(Math.PI) * integrate((t) => Math.exp(t * t), 0, x, 0.25);
+  var Si = (x) => integrate((t) => t === 0 ? 1 : Math.sin(t) / t, 0, x);
+  var Ci = (x) => x <= 0 ? NaN : EULER + Math.log(x) + integrate(removable(Math.cos, 0), 0, x);
+  var Shi = (x) => integrate((t) => t === 0 ? 1 : Math.sinh(t) / t, 0, x);
+  var Chi = (x) => x <= 0 ? NaN : EULER + Math.log(x) + integrate(removable(Math.cosh, 0), 0, x);
+  var Ei = (x) => x === 0 ? NaN : EULER + Math.log(Math.abs(x)) + integrate(removable(Math.exp, 1), 0, x);
+  var li = (x) => x <= 0 || x === 1 ? NaN : Ei(Math.log(x));
+  function dilog(z) {
+    if (z > 1)
+      return NaN;
+    if (z === 1)
+      return Math.PI * Math.PI / 6;
+    if (z < -1)
+      return -(Math.PI * Math.PI) / 6 - 0.5 * Math.log(-z) ** 2 - dilog(1 / z);
+    if (z > 0.5)
+      return Math.PI * Math.PI / 6 - Math.log(z) * Math.log(1 - z) - dilog(1 - z);
+    if (z < -0.5)
+      return -dilog(z / (z - 1)) - 0.5 * Math.log(1 - z) ** 2;
+    let total = 0;
+    let power8 = z;
+    for (let k = 1; k < 200; k += 1) {
+      total += power8 / (k * k);
+      power8 *= z;
+      if (Math.abs(power8) < 1e-18)
+        break;
+    }
+    return total;
+  }
+  var fresnelS = (x) => integrate((t) => Math.sin(Math.PI * t * t / 2), 0, x, 0.25);
+  var fresnelC = (x) => integrate((t) => Math.cos(Math.PI * t * t / 2), 0, x, 0.25);
+  function besselJ(nu, x) {
+    if (Number.isInteger(nu))
+      return integrate((u) => Math.cos(nu * u - x * Math.sin(u)), 0, Math.PI, 0.1) / Math.PI;
+    let total = 0;
+    for (let k = 0; k < 120; k += 1) {
+      const term2 = (-1) ** k * (x / 2) ** (2 * k + nu) / (gamma(k + 1) * gamma(k + nu + 1));
+      total += term2;
+      if (Math.abs(term2) < 1e-18 * Math.max(1, Math.abs(total)) && k > x)
+        break;
+    }
+    return total;
+  }
+  function lambertW(x) {
+    if (x < -1 / Math.E)
+      return NaN;
+    if (x === 0)
+      return 0;
+    let w = x < 1 ? x * (1 - x) : Math.log(x) - Math.log(Math.log(x) + 1);
+    if (x < 0)
+      w = -0.5;
+    for (let i = 0; i < 60; i += 1) {
+      const e = Math.exp(w);
+      const f = w * e - x;
+      const next = w - f / (e * (w + 1) - (w + 2) * f / (2 * w + 2));
+      if (Math.abs(next - w) < 1e-15 * (1 + Math.abs(next)))
+        return next;
+      w = next;
+    }
+    return w;
+  }
+  function ellipticK(k) {
+    if (Math.abs(k) >= 1)
+      return NaN;
+    let a = 1;
+    let b = Math.sqrt(1 - k * k);
+    for (let i = 0; i < 40 && Math.abs(a - b) > 1e-16; i += 1)
+      [a, b] = [(a + b) / 2, Math.sqrt(a * b)];
+    return Math.PI / (2 * a);
+  }
+  function mittagLeffler(a, b, z) {
+    let sum3 = 0;
+    let quiet = 0;
+    for (let k = 0; k < 600; k += 1) {
+      const term2 = z === 0 && k > 0 ? 0 : z ** k * reciprocalGamma(a * k + b);
+      sum3 += term2;
+      if (Math.abs(term2) <= 1e-17 * Math.max(1, Math.abs(sum3))) {
+        quiet += 1;
+        if (quiet > 6 && k > 2 * Math.abs(z))
+          break;
+      } else
+        quiet = 0;
+    }
+    return sum3;
+  }
+  var L = (s) => `\\left(${s}\\right)`;
+  var SPECIAL_FUNCTIONS = [
+    {
+      symbol: "Gamma",
+      name: "the gamma function",
+      notation: `\\Gamma${L("#1")}`,
+      arity: 1,
+      evaluate: gamma,
+      definitions: [`\\Gamma${L("z")}=${L("z-1")}!`],
+      needs: []
+    },
+    {
+      symbol: "Gamma_r",
+      name: "1/\u0393, which is 0 at \u0393's poles",
+      notation: `\\frac{1}{\\Gamma${L("#1")}}`,
+      arity: 1,
+      evaluate: reciprocalGamma,
+      definitions: [
+        `\\Gamma_{r}${L("z")}=\\left\\{z>0:\\frac{1}{${L("z-1")}!},\\frac{${L("-z")}!\\sin${L("\\pi z")}}{\\pi}\\right\\}`
+      ],
+      needs: []
+    },
+    {
+      symbol: "B",
+      name: "the beta function",
+      notation: `B${L("#1,#2")}`,
+      arity: 2,
+      evaluate: beta,
+      definitions: [
+        `B${L("a,b")}=\\frac{\\Gamma${L("a")}\\Gamma${L("b")}}{\\Gamma${L("a+b")}}`
+      ],
+      needs: ["Gamma"]
+    },
+    {
+      symbol: "psi",
+      name: "the digamma function \u03C8 = \u0393\u2032/\u0393",
+      notation: `\\psi${L("#1")}`,
+      arity: 1,
+      evaluate: digamma,
+      definitions: [
+        `\\psi${L("z")}=\\frac{d}{dz}\\ln${L("\\left|\\Gamma\\left(z\\right)\\right|")}`
+      ],
+      needs: ["Gamma"]
+    },
+    {
+      symbol: "zeta",
+      name: "the Riemann zeta function",
+      notation: `\\zeta${L("#1")}`,
+      arity: 1,
+      evaluate: zeta,
+      definitions: [
+        `\\zeta${L("s")}=\\sum_{n=1}^{9}n^{-s}+\\frac{10^{1-s}}{s-1}+\\frac{10^{-s}}{2}+\\frac{s\\cdot10^{-s-1}}{12}-\\frac{s${L("s+1")}${L("s+2")}10^{-s-3}}{720}+\\frac{s${L("s+1")}${L("s+2")}${L("s+3")}${L("s+4")}10^{-s-5}}{30240}-\\frac{s${L("s+1")}${L("s+2")}${L("s+3")}${L("s+4")}${L("s+5")}${L("s+6")}10^{-s-7}}{1209600}`
+      ],
+      needs: [],
+      domain: "s > \u22123, s \u2260 1"
+    },
+    {
+      symbol: "erf",
+      name: "the error function",
+      notation: `\\operatorname{erf}${L("#1")}`,
+      arity: 1,
+      evaluate: erf,
+      definitions: [],
+      needs: []
+    },
+    {
+      symbol: "erfc",
+      name: "the complementary error function",
+      notation: `\\operatorname{erfc}${L("#1")}`,
+      arity: 1,
+      evaluate: erfc,
+      definitions: [
+        `\\operatorname{erfc}${L("z")}=1-\\operatorname{erf}${L("z")}`
+      ],
+      needs: []
+    },
+    {
+      symbol: "erfi",
+      name: "the imaginary error function",
+      notation: `\\operatorname{erfi}${L("#1")}`,
+      arity: 1,
+      evaluate: erfi,
+      definitions: [
+        `\\operatorname{erfi}${L("z")}=\\frac{2}{\\sqrt{\\pi}}\\int_{0}^{z}e^{t^{2}}dt`
+      ],
+      needs: []
+    },
+    {
+      symbol: "Si",
+      name: "the sine integral",
+      notation: `\\operatorname{Si}${L("#1")}`,
+      arity: 1,
+      evaluate: Si,
+      definitions: [
+        `\\operatorname{Si}${L("z")}=\\int_{0}^{z}\\frac{\\sin${L("t")}}{t}dt`
+      ],
+      needs: []
+    },
+    {
+      symbol: "Ci",
+      name: "the cosine integral",
+      notation: `\\operatorname{Ci}${L("#1")}`,
+      arity: 1,
+      evaluate: Ci,
+      definitions: [
+        `\\operatorname{Ci}${L("z")}=${EULER}+\\ln${L("z")}+\\int_{0}^{z}\\frac{\\cos${L("t")}-1}{t}dt`
+      ],
+      needs: [],
+      domain: "z > 0"
+    },
+    {
+      symbol: "Shi",
+      name: "the hyperbolic sine integral",
+      notation: `\\operatorname{Shi}${L("#1")}`,
+      arity: 1,
+      evaluate: Shi,
+      definitions: [
+        `\\operatorname{Shi}${L("z")}=\\int_{0}^{z}\\frac{\\sinh${L("t")}}{t}dt`
+      ],
+      needs: []
+    },
+    {
+      symbol: "Chi",
+      name: "the hyperbolic cosine integral",
+      notation: `\\operatorname{Chi}${L("#1")}`,
+      arity: 1,
+      evaluate: Chi,
+      definitions: [
+        `\\operatorname{Chi}${L("z")}=${EULER}+\\ln${L("z")}+\\int_{0}^{z}\\frac{\\cosh${L("t")}-1}{t}dt`
+      ],
+      needs: [],
+      domain: "z > 0"
+    },
+    {
+      symbol: "Ei",
+      name: "the exponential integral",
+      notation: `\\operatorname{Ei}${L("#1")}`,
+      arity: 1,
+      evaluate: Ei,
+      definitions: [
+        `\\operatorname{Ei}${L("z")}=${EULER}+\\ln${L("\\left|z\\right|")}+\\int_{0}^{z}\\frac{e^{t}-1}{t}dt`
+      ],
+      needs: [],
+      domain: "z \u2260 0"
+    },
+    {
+      symbol: "li",
+      name: "the logarithmic integral",
+      notation: `\\operatorname{li}${L("#1")}`,
+      arity: 1,
+      evaluate: li,
+      definitions: [
+        `\\operatorname{li}${L("z")}=\\operatorname{Ei}${L("\\ln" + L("z"))}`
+      ],
+      needs: ["Ei"],
+      domain: "z > 0, z \u2260 1"
+    },
+    {
+      symbol: "Li_2",
+      name: "the dilogarithm",
+      notation: `\\operatorname{Li}_{2}${L("#1")}`,
+      arity: 1,
+      evaluate: dilog,
+      definitions: [
+        `\\operatorname{Li}_{2}${L("z")}=-\\int_{0}^{z}\\frac{\\ln${L("1-t")}}{t}dt`
+      ],
+      needs: [],
+      domain: "z \u2264 1 (beyond 1 it is complex)"
+    },
+    {
+      symbol: "S",
+      name: "the Fresnel sine integral",
+      notation: `S${L("#1")}`,
+      arity: 1,
+      evaluate: fresnelS,
+      definitions: [
+        `S${L("z")}=\\int_{0}^{z}\\sin${L("\\frac{\\pi t^{2}}{2}")}dt`
+      ],
+      needs: []
+    },
+    {
+      symbol: "C",
+      name: "the Fresnel cosine integral",
+      notation: `C${L("#1")}`,
+      arity: 1,
+      evaluate: fresnelC,
+      definitions: [
+        `C${L("z")}=\\int_{0}^{z}\\cos${L("\\frac{\\pi t^{2}}{2}")}dt`
+      ],
+      needs: []
+    },
+    {
+      symbol: "J",
+      name: "the Bessel function of the first kind",
+      notation: `J${L("#1,#2")}`,
+      arity: 2,
+      evaluate: besselJ,
+      definitions: [
+        `J${L("n,z")}=\\frac{1}{\\pi}\\int_{0}^{\\pi}\\cos${L("nu-z\\sin" + L("u"))}du`
+      ],
+      needs: [],
+      domain: "whole orders n (Bessel's integral); J(n, z) is J_n(z)"
+    },
+    {
+      symbol: "W",
+      name: "the Lambert W function (principal branch)",
+      notation: `W${L("#1")}`,
+      arity: 1,
+      evaluate: lambertW,
+      definitions: [
+        `W${L("z")}=\\frac{1}{\\pi}\\int_{0}^{\\pi}\\ln${L("1+\\frac{z\\sin" + L("u") + "}{u}e^{u\\cot" + L("u") + "}")}du`
+      ],
+      needs: [],
+      domain: "z \u2265 \u22121/e"
+    },
+    {
+      symbol: "K",
+      name: "the complete elliptic integral of the first kind",
+      notation: `K${L("#1")}`,
+      arity: 1,
+      evaluate: ellipticK,
+      definitions: [
+        `K${L("k")}=\\int_{0}^{\\frac{\\pi}{2}}\\frac{1}{\\sqrt{1-k^{2}\\sin^{2}${L("u")}}}du`
+      ],
+      needs: [],
+      domain: "\u22121 < k < 1"
+    },
+    {
+      symbol: "E",
+      name: "the Mittag-Leffler function E_{a,b}",
+      notation: `E${L("#1,#2,#3")}`,
+      arity: 3,
+      evaluate: mittagLeffler,
+      definitions: [
+        `E${L("a,b,z")}=\\sum_{k=0}^{100}z^{k}\\Gamma_{r}${L("ak+b")}`
+      ],
+      needs: ["Gamma_r"],
+      domain: "E(a, b, z) is E_{a,b}(z); |z| up to about 30"
+    }
+  ];
+  var BY_SYMBOL = new Map(SPECIAL_FUNCTIONS.map((f) => [f.symbol, f]));
+  function specialFunction(symbol) {
+    return BY_SYMBOL.get(symbol);
+  }
+  function desmosDefinitions(symbols) {
+    const out = [];
+    const seen = /* @__PURE__ */ new Set();
+    const add8 = (symbol) => {
+      if (seen.has(symbol))
+        return;
+      seen.add(symbol);
+      const f = BY_SYMBOL.get(symbol);
+      if (f === void 0)
+        return;
+      f.needs.forEach(add8);
+      out.push(...f.definitions);
+    };
+    for (const symbol of symbols)
+      add8(symbol);
+    return out;
+  }
+  var CALL_PATTERNS = SPECIAL_FUNCTIONS.map((f) => {
+    const source = f.definitions[0] ?? f.notation;
+    const head = source.slice(0, source.indexOf("\\left("));
+    const literal = head.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
+    return [f.symbol, new RegExp(String.raw`(?<![a-zA-Z_\\])${literal}\\left\(`)];
+  });
+  function specialFunctionsIn(latex) {
+    return CALL_PATTERNS.filter(([, re]) => re.test(latex)).map(([s]) => s);
+  }
+
   // src/symbolic/evaluate.ts
   var FUNCTIONS = {
     sin: Math.sin,
@@ -4791,9 +5224,14 @@ var CalcEngine = (() => {
         return -evaluate(node.arg, bindings);
       case "FunctionCall": {
         const fn = FUNCTIONS[node.callee.symbol];
-        if (fn === void 0 || node.args.length !== 1)
+        if (fn !== void 0 && node.args.length === 1)
+          return fn(evaluate(node.args[0], bindings));
+        const special2 = specialFunction(node.callee.symbol);
+        if (special2 === void 0 || special2.arity !== node.args.length)
           return NaN;
-        return fn(evaluate(node.args[0], bindings));
+        return special2.evaluate(
+          ...node.args.map((arg) => evaluate(arg, bindings))
+        );
       }
       case "Factorial": {
         const value = evaluate(node.arg, bindings);
@@ -5351,7 +5789,7 @@ var CalcEngine = (() => {
     return this.cmp(y) < 1;
   };
   P.logarithm = P.log = function(base2) {
-    var isBase10, d, denominator, k, inf, num, sd, r, arg = this, Ctor = arg.constructor, pr = Ctor.precision, rm = Ctor.rounding, guard = 5;
+    var isBase10, d, denominator, k, inf, num2, sd, r, arg = this, Ctor = arg.constructor, pr = Ctor.precision, rm = Ctor.rounding, guard = 5;
     if (base2 == null) {
       base2 = new Ctor(10);
       isBase10 = true;
@@ -5377,15 +5815,15 @@ var CalcEngine = (() => {
     }
     external = false;
     sd = pr + guard;
-    num = naturalLogarithm(arg, sd);
+    num2 = naturalLogarithm(arg, sd);
     denominator = isBase10 ? getLn10(Ctor, sd + 10) : naturalLogarithm(base2, sd);
-    r = divide2(num, denominator, sd, 1);
+    r = divide2(num2, denominator, sd, 1);
     if (checkRoundingDigits(r.d, k = pr, rm)) {
       do {
         sd += 10;
-        num = naturalLogarithm(arg, sd);
+        num2 = naturalLogarithm(arg, sd);
         denominator = isBase10 ? getLn10(Ctor, sd + 10) : naturalLogarithm(base2, sd);
-        r = divide2(num, denominator, sd, 1);
+        r = divide2(num2, denominator, sd, 1);
         if (!inf) {
           if (+digitsToString(r.d).slice(k + 1, k + 15) + 1 == 1e14) {
             r = finalise(r, pr + 1, 0);
@@ -7401,14 +7839,14 @@ var CalcEngine = (() => {
     };
     return walk(node);
   }
-  function power3(D, base2, exponent) {
-    if (base2.isNaN() || exponent.isNaN())
+  function power3(D, base2, exponent2) {
+    if (base2.isNaN() || exponent2.isNaN())
       return new D(NaN);
-    if (base2.isNegative() && !base2.isZero() && !exponent.isInteger())
+    if (base2.isNegative() && !base2.isZero() && !exponent2.isInteger())
       return new D(NaN);
-    if (base2.isZero() && exponent.isNegative())
+    if (base2.isZero() && exponent2.isNegative())
       return new D(Infinity);
-    return D.pow(base2, exponent);
+    return D.pow(base2, exponent2);
   }
 
   // src/plugins/physics-lab/symbolic/differentiate.ts
@@ -7860,14 +8298,14 @@ var CalcEngine = (() => {
       }
     };
   }
-  function exponentRule(cfg2, node, base2, exponent, variable) {
+  function exponentRule(cfg2, node, base2, exponent2, variable) {
     const baseHas = dependsOn(base2, variable);
-    const exponentHas = dependsOn(exponent, variable);
+    const exponentHas = dependsOn(exponent2, variable);
     if (baseHas && !exponentHas) {
-      const lowered = fold(subtract2(exponent, number3(1)));
-      const outer = multiply2(exponent, power4(base2, lowered));
+      const lowered = fold(subtract2(exponent2, number3(1)));
+      const outer = multiply2(exponent2, power4(base2, lowered));
       if (isVariable(base2, variable)) {
-        const named2 = exponent.type === "Constant" ? `The exponent ${exponent.value} is` : "The exponent is";
+        const named2 = exponent2.type === "Constant" ? `The exponent ${exponent2.value} is` : "The exponent is";
         return {
           derivative: outer,
           step: {
@@ -7909,9 +8347,9 @@ var CalcEngine = (() => {
     }
     if (!baseHas && exponentHas) {
       const isE = base2.type === "Identifier" && base2.symbol === "e";
-      const outer = isE ? power4(base2, exponent) : multiply2(power4(base2, exponent), call2("ln", base2));
+      const outer = isE ? power4(base2, exponent2) : multiply2(power4(base2, exponent2), call2("ln", base2));
       const recognition = `The base is constant and ${variable} is in the exponent, so this is an exponential, not a power.`;
-      if (isVariable(exponent, variable)) {
+      if (isVariable(exponent2, variable)) {
         return {
           derivative: outer,
           step: {
@@ -7928,7 +8366,7 @@ var CalcEngine = (() => {
           }
         };
       }
-      const inner = derive(cfg2, exponent, variable);
+      const inner = derive(cfg2, exponent2, variable);
       return {
         derivative: multiply2(outer, inner.derivative),
         step: {
@@ -7938,9 +8376,9 @@ var CalcEngine = (() => {
           detail: "",
           importance: "major",
           before: node,
-          intermediate: multiply2(outer, pending(exponent, variable)),
+          intermediate: multiply2(outer, pending(exponent2, variable)),
           after: multiply2(outer, inner.derivative),
-          substitutions: [{ symbol: "u", value: exponent }],
+          substitutions: [{ symbol: "u", value: exponent2 }],
           childRoles: ["u"],
           domain: [],
           children: [inner.step]
@@ -7948,10 +8386,10 @@ var CalcEngine = (() => {
       };
     }
     const dBase = derive(cfg2, base2, variable);
-    const dExponent = derive(cfg2, exponent, variable);
+    const dExponent = derive(cfg2, exponent2, variable);
     const built = (dU, dV) => multiply2(
-      power4(base2, exponent),
-      add3(multiply2(dV, call2("ln", base2)), divide3(multiply2(exponent, dU), base2))
+      power4(base2, exponent2),
+      add3(multiply2(dV, call2("ln", base2)), divide3(multiply2(exponent2, dU), base2))
     );
     return {
       derivative: built(dBase.derivative, dExponent.derivative),
@@ -7962,11 +8400,11 @@ var CalcEngine = (() => {
         detail: "Taking logs first turns the power into a product, which the product and chain rules can handle. Do not bring the exponent down: it is not a constant.",
         importance: "major",
         before: node,
-        intermediate: built(pending(base2, variable), pending(exponent, variable)),
+        intermediate: built(pending(base2, variable), pending(exponent2, variable)),
         after: built(dBase.derivative, dExponent.derivative),
         substitutions: [
           { symbol: "u", value: base2 },
-          { symbol: "v", value: exponent }
+          { symbol: "v", value: exponent2 }
         ],
         childRoles: ["u", "v"],
         // The log of the base ends up in the answer whether or not the question
@@ -8163,8 +8601,8 @@ var CalcEngine = (() => {
   function lowerPowers(node) {
     if (node.type !== "BinaryOperator" || node.name !== "Exponent")
       return [];
-    const exponent = fold(node.right);
-    const whole = constantValue(exponent);
+    const exponent2 = fold(node.right);
+    const whole = constantValue(exponent2);
     const out = [];
     const raise2 = (to) => ({
       type: "BinaryOperator",
@@ -8179,19 +8617,19 @@ var CalcEngine = (() => {
       }
       return out;
     }
-    if (exponent.type === "BinaryOperator" && (exponent.name === "Multiply" || exponent.name === "CrossMultiply")) {
-      const factor = constantValue(exponent.left);
+    if (exponent2.type === "BinaryOperator" && (exponent2.name === "Multiply" || exponent2.name === "CrossMultiply")) {
+      const factor = constantValue(exponent2.left);
       if (factor !== void 0 && Number.isInteger(factor) && factor >= 2) {
         for (let d = 1; d < factor; d += 1) {
           if (factor % d !== 0)
             continue;
           out.push(
             raise2(
-              d === 1 ? exponent.right : {
+              d === 1 ? exponent2.right : {
                 type: "BinaryOperator",
                 name: "Multiply",
                 left: number2(d),
-                right: exponent.right
+                right: exponent2.right
               }
             )
           );
@@ -8264,11 +8702,11 @@ var CalcEngine = (() => {
       return void 0;
     const [logarithm3] = logs;
     const [inside] = logarithm3.args;
-    const linear = linearIn(inside, variable);
-    if (linear === void 0)
+    const linear2 = linearIn(inside, variable);
+    if (linear2 === void 0)
       return void 0;
-    const slope = constantValue(fold(linear.a));
-    const intercept = constantValue(fold(linear.b));
+    const slope = constantValue(fold(linear2.a));
+    const intercept = constantValue(fold(linear2.b));
     if (slope === void 0 || slope === 0 || intercept === void 0)
       return void 0;
     const name = freshName(node, ["u", "w", "s", "v"]);
@@ -8316,10 +8754,10 @@ var CalcEngine = (() => {
     const [angle] = first.args;
     if (!calls.every((call4) => sameTree(call4.args[0], angle)))
       return void 0;
-    const linear = linearIn(angle, variable);
-    if (linear === void 0)
+    const linear2 = linearIn(angle, variable);
+    if (linear2 === void 0)
       return void 0;
-    const slope = constantValue(fold(linear.a));
+    const slope = constantValue(fold(linear2.a));
     if (slope === void 0 || slope === 0)
       return void 0;
     const name = freshName(node, ["t", "w", "s", "u"]);
@@ -8442,8 +8880,8 @@ var CalcEngine = (() => {
       if (base2 !== void 0 && !sameTree(base2, child.left))
         usable = false;
       base2 ??= child.left;
-      const linear = linearIn(child.right, variable);
-      const slope = linear && rationalOf(fold(linear.a));
+      const linear2 = linearIn(child.right, variable);
+      const slope = linear2 && rationalOf(fold(linear2.a));
       if (slope === void 0 || slope.n === 0)
         usable = false;
       else
@@ -8461,14 +8899,14 @@ var CalcEngine = (() => {
     const u = id3(name);
     const walk = (n) => {
       if (n.type === "BinaryOperator" && n.name === "Exponent" && !dependsOn(n.left, variable) && dependsOn(n.right, variable)) {
-        const linear = linearIn(n.right, variable);
-        const slope = linear && rationalOf(fold(linear.a));
-        if (linear === void 0 || slope === void 0)
+        const linear2 = linearIn(n.right, variable);
+        const slope = linear2 && rationalOf(fold(linear2.a));
+        if (linear2 === void 0 || slope === void 0)
           return n;
         const ratio2 = { n: slope.n * k.d, d: slope.d * k.n };
         const g = gcd(ratio2.n, ratio2.d);
-        const exponent = rationalNode({ n: ratio2.n / g, d: ratio2.d / g });
-        return multiply(power2(n.left, linear.b), power2(u, exponent));
+        const exponent2 = rationalNode({ n: ratio2.n / g, d: ratio2.d / g });
+        return multiply(power2(n.left, linear2.b), power2(u, exponent2));
       }
       switch (n.type) {
         case "Negative":
@@ -8527,15 +8965,15 @@ var CalcEngine = (() => {
     const sec = call("sec", argument);
     const csc = call("csc", argument);
     const cot = call("cot", argument);
-    const scaled = (inner) => fold(multiply(multiply(coefficient, rest), inner));
+    const scaled2 = (inner) => fold(multiply(multiply(coefficient, rest), inner));
     const one2 = number2(1);
     if (p === 1 && q === 1) {
-      return scaled(
+      return scaled2(
         divide(call("sin", multiply(number2(2), argument)), number2(2))
       );
     }
     if (q === -p && p >= 2) {
-      return scaled(
+      return scaled2(
         subtract(
           multiply(power2(tan2, number2(p - 2)), power2(sec, number2(2))),
           power2(tan2, number2(p - 2))
@@ -8543,7 +8981,7 @@ var CalcEngine = (() => {
       );
     }
     if (p === -q && q >= 2) {
-      return scaled(
+      return scaled2(
         subtract(
           multiply(power2(cot, number2(q - 2)), power2(csc, number2(2))),
           power2(cot, number2(q - 2))
@@ -8551,7 +8989,7 @@ var CalcEngine = (() => {
       );
     }
     if (p > 0 && p % 2 === 1) {
-      return scaled(
+      return scaled2(
         multiply(
           multiply(
             power2(subtract(one2, power2(cos2, number2(2))), number2((p - 1) / 2)),
@@ -8562,7 +9000,7 @@ var CalcEngine = (() => {
       );
     }
     if (q > 0 && q % 2 === 1) {
-      return scaled(
+      return scaled2(
         multiply(
           multiply(
             power2(subtract(one2, power2(sin2, number2(2))), number2((q - 1) / 2)),
@@ -8574,7 +9012,7 @@ var CalcEngine = (() => {
     }
     if (p >= 0 && p % 2 === 0 && p + q <= -2 && (p + q) % 2 === 0) {
       const spare = (-(p + q) - 2) / 2;
-      return scaled(
+      return scaled2(
         multiply(
           multiply(
             power2(tan2, number2(p)),
@@ -8586,7 +9024,7 @@ var CalcEngine = (() => {
     }
     if (q >= 0 && q % 2 === 0 && p + q <= -2 && (p + q) % 2 === 0) {
       const spare = (-(p + q) - 2) / 2;
-      return scaled(
+      return scaled2(
         multiply(
           multiply(
             power2(cot, number2(q)),
@@ -8597,16 +9035,16 @@ var CalcEngine = (() => {
       );
     }
     if (p > 0 && p % 2 === 0 && q < 0 && Math.abs(q % 2) === 1) {
-      return scaled(binomialInReciprocal(p / 2, -q, sec));
+      return scaled2(binomialInReciprocal(p / 2, -q, sec));
     }
     if (q > 0 && q % 2 === 0 && p < 0 && Math.abs(p % 2) === 1) {
-      return scaled(binomialInReciprocal(q / 2, -p, csc));
+      return scaled2(binomialInReciprocal(q / 2, -p, csc));
     }
     if (p >= 0 && q >= 0 && p % 2 === 0 && q % 2 === 0 && p + q >= 2) {
       const doubled = call("cos", multiply(number2(2), argument));
       const sinSquared = divide(subtract(one2, doubled), number2(2));
       const cosSquared = divide(add(one2, doubled), number2(2));
-      return scaled(
+      return scaled2(
         multiply(
           power2(sinSquared, number2(p / 2)),
           power2(cosSquared, number2(q / 2))
@@ -8629,10 +9067,10 @@ var CalcEngine = (() => {
     const n = secant ? -q : -p;
     if (n > MAX_POWER2)
       return void 0;
-    const linear = linearIn(argument, variable);
-    if (linear === void 0)
+    const linear2 = linearIn(argument, variable);
+    if (linear2 === void 0)
       return void 0;
-    const slope = fold(linear.a);
+    const slope = fold(linear2.a);
     if (constantValue(slope) === 0)
       return void 0;
     const scale = fold(multiply(coefficient, rest));
@@ -8692,9 +9130,9 @@ var CalcEngine = (() => {
         argument = inside;
       else if (!sameTree(argument, inside))
         return void 0;
-      const exponent = (inNumerator ? 1 : -1) * rawExponent;
-      p += spelling.p * exponent;
-      q += spelling.q * exponent;
+      const exponent2 = (inNumerator ? 1 : -1) * rawExponent;
+      p += spelling.p * exponent2;
+      q += spelling.q * exponent2;
       found = true;
     }
     if (!found || argument === void 0)
@@ -8758,9 +9196,9 @@ var CalcEngine = (() => {
       return number2(value);
     let denominator = 1;
     for (; denominator <= 1e4; denominator += 1) {
-      const scaled = value * denominator;
-      if (Math.abs(scaled - Math.round(scaled)) < 1e-9)
-        return divide(number2(Math.round(scaled)), number2(denominator));
+      const scaled2 = value * denominator;
+      if (Math.abs(scaled2 - Math.round(scaled2)) < 1e-9)
+        return divide(number2(Math.round(scaled2)), number2(denominator));
     }
     return number2(value);
   }
@@ -8917,12 +9355,12 @@ var CalcEngine = (() => {
       whole -= 1n;
     return { whole, frac: subtract3(q, rational(whole)) };
   }
-  function pow2(base2, exponent) {
-    if (exponent < 0n)
-      return pow2(divide5(ONE, base2), -exponent);
+  function pow2(base2, exponent2) {
+    if (exponent2 < 0n)
+      return pow2(divide5(ONE, base2), -exponent2);
     let result = ONE;
     let acc = base2;
-    for (let e = exponent; e > 0n; e >>= 1n) {
+    for (let e = exponent2; e > 0n; e >>= 1n) {
       if (e & 1n)
         result = multiply3(result, acc);
       acc = multiply3(acc, acc);
@@ -8949,6 +9387,13 @@ var CalcEngine = (() => {
     const scale = 10n ** BigInt(decimals.length);
     const magnitude = BigInt(whole) * scale + BigInt(decimals || "0");
     return rational(sign3 === "-" ? -magnitude : magnitude, scale);
+  }
+  function toLatex2(q) {
+    if (isInteger(q))
+      return String(q.n);
+    const sign3 = q.n < 0n ? "-" : "";
+    const magnitude = q.n < 0n ? -q.n : q.n;
+    return `${sign3}\\frac{${magnitude}}{${q.d}}`;
   }
 
   // src/plugins/physics-lab/symbolic/field.ts
@@ -9545,9 +9990,9 @@ var CalcEngine = (() => {
       const G = field;
       const k = G.of(shift);
       const shifted = pairs.map(
-        ([alpha, beta]) => [
+        ([alpha, beta2]) => [
           G.add(alpha, G.multiply(G.of(rational(2n)), k)),
-          G.add(G.add(beta, G.multiply(alpha, k)), G.multiply(k, k))
+          G.add(G.add(beta2, G.multiply(alpha, k)), G.multiply(k, k))
         ]
       );
       return { field, pairs: shifted };
@@ -9827,8 +10272,8 @@ var CalcEngine = (() => {
   function integrateFactored(factored, top, bottom, variable) {
     const { field: F, leading } = factored;
     const monic2 = lift(F, bottom).map((value) => F.divide(value, leading));
-    const scaled = lift(F, top).map((value) => F.divide(value, leading));
-    const pieces = decompose(F, scaled, factored.factors, monic2);
+    const scaled2 = lift(F, top).map((value) => F.divide(value, leading));
+    const pieces = decompose(F, scaled2, factored.factors, monic2);
     if (pieces === void 0)
       return void 0;
     let total;
@@ -9858,10 +10303,10 @@ var CalcEngine = (() => {
   }
   function linearNode(F, slope, intercept, variable) {
     const x = id3(variable);
-    const scaled = F.equals(slope, F.one) ? x : multiply(F.toNode(slope), x);
+    const scaled2 = F.equals(slope, F.one) ? x : multiply(F.toNode(slope), x);
     if (F.isZero(intercept))
-      return scaled;
-    return F.sign(intercept) < 0 ? subtract(scaled, F.toNode(F.negate(intercept))) : add(scaled, F.toNode(intercept));
+      return scaled2;
+    return F.sign(intercept) < 0 ? subtract(scaled2, F.toNode(F.negate(intercept))) : add(scaled2, F.toNode(intercept));
   }
   function quadraticNode(F, b, c, variable) {
     const x = id3(variable);
@@ -10055,8 +10500,8 @@ var CalcEngine = (() => {
       if (child.type !== "BinaryOperator" || child.name !== "Exponent")
         return child;
       const base2 = child.left;
-      const exponent = constantValue(child.right);
-      if (exponent === void 0 || !Number.isInteger(exponent) || base2.type !== "BinaryOperator" || base2.name !== "Multiply" && base2.name !== "CrossMultiply") {
+      const exponent2 = constantValue(child.right);
+      if (exponent2 === void 0 || !Number.isInteger(exponent2) || base2.type !== "BinaryOperator" || base2.name !== "Multiply" && base2.name !== "CrossMultiply") {
         return child;
       }
       return multiply(
@@ -10069,11 +10514,11 @@ var CalcEngine = (() => {
     return mapTree2(node, (child) => {
       if (child.type !== "BinaryOperator" || child.name !== "Exponent")
         return child;
-      const exponent = fold(child.right);
-      if (exponent.type !== "BinaryOperator" || exponent.name !== "Divide" || constantValue(exponent.right) !== 2) {
+      const exponent2 = fold(child.right);
+      if (exponent2.type !== "BinaryOperator" || exponent2.name !== "Divide" || constantValue(exponent2.right) !== 2) {
         return child;
       }
-      const top = constantValue(exponent.left);
+      const top = constantValue(exponent2.left);
       if (top === void 0 || !Number.isInteger(top) || Math.abs(top) % 2 !== 1)
         return child;
       return {
@@ -10118,8 +10563,8 @@ var CalcEngine = (() => {
       return node.args[0];
     }
     if (node.type === "BinaryOperator" && node.name === "Exponent") {
-      const exponent = fold(node.right);
-      if (exponent.type === "BinaryOperator" && exponent.name === "Divide" && constantValue(exponent.left) === 1 && constantValue(exponent.right) === 2) {
+      const exponent2 = fold(node.right);
+      if (exponent2.type === "BinaryOperator" && exponent2.name === "Divide" && constantValue(exponent2.left) === 1 && constantValue(exponent2.right) === 2) {
         return node.left;
       }
     }
@@ -10286,11 +10731,11 @@ var CalcEngine = (() => {
   }
   function inverseOf(base2, variable) {
     const undoLinear = (inside) => {
-      const linear = linearIn(inside, variable);
-      if (linear === void 0)
+      const linear2 = linearIn(inside, variable);
+      if (linear2 === void 0)
         return void 0;
-      const slope = constantValue(fold(linear.a));
-      const intercept = constantValue(fold(linear.b));
+      const slope = constantValue(fold(linear2.a));
+      const intercept = constantValue(fold(linear2.b));
       if (slope === void 0 || slope === 0 || intercept === void 0)
         return void 0;
       return (value) => divide(subtract(value, number2(intercept)), number2(slope));
@@ -10337,12 +10782,12 @@ var CalcEngine = (() => {
     }
     if (node.type !== "BinaryOperator" || node.name !== "Exponent")
       return void 0;
-    const exponent = fold(node.right);
-    if (exponent.type !== "BinaryOperator" || exponent.name !== "Divide") {
+    const exponent2 = fold(node.right);
+    if (exponent2.type !== "BinaryOperator" || exponent2.name !== "Divide") {
       return void 0;
     }
-    const numerator = constantValue(exponent.left);
-    const index = constantValue(exponent.right);
+    const numerator = constantValue(exponent2.left);
+    const index = constantValue(exponent2.right);
     if (numerator === void 0 || index === void 0 || !Number.isInteger(numerator) || !Number.isInteger(index) || index < 2 || numerator === 0) {
       return void 0;
     }
@@ -10443,10 +10888,10 @@ var CalcEngine = (() => {
     return all.filter((factor) => dependsOn(factor.node, variable));
   }
   function isLinear(node, variable) {
-    const linear = linearIn(node, variable);
-    if (linear === void 0)
+    const linear2 = linearIn(node, variable);
+    if (linear2 === void 0)
       return false;
-    const slope = constantValue(fold(linear.a));
+    const slope = constantValue(fold(linear2.a));
     return slope !== void 0 ? slope !== 0 : dependsOn(node, variable);
   }
   function quadratic(node, variable) {
@@ -10505,8 +10950,8 @@ var CalcEngine = (() => {
     const bottom = factors.find((factor) => !factor.inNumerator);
     if (top === void 0 || bottom === void 0)
       return void 0;
-    const exponent = exponentOf(top.node);
-    if (exponent === void 0 || !isLinear(exponent, variable))
+    const exponent2 = exponentOf(top.node);
+    if (exponent2 === void 0 || !isLinear(exponent2, variable))
       return void 0;
     if (linearPower(bottom.node, variable) === void 0)
       return void 0;
@@ -10559,11 +11004,11 @@ var CalcEngine = (() => {
     for (const factor of factors) {
       if (!factor.inNumerator)
         return void 0;
-      const exponent = exponentOf(factor.node);
-      if (exponent !== void 0) {
+      const exponent2 = exponentOf(factor.node);
+      if (exponent2 !== void 0) {
         if (sign3 !== void 0)
           return void 0;
-        const q = quadratic(exponent, variable);
+        const q = quadratic(exponent2, variable);
         if (q === void 0)
           return void 0;
         sign3 = Math.sign(q[2]);
@@ -10618,9 +11063,9 @@ var CalcEngine = (() => {
       const sum3 = bottom[0].node;
       if (m !== void 0 && m >= 1 && sum3.type === "BinaryOperator" && (sum3.name === "Add" || sum3.name === "Subtract")) {
         const [expPart, constPart] = dependsOn(sum3.left, variable) ? [sum3.left, sum3.right] : [sum3.right, sum3.left];
-        const exponent = exponentOf(expPart);
+        const exponent2 = exponentOf(expPart);
         const c = constantValue(fold(constPart));
-        if (exponent !== void 0 && isLinear(exponent, variable) && c !== void 0 && c !== 0) {
+        if (exponent2 !== void 0 && isLinear(exponent2, variable) && c !== void 0 && c !== 0) {
           return named("Li2");
         }
       }
@@ -10655,21 +11100,21 @@ var CalcEngine = (() => {
         continue;
       }
       let base2 = node;
-      let exponent = ONE;
+      let exponent2 = ONE;
       if (node.type === "FunctionCall" && node.callee.symbol === "sqrt") {
         if (node.args.length !== 1)
           return void 0;
         [base2] = node.args;
-        exponent = rational(1n, 2n);
+        exponent2 = rational(1n, 2n);
       } else if (node.type === "BinaryOperator" && node.name === "Exponent") {
         const e = exactRational(node.right);
         if (e === void 0)
           return void 0;
         base2 = node.left;
-        exponent = e;
+        exponent2 = e;
       }
       if (base2.type === "Identifier" && base2.symbol === variable) {
-        m = add4(m, multiply3(sign3, exponent));
+        m = add4(m, multiply3(sign3, exponent2));
         continue;
       }
       if (found !== void 0)
@@ -10677,7 +11122,7 @@ var CalcEngine = (() => {
       const n = binomialPower(base2, variable);
       if (n === void 0)
         return void 0;
-      found = { n, p: multiply3(sign3, exponent) };
+      found = { n, p: multiply3(sign3, exponent2) };
     }
     if (found === void 0)
       return void 0;
@@ -10701,14 +11146,14 @@ var CalcEngine = (() => {
         continue;
       if (n !== void 0)
         return void 0;
-      let power9;
+      let power8;
       if (node.type === "Identifier" && node.symbol === variable)
-        power9 = ONE;
+        power8 = ONE;
       else if (node.type === "BinaryOperator" && node.name === "Exponent" && node.left.type === "Identifier" && node.left.symbol === variable)
-        power9 = exactRational(node.right);
-      if (power9 === void 0)
+        power8 = exactRational(node.right);
+      if (power8 === void 0)
         return void 0;
-      n = inNumerator ? power9 : negate(power9);
+      n = inNumerator ? power8 : negate(power8);
     }
     return n === void 0 || isZero(n) ? void 0 : n;
   }
@@ -10795,8 +11240,8 @@ var CalcEngine = (() => {
       factors.forEach((factor, index) => {
         if (!factor.inNumerator)
           return;
-        const exponent2 = exponentOf2(factor.node);
-        if (exponent2 === void 0 || !dependsOn(exponent2, variable))
+        const exponent3 = exponentOf2(factor.node);
+        if (exponent3 === void 0 || !dependsOn(exponent3, variable))
           return;
         if (found >= 0)
           found = -2;
@@ -10805,13 +11250,13 @@ var CalcEngine = (() => {
       });
       if (found < 0)
         return void 0;
-      const exponent = exponentOf2(factors[found].node);
-      if (exponent === void 0)
+      const exponent2 = exponentOf2(factors[found].node);
+      if (exponent2 === void 0)
         return void 0;
       if (g === void 0) {
-        g = fold(exponent);
+        g = fold(exponent2);
         exponential3 = factors[found].node;
-      } else if (!sameTree(fold(exponent), g)) {
+      } else if (!sameTree(fold(exponent2), g)) {
         return void 0;
       }
       const rest = factors.reduce(
@@ -10974,12 +11419,12 @@ var CalcEngine = (() => {
       }
       if (!inNumerator)
         return void 0;
-      const exponent = factor.type === "BinaryOperator" && factor.name === "Exponent" && factor.left.type === "Identifier" && factor.left.symbol === "e" ? factor.right : factor.type === "FunctionCall" && factor.callee.symbol === "exp" && factor.args.length === 1 ? factor.args[0] : void 0;
-      if (exponent !== void 0) {
+      const exponent2 = factor.type === "BinaryOperator" && factor.name === "Exponent" && factor.left.type === "Identifier" && factor.left.symbol === "e" ? factor.right : factor.type === "FunctionCall" && factor.callee.symbol === "exp" && factor.args.length === 1 ? factor.args[0] : void 0;
+      if (exponent2 !== void 0) {
         if (exponential3 !== void 0)
           return void 0;
-        const linear = linearIn(exponent, variable);
-        const slope = linear === void 0 ? void 0 : exactOf(linear.a);
+        const linear2 = linearIn(exponent2, variable);
+        const slope = linear2 === void 0 ? void 0 : exactOf(linear2.a);
         if (slope === void 0 || isZero(slope))
           return void 0;
         exponential3 = factor;
@@ -10989,8 +11434,8 @@ var CalcEngine = (() => {
       if (factor.type === "FunctionCall" && (factor.callee.symbol === "sin" || factor.callee.symbol === "cos") && factor.args.length === 1) {
         if (wave !== void 0)
           return void 0;
-        const linear = linearIn(factor.args[0], variable);
-        const slope = linear === void 0 ? void 0 : exactOf(linear.a);
+        const linear2 = linearIn(factor.args[0], variable);
+        const slope = linear2 === void 0 ? void 0 : exactOf(linear2.a);
         if (slope === void 0 || isZero(slope))
           return void 0;
         wave = { name: factor.callee.symbol, argument: factor.args[0], b: slope };
@@ -11042,13 +11487,13 @@ var CalcEngine = (() => {
     for (const c of [...U, ...V])
       common = common / gcd5(common, c.d) * c.d;
     const scale = rational(common);
-    const scaled = (p) => p.map((c) => multiply3(c, scale));
+    const scaled2 = (p) => p.map((c) => multiply3(c, scale));
     const cosTerm = multiply(
-      polyNode(scaled(U), variable),
+      polyNode(scaled2(U), variable),
       callOf("cos", wave.argument)
     );
     const sinTerm = multiply(
-      polyNode(scaled(V), variable),
+      polyNode(scaled2(V), variable),
       callOf("sin", wave.argument)
     );
     const inside = subtractOrAdd(cosTerm, sinTerm);
@@ -11330,8 +11775,8 @@ var CalcEngine = (() => {
     const quartic = asQPoly(root2.node.args[0], variable);
     if (numerator === void 0 || plus === void 0 || quartic === void 0)
       return void 0;
-    const shape = (p) => p.length === 3 && isZero(p[1]) && isOne(p[2]);
-    if (!shape(numerator) || !shape(plus))
+    const shape2 = (p) => p.length === 3 && isZero(p[1]) && isOne(p[2]);
+    if (!shape2(numerator) || !shape2(plus))
       return void 0;
     const [c] = plus;
     if (!equals(numerator[0], negate(c)) || !(c.n > 0n))
@@ -11362,11 +11807,11 @@ var CalcEngine = (() => {
     );
     if (index < 0)
       return void 0;
-    const exponent = factors[index].node;
-    if (exponent.type !== "BinaryOperator")
+    const exponent2 = factors[index].node;
+    if (exponent2.type !== "BinaryOperator")
       return void 0;
-    const rate = evaluate(exponent.right, { [variable]: 1 });
-    const at0 = evaluate(exponent.right, { [variable]: 0 });
+    const rate = evaluate(exponent2.right, { [variable]: 1 });
+    const at0 = evaluate(exponent2.right, { [variable]: 0 });
     if (!Number.isFinite(rate) || at0 !== 0 || rate === 0)
       return void 0;
     const q = fromNumber(rate);
@@ -11595,7 +12040,7 @@ var CalcEngine = (() => {
     )
   };
   var square3 = (node) => power2(node, number2(2));
-  function integrate(node, variable) {
+  function integrate2(node, variable) {
     return integrateWithMethod(node, variable).value;
   }
   function integrateWithMethod(node, variable) {
@@ -12106,7 +12551,7 @@ var CalcEngine = (() => {
       return void 0;
     const call0 = marked[0].node;
     const [u] = call0.args;
-    const linear = linearIn(u, variable);
+    const linear2 = linearIn(u, variable);
     let otherBars = false;
     visit(node, (child) => {
       if (child !== call0 && child.type === "FunctionCall" && (child.callee.symbol === "abs" || child.callee.symbol === "sign") && dependsOn(child, variable))
@@ -12114,14 +12559,14 @@ var CalcEngine = (() => {
     });
     if (otherBars)
       return void 0;
-    if (linear === void 0)
+    if (linear2 === void 0)
       return call0.callee.symbol === "abs" ? byExactSignChanges(node, call0, variable, depth2) : void 0;
     const smooth = replaceSubtree(
       node,
       call0,
       call0.callee.symbol === "abs" ? u : number2(1)
     );
-    const root2 = fold(divide(negative2(linear.b), linear.a));
+    const root2 = fold(divide(negative2(linear2.b), linear2.a));
     if (!Number.isFinite(evaluate(root2, {})))
       return void 0;
     try {
@@ -12134,7 +12579,7 @@ var CalcEngine = (() => {
           );
         const piece = fold(subtract(G, atRoot));
         const signed = fold(multiply(call("sign", u), piece));
-        const quotient = dividedByLinear(piece, linear, variable);
+        const quotient = dividedByLinear(piece, linear2, variable);
         if (quotient === void 0)
           return signed;
         return fold(multiply(call("abs", u), quotient));
@@ -12191,10 +12636,10 @@ var CalcEngine = (() => {
       return void 0;
     }
   }
-  function dividedByLinear(piece, linear, variable) {
+  function dividedByLinear(piece, linear2, variable) {
     const coefficients = coefficientsIn(fold(expand(piece).node), variable, 12);
-    const a = rationalOf(fold(linear.a));
-    const b = rationalOf(fold(linear.b));
+    const a = rationalOf(fold(linear2.a));
+    const b = rationalOf(fold(linear2.b));
     if (coefficients === void 0 || a === void 0 || b === void 0)
       return void 0;
     const q = coefficients.map((c) => rationalOf(fold(c)));
@@ -12480,15 +12925,15 @@ var CalcEngine = (() => {
         );
         if (root2 !== void 0)
           return root2;
-        const linear = linearIn(right, variable);
-        if (linear === void 0) {
+        const linear2 = linearIn(right, variable);
+        if (linear2 === void 0) {
           throw new IntegrationError(
             "Only a denominator that is linear in the variable can be integrated here."
           );
         }
         return recorded(
           TECHNIQUES.table,
-          () => divide(multiply(left, call("ln", call("abs", right))), linear.a)
+          () => divide(multiply(left, call("ln", call("abs", right))), linear2.a)
         );
       }
       case "Exponent":
@@ -12524,21 +12969,21 @@ var CalcEngine = (() => {
     if (name !== "sec" && name !== "csc")
       return void 0;
     const [argument] = base2.args;
-    const linear = linearIn(argument, variable);
-    if (linear === void 0 || isZeroConstant(linear.a))
+    const linear2 = linearIn(argument, variable);
+    if (linear2 === void 0 || isZeroConstant(linear2.a))
       return void 0;
     if (name === "sec") {
       const inner2 = add(
         multiply(call("sec", argument), call("tan", argument)),
         call("ln", call("abs", add(call("sec", argument), call("tan", argument))))
       );
-      return divide(inner2, multiply(number2(2), linear.a));
+      return divide(inner2, multiply(number2(2), linear2.a));
     }
     const inner = add(
       multiply(call("csc", argument), call("cot", argument)),
       call("ln", call("abs", add(call("csc", argument), call("cot", argument))))
     );
-    return negative2(divide(inner, multiply(number2(2), linear.a)));
+    return negative2(divide(inner, multiply(number2(2), linear2.a)));
   }
   function exponentialTimesWave(left, right, variable) {
     const pair = (first, second) => {
@@ -12571,13 +13016,13 @@ var CalcEngine = (() => {
     );
   }
   function asExponential(node, variable) {
-    const exponent = node.type === "FunctionCall" && node.callee.symbol === "exp" && node.args.length === 1 ? node.args[0] : node.type === "BinaryOperator" && node.name === "Exponent" && node.left.type === "Identifier" && node.left.symbol === "e" ? node.right : void 0;
-    if (exponent === void 0)
+    const exponent2 = node.type === "FunctionCall" && node.callee.symbol === "exp" && node.args.length === 1 ? node.args[0] : node.type === "BinaryOperator" && node.name === "Exponent" && node.left.type === "Identifier" && node.left.symbol === "e" ? node.right : void 0;
+    if (exponent2 === void 0)
       return void 0;
-    const linear = linearIn(exponent, variable);
-    if (linear === void 0 || isZeroConstant(linear.a))
+    const linear2 = linearIn(exponent2, variable);
+    if (linear2 === void 0 || isZeroConstant(linear2.a))
       return void 0;
-    return { node, rate: linear.a };
+    return { node, rate: linear2.a };
   }
   function asWave2(node, variable) {
     if (node.type !== "FunctionCall" || node.args.length !== 1)
@@ -12585,10 +13030,10 @@ var CalcEngine = (() => {
     const name = node.callee.symbol;
     if (name !== "sin" && name !== "cos")
       return void 0;
-    const linear = linearIn(node.args[0], variable);
-    if (linear === void 0 || isZeroConstant(linear.a))
+    const linear2 = linearIn(node.args[0], variable);
+    if (linear2 === void 0 || isZeroConstant(linear2.a))
       return void 0;
-    return { name, argument: node.args[0], rate: linear.a };
+    return { name, argument: node.args[0], rate: linear2.a };
   }
   var MAX_PARTS_DEGREE = 8;
   function byParts(left, right, variable, depth2) {
@@ -12714,8 +13159,8 @@ var CalcEngine = (() => {
       if (child.type === "FunctionCall" && child.callee.symbol === "sqrt" && child.args.length === 1 && nonlinear(child.args[0]))
         found = true;
       if (child.type === "BinaryOperator" && child.name === "Exponent") {
-        const exponent = constantValue(fold(child.right));
-        if (exponent !== void 0 && !Number.isInteger(exponent) && nonlinear(child.left))
+        const exponent2 = constantValue(fold(child.right));
+        if (exponent2 !== void 0 && !Number.isInteger(exponent2) && nonlinear(child.left))
           found = true;
       }
     });
@@ -12753,11 +13198,11 @@ var CalcEngine = (() => {
       const { coefficient } = splitRationalCoefficient(value);
       common = common === 0 ? coefficient.d : lcmOf(common, coefficient.d);
     }
-    const scaled = common > 1 ? rest.map(({ value, negated }) => ({
+    const scaled2 = common > 1 ? rest.map(({ value, negated }) => ({
       value: fold(multiply(number2(common), value)),
       negated
     })) : rest;
-    const inside = multiply(candidate.node, tidySums(rebuildSum(scaled)));
+    const inside = multiply(candidate.node, tidySums(rebuildSum(scaled2)));
     return fold(common > 1 ? divide(inside, number2(common)) : inside);
   }
   function lcmOf(a, b) {
@@ -12827,8 +13272,8 @@ var CalcEngine = (() => {
     if (node.type === "FunctionCall")
       return INVERSE_OR_LOG.has(node.callee.symbol);
     if (node.type === "BinaryOperator" && node.name === "Exponent") {
-      const exponent = constantValue(fold(node.right));
-      return exponent !== void 0 && Number.isInteger(exponent) && exponent >= 1 && isInverseOrLog(node.left);
+      const exponent2 = constantValue(fold(node.right));
+      return exponent2 !== void 0 && Number.isInteger(exponent2) && exponent2 >= 1 && isInverseOrLog(node.left);
     }
     return false;
   }
@@ -12919,27 +13364,27 @@ var CalcEngine = (() => {
     if (Number.isInteger(value))
       return number2(value);
     for (let denominator = 1; denominator <= 1e4; denominator += 1) {
-      const scaled = value * denominator;
-      if (Math.abs(scaled - Math.round(scaled)) < 1e-9)
-        return divide(number2(Math.round(scaled)), number2(denominator));
+      const scaled2 = value * denominator;
+      if (Math.abs(scaled2 - Math.round(scaled2)) < 1e-9)
+        return divide(number2(Math.round(scaled2)), number2(denominator));
     }
     return number2(value);
   }
-  function trigPowerIntegral(base2, exponent, variable, depth2) {
-    if (exponent.type !== "Constant")
+  function trigPowerIntegral(base2, exponent2, variable, depth2) {
+    if (exponent2.type !== "Constant")
       return void 0;
-    if (exponent.value === 3)
+    if (exponent2.value === 3)
       return oddSecantCube(base2, variable);
-    if (exponent.value !== 2)
+    if (exponent2.value !== 2)
       return void 0;
     if (base2.type !== "FunctionCall" || base2.args.length !== 1)
       return void 0;
     const name = base2.callee.symbol;
     const [argument] = base2.args;
-    const linear = linearIn(argument, variable);
-    if (linear === void 0 || isZeroConstant(linear.a))
+    const linear2 = linearIn(argument, variable);
+    if (linear2 === void 0 || isZeroConstant(linear2.a))
       return void 0;
-    const over = (node) => divide(node, linear.a);
+    const over = (node) => divide(node, linear2.a);
     const x = id3(variable);
     switch (name) {
       case "sec":
@@ -12962,14 +13407,14 @@ var CalcEngine = (() => {
       case "cosh": {
         const doubled = call("sinh", multiply(number2(2), argument));
         const half = divide(x, number2(2));
-        const wave = divide(doubled, multiply(number2(4), linear.a));
+        const wave = divide(doubled, multiply(number2(4), linear2.a));
         return name === "sinh" ? subtract(wave, half) : add(wave, half);
       }
       case "sin":
       case "cos": {
         const doubled = call("sin", multiply(number2(2), argument));
         const half = divide(x, number2(2));
-        const wave = divide(doubled, multiply(number2(4), linear.a));
+        const wave = divide(doubled, multiply(number2(4), linear2.a));
         return name === "sin" ? subtract(half, wave) : add(half, wave);
       }
       default:
@@ -12999,10 +13444,10 @@ var CalcEngine = (() => {
           case "Exponent": {
             if (node.right.type !== "Constant")
               return void 0;
-            const exponent = node.right.value;
-            if (!Number.isInteger(exponent) || exponent < 0)
+            const exponent2 = node.right.value;
+            if (!Number.isInteger(exponent2) || exponent2 < 0)
               return void 0;
-            return left === void 0 ? void 0 : left * exponent;
+            return left === void 0 ? void 0 : left * exponent2;
           }
         }
         return void 0;
@@ -13112,11 +13557,11 @@ var CalcEngine = (() => {
           case "Exponent": {
             if (right.type !== "Constant")
               return void 0;
-            const power9 = right.value;
-            if (!Number.isInteger(power9) || power9 < 0 || power9 > maxDegree)
+            const power8 = right.value;
+            if (!Number.isInteger(power8) || power8 < 0 || power8 > maxDegree)
               return void 0;
             let out = [number2(1)];
-            for (let i = 0; i < power9; i++) {
+            for (let i = 0; i < power8; i++) {
               const next = coefficientsIn(
                 binop2("Multiply", rebuild(out, variable), left),
                 variable,
@@ -13145,23 +13590,23 @@ var CalcEngine = (() => {
     const simplified = fold(node);
     return simplified.type === "Constant" && simplified.value === 0;
   }
-  function exponentIntegral(base2, exponent, variable, depth2) {
+  function exponentIntegral(base2, exponent2, variable, depth2) {
     const baseHas = dependsOn(base2, variable);
-    const exponentHas = dependsOn(exponent, variable);
+    const exponentHas = dependsOn(exponent2, variable);
     const trigonometric = record(
-      exponent.type === "Constant" && exponent.value === 3 ? TECHNIQUES.reduction : TECHNIQUES.table,
-      () => trigPowerIntegral(base2, exponent, variable, depth2)
+      exponent2.type === "Constant" && exponent2.value === 3 ? TECHNIQUES.reduction : TECHNIQUES.table,
+      () => trigPowerIntegral(base2, exponent2, variable, depth2)
     );
     if (trigonometric !== void 0)
       return trigonometric;
     if (baseHas && !exponentHas) {
-      const linear = linearIn(base2, variable);
-      if (linear === void 0) {
+      const linear2 = linearIn(base2, variable);
+      if (linear2 === void 0) {
         throw new IntegrationError(
           "Only a power of an expression linear in the variable can be integrated here."
         );
       }
-      const rational2 = rationalOf(exponent);
+      const rational2 = rationalOf(exponent2);
       if (rational2 === void 0) {
         throw new IntegrationError(
           "A symbolic exponent could be -1, where the power rule does not apply, so this is not integrated."
@@ -13170,7 +13615,7 @@ var CalcEngine = (() => {
       if (rational2.n === -rational2.d) {
         return recorded(
           TECHNIQUES.table,
-          () => divide(call("ln", call("abs", base2)), linear.a)
+          () => divide(call("ln", call("abs", base2)), linear2.a)
         );
       }
       const raised2 = rationalNode({
@@ -13179,21 +13624,21 @@ var CalcEngine = (() => {
       });
       return recorded(
         TECHNIQUES.power,
-        () => divide(divide(power2(base2, raised2), raised2), linear.a)
+        () => divide(divide(power2(base2, raised2), raised2), linear2.a)
       );
     }
     if (!baseHas && exponentHas) {
-      const linear = linearIn(exponent, variable);
-      if (linear === void 0) {
+      const linear2 = linearIn(exponent2, variable);
+      if (linear2 === void 0) {
         throw new IntegrationError(
           "Only an exponential whose exponent is linear in the variable can be integrated here."
         );
       }
       const isE = base2.type === "Identifier" && base2.symbol === "e";
-      const scale = isE ? linear.a : multiply(linear.a, call("ln", base2));
+      const scale = isE ? linear2.a : multiply(linear2.a, call("ln", base2));
       return recorded(
         TECHNIQUES.table,
-        () => divide(power2(base2, exponent), scale)
+        () => divide(power2(base2, exponent2), scale)
       );
     }
     throw new IntegrationError(
@@ -13212,13 +13657,13 @@ var CalcEngine = (() => {
     if (rule2 === void 0) {
       throw new IntegrationError(`The integral of ${name} is not known.`);
     }
-    const linear = linearIn(argument, variable);
-    if (linear === void 0) {
+    const linear2 = linearIn(argument, variable);
+    if (linear2 === void 0) {
       throw new IntegrationError(
         `${name} of something that is not linear in the variable cannot be integrated here.`
       );
     }
-    return divide(rule2(argument), linear.a);
+    return divide(rule2(argument), linear2.a);
   }
   function describe3(node) {
     switch (node.type) {
@@ -13270,7 +13715,7 @@ var CalcEngine = (() => {
       return new (decimalContext(digits))(u.div(v));
     });
   }
-  function zeta(s, digits) {
+  function zeta2(s, digits) {
     return cached(`zeta ${s}`, digits, () => {
       const n = Math.ceil((digits + 5) / Math.log10(3 + Math.sqrt(8))) + 1;
       const d = [];
@@ -13330,19 +13775,19 @@ var CalcEngine = (() => {
     {
       symbol: "zeta_3",
       name: "Ap\xE9ry's constant \u03B6(3)",
-      compute: (digits) => zeta(3, digits),
+      compute: (digits) => zeta2(3, digits),
       definition: zetaDefinition(3)
     },
     {
       symbol: "zeta_5",
       name: "\u03B6(5)",
-      compute: (digits) => zeta(5, digits),
+      compute: (digits) => zeta2(5, digits),
       definition: zetaDefinition(5)
     },
     {
       symbol: "zeta_7",
       name: "\u03B6(7)",
-      compute: (digits) => zeta(7, digits),
+      compute: (digits) => zeta2(7, digits),
       definition: zetaDefinition(7)
     },
     {
@@ -13447,14 +13892,14 @@ var CalcEngine = (() => {
       return void 0;
     let scale = ONE;
     const factors = /* @__PURE__ */ new Map();
-    for (const [atom, exponent] of raw) {
-      if (isZero(exponent))
+    for (const [atom, exponent2] of raw) {
+      if (isZero(exponent2))
         continue;
       if (atom === PI2 || atom === E || isOpaque(atom)) {
-        factors.set(atom, exponent);
+        factors.set(atom, exponent2);
         continue;
       }
-      const { whole, frac } = floorSplit(exponent);
+      const { whole, frac } = floorSplit(exponent2);
       if (whole !== 0n)
         scale = multiply3(scale, pow2(rational(BigInt(atom)), whole));
       if (!isZero(frac))
@@ -13486,8 +13931,8 @@ var CalcEngine = (() => {
   var subtract4 = (a, b) => add5(a, negate2(b));
   function multiplyTerms(a, b) {
     const factors = new Map(a.factors);
-    for (const [atom, exponent] of b.factors)
-      factors.set(atom, add4(factors.get(atom) ?? ZERO, exponent));
+    for (const [atom, exponent2] of b.factors)
+      factors.set(atom, add4(factors.get(atom) ?? ZERO, exponent2));
     return normalize(multiply3(a.coeff, b.coeff), factors);
   }
   function multiply5(a, b) {
@@ -13504,21 +13949,21 @@ var CalcEngine = (() => {
       return void 0;
     const [divisor] = b;
     const inverse = /* @__PURE__ */ new Map();
-    for (const [atom, exponent] of divisor.factors)
-      inverse.set(atom, negate(exponent));
+    for (const [atom, exponent2] of divisor.factors)
+      inverse.set(atom, negate(exponent2));
     const reciprocal = normalize(divide5(ONE, divisor.coeff), inverse);
     return reciprocal === void 0 ? void 0 : multiply5(a, [reciprocal]);
   }
   var MAX_EXPANSION = 12n;
-  function power5(base2, exponent) {
-    if (isZero(exponent))
+  function power5(base2, exponent2) {
+    if (isZero(exponent2))
       return fromInteger(1);
     if (base2.length === 0)
-      return isNegative(exponent) ? void 0 : ZERO2;
-    if (isInteger(exponent)) {
-      const { n } = exponent;
+      return isNegative(exponent2) ? void 0 : ZERO2;
+    if (isInteger(exponent2)) {
+      const { n } = exponent2;
       if (n < 0n) {
-        const positive3 = power5(base2, negate(exponent));
+        const positive3 = power5(base2, negate(exponent2));
         return positive3 === void 0 ? void 0 : divide7(fromInteger(1), positive3);
       }
       if (base2.length > 1 && n > MAX_EXPANSION)
@@ -13532,7 +13977,7 @@ var CalcEngine = (() => {
       return void 0;
     const [single2] = base2;
     const negativeBase = isNegative(single2.coeff);
-    if (negativeBase && exponent.d % 2n === 0n)
+    if (negativeBase && exponent2.d % 2n === 0n)
       return void 0;
     const magnitude = negativeBase ? negate(single2.coeff) : single2.coeff;
     const numerator = factorize(magnitude.n);
@@ -13549,8 +13994,8 @@ var CalcEngine = (() => {
       contribute(atom, e);
     const raised2 = /* @__PURE__ */ new Map();
     for (const [atom, e] of factors)
-      raised2.set(atom, multiply3(e, exponent));
-    const sign3 = negativeBase && exponent.n % 2n !== 0n ? rational(-1n) : ONE;
+      raised2.set(atom, multiply3(e, exponent2));
+    const sign3 = negativeBase && exponent2.n % 2n !== 0n ? rational(-1n) : ONE;
     const result = normalize(sign3, raised2);
     return result === void 0 ? ZERO2 : [result];
   }
@@ -13585,8 +14030,8 @@ var CalcEngine = (() => {
           specialBindings(digits),
           digits
         ) : atom === PI2 ? D.acos(-1) : atom === E ? D.exp(1) : new D(atom);
-        const exponent = new D(e.n.toString()).div(e.d.toString());
-        const raised2 = base2.isNegative() && e.d % 2n === 1n ? D.pow(base2.neg(), exponent).times(e.n % 2n === 0n ? 1 : -1) : D.pow(base2, exponent);
+        const exponent2 = new D(e.n.toString()).div(e.d.toString());
+        const raised2 = base2.isNegative() && e.d % 2n === 1n ? D.pow(base2.neg(), exponent2).times(e.n % 2n === 0n ? 1 : -1) : D.pow(base2, exponent2);
         product = product.times(raised2);
       }
       total = total.plus(product);
@@ -13601,11 +14046,11 @@ var CalcEngine = (() => {
   function atomsNode(entries) {
     const plain = [];
     const radicals = /* @__PURE__ */ new Map();
-    for (const [atom, exponent] of entries) {
+    for (const [atom, exponent2] of entries) {
       const base2 = isOpaque(atom) ? OPAQUE.get(atom)?.node ?? number4(NaN) : atom === PI2 ? id5("pi") : atom === E ? id5("e") : number4(Number(atom));
-      if (isInteger(exponent)) {
+      if (isInteger(exponent2)) {
         plain.push(
-          exponent.n === 1n ? base2 : binop4("Exponent", base2, number4(Number(exponent.n)))
+          exponent2.n === 1n ? base2 : binop4("Exponent", base2, number4(Number(exponent2.n)))
         );
         continue;
       }
@@ -13616,15 +14061,15 @@ var CalcEngine = (() => {
             base2,
             binop4(
               "Divide",
-              number4(Number(exponent.n)),
-              number4(Number(exponent.d))
+              number4(Number(exponent2.n)),
+              number4(Number(exponent2.d))
             )
           )
         );
         continue;
       }
-      const index = exponent.d;
-      const contribution = pow2(rational(BigInt(atom)), exponent.n);
+      const index = exponent2.d;
+      const contribution = pow2(rational(BigInt(atom)), exponent2.n);
       radicals.set(index, (radicals.get(index) ?? 1n) * contribution.n);
     }
     for (const [index, radicand] of [...radicals].sort(
@@ -13646,10 +14091,10 @@ var CalcEngine = (() => {
   function termNode(t) {
     const positive3 = [];
     const negativeExponents = [];
-    for (const [atom, exponent] of t.factors)
-      (isNegative(exponent) ? negativeExponents : positive3).push([
+    for (const [atom, exponent2] of t.factors)
+      (isNegative(exponent2) ? negativeExponents : positive3).push([
         atom,
-        isNegative(exponent) ? negate(exponent) : exponent
+        isNegative(exponent2) ? negate(exponent2) : exponent2
       ]);
     const magnitude = isNegative(t.coeff) ? negate(t.coeff) : t.coeff;
     const above = atomsNode(positive3);
@@ -13713,8 +14158,8 @@ var CalcEngine = (() => {
       case "Divide":
         return divide7(left, right);
       case "Exponent": {
-        const exponent = asRational(right);
-        return exponent === void 0 ? void 0 : power5(left, exponent);
+        const exponent2 = asRational(right);
+        return exponent2 === void 0 ? void 0 : power5(left, exponent2);
       }
     }
   }
@@ -13730,8 +14175,8 @@ var CalcEngine = (() => {
       case "sqrt":
         return power5(inner, rational(1n, 2n));
       case "exp": {
-        const exponent = asRational(inner);
-        return exponent === void 0 ? void 0 : power5(E_VALUE, exponent);
+        const exponent2 = asRational(inner);
+        return exponent2 === void 0 ? void 0 : power5(E_VALUE, exponent2);
       }
       default:
         return void 0;
@@ -13768,8 +14213,8 @@ var CalcEngine = (() => {
       this.F = F;
       this.variable = variable;
     }
-    coefficient(s, exponent) {
-      return exponent < s.v ? this.F.zero : s.c[exponent - s.v] ?? this.F.zero;
+    coefficient(s, exponent2) {
+      return exponent2 < s.v ? this.F.zero : s.c[exponent2 - s.v] ?? this.F.zero;
     }
     /** Leading zeros moved into the valuation, and nothing past `cap` kept. */
     normalise(s, cap) {
@@ -13877,14 +14322,14 @@ var CalcEngine = (() => {
     /** `s^r` for a rational `r`. */
     power(s, r, cap) {
       if (isInteger(r)) {
-        let exponent = Number(r.n);
+        let exponent2 = Number(r.n);
         let base2 = s;
-        if (exponent < 0) {
+        if (exponent2 < 0) {
           base2 = this.inverse(s, cap);
-          exponent = -exponent;
+          exponent2 = -exponent2;
         }
         let total = this.constant(this.F.one, cap);
-        for (let i = 0; i < exponent; i += 1)
+        for (let i = 0; i < exponent2; i += 1)
           total = this.multiply(total, base2, cap);
         return total;
       }
@@ -13976,17 +14421,17 @@ var CalcEngine = (() => {
           );
       }
     }
-    exponent(base2, exponent, cap) {
+    exponent(base2, exponent2, cap) {
       if (base2.type === "Identifier" && base2.symbol === "e")
-        return this.function("exp", [exponent], cap);
-      const exact = rationalOfNode(exponent);
+        return this.function("exp", [exponent2], cap);
+      const exact = rationalOfNode(exponent2);
       if (exact !== void 0)
         return this.power(this.series(base2, cap + 8), exact, cap);
       if (!dependsOn(base2, this.variable) && !(evaluate(base2, {}) > 0))
         throw new PowerSeriesError(
           "A power of a base that is not positive has no real logarithm to expand with."
         );
-      return this.function("exp", [multiply(exponent, call("ln", base2))], cap);
+      return this.function("exp", [multiply(exponent2, call("ln", base2))], cap);
     }
     function(name, args, cap) {
       if (args.length !== 1)
@@ -14432,10 +14877,10 @@ var CalcEngine = (() => {
     const inner = sizeOf(fold(subtract(log3, lnC)), variable);
     if (inner === void 0)
       return void 0;
-    const scaled = multiply5(inner.c, constantSide.c);
+    const scaled2 = multiply5(inner.c, constantSide.c);
     return {
       ...inner,
-      c: "flip" in constantSide && constantSide.flip ? negate2(scaled) : scaled
+      c: "flip" in constantSide && constantSide.flip ? negate2(scaled2) : scaled2
     };
   }
   function openedLogarithm(node, variable) {
@@ -14478,19 +14923,19 @@ var CalcEngine = (() => {
       return f.args[0];
     return void 0;
   }
-  function exponential(base2, exponent, variable) {
-    if (!dependsOn(exponent, variable)) {
-      const r = asRational(exactConstant(exponent) ?? []);
+  function exponential(base2, exponent2, variable) {
+    if (!dependsOn(exponent2, variable)) {
+      const r = asRational(exactConstant(exponent2) ?? []);
       const inner = r && sizeOf(base2, variable);
       return r && inner && raised(inner, r);
     }
     if (base2.type === "Identifier" && base2.symbol === "e")
-      return withExponential(ONE2(), exponent, variable);
+      return withExponential(ONE2(), exponent2, variable);
     if (!(evaluate(base2, { [variable]: 1e6 }) > 0))
       return void 0;
     return withExponential(
       ONE2(),
-      fold(multiply(exponent, call("ln", base2))),
+      fold(multiply(exponent2, call("ln", base2))),
       variable
     );
   }
@@ -14638,8 +15083,8 @@ var CalcEngine = (() => {
     const single2 = atomsOf(value);
     if (single2 === void 0 || single2.factors.size !== 1)
       return void 0;
-    const [[atom, exponent]] = [...single2.factors];
-    if (!isPiAtom(atom) || !isOne(exponent))
+    const [[atom, exponent2]] = [...single2.factors];
+    if (!isPiAtom(atom) || !isOne(exponent2))
       return void 0;
     const twelfths = multiply3(single2.coeff, rational(12n));
     return isInteger(twelfths) ? Number(twelfths.n) : void 0;
@@ -14751,9 +15196,9 @@ var CalcEngine = (() => {
       }
       if (t.factors.size !== 1)
         return void 0;
-      const [[atom, exponent]] = [...t.factors];
+      const [[atom, exponent2]] = [...t.factors];
       const match = /^@ln:(\d+)$/.exec(atom);
-      if (match === null || !isOne(exponent))
+      if (match === null || !isOne(exponent2))
         return void 0;
       const raised2 = power5(fromInteger(BigInt(match[1])), t.coeff);
       if (raised2 === void 0)
@@ -14830,11 +15275,11 @@ var CalcEngine = (() => {
     let total = logarithm(single2.coeff);
     if (total === void 0)
       return void 0;
-    for (const [atom, exponent] of single2.factors) {
+    for (const [atom, exponent2] of single2.factors) {
       const log3 = logarithmOfAtom(atom);
       if (log3 === void 0)
         return void 0;
-      total = add5(total, multiply5(fromRational(exponent), log3));
+      total = add5(total, multiply5(fromRational(exponent2), log3));
     }
     return total;
   }
@@ -15136,7 +15581,7 @@ var CalcEngine = (() => {
     if (dependsOn(right, variable)) {
       if (!(evaluate(left, { [variable]: near(approach) }) > 0))
         return void 0;
-      const exponent = (logarithm3) => functionLimit(
+      const exponent2 = (logarithm3) => functionLimit(
         call(
           "exp",
           topLevelTerms(logarithm3).map(({ term: term2, negated }) => {
@@ -15148,11 +15593,11 @@ var CalcEngine = (() => {
         approach,
         record2
       );
-      let found = exponent(call("ln", left));
+      let found = exponent2(call("ln", left));
       if (found === void 0) {
         const expanded = expandedLogarithm(left, variable, approach);
         if (expanded !== void 0) {
-          found = exponent(expanded);
+          found = exponent2(expanded);
           if (found !== void 0)
             record2("dominant-term");
         }
@@ -15499,25 +15944,25 @@ var CalcEngine = (() => {
       );
     if (approach.kind === "point") {
       const at2 = evaluate(factor, { [variable]: approach.value });
-      const exponent2 = factor.type === "BinaryOperator" && factor.name === "Exponent" ? asRational(exactConstant(factor.right) ?? []) : ONE;
+      const exponent3 = factor.type === "BinaryOperator" && factor.name === "Exponent" ? asRational(exactConstant(factor.right) ?? []) : ONE;
       const base2 = factor.type === "BinaryOperator" && factor.name === "Exponent" ? factor.left : factor;
-      if (exponent2 === void 0)
+      if (exponent3 === void 0)
         return void 0;
       const baseAt = evaluate(base2, { [variable]: approach.value });
       if (baseAt === 0 && coefficientsIn(base2, variable, 1) !== void 0)
-        return isNegative(exponent2) ? "exploding-power" : "vanishing";
+        return isNegative(exponent3) ? "exploding-power" : "vanishing";
       if (!Number.isFinite(at2) || at2 === 0)
         return void 0;
       const settles = limitOf(factor, variable, approach, record2);
       return settles?.kind === "finite" && certainlyZero(settles.value) === false ? "polynomial" : void 0;
     }
-    const exponent = factor.type === "BinaryOperator" && factor.name === "Exponent" && factor.left.type === "Identifier" && factor.left.symbol === "e" ? factor.right : factor.type === "FunctionCall" && factor.callee.symbol === "exp" ? factor.args[0] : void 0;
-    if (exponent !== void 0) {
-      const inner = limitOf(exponent, variable, approach, record2);
+    const exponent2 = factor.type === "BinaryOperator" && factor.name === "Exponent" && factor.left.type === "Identifier" && factor.left.symbol === "e" ? factor.right : factor.type === "FunctionCall" && factor.callee.symbol === "exp" ? factor.args[0] : void 0;
+    if (exponent2 !== void 0) {
+      const inner = limitOf(exponent2, variable, approach, record2);
       if (inner?.kind !== "infinite")
         return void 0;
       const outgrowsLog = limitOf(
-        divide(exponent, call("ln", id3(variable))),
+        divide(exponent2, call("ln", id3(variable))),
         variable,
         approach
       );
@@ -15736,11 +16181,11 @@ var CalcEngine = (() => {
         const offset = name === "tan" || name === "sec" ? rational(1n, 2n) : name === "cot" || name === "csc" ? ZERO : void 0;
         if (offset === void 0)
           return;
-        const linear = linearIn(child.args[0], variable);
-        if (linear === void 0)
+        const linear2 = linearIn(child.args[0], variable);
+        if (linear2 === void 0)
           return;
-        const slope = asRational(exactConstant(linear.a) ?? []);
-        const shift = exactConstant(linear.b);
+        const slope = asRational(exactConstant(linear2.a) ?? []);
+        const shift = exactConstant(linear2.b);
         if (slope === void 0 || isZero(slope) || shift === void 0) {
           giveUp = true;
           return;
@@ -15855,7 +16300,7 @@ var CalcEngine = (() => {
       for (const piece of pieces) {
         const result = definiteIntegral(
           piece.integrand,
-          integrate(piece.integrand, variable),
+          integrate2(piece.integrand, variable),
           variable,
           piece.lower,
           piece.upper
@@ -15977,9 +16422,9 @@ var CalcEngine = (() => {
         if (entry !== void 0 && rate !== void 0 && rate > 0)
           return { key: term2.callee.symbol, rate, ...entry };
       }
-      const exponent = exponentOf3(term2);
-      if (exponent !== void 0) {
-        const rate = rateIn(exponent, variable);
+      const exponent2 = exponentOf3(term2);
+      if (exponent2 !== void 0) {
+        const rate = rateIn(exponent2, variable);
         if (rate !== void 0 && rate < 0)
           return {
             key: "exp",
@@ -16040,9 +16485,9 @@ var CalcEngine = (() => {
     let overX = false;
     let scale = 1;
     for (const factor of factors) {
-      const exponent = exponentOf3(factor.node);
-      if (factor.inNumerator && exponent !== void 0) {
-        const rate = rateIn(exponent, variable);
+      const exponent2 = exponentOf3(factor.node);
+      if (factor.inNumerator && exponent2 !== void 0) {
+        const rate = rateIn(exponent2, variable);
         if (rate !== void 0 && rate < 0)
           s = -rate;
       } else if (factor.inNumerator && factor.node.type === "FunctionCall" && factor.node.callee.symbol === "sin")
@@ -16103,10 +16548,10 @@ var CalcEngine = (() => {
     const other = terms.find((t) => t !== one2);
     if (one2 === void 0 || other === void 0)
       return void 0;
-    const exponent = exponentOf3(other.term);
-    if (exponent === void 0)
+    const exponent2 = exponentOf3(other.term);
+    if (exponent2 === void 0)
       return void 0;
-    const rate = rateIn(exponent, variable);
+    const rate = rateIn(exponent2, variable);
     if (rate === void 0 || !(rate < 0))
       return void 0;
     const k = rationalNodeOf(-rate);
@@ -16170,7 +16615,7 @@ var CalcEngine = (() => {
     try {
       const result = definiteIntegral(
         g,
-        integrate(g, variable),
+        integrate2(g, variable),
         variable,
         lower,
         upper
@@ -16280,6 +16725,828 @@ var CalcEngine = (() => {
     } else if (!found.proved)
       return void 0;
     return { ...found, value };
+  }
+
+  // src/plugins/physics-lab/symbolic/specialIntegrals.ts
+  function linear(node, variable) {
+    const b = evaluate(node, { [variable]: 0 });
+    const a = evaluate(node, { [variable]: 1 }) - b;
+    const check = evaluate(node, { [variable]: 2.5 });
+    if (!Number.isFinite(a) || !Number.isFinite(b) || a === 0)
+      return void 0;
+    if (Math.abs(check - (a * 2.5 + b)) > 1e-12 * Math.max(1, Math.abs(check)))
+      return void 0;
+    return { a, b };
+  }
+  function pureSquare(node, variable) {
+    const k = evaluate(node, { [variable]: 1 });
+    if (!Number.isFinite(k) || k === 0)
+      return void 0;
+    for (const x of [0, 2, -1.5])
+      if (Math.abs(evaluate(node, { [variable]: x }) - k * x * x) > 1e-12)
+        return void 0;
+    return k;
+  }
+  var num = (v) => v < 0 ? negative2(number2(-v)) : number2(v);
+  function exponent(node) {
+    if (node.type === "BinaryOperator" && node.name === "Exponent" && node.left.type === "Identifier" && node.left.symbol === "e")
+      return node.right;
+    if (node.type === "FunctionCall" && node.callee.symbol === "exp")
+      return node.args[0];
+    return void 0;
+  }
+  function oneTerm(node, variable) {
+    const factors = [];
+    quotientFactors(fold(node), true, factors);
+    let constant3 = number2(1);
+    const top = [];
+    const bottom = [];
+    for (const f of factors) {
+      if (!dependsOn(f.node, variable))
+        constant3 = f.inNumerator ? multiply(constant3, f.node) : divide(constant3, f.node);
+      else
+        (f.inNumerator ? top : bottom).push(f.node);
+    }
+    const shaped = shape(top, bottom, variable);
+    if (shaped === void 0)
+      return void 0;
+    return { value: fold(multiply(constant3, shaped.value)), uses: shaped.uses };
+  }
+  function shape(top, bottom, variable) {
+    const x = id3(variable);
+    if (top.length === 1 && bottom.length === 1) {
+      const den = linear(bottom[0], variable);
+      const [t] = top;
+      if (den !== void 0) {
+        const { a: p, b: q } = den;
+        const ex = exponent(t);
+        if (ex !== void 0) {
+          const e = linear(ex, variable);
+          if (e !== void 0) {
+            const shift = e.b - e.a * q / p;
+            const frontNode = shift === 0 ? divide(number2(1), num(p)) : divide(power2(id3("e"), num(shift)), num(p));
+            return {
+              value: multiply(
+                frontNode,
+                call("Ei", multiply(num(e.a / p), bottom[0]))
+              ),
+              uses: ["Ei"]
+            };
+          }
+        }
+        if (q === 0 && t.type === "FunctionCall" && t.args.length === 1 && ["sin", "cos", "sinh", "cosh"].includes(t.callee.symbol)) {
+          const w = linear(t.args[0], variable);
+          if (w !== void 0 && w.b === 0) {
+            const name = { sin: "Si", cos: "Ci", sinh: "Shi", cosh: "Chi" }[t.callee.symbol];
+            const even = t.callee.symbol === "cos" || t.callee.symbol === "cosh";
+            const rate = even ? Math.abs(w.a) : w.a;
+            return {
+              value: divide(call(name, multiply(num(rate), x)), num(p)),
+              uses: [name]
+            };
+          }
+        }
+        if (q === 0 && t.type === "FunctionCall" && t.callee.symbol === "ln" && t.args.length === 1) {
+          const inner = linear(t.args[0], variable);
+          if (inner !== void 0 && inner.b === 1)
+            return {
+              value: negative2(
+                divide(call("Li_2", multiply(num(-inner.a), x)), num(p))
+              ),
+              uses: ["Li_2"]
+            };
+        }
+      }
+    }
+    if (top.length === 0 && bottom.length === 1) {
+      const [l] = bottom;
+      if (l.type === "FunctionCall" && l.callee.symbol === "ln") {
+        const inner = linear(l.args[0], variable);
+        if (inner !== void 0)
+          return {
+            value: divide(call("li", l.args[0]), num(inner.a)),
+            uses: ["li"]
+          };
+      }
+    }
+    if (top.length === 1 && bottom.length === 0) {
+      const [t] = top;
+      const ex = exponent(t);
+      if (ex !== void 0) {
+        const k = pureSquare(ex, variable);
+        if (k !== void 0) {
+          const front = divide(
+            power2(id3("pi"), divide(number2(1), number2(2))),
+            multiply(
+              number2(2),
+              power2(num(Math.abs(k)), divide(number2(1), number2(2)))
+            )
+          );
+          const name = k < 0 ? "erf" : "erfi";
+          return {
+            value: multiply(
+              front,
+              call(
+                name,
+                multiply(power2(num(Math.abs(k)), divide(number2(1), number2(2))), x)
+              )
+            ),
+            uses: [name]
+          };
+        }
+      }
+      if (t.type === "FunctionCall" && (t.callee.symbol === "sin" || t.callee.symbol === "cos") && t.args.length === 1) {
+        const k = pureSquare(t.args[0], variable);
+        if (k !== void 0 && k > 0) {
+          const name = t.callee.symbol === "sin" ? "S" : "C";
+          const half = divide(number2(1), number2(2));
+          return {
+            value: multiply(
+              power2(divide(id3("pi"), num(2 * k)), half),
+              call(name, multiply(power2(divide(num(2 * k), id3("pi")), half), x))
+            ),
+            uses: [name]
+          };
+        }
+      }
+    }
+    return void 0;
+  }
+  function specialAntiderivative(node, variable, elementary) {
+    const terms = topLevelTerms(fold(node));
+    let total = number2(0);
+    const uses = /* @__PURE__ */ new Set();
+    let special2 = false;
+    for (const { term: term2, negated } of terms) {
+      const found = oneTerm(term2, variable);
+      let value;
+      if (found !== void 0) {
+        special2 = true;
+        found.uses.forEach((u) => uses.add(u));
+        ({ value } = found);
+      } else {
+        const plain = elementary(term2);
+        if (plain === void 0)
+          return void 0;
+        value = plain;
+      }
+      total = add(total, negated ? negative2(value) : value);
+    }
+    return special2 ? { value: fold(total), uses: [...uses] } : void 0;
+  }
+
+  // src/plugins/physics-lab/symbolic/fractional.ts
+  var EULER_GAMMA = 0.5772156649015329;
+  function shiftLatex(offset, req) {
+    const q = fromNumber(req.order);
+    const p = fromNumber(offset);
+    if (q !== void 0 && p !== void 0 && /^[-\d.\\{}frac\s]*$/.test(req.orderLatex))
+      return toLatex2(subtract3(p, q));
+    const a = req.orderLatex.trim();
+    const negated = a.startsWith("-") ? a.slice(1) : void 0;
+    const head = offset === 0 ? "" : formatNumber(offset);
+    if (negated !== void 0)
+      return offset === 0 ? negated : `${head}+${negated}`;
+    return `${head}-${a}`;
+  }
+  function kShift(offset, req, k = "k") {
+    const a = req.orderLatex.trim();
+    const o = offset === 0 ? "" : offset > 0 ? `+${formatNumber(offset)}` : formatNumber(offset);
+    return `${k}${o}-\\left(${a}\\right)`;
+  }
+  function formatNumber(v) {
+    if (Number.isInteger(v))
+      return String(v);
+    const q = fromNumber(v);
+    return q !== void 0 ? toLatex2(q) : String(v);
+  }
+  function coefficientLatex(c, cLatex) {
+    if (c === 1)
+      return "";
+    if (c === -1)
+      return "-";
+    return /^[-\d.]+$/.test(cLatex) || cLatex.startsWith("\\frac") ? cLatex : `\\left(${cLatex}\\right)`;
+  }
+  function joinTerms(parts) {
+    const kept = parts.filter((p) => p !== "" && p !== "0");
+    if (kept.length === 0)
+      return "0";
+    return kept.map((p, i) => i === 0 || p.startsWith("-") ? p : `+${p}`).join("");
+  }
+  function rateOf2(node, variable) {
+    const at0 = evaluate(node, { [variable]: 0 });
+    const at1 = evaluate(node, { [variable]: 1 });
+    const at3 = evaluate(node, { [variable]: 3 });
+    if (at0 !== 0 || !Number.isFinite(at1) || Math.abs(at3 - 3 * at1) > 1e-12)
+      return void 0;
+    return at1;
+  }
+  function shapeOf(node, variable, inNumerator) {
+    const sign3 = inNumerator ? 1 : -1;
+    if (node.type === "Identifier" && node.symbol === variable)
+      return { kind: "power", p: sign3 };
+    if (node.type === "BinaryOperator" && node.name === "Exponent") {
+      if (node.left.type === "Identifier" && node.left.symbol === variable && !dependsOn(node.right, variable))
+        return { kind: "power", p: sign3 * evaluate(node.right, {}) };
+      if (node.left.type === "Identifier" && node.left.symbol === "e") {
+        const b = rateOf2(node.right, variable);
+        if (b !== void 0)
+          return { kind: "exp", b: sign3 * b };
+      }
+    }
+    if (node.type === "FunctionCall" && node.args.length === 1) {
+      const [arg] = node.args;
+      const name = node.callee.symbol;
+      if (name === "sqrt" && arg.type === "Identifier" && arg.symbol === variable)
+        return { kind: "power", p: sign3 * 0.5 };
+      if (!inNumerator)
+        return void 0;
+      if (name === "exp") {
+        const b = rateOf2(arg, variable);
+        if (b !== void 0)
+          return { kind: "exp", b };
+      }
+      if (name === "sin" || name === "cos") {
+        const b = rateOf2(arg, variable);
+        if (b !== void 0 && b !== 0)
+          return { kind: name, b };
+      }
+      if (name === "ln" && arg.type === "Identifier" && arg.symbol === variable)
+        return { kind: "ln" };
+    }
+    return void 0;
+  }
+  function readTerms(f, req) {
+    const out = [];
+    for (const { term: term2, negated } of topLevelTerms(fold(f))) {
+      const factors = [];
+      quotientFactors(term2, true, factors);
+      let c = negated ? -1 : 1;
+      const varying = factors.filter((x) => dependsOn(x.node, req.variable));
+      for (const x of factors) {
+        if (dependsOn(x.node, req.variable))
+          continue;
+        const v = evaluate(x.node, {});
+        c = x.inNumerator ? c * v : c / v;
+      }
+      const cNode = fold(
+        factors.filter((x) => !dependsOn(x.node, req.variable)).reduce(
+          (acc, x) => x.inNumerator ? multiply(acc, x.node) : {
+            type: "BinaryOperator",
+            name: "Divide",
+            left: acc,
+            right: x.node
+          },
+          { type: "Constant", value: negated ? -1 : 1 }
+        )
+      );
+      const cLatex = req.emit(cNode);
+      const whole = negated ? { type: "Negative", arg: term2 } : term2;
+      if (varying.length === 0) {
+        out.push({ c, cLatex, shape: { kind: "constant" }, node: whole });
+        continue;
+      }
+      const shape2 = varying.length === 1 ? shapeOf(varying[0].node, req.variable, varying[0].inNumerator) : void 0;
+      out.push({
+        c,
+        cLatex,
+        shape: shape2 ?? { kind: "generic", node: whole },
+        node: whole
+      });
+    }
+    return out;
+  }
+  var derivativeCache = /* @__PURE__ */ new WeakMap();
+  function derivatives(f, variable, upTo) {
+    const cached2 = derivativeCache.get(f);
+    if (cached2 !== void 0 && cached2.length > upTo)
+      return cached2;
+    const out = [fold(f)];
+    for (let k = 1; k <= upTo; k += 1)
+      out.push(fold(differentiate(out[k - 1], variable)));
+    derivativeCache.set(f, out);
+    return out;
+  }
+  function caputoNumeric(f, req, n, x) {
+    const dn = derivatives(f, req.variable, n)[n];
+    const beta2 = n - req.order;
+    const g = (w) => evaluate(dn, { [req.variable]: x - w ** (1 / beta2) }) / beta2;
+    const integral = quadrature(g, 0, (x - req.lower) ** beta2);
+    return integral === void 0 ? void 0 : integral / gamma(n - req.order);
+  }
+  function riemannNumeric(f, req, n, x) {
+    const caputo = caputoNumeric(f, req, n, x);
+    if (caputo === void 0)
+      return void 0;
+    const ds = derivatives(f, req.variable, n);
+    let total = caputo;
+    for (let k = 0; k < n; k += 1) {
+      const at2 = evaluate(ds[k], { [req.variable]: req.lower });
+      if (!Number.isFinite(at2))
+        return void 0;
+      total += at2 * (x - req.lower) ** (k - req.order) * reciprocalGamma(k + 1 - req.order);
+    }
+    return total;
+  }
+  function grunwaldNumeric(f, req, x) {
+    const sum3 = (N) => {
+      const h = (x - req.lower) / N;
+      let w = 1;
+      let total = 0;
+      for (let k = 0; k <= N; k += 1) {
+        if (k > 0)
+          w *= 1 - (req.order + 1) / k;
+        const y = evaluate(f, { [req.variable]: x - k * h });
+        if (Number.isFinite(y))
+          total += w * y;
+      }
+      return total / h ** req.order;
+    };
+    let row = [40, 80, 160, 320, 640].map(sum3);
+    for (let power8 = 1; row.length > 1; power8 += 1) {
+      const factor = 2 ** power8;
+      row = row.slice(1).map((fine, i) => (factor * fine - row[i]) / (factor - 1));
+    }
+    const [value] = row;
+    return Number.isFinite(value) ? value : void 0;
+  }
+  function hadamardOperator(f, variable, n) {
+    let g = fold(f);
+    for (let k = 0; k < n; k += 1)
+      g = fold(multiply(id3(variable), differentiate(g, variable)));
+    return g;
+  }
+  function riemannTerm(t, req) {
+    const v = req.variableLatex;
+    const a = req.order;
+    const A = `\\left(${req.orderLatex}\\right)`;
+    const cl = coefficientLatex(t.c, t.cLatex);
+    const s = t.shape;
+    switch (s.kind) {
+      case "constant":
+        return {
+          latex: `\\frac{${t.cLatex}${v}^{${shiftLatex(0, req)}}}{\\Gamma\\left(${shiftLatex(1, req)}\\right)}`,
+          graph: `\\frac{${t.cLatex}${v}^{-${A}}}{\\left(-${A}\\right)!}`,
+          value: (x) => t.c * x ** -a * reciprocalGamma(1 - a)
+        };
+      case "power": {
+        if (!(s.p > -1))
+          return "undefined";
+        return {
+          latex: `${cl}\\frac{\\Gamma\\left(${formatNumber(s.p + 1)}\\right)}{\\Gamma\\left(${shiftLatex(s.p + 1, req)}\\right)}${v}^{${shiftLatex(s.p, req)}}`,
+          graph: `${cl}\\frac{${formatNumber(s.p)}!}{\\left(${formatNumber(s.p)}-${A}\\right)!}${v}^{${formatNumber(s.p)}-${A}}`,
+          value: (x) => t.c * gamma(s.p + 1) * reciprocalGamma(s.p + 1 - a) * x ** (s.p - a)
+        };
+      }
+      case "exp":
+        return {
+          latex: `${cl}${v}^{${shiftLatex(0, req)}}E_{1,${shiftLatex(1, req)}}\\left(${scaled(s.b, v)}\\right)`,
+          graph: `${cl}\\sum_{k=0}^{80}\\frac{\\left(${formatNumber(s.b)}\\right)^{k}${v}^{${kShift(0, req)}}}{\\left(${kShift(0, req)}\\right)!}`,
+          value: (x) => t.c * x ** -a * mittagLeffler(1, 1 - a, s.b * x)
+        };
+      case "cos":
+        return {
+          latex: `${cl}${v}^{${shiftLatex(0, req)}}E_{2,${shiftLatex(1, req)}}\\left(-${scaled(s.b * s.b, `${v}^{2}`)}\\right)`,
+          graph: `${cl}\\sum_{k=0}^{60}\\frac{\\left(-1\\right)^{k}\\left(${formatNumber(s.b)}\\right)^{2k}${v}^{${kShift(0, req, "2k")}}}{\\left(${kShift(0, req, "2k")}\\right)!}`,
+          value: (x) => t.c * x ** -a * mittagLeffler(2, 1 - a, -s.b * s.b * x * x)
+        };
+      case "sin":
+        return {
+          latex: `${coefficientLatex(t.c * s.b, formatNumber(t.c * s.b))}${v}^{${shiftLatex(1, req)}}E_{2,${shiftLatex(2, req)}}\\left(-${scaled(s.b * s.b, `${v}^{2}`)}\\right)`,
+          graph: `${cl}\\sum_{k=0}^{60}\\frac{\\left(-1\\right)^{k}\\left(${formatNumber(s.b)}\\right)^{2k+1}${v}^{${kShift(1, req, "2k")}}}{\\left(${kShift(1, req, "2k")}\\right)!}`,
+          value: (x) => t.c * s.b * x ** (1 - a) * mittagLeffler(2, 2 - a, -s.b * s.b * x * x)
+        };
+      case "ln": {
+        const psi = digamma(1 - a);
+        return {
+          latex: `\\frac{${t.cLatex}${v}^{${shiftLatex(0, req)}}}{\\Gamma\\left(${shiftLatex(1, req)}\\right)}\\left(\\ln ${v}+\\psi\\left(1\\right)-\\psi\\left(${shiftLatex(1, req)}\\right)\\right)`,
+          graph: `\\frac{${t.cLatex}${v}^{-${A}}}{\\left(-${A}\\right)!}\\left(\\ln\\left(${v}\\right)-${EULER_GAMMA}-\\left(${psi}\\right)\\right)`,
+          value: (x) => t.c * x ** -a * reciprocalGamma(1 - a) * (Math.log(x) - EULER_GAMMA - psi)
+        };
+      }
+      default:
+        return void 0;
+    }
+  }
+  function caputoTerm(t, req, n) {
+    const v = req.variableLatex;
+    const a = req.order;
+    const A = `\\left(${req.orderLatex}\\right)`;
+    const cl = coefficientLatex(t.c, t.cLatex);
+    const s = t.shape;
+    if (n === 0)
+      return riemannTerm(t, req);
+    switch (s.kind) {
+      case "constant":
+        return { latex: "0", graph: "0", value: () => 0 };
+      case "power":
+        if (Number.isInteger(s.p) && s.p >= 0 && s.p < n)
+          return { latex: "0", graph: "0", value: () => 0 };
+        if (!(s.p > n - 1))
+          return "undefined";
+        return riemannTerm(t, req);
+      case "exp":
+        return {
+          latex: `${coefficientLatex(t.c * s.b ** n, formatNumber(t.c * s.b ** n))}${v}^{${shiftLatex(n, req)}}E_{1,${shiftLatex(n + 1, req)}}\\left(${scaled(s.b, v)}\\right)`,
+          graph: `${cl}\\sum_{k=${n}}^{80}\\frac{\\left(${formatNumber(s.b)}\\right)^{k}${v}^{${kShift(0, req)}}}{\\left(${kShift(0, req)}\\right)!}`,
+          value: (x) => t.c * s.b ** n * x ** (n - a) * mittagLeffler(1, n + 1 - a, s.b * x)
+        };
+      case "cos":
+      case "sin": {
+        const odd = s.kind === "sin" ? 1 : 0;
+        const start = Math.ceil((n - odd) / 2);
+        const series = (x) => {
+          let total = 0;
+          for (let k = start; k < start + 200; k += 1) {
+            const term2 = (-1) ** k * s.b ** (2 * k + odd) * x ** (2 * k + odd - a) * reciprocalGamma(2 * k + odd + 1 - a);
+            total += term2;
+            if (Math.abs(term2) < 1e-18 * Math.max(1, Math.abs(total)) && k > start + Math.abs(s.b * x))
+              break;
+          }
+          return total;
+        };
+        const power8 = odd ? "2k+1" : "2k";
+        return {
+          latex: `${cl}\\sum_{k=${start}}^{\\infty}\\frac{\\left(-1\\right)^{k}${s.b === 1 ? "" : `${formatNumber(s.b)}^{${power8}}`}${v}^{${power8}-${A}}}{\\Gamma\\left(${power8}+1-${A}\\right)}`,
+          graph: `${cl}\\sum_{k=${start}}^{60}\\frac{\\left(-1\\right)^{k}\\left(${formatNumber(s.b)}\\right)^{${power8}}${v}^{${kShift(odd, req, "2k")}}}{\\left(${kShift(odd, req, "2k")}\\right)!}`,
+          value: (x) => t.c * series(x)
+        };
+      }
+      case "ln":
+        return "undefined";
+      default:
+        return void 0;
+    }
+  }
+  function weylTerm(t, req) {
+    const v = req.variableLatex;
+    const A = `\\left(${req.orderLatex}\\right)`;
+    const a = req.order;
+    const s = t.shape;
+    const cl = coefficientLatex(t.c, t.cLatex);
+    switch (s.kind) {
+      case "exp":
+        if (!(s.b > 0))
+          return "it does not decay as the variable goes to \u2212\u221E";
+        return {
+          latex: `${cl}${s.b === 1 ? "" : `${formatNumber(s.b)}^{${req.orderLatex}}`}e^{${s.b === 1 ? "" : formatNumber(s.b)}${v}}`,
+          graph: `${cl}\\left(${formatNumber(s.b)}\\right)^{${A}}e^{${formatNumber(s.b)}${v}}`,
+          value: (x) => t.c * s.b ** a * Math.exp(s.b * x)
+        };
+      case "sin":
+      case "cos": {
+        const b = Math.abs(s.b);
+        const c = s.kind === "sin" && s.b < 0 ? -t.c : t.c;
+        const cL = coefficientLatex(c, formatNumber(c));
+        const phase = halfPiTimesOrder(req);
+        return {
+          latex: `${cL}${b === 1 ? "" : `${formatNumber(b)}^{${req.orderLatex}}`}\\${s.kind}\\left(${b === 1 ? "" : formatNumber(b)}${v}+${phase}\\right)`,
+          graph: `${cL}\\left(${formatNumber(b)}\\right)^{${A}}\\${s.kind}\\left(${formatNumber(b)}${v}+\\frac{${A}\\pi}{2}\\right)`,
+          value: (x) => c * b ** a * (s.kind === "sin" ? Math.sin : Math.cos)(b * x + a * Math.PI / 2)
+        };
+      }
+      case "constant":
+        return a > 0 && Number.isInteger(a) ? { latex: "0", graph: "0", value: () => 0 } : "a constant does not decay at \u2212\u221E, so its Weyl integral diverges";
+      case "power":
+        return "a power of the variable does not decay at \u2212\u221E";
+      case "ln":
+        return "ln is not defined for negative values";
+      default:
+        return "this term has no Weyl derivative this can find";
+    }
+  }
+  function fractionalDerivatives(req) {
+    const a = req.order;
+    const v = req.variableLatex;
+    const x0 = req.point;
+    const A = req.orderLatex;
+    const answers = [];
+    const show = (node) => req.emit(condense(fold(tidySums(fold(node)))).node);
+    const inline = (node) => `\\(${show(node)}\\)`;
+    if (Number.isInteger(a) && a >= 0) {
+      const d = derivatives(req.f, req.variable, a)[a];
+      const latex = show(d);
+      return {
+        kind: "ordinary",
+        n: a,
+        answers: [
+          {
+            key: "riemannLiouville",
+            definitions: [],
+            name: "Every definition",
+            definitionLatex: `\\frac{d^{${a}}}{d${v}^{${a}}}`,
+            kind: "closed",
+            latex,
+            graphLatex: latex,
+            value: evaluate(d, { [req.variable]: x0 }),
+            notes: [
+              "For a whole order, Riemann\u2013Liouville, Caputo, Gr\xFCnwald\u2013Letnikov, conformable and Weyl all give the ordinary derivative."
+            ]
+          }
+        ],
+        notes: []
+      };
+    }
+    const n = a > 0 ? Math.ceil(a) : 0;
+    const integral = a < 0;
+    const dummy = req.variable === "t" ? "s" : "t";
+    const terms = readTerms(req.f, req);
+    const notes = [];
+    const generic = terms.filter((t) => t.shape.kind === "generic").length;
+    if (generic > 0)
+      notes.push(
+        `${generic} term${generic === 1 ? " has" : "s have"} no closed form here; ${generic === 1 ? "it is" : "they are"} answered through the integral representations.`
+      );
+    const fAt = (node) => show(fold(replaceIdentifier(node, req.variable, id3(dummy))));
+    const ds = derivatives(req.f, req.variable, Math.max(n, 1));
+    const kernelPower = shiftLatex(n - 1, req);
+    const gammaFront = `\\frac{1}{\\Gamma\\left(${shiftLatex(n, req)}\\right)}`;
+    const integrandLatex = `${n === 0 ? `\\left(${fAt(req.f)}\\right)` : `\\left(${fAt(ds[n])}\\right)`}\\left(${v}-${dummy}\\right)^{${kernelPower}}`;
+    const integralRep = (lower) => `${gammaFront}\\int_{${lower}}^{${v}}${integrandLatex}d${dummy}`;
+    const integralGraph = (lower) => `\\frac{1}{\\left(${n - 1}-\\left(${A}\\right)\\right)!}\\int_{${lower}}^{${v}}\\left(${n === 0 ? fAt(req.f) : fAt(ds[n])}\\right)\\left(${v}-${dummy}\\right)^{${n - 1}-\\left(${A}\\right)}d${dummy}`;
+    const closed = (piece) => {
+      const pieces = [];
+      let missing = false;
+      for (const t of terms) {
+        const p = piece(t);
+        if (p === "undefined")
+          return { pieces, undefinedTerm: t, missing };
+        if (p === void 0)
+          missing = true;
+        else
+          pieces.push(p);
+      }
+      return { pieces, missing };
+    };
+    const fromZero = req.lower === 0;
+    {
+      const name = integral ? "Riemann\u2013Liouville integral" : "Riemann\u2013Liouville";
+      const definitionLatex = integral ? `{}_{${req.lowerLatex}}I_{${v}}^{${shiftLatex(0, req)}}f=\\frac{1}{\\Gamma\\left(${shiftLatex(0, req)}\\right)}\\int_{${req.lowerLatex}}^{${v}}f\\left(${dummy}\\right)\\left(${v}-${dummy}\\right)^{${shiftLatex(-1, req)}}d${dummy}` : `{}_{${req.lowerLatex}}D_{${v}}^{${A}}f=\\frac{d^{${n}}}{d${v}^{${n}}}\\frac{1}{\\Gamma\\left(${shiftLatex(n, req)}\\right)}\\int_{${req.lowerLatex}}^{${v}}f\\left(${dummy}\\right)\\left(${v}-${dummy}\\right)^{${kernelPower}}d${dummy}`;
+      const c = fromZero ? closed((t) => riemannTerm(t, req)) : void 0;
+      if (c !== void 0 && c.undefinedTerm === void 0 && !c.missing) {
+        const value = c.pieces.reduce((s, p) => s + p.value(x0), 0);
+        answers.push({
+          definitions: [],
+          key: "riemannLiouville",
+          name,
+          definitionLatex,
+          kind: "closed",
+          latex: joinTerms(c.pieces.map((p) => p.latex)),
+          graphLatex: joinTerms(c.pieces.map((p) => p.graph)),
+          value,
+          notes: [
+            "Term by term: \u0393(p + 1)/\u0393(p + 1 \u2212 \u03B1)\xB7x^{p\u2212\u03B1} for a power, and the Mittag-Leffler function E_{a,b}(z) = \u03A3 z\u1D4F/\u0393(ak + b) for exponentials, sines and cosines."
+          ]
+        });
+      } else if (c?.undefinedTerm !== void 0) {
+        answers.push({
+          definitions: [],
+          key: "riemannLiouville",
+          name,
+          definitionLatex,
+          kind: "undefined",
+          latex: "",
+          graphLatex: "",
+          notes: [
+            `Not defined from ${req.lowerLatex}: the term ${inline(c.undefinedTerm.node)} is not integrable there. Choose a lower limit above 0.`
+          ]
+        });
+      } else {
+        const value = riemannNumeric(req.f, req, n, x0);
+        const boundary = Array.from({ length: n }, (_, k) => {
+          const at2 = req.emit(
+            fold(
+              replaceIdentifier(ds[k], req.variable, {
+                type: "Constant",
+                value: req.lower
+              })
+            )
+          );
+          return `\\frac{${at2}\\left(${v}-${req.lowerLatex}\\right)^{${shiftLatex(k, req)}}}{\\Gamma\\left(${shiftLatex(k + 1, req)}\\right)}`;
+        });
+        answers.push({
+          definitions: [],
+          key: "riemannLiouville",
+          name,
+          definitionLatex,
+          kind: "integral",
+          latex: joinTerms([...boundary, integralRep(req.lowerLatex)]),
+          graphLatex: joinTerms([
+            ...Array.from({ length: n }, (_, k) => {
+              const at2 = req.emit(
+                fold(
+                  replaceIdentifier(ds[k], req.variable, {
+                    type: "Constant",
+                    value: req.lower
+                  })
+                )
+              );
+              return `\\frac{\\left(${at2}\\right)\\left(${v}-${req.lowerLatex}\\right)^{${k}-\\left(${A}\\right)}}{\\left(${k}-\\left(${A}\\right)\\right)!}`;
+            }),
+            integralGraph(req.lowerLatex)
+          ]),
+          value,
+          notes: [
+            "Written as the Caputo integral plus the boundary terms f\u207D\u1D4F\u207E(a)(x \u2212 a)^{k\u2212\u03B1}/\u0393(k + 1 \u2212 \u03B1), which is the same operator and needs no derivative of an integral."
+          ]
+        });
+      }
+    }
+    if (!integral) {
+      const definitionLatex = `{}^{C}_{${req.lowerLatex}}D_{${v}}^{${A}}f=\\frac{1}{\\Gamma\\left(${shiftLatex(n, req)}\\right)}\\int_{${req.lowerLatex}}^{${v}}f^{\\left(${n}\\right)}\\left(${dummy}\\right)\\left(${v}-${dummy}\\right)^{${kernelPower}}d${dummy}`;
+      const c = fromZero ? closed((t) => caputoTerm(t, req, n)) : void 0;
+      if (c !== void 0 && c.undefinedTerm === void 0 && !c.missing) {
+        answers.push({
+          definitions: [],
+          key: "caputo",
+          name: "Caputo",
+          definitionLatex,
+          kind: "closed",
+          latex: joinTerms(c.pieces.map((p) => p.latex)),
+          graphLatex: joinTerms(c.pieces.map((p) => p.graph)),
+          value: c.pieces.reduce((s, p) => s + p.value(x0), 0),
+          notes: [
+            `The ordinary ${n}th derivative first, then a fractional integral: whole powers below ${n} and constants give 0.`
+          ]
+        });
+      } else {
+        const bad = c?.undefinedTerm;
+        const representation = integralRep(
+          bad !== void 0 ? "a" : req.lowerLatex
+        );
+        const value = bad === void 0 ? caputoNumeric(req.f, req, n, x0) : void 0;
+        answers.push({
+          definitions: [],
+          key: "caputo",
+          name: "Caputo",
+          definitionLatex,
+          kind: bad !== void 0 ? "partial" : "integral",
+          latex: representation,
+          graphLatex: bad === void 0 ? integralGraph(req.lowerLatex) : "",
+          value,
+          notes: bad !== void 0 ? [
+            `From ${req.lowerLatex} it does not exist: the ${n}th derivative of ${inline(bad.node)} is too singular there to integrate. From any a > 0 it is the integral shown; set a lower limit above 0 to evaluate it.`
+          ] : [
+            "An exact integral representation, with the function's own derivative written in."
+          ]
+        });
+      }
+    }
+    {
+      const definitionLatex = `{}^{GL}_{${req.lowerLatex}}D_{${v}}^{${A}}f=\\lim_{h\\to0^{+}}\\frac{1}{h^{${A}}}\\sum_{k=0}^{\\frac{${v}-${req.lowerLatex}}{h}}\\left(-1\\right)^{k}\\frac{\\Gamma\\left(${A}+1\\right)}{k!\\Gamma\\left(${A}-k+1\\right)}f\\left(${v}-kh\\right)`;
+      const value = grunwaldNumeric(req.f, req, x0);
+      const riemann = answers.find((x) => x.key === "riemannLiouville");
+      const agrees = value !== void 0 && riemann?.value !== void 0 && Math.abs(value - riemann.value) < 1e-4 * Math.max(1, Math.abs(value));
+      answers.push({
+        definitions: [],
+        key: "grunwaldLetnikov",
+        name: "Gr\xFCnwald\u2013Letnikov",
+        definitionLatex,
+        kind: "limit",
+        latex: `\\lim_{h\\to0^{+}}\\frac{1}{h^{${A}}}\\sum_{k=0}^{\\frac{${v}-${req.lowerLatex}}{h}}\\left(-1\\right)^{k}\\frac{\\Gamma\\left(${A}+1\\right)}{k!\\Gamma\\left(${A}-k+1\\right)}\\left(${req.emit(fold(replaceIdentifier(req.f, req.variable, { type: "BinaryOperator", name: "Subtract", left: id3(req.variable), right: multiply(id3("k"), id3("h")) })))}\\right)`,
+        graphLatex: "",
+        value,
+        notes: [
+          agrees ? `Its value at ${v} = ${x0}, computed from the finite differences with h \u2192 0, matches Riemann\u2013Liouville from the same lower limit, as the theorem says it must for this function.` : "A limit of finite differences; for a function this smooth it equals Riemann\u2013Liouville from the same lower limit."
+        ]
+      });
+    }
+    if (!integral) {
+      const d = ds[n];
+      const body = fold(
+        multiply(
+          {
+            type: "BinaryOperator",
+            name: "Exponent",
+            left: id3(req.variable),
+            right: { type: "Constant", value: n - a }
+          },
+          d
+        )
+      );
+      const value = evaluate(body, { [req.variable]: x0 });
+      answers.push({
+        definitions: [],
+        key: "conformable",
+        name: "Conformable",
+        definitionLatex: `T_{${A}}f\\left(${v}\\right)=${v}^{${shiftLatex(n, req)}}f^{\\left(${n}\\right)}\\left(${v}\\right)`,
+        kind: "closed",
+        latex: `${v}^{${shiftLatex(n, req)}}\\left(${show(d)}\\right)`,
+        graphLatex: `${v}^{${n}-\\left(${A}\\right)}\\left(${show(d)}\\right)`,
+        value: Number.isFinite(value) ? value : void 0,
+        notes: [
+          "Always elementary, because it is local: the ordinary derivative times a power. It is a different operator from the classical, nonlocal ones above."
+        ]
+      });
+    }
+    {
+      const lower = req.lower > 0 ? req.lower : 1;
+      const lowerLatex = req.lower > 0 ? req.lowerLatex : "1";
+      const G = hadamardOperator(req.f, req.variable, n);
+      const Gt = fAt(G);
+      const kernel = integral ? shiftLatex(-1, req) : kernelPower;
+      const definitionLatex = `{}^{CH}_{${lowerLatex}}D_{${v}}^{${A}}f=\\frac{1}{\\Gamma\\left(${shiftLatex(n, req)}\\right)}\\int_{${lowerLatex}}^{${v}}\\left(\\ln\\frac{${v}}{${dummy}}\\right)^{${kernel}}\\delta^{${n}}f\\left(${dummy}\\right)\\frac{d${dummy}}{${dummy}}`;
+      const beta2 = n - a;
+      const g = (w) => evaluate(G, { [req.variable]: x0 * Math.exp(-(w ** (1 / beta2))) }) / beta2;
+      const integralValue = x0 > lower ? quadrature(g, 0, Math.log(x0 / lower) ** beta2) : void 0;
+      answers.push({
+        definitions: [],
+        key: "caputoHadamard",
+        name: integral ? "Hadamard integral" : "Caputo\u2013Hadamard",
+        definitionLatex,
+        kind: "integral",
+        latex: `${gammaFront}\\int_{${lowerLatex}}^{${v}}\\left(\\ln\\frac{${v}}{${dummy}}\\right)^{${kernel}}\\frac{${Gt}}{${dummy}}d${dummy}`,
+        graphLatex: `\\frac{1}{\\left(${n - 1}-\\left(${A}\\right)\\right)!}\\int_{${lowerLatex}}^{${v}}\\left(\\ln\\left(\\frac{${v}}{${dummy}}\\right)\\right)^{${n - 1}-\\left(${A}\\right)}\\frac{${Gt}}{${dummy}}d${dummy}`,
+        value: integralValue === void 0 ? void 0 : integralValue / gamma(n - a),
+        notes: [
+          `The kernel uses logarithmic distance, and the derivative is \u03B4 = ${v}\xB7d/d${v}, applied ${n} time${n === 1 ? "" : "s"}: \u03B4${n === 1 ? "" : `^${n}`}f = ${inline(G)}.`,
+          ...x0 > lower ? [] : [`Evaluated only for ${v} above the lower limit ${lowerLatex}.`]
+        ]
+      });
+    }
+    {
+      const pieces = terms.map((t) => ({ t, w: weylTerm(t, req) }));
+      const missing = pieces.filter((p) => typeof p.w === "string");
+      const found = pieces.filter((p) => typeof p.w !== "string").map((p) => p.w);
+      const definitionLatex = `{}_{-\\infty}D_{${v}}^{${A}}f:\\ \\mathcal{F}\\left[D^{${A}}f\\right]\\left(\\omega\\right)=\\left(i\\omega\\right)^{${A}}\\hat{f}\\left(\\omega\\right)`;
+      answers.push({
+        definitions: [],
+        key: "weyl",
+        name: "Weyl (from \u2212\u221E)",
+        definitionLatex,
+        kind: missing.length === 0 ? "closed" : found.length > 0 ? "partial" : "undefined",
+        latex: missing.length === 0 ? joinTerms(found.map((p) => p.latex)) : found.length > 0 ? joinTerms(found.map((p) => p.latex)) : "",
+        graphLatex: missing.length === 0 ? joinTerms(found.map((p) => p.graph)) : "",
+        value: missing.length === 0 ? found.reduce((s, p) => s + p.value(x0), 0) : void 0,
+        notes: missing.length === 0 ? [
+          "Exponentials scale by b\u1D45 and sines and cosines shift phase by \u03B1\u03C0/2."
+        ] : [
+          `Not defined for the whole function: ${missing.map((p) => `${inline(p.t.node)} (${p.w})`).join("; ")}.${found.length > 0 ? " Shown: the terms that have one." : ""}`
+        ]
+      });
+    }
+    for (const answer of answers) {
+      if (answer.latex === "" || answer.kind === "limit" || answer.kind === "undefined" || answer.kind === "partial" && answer.key === "caputo")
+        continue;
+      answer.graphLatex = desmosForm(answer.latex);
+      answer.definitions = desmosDefinitions(
+        specialFunctionsIn(answer.graphLatex)
+      );
+    }
+    return { kind: integral ? "integral" : "derivative", n, answers, notes };
+  }
+  function desmosForm(latex) {
+    let out = latex.split("}^{\\infty}").join("}^{60}");
+    for (let guard = 0; guard < 50; guard += 1) {
+      const at2 = out.indexOf("E_{");
+      if (at2 < 0)
+        break;
+      let depth2 = 0;
+      let end = at2 + 2;
+      for (; end < out.length; end += 1) {
+        if (out[end] === "{")
+          depth2 += 1;
+        else if (out[end] === "}" && --depth2 === 0)
+          break;
+      }
+      const subscript = out.slice(at2 + 3, end);
+      const comma = topLevelComma(subscript);
+      const rest = out.slice(end + 1);
+      const open = "\\left(";
+      if (comma < 0 || !rest.startsWith(open))
+        break;
+      out = `${out.slice(0, at2)}E${open}${subscript.slice(0, comma)},${subscript.slice(comma + 1)},${rest.slice(open.length)}`;
+    }
+    return out;
+  }
+  function topLevelComma(s) {
+    let depth2 = 0;
+    for (let i = 0; i < s.length; i += 1) {
+      if (s[i] === "{" || s[i] === "(")
+        depth2 += 1;
+      else if (s[i] === "}" || s[i] === ")")
+        depth2 -= 1;
+      else if (s[i] === "," && depth2 === 0)
+        return i;
+    }
+    return -1;
+  }
+  function halfPiTimesOrder(req) {
+    const a = req.orderLatex.trim();
+    if (a === "\\pi")
+      return "\\frac{\\pi^{2}}{2}";
+    const q = fromNumber(req.order);
+    if (q !== void 0 && /^[-\d.\\{}frac\s]*$/.test(a)) {
+      const h = multiply3(q, rational(1n, 2n));
+      if (isOne(h))
+        return "\\pi";
+      const top = h.n === 1n ? "" : h.n === -1n ? "-" : String(h.n);
+      return h.d === 1n ? `${top}\\pi` : `\\frac{${top}\\pi}{${h.d}}`;
+    }
+    return `\\frac{${a}\\pi}{2}`;
+  }
+  function scaled(b, v) {
+    return b === 1 ? v : `${formatNumber(b)}${v}`;
   }
 
   // src/plugins/physics-lab/symbolic/quadrature.ts
@@ -16750,12 +18017,12 @@ var CalcEngine = (() => {
         if (!dependsOn(node.right, variable))
           return void 0;
         const base2 = part(node.left);
-        const exponent = part(node.right);
-        if (isOne3(base2) && isInfinite(exponent))
+        const exponent2 = part(node.right);
+        if (isOne3(base2) && isInfinite(exponent2))
           return "1^inf";
-        if (isZero4(base2) && isZero4(exponent))
+        if (isZero4(base2) && isZero4(exponent2))
           return "0^0";
-        if (base2?.kind === "infinite" && base2.sign > 0 && isZero4(exponent))
+        if (base2?.kind === "infinite" && base2.sign > 0 && isZero4(exponent2))
           return "inf^0";
         return void 0;
       }
@@ -16902,11 +18169,11 @@ var CalcEngine = (() => {
   }
 
   // src/plugins/physics-lab/symbolic/ode.ts
-  var { number: number6, binop: binop5, id: id6, negative: negative5 } = augBuilders_exports;
-  var add7 = (a, b) => binop5("Add", a, b);
+  var { number: number5, binop: binop5, id: id6, negative: negative5 } = augBuilders_exports;
+  var add6 = (a, b) => binop5("Add", a, b);
   var multiply6 = (a, b) => binop5("Multiply", a, b);
-  var divide9 = (a, b) => binop5("Divide", a, b);
-  var power7 = (a, b) => binop5("Exponent", a, b);
+  var divide8 = (a, b) => binop5("Divide", a, b);
+  var power6 = (a, b) => binop5("Exponent", a, b);
   var subtract5 = (a, b) => binop5("Subtract", a, b);
   var CONSTANT = "C";
   var SAMPLE_XS = [-1.7, -0.6, 0.4, 1.3, 2.2, 3.1];
@@ -16966,9 +18233,9 @@ var CalcEngine = (() => {
       const coefficient = fold(
         multiply6(
           split4.g,
-          divide9(
-            number6(1),
-            multiply6(split4.hInverse, power7(id6(dependent), number6(rounded)))
+          divide8(
+            number5(1),
+            multiply6(split4.hInverse, power6(id6(dependent), number5(rounded)))
           )
         )
       );
@@ -16980,19 +18247,19 @@ var CalcEngine = (() => {
     const n = [...byPower.keys()].find((k) => k !== 1);
     if (n === 0)
       return void 0;
-    const sum3 = (terms) => terms.reduce((a, b) => add7(a, b));
+    const sum3 = (terms) => terms.reduce((a, b) => add6(a, b));
     const P2 = fold(sum3(byPower.get(1)));
     const Q = fold(sum3(byPower.get(n)));
     if (dependsOn(P2, dependent) || dependsOn(Q, dependent))
       return void 0;
     const v = "v";
-    const scale = number6(1 - n);
-    const linearInV = fold(multiply6(scale, add7(multiply6(P2, id6(v)), Q)));
+    const scale = number5(1 - n);
+    const linearInV = fold(multiply6(scale, add6(multiply6(P2, id6(v)), Q)));
     const inV = solveFirstOrder(cfg2, linearInV, independent, v);
     if (!inV.ok || inV.solution.tree === void 0)
       return void 0;
     const root2 = 1 / (1 - n);
-    const solution = fold(power7(inV.solution.tree, rationalExponent(root2)));
+    const solution = fold(power6(inV.solution.tree, rationalExponent(root2)));
     const evenRoot = rationalExponent(root2).type !== "Constant" && Math.round(Math.abs(1 - n)) % 2 === 0;
     return verified(
       {
@@ -17012,28 +18279,28 @@ var CalcEngine = (() => {
     for (let d = 1; d <= 12; d++) {
       const n = Math.round(value * d);
       if (Math.abs(n / d - value) < 1e-12)
-        return d === 1 ? number6(n) : divide9(number6(n), number6(d));
+        return d === 1 ? number5(n) : divide8(number5(n), number5(d));
     }
-    return number6(value);
+    return number5(value);
   }
-  function powerWords(name, exponent) {
+  function powerWords(name, exponent2) {
     const superscripts = {
       "2": "\xB2",
       "3": "\xB3",
       "4": "\u2074",
       "5": "\u2075"
     };
-    if (exponent === 1)
+    if (exponent2 === 1)
       return name;
-    if (exponent === -1)
+    if (exponent2 === -1)
       return `1/${name}`;
-    if (Number.isInteger(exponent)) {
-      const up = superscripts[String(Math.abs(exponent))];
-      const raised2 = up === void 0 ? `${name}^${Math.abs(exponent)}` : name + up;
-      return exponent > 0 ? raised2 : `1/${raised2}`;
+    if (Number.isInteger(exponent2)) {
+      const up = superscripts[String(Math.abs(exponent2))];
+      const raised2 = up === void 0 ? `${name}^${Math.abs(exponent2)}` : name + up;
+      return exponent2 > 0 ? raised2 : `1/${raised2}`;
     }
-    const node = rationalExponent(exponent);
-    return node.type === "BinaryOperator" && node.left.type === "Constant" && node.right.type === "Constant" ? `${name}^(${node.left.value}/${node.right.value})` : `${name}^${exponent}`;
+    const node = rationalExponent(exponent2);
+    return node.type === "BinaryOperator" && node.left.type === "Constant" && node.right.type === "Constant" ? `${name}^(${node.left.value}/${node.right.value})` : `${name}^${exponent2}`;
   }
   function homogeneous(emit2, f, independent, dependent) {
     const at2 = (x, y) => evaluate(f, { [independent]: x, [dependent]: y });
@@ -17056,7 +18323,7 @@ var CalcEngine = (() => {
       return void 0;
     const v = "v";
     const F = fold(
-      replaceName(replaceName(f, dependent, id6(v)), independent, number6(1))
+      replaceName(replaceName(f, dependent, id6(v)), independent, number5(1))
     );
     const denominator = fold(subtract5(F, id6(v)));
     if (isZero3(denominator))
@@ -17064,9 +18331,9 @@ var CalcEngine = (() => {
     const ratio = asRatio(denominator);
     let left;
     try {
-      left = integrate(
+      left = integrate2(
         fold(
-          divide9(
+          divide8(
             fold(tidySums(fold(expand(ratio.denominator).node))),
             fold(tidySums(fold(expand(ratio.numerator).node)))
           )
@@ -17076,10 +18343,10 @@ var CalcEngine = (() => {
     } catch {
       return void 0;
     }
-    const quotient = divide9(id6(dependent), id6(independent));
+    const quotient = divide8(id6(dependent), id6(independent));
     const leftInY = fold(replaceName(left, v, quotient));
     const right = fold(
-      add7(
+      add6(
         {
           type: "FunctionCall",
           callee: id6("ln"),
@@ -17151,11 +18418,11 @@ var CalcEngine = (() => {
   function direct(emit2, f, independent, dependent) {
     let antiderivative2;
     try {
-      antiderivative2 = integrate(f, independent);
+      antiderivative2 = integrate2(f, independent);
     } catch (error2) {
       return failed(error2);
     }
-    const solution = fold(add7(antiderivative2, id6(CONSTANT)));
+    const solution = fold(add6(antiderivative2, id6(CONSTANT)));
     return verified(
       {
         // Written as `+C` on the end rather than emitted from the tree. The
@@ -17166,7 +18433,7 @@ var CalcEngine = (() => {
         latex: `${dependent}=${emit2(fold(antiderivative2))}+${CONSTANT}`,
         method: "Direct antiderivative",
         explicit: true,
-        tree: fold(add7(antiderivative2, id6(CONSTANT)))
+        tree: fold(add6(antiderivative2, id6(CONSTANT)))
       },
       solution,
       f,
@@ -17180,11 +18447,11 @@ var CalcEngine = (() => {
     const bIsZero = isZero3(b);
     let antiderivativeOfA;
     try {
-      antiderivativeOfA = withoutLogBars(integrate(a, independent));
+      antiderivativeOfA = withoutLogBars(integrate2(a, independent));
     } catch (error2) {
       return failed(error2);
     }
-    const growth2 = power7(id6("e"), antiderivativeOfA);
+    const growth2 = power6(id6("e"), antiderivativeOfA);
     if (bIsZero) {
       const solution2 = fold(multiply6(id6(CONSTANT), growth2));
       return verified(
@@ -17201,8 +18468,8 @@ var CalcEngine = (() => {
       );
     }
     if (!aHasX && !dependsOn(b, independent)) {
-      const equilibrium = divide9(negative5(b), a);
-      const solution2 = fold(add7(equilibrium, multiply6(id6(CONSTANT), growth2)));
+      const equilibrium = divide8(negative5(b), a);
+      const solution2 = fold(add6(equilibrium, multiply6(id6(CONSTANT), growth2)));
       return verified(
         {
           latex: `${dependent}=${emit2(solution2)}`,
@@ -17218,13 +18485,13 @@ var CalcEngine = (() => {
     }
     let particular;
     try {
-      const factor = power7(id6("e"), fold(negative5(antiderivativeOfA)));
-      particular = integrate(fold(multiply6(b, factor)), independent);
+      const factor = power6(id6("e"), fold(negative5(antiderivativeOfA)));
+      particular = integrate2(fold(multiply6(b, factor)), independent);
     } catch (error2) {
       return failed(error2);
     }
     const solution = fold(
-      add7(distribute2(growth2, particular), multiply6(id6(CONSTANT), growth2))
+      add6(distribute2(growth2, particular), multiply6(id6(CONSTANT), growth2))
     );
     return verified(
       {
@@ -17243,24 +18510,24 @@ var CalcEngine = (() => {
     const coefficients = coefficientsIn(f, dependent, 2);
     if (coefficients === void 0 || coefficients.length !== 3)
       return void 0;
-    const [constant3, linear, quadratic2] = coefficients.map((c) => fold(c));
+    const [constant3, linear2, quadratic2] = coefficients.map((c) => fold(c));
     if (!isZero3(constant3))
       return void 0;
     if (isZero3(quadratic2))
       return void 0;
-    if (isZero3(linear))
+    if (isZero3(linear2))
       return void 0;
-    if (dependsOn(linear, independent) || dependsOn(quadratic2, independent))
+    if (dependsOn(linear2, independent) || dependsOn(quadratic2, independent))
       return void 0;
-    const capacity = fold(divide9(negative5(linear), quadratic2));
+    const capacity = fold(divide8(negative5(linear2), quadratic2));
     const solution = fold(
-      divide9(
+      divide8(
         capacity,
-        add7(
-          number6(1),
+        add6(
+          number5(1),
           multiply6(
             id6(CONSTANT),
-            power7(id6("e"), fold(multiply6(negative5(linear), id6(independent))))
+            power6(id6("e"), fold(multiply6(negative5(linear2), id6(independent))))
           )
         )
       )
@@ -17289,8 +18556,8 @@ var CalcEngine = (() => {
     let left;
     let right;
     try {
-      left = fold(integrate(split4.hInverse, dependent));
-      right = fold(integrate(split4.g, independent));
+      left = fold(integrate2(split4.hInverse, dependent));
+      right = fold(integrate2(split4.g, independent));
     } catch (error2) {
       return failed(error2);
     }
@@ -17303,7 +18570,7 @@ var CalcEngine = (() => {
     const implicit = {
       ok: true,
       solution: {
-        latex: `${emit2(left)}=${emit2(fold(add7(right, id6(CONSTANT))))}`,
+        latex: `${emit2(left)}=${emit2(fold(add6(right, id6(CONSTANT))))}`,
         method: "Separable, left as a relation between x and y",
         explicit: false,
         relation: { left, right }
@@ -17363,15 +18630,15 @@ var CalcEngine = (() => {
       if (!(Math.abs(at2(y) - expected) <= 1e-9 * Math.abs(expected)))
         return void 0;
     }
-    const coefficient = fold(divide9(left, power7(id6(dependent), number6(n))));
+    const coefficient = fold(divide8(left, power6(id6(dependent), number5(n))));
     if (dependsOn(coefficient, dependent))
       return void 0;
     const negativeK = evaluate(coefficient, parameters) < 0;
-    const base2 = negativeK ? divide9(
-      add7(fold(negative5(right)), id6(CONSTANT)),
+    const base2 = negativeK ? divide8(
+      add6(fold(negative5(right)), id6(CONSTANT)),
       fold(negative5(coefficient))
-    ) : divide9(add7(right, id6(CONSTANT)), coefficient);
-    return fold(power7(base2, divide9(number6(1), number6(n))));
+    ) : divide8(add6(right, id6(CONSTANT)), coefficient);
+    return fold(power6(base2, divide8(number5(1), number5(n))));
   }
   function separate(f, independent, dependent) {
     const collected = [];
@@ -17397,10 +18664,10 @@ var CalcEngine = (() => {
     };
   }
   function assemble2(numerator, denominator) {
-    const product = (factors) => factors.length === 0 ? number6(1) : factors.reduce((left, right) => multiply6(left, right));
+    const product = (factors) => factors.length === 0 ? number5(1) : factors.reduce((left, right) => multiply6(left, right));
     if (denominator.length === 0)
       return product(numerator);
-    return divide9(product(numerator), product(denominator));
+    return divide8(product(numerator), product(denominator));
   }
   function collect2(node, inNumerator, out) {
     if (node.type === "BinaryOperator") {
@@ -17417,12 +18684,12 @@ var CalcEngine = (() => {
     }
     if (node.type === "BinaryOperator" && node.name === "Exponent" && node.left.type === "Identifier" && node.left.symbol === "e" && node.right.type === "BinaryOperator" && (node.right.name === "Add" || node.right.name === "Subtract")) {
       const second = node.right.name === "Add" ? node.right.right : negative5(node.right.right);
-      collect2(power7(node.left, node.right.left), inNumerator, out);
-      collect2(power7(node.left, second), inNumerator, out);
+      collect2(power6(node.left, node.right.left), inNumerator, out);
+      collect2(power6(node.left, second), inNumerator, out);
       return;
     }
     if (node.type === "Negative") {
-      out.push({ node: number6(-1), inNumerator });
+      out.push({ node: number5(-1), inNumerator });
       collect2(node.arg, inNumerator, out);
       return;
     }
@@ -17504,7 +18771,7 @@ var CalcEngine = (() => {
   function distribute2(factor, sum3) {
     if (sum3.type === "BinaryOperator") {
       if (sum3.name === "Add")
-        return add7(distribute2(factor, sum3.left), distribute2(factor, sum3.right));
+        return add6(distribute2(factor, sum3.left), distribute2(factor, sum3.right));
       if (sum3.name === "Subtract")
         return subtract5(
           distribute2(factor, sum3.left),
@@ -17516,9 +18783,9 @@ var CalcEngine = (() => {
 
   // src/plugins/physics-lab/symbolic/secondOrder.ts
   var { binop: binop6, functionCall: functionCall5, id: id7 } = augBuilders_exports;
-  var add8 = (a, b) => binop6("Add", a, b);
+  var add7 = (a, b) => binop6("Add", a, b);
   var multiply7 = (a, b) => binop6("Multiply", a, b);
-  var power8 = (a, b) => binop6("Exponent", a, b);
+  var power7 = (a, b) => binop6("Exponent", a, b);
   var call3 = (name, arg) => functionCall5(id7(name), arg);
   var FIRST = "C_1";
   var SECOND = "C_2";
@@ -17570,7 +18837,7 @@ var CalcEngine = (() => {
       };
     }
     const solution = fold(
-      equilibrium === void 0 ? built.tree : add8(equilibrium, built.tree)
+      equilibrium === void 0 ? built.tree : add7(equilibrium, built.tree)
     );
     return verifiedSecondOrder(
       {
@@ -17593,9 +18860,9 @@ var CalcEngine = (() => {
     const first = toNode(add5(centre, spread));
     const second = toNode(subtract4(centre, spread));
     return {
-      tree: add8(
-        multiply7(id7(FIRST), power8(id7("e"), multiply7(first, id7("x")))),
-        multiply7(id7(SECOND), power8(id7("e"), multiply7(second, id7("x"))))
+      tree: add7(
+        multiply7(id7(FIRST), power7(id7("e"), multiply7(first, id7("x")))),
+        multiply7(id7(SECOND), power7(id7("e"), multiply7(second, id7("x"))))
       ),
       method: "Two real characteristic roots"
     };
@@ -17604,8 +18871,8 @@ var CalcEngine = (() => {
     const root2 = toNode(fromRational(halfP));
     return {
       tree: multiply7(
-        add8(id7(FIRST), multiply7(id7(SECOND), id7("x"))),
-        power8(id7("e"), multiply7(root2, id7("x")))
+        add7(id7(FIRST), multiply7(id7(SECOND), id7("x"))),
+        power7(id7("e"), multiply7(root2, id7("x")))
       ),
       method: "A repeated characteristic root, critically damped"
     };
@@ -17614,17 +18881,17 @@ var CalcEngine = (() => {
     const magnitude = power5(fromRational(negate(discriminant)), half);
     if (magnitude === void 0)
       return void 0;
-    const beta = toNode(multiply5(fromRational(half), magnitude));
-    const oscillation = add8(
-      multiply7(id7(FIRST), call3("cos", multiply7(beta, id7("x")))),
-      multiply7(id7(SECOND), call3("sin", multiply7(beta, id7("x"))))
+    const beta2 = toNode(multiply5(fromRational(half), magnitude));
+    const oscillation = add7(
+      multiply7(id7(FIRST), call3("cos", multiply7(beta2, id7("x")))),
+      multiply7(id7(SECOND), call3("sin", multiply7(beta2, id7("x"))))
     );
     if (isZero(halfP)) {
       return { tree: oscillation, method: "Simple harmonic motion" };
     }
     return {
       tree: multiply7(
-        power8(id7("e"), multiply7(toNode(fromRational(halfP)), id7("x"))),
+        power7(id7("e"), multiply7(toNode(fromRational(halfP)), id7("x"))),
         oscillation
       ),
       method: "Complex characteristic roots, a damped oscillation"
@@ -17732,19 +18999,19 @@ var CalcEngine = (() => {
   var DEFAULT_SERIES_TERMS = 20;
   var PARTIAL_TERMS2 = 4;
   function seriesAntiderivative(node, variable, terms = DEFAULT_SERIES_TERMS) {
-    const shape = readIntegrand(fold(node), variable);
-    const entry = SERIES[shape.series];
+    const shape2 = readIntegrand(fold(node), variable);
+    const entry = SERIES[shape2.series];
     const index = freshName(node, ["n", "k", "j"]);
     const n = id3(index);
     const innerExponent = entry.exponent(n);
     const xPower = add(
       add(
-        multiply(number2(shape.monomialPower), innerExponent),
-        number2(shape.outerPower)
+        multiply(number2(shape2.monomialPower), innerExponent),
+        number2(shape2.outerPower)
       ),
       number2(1)
     );
-    const raisedScale = power2(shape.scale, innerExponent);
+    const raisedScale = power2(shape2.scale, innerExponent);
     const degree3 = fold(expand(xPower).node);
     const zeros = vanishingIndices(degree3, index, entry.from, terms);
     let { from } = entry;
@@ -17756,7 +19023,7 @@ var CalcEngine = (() => {
           replaceIdentifier(
             fold(
               multiply(
-                multiply(shape.constant, entry.coefficient(n)),
+                multiply(shape2.constant, entry.coefficient(n)),
                 raisedScale
               )
             ),
@@ -17774,7 +19041,7 @@ var CalcEngine = (() => {
     }
     const coefficient = fold(
       divide(
-        multiply(multiply(shape.constant, entry.coefficient(n)), raisedScale),
+        multiply(multiply(shape2.constant, entry.coefficient(n)), raisedScale),
         degree3
       )
     );
@@ -17798,7 +19065,7 @@ var CalcEngine = (() => {
       // out of order is harder to recognise than one with a stray bracket.
       partial: logarithm3 === void 0 ? partial : joinSums([logarithm3, partial]),
       interval: logarithm3 === void 0 ? entry.interval : `${entry.interval} except 0`,
-      source: shape.series
+      source: shape2.series
     };
   }
   function writtenOut(term2, index, from) {
@@ -17868,8 +19135,8 @@ var CalcEngine = (() => {
     if (node.type === "BinaryOperator" && node.name === "Exponent") {
       if (node.left.type !== "Identifier" || node.left.symbol !== variable)
         return void 0;
-      const exponent = constantValue(fold(node.right));
-      return exponent !== void 0 && Number.isInteger(exponent) ? exponent : void 0;
+      const exponent2 = constantValue(fold(node.right));
+      return exponent2 !== void 0 && Number.isInteger(exponent2) ? exponent2 : void 0;
     }
     return void 0;
   }
@@ -17941,10 +19208,10 @@ var CalcEngine = (() => {
         scale = inNumerator ? multiply(scale, factor) : divide(scale, factor);
         continue;
       }
-      const power9 = asMonomialPower(factor, variable);
-      if (power9 === void 0 || monomialPower2 !== void 0)
+      const power8 = asMonomialPower(factor, variable);
+      if (power8 === void 0 || monomialPower2 !== void 0)
         return void 0;
-      monomialPower2 = inNumerator ? power9 : -power9;
+      monomialPower2 = inNumerator ? power8 : -power8;
     }
     if (monomialPower2 === void 0 || monomialPower2 <= 0)
       return void 0;
@@ -18002,7 +19269,7 @@ var CalcEngine = (() => {
   }
   function tryClosed(term2, variable) {
     try {
-      return integrate(term2, variable);
+      return integrate2(term2, variable);
     } catch (error2) {
       if (error2 instanceof IntegrationError)
         return void 0;
@@ -18283,9 +19550,9 @@ var CalcEngine = (() => {
       if (ratio === void 0 || isZero(ratio))
         continue;
       const top = ratio.n === 1n ? atom.node : multiply(number2(Number(ratio.n)), atom.node);
-      const scaled = plain ? rationalNode2(ratio) : ratio.d === 1n ? top : divide(top, number2(Number(ratio.d)));
+      const scaled2 = plain ? rationalNode2(ratio) : ratio.d === 1n ? top : divide(top, number2(Number(ratio.d)));
       yield {
-        node: scaled,
+        node: scaled2,
         cost: log102(ratio.n) + log102(ratio.d) + atom.cost,
         plain
       };
@@ -18489,17 +19756,17 @@ var CalcEngine = (() => {
     const logOfValue = D.ln(size);
     for (const base2 of [id3("pi"), id3("e"), number2(2), number2(3), number2(10)]) {
       const logOfBase = D.ln(valueOf(base2, precision));
-      const exponent = logOfValue.div(logOfBase);
-      if (exponent.abs().lt("1e-6"))
+      const exponent2 = logOfValue.div(logOfBase);
+      if (exponent2.abs().lt("1e-6"))
         continue;
       const exponentTolerance = tolerance.div(size).div(logOfBase.abs());
       const exponentDigits = Math.floor(
-        exponent.abs().div(exponentTolerance).log(10).toNumber()
+        exponent2.abs().div(exponentTolerance).log(10).toNumber()
       );
       if (exponentDigits < 10)
         continue;
       const inner = identify(
-        exponent,
+        exponent2,
         exponentTolerance,
         exponentDigits,
         precision,
@@ -18676,6 +19943,7 @@ var CalcEngine = (() => {
   }
   var OPERATION_LABELS = {
     derivative: "Differentiate",
+    fractional: "Fractional derivative",
     integral: "Integrate",
     definite: "Definite integral",
     limit: "Limit",
@@ -18700,16 +19968,46 @@ var CalcEngine = (() => {
     }
     return { text: s[i] ?? "", end: i + 1 };
   }
+  function derivativeHead(s) {
+    const opening = String.raw`\frac{d`;
+    if (!s.startsWith(opening))
+      return void 0;
+    let i = opening.length;
+    let order = "";
+    if (s[i] === "^") {
+      const g = group3(s, i + 1);
+      order = g.text.trim();
+      i = g.end;
+    }
+    if (s[i] !== "}" || s[i + 1] !== "{" || s[i + 2] !== "d")
+      return void 0;
+    const below = closing(s, i + 1);
+    if (below < 0)
+      return void 0;
+    const inside = s.slice(i + 3, below);
+    const hat = inside.indexOf("^");
+    const binder = (hat < 0 ? inside : inside.slice(0, hat)).trim();
+    if (binder === "")
+      return void 0;
+    return { order, binder, body: s.slice(below + 1) };
+  }
   function readRequest(raw) {
     const s = raw.replace(/\\ /g, " ").trim();
-    let m = /^\\frac\{d(?:\^\{?(\d+)\}?)?\}\{d([^}^]+)(?:\^\{?\d+\}?)?\}/.exec(s);
-    if (m)
-      return {
+    const head = derivativeHead(s);
+    if (head !== void 0) {
+      const whole = head.order === "" || /^\d+$/.test(head.order);
+      return whole ? {
         operation: "derivative",
-        order: m[1] ? Number(m[1]) : 1,
-        binder: m[2].trim(),
-        bodyLatex: s.slice(m[0].length)
+        order: head.order === "" ? 1 : Number(head.order),
+        binder: head.binder,
+        bodyLatex: head.body
+      } : {
+        operation: "fractional",
+        orderLatex: head.order,
+        binder: head.binder,
+        bodyLatex: head.body
       };
+    }
     if (s.startsWith("\\int")) {
       let i = 4;
       let lower;
@@ -18737,7 +20035,7 @@ var CalcEngine = (() => {
         upperLatex: upper
       };
     }
-    m = /^\\(?:lim|operatorname\{lim\})_\{/.exec(s);
+    let m = /^\\(?:lim|operatorname\{lim\})_\{/.exec(s);
     if (m) {
       const g = group3(s, m[0].length - 1);
       const arrow = /^(.+?)\\(?:to|rightarrow)(.+)$/.exec(g.text);
@@ -18927,6 +20225,48 @@ var CalcEngine = (() => {
           base2.answer = derivativeAnswer(body, variable, n, options.depth);
           break;
         }
+        case "fractional": {
+          const orderLatex = request.orderLatex ?? "";
+          const order = readBound(orderLatex);
+          if (order === void 0 || order.kind !== "finite")
+            throw new Error(
+              "The order has to be a number, such as \u03C0, 1/2 or \u22120.5."
+            );
+          const lowerLatex = options.lowerLatex?.trim() || "0";
+          const lower = readBound(lowerLatex);
+          const pointLatex = options.pointLatex?.trim() || "2";
+          const point = readBound(pointLatex);
+          if (lower?.kind !== "finite" || point?.kind !== "finite")
+            throw new Error("The lower limit and the point have to be numbers.");
+          const result = fractionalDerivatives({
+            f: implicitProducts2(normsToAbs(body), variable),
+            variable,
+            variableLatex: v,
+            order: order.value,
+            orderLatex,
+            lower: lower.value,
+            lowerLatex,
+            point: point.value,
+            emit
+          });
+          base2.fractional = result;
+          const what = result.kind === "integral" ? `The fractional integral of order \\(${orderLatex.replace(/^-/, "")}\\)` : `The derivative of order \\(${orderLatex}\\)`;
+          base2.summary = `${what} with respect to \\(${v}\\), under every definition that gives a different answer, from \\(${lowerLatex}\\) and evaluated at \\(${v}=${pointLatex}\\).${treat}${sliderWords}${inlinedWords}`;
+          const head = result.answers[0];
+          base2.answer = {
+            latex: head.latex,
+            decimal: head.value === void 0 ? void 0 : fmt(head.value),
+            verdict: "Proved",
+            method: head.name,
+            steps: [],
+            notes: result.notes,
+            graph: [
+              ...head.definitions.map((d) => ({ latex: d })),
+              ...head.graphLatex ? [{ latex: `y=${head.graphLatex}` }] : []
+            ]
+          };
+          break;
+        }
         case "integral":
           base2.summary = `Integrate with respect to \\(${v}\\).${treat}${sliderWords}${inlinedWords}`;
           base2.answer = integralAnswer(body, variable, options);
@@ -19036,6 +20376,29 @@ var CalcEngine = (() => {
       if (!(error2 instanceof IntegrationError))
         throw error2;
       const special2 = error2 instanceof NonElementaryError ? error2.special : "";
+      const named2 = specialAntiderivative(integrand, variable, (term2) => {
+        try {
+          return integrateWithMethod(term2, variable).value;
+        } catch {
+          return void 0;
+        }
+      });
+      if (named2 !== void 0 && checkAntiderivative(named2.value, integrand, variable)) {
+        const constant3 = freshName(integrand, ["C", "K", "D"]);
+        const latex = emit(add(named2.value, id3(constant3)));
+        const definitions = desmosDefinitions(named2.uses);
+        return {
+          latex,
+          verdict: "Proved, checked by differentiating back",
+          method: `No elementary antiderivative${special2 ? ` (${special2})` : ""}, so it is written with ${named2.uses.map((u) => specialFunction(u)?.name ?? u).join(" and ")}.`,
+          steps: [],
+          notes: named2.uses.map((u) => specialFunction(u)).filter((f) => f?.domain !== void 0).map((f) => `${f.name}: defined in Desmos for ${f.domain}.`),
+          graph: [
+            ...definitions.map((d) => ({ latex: d })),
+            { latex: `y=${latex}`, slider: `${constant3}=0` }
+          ]
+        };
+      }
       const series = seriesFallback(integrand, variable, options.seriesTerms);
       if (series === void 0)
         return {

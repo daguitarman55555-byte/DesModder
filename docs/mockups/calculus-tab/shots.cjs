@@ -81,6 +81,22 @@ const OUT = path.join(__dirname, "../../assets");
   await clickText("#calculus-body", "Add to graph");
   await shot("ode-added");
 
+  // Every definition of D^π, and the comparison of their values.
+  await type(
+    String.raw`\frac{d^{\pi}}{dx^{\pi}}\left(\cos\left(x\right)+x+e^{x}+\ln\left(x\right)\right)`
+  );
+  await new Promise((r) => setTimeout(r, 1200));
+  await shot("fractional");
+  await page.evaluate(() =>
+    document.querySelectorAll("#calculus-body .answer")[3]?.scrollIntoView()
+  );
+  await shot("fractional-cards");
+
+  // A special-function antiderivative, graphed with its definition.
+  await type(String.raw`\int\frac{e^{x}}{x}dx`);
+  await clickText("#calculus-body", "Add to graph");
+  await shot("special-function");
+
   await page.click('#tabs [data-tab="precise"]');
   await clickText("#precise-body", "A sum or series");
   await page.evaluate(() => {

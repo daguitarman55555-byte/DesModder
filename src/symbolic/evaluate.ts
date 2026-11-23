@@ -19,6 +19,7 @@
  * sample points while somebody is typing.
  */
 import type { Node } from "./tree";
+import { specialFunction } from "./special";
 
 export type Bindings = Readonly<Record<string, number>>;
 
@@ -102,8 +103,16 @@ export function evaluate(node: Node, bindings: Bindings): number {
       return -evaluate(node.arg, bindings);
     case "FunctionCall": {
       const fn = FUNCTIONS[node.callee.symbol];
-      if (fn === undefined || node.args.length !== 1) return NaN;
-      return fn(evaluate(node.args[0], bindings));
+      if (fn !== undefined && node.args.length === 1)
+        return fn(evaluate(node.args[0], bindings));
+      // Γ, ψ, Li₂, Si, Ei and the rest (special.ts), looked up at call time
+      // because that module imports gamma from this one.
+      const special = specialFunction(node.callee.symbol);
+      if (special === undefined || special.arity !== node.args.length)
+        return NaN;
+      return special.evaluate(
+        ...node.args.map((arg) => evaluate(arg, bindings))
+      );
     }
     case "Factorial": {
       // Desmos's factorial is Γ(z+1) at every z, and a field pasted from a CAS

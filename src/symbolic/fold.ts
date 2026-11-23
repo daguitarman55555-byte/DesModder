@@ -107,6 +107,17 @@ export function fold(node: Node): Node {
       if (node.name === "Exponent") {
         const base = fold(node.left);
         const n = constantValue(fold(node.right));
+        // (uᵃ)ⁿ = u^{an} for a whole n, whatever a is: (x²)² is x⁴.
+        if (
+          base.type === "BinaryOperator" &&
+          base.name === "Exponent" &&
+          n !== undefined &&
+          Number.isInteger(n)
+        ) {
+          const a = constantValue(base.right);
+          if (a !== undefined)
+            return fold(binop("Exponent", base.left, number(a * n)));
+        }
         if (
           base.type === "Negative" &&
           n !== undefined &&

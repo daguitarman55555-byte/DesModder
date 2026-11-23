@@ -158,6 +158,35 @@
         flex-wrap: wrap;
         gap: 5px;
       }
+      .compare {
+        border-collapse: collapse;
+        margin: 8px 0;
+        font-size: 13px;
+        width: 100%;
+      }
+      .compare th,
+      .compare td {
+        text-align: left;
+        padding: 3px 6px;
+        border-bottom: 1px solid #e4e4e4;
+      }
+      .def-name {
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .definition {
+        font-size: 12px;
+        color: #555;
+        overflow-x: auto;
+        margin-bottom: 6px;
+      }
+      .small-input {
+        width: 4.5em;
+        font: inherit;
+      }
+      .row-item {
+        margin-right: 10px;
+      }
       .chip {
         border: 1px solid #ccc;
         background: var(--chip);
@@ -540,6 +569,7 @@
       const fieldSpan = el("span", { class: "field" });
       const OPS = [
         ["d/dx", "derivative", "Differentiate"],
+        ["dᵅ/dxᵅ", "fractional", "Fractional derivative"],
         ["∫", "integral", "Integrate"],
         ["∫ₐᵇ", "definite", "Definite integral"],
         ["lim", "limit", "Limit"],
@@ -550,6 +580,10 @@
         String.raw`\frac{d}{dt}\left(t^{2}\sin\left(at\right)\right)`,
         String.raw`\int x\cos\left(x\right)dx`,
         String.raw`\int e^{-u^{2}}du`,
+        String.raw`\frac{d^{\pi}}{dx^{\pi}}\left(\cos\left(x\right)+x+e^{x}+\ln\left(x\right)\right)`,
+        String.raw`\frac{d^{\frac{1}{2}}}{dt^{\frac{1}{2}}}\left(t^{2}\right)`,
+        String.raw`\int\frac{e^{x}}{x}dx`,
+        String.raw`\int\frac{\ln\left(1+x\right)}{x}dx`,
         String.raw`\int_{0}^{1}\frac{\ln\left(1+x\right)}{x}dx`,
         String.raw`\lim_{h\to0}\frac{f\left(1+h\right)-f\left(1\right)}{h}`,
         String.raw`\lim_{x\to\infty}\left(1+\frac{1}{x}\right)^{x}`,
@@ -629,6 +663,7 @@
           : "";
         const templates = {
           derivative: String.raw`\frac{d}{d${v}}${wrapped}`,
+          fractional: String.raw`\frac{d^{\frac{1}{2}}}{d${v}^{\frac{1}{2}}}${wrapped}`,
           integral: String.raw`\int ${body}d${v}`,
           definite: String.raw`\int_{0}^{1}${body}d${v}`,
           limit: String.raw`\lim_{${v}\to0}${body}`,
@@ -645,6 +680,8 @@
         depth: state.depth,
         seriesTerms: state.terms,
         variable: state.variable,
+        lowerLatex: state.fracLower,
+        pointLatex: state.fracPoint,
       });
 
       const VERDICT_CLASS = {
@@ -762,6 +799,10 @@
         }
         output.append(readback);
         if (a.status !== "ok" || !a.answer) return;
+        if (a.fractional) {
+          renderFractional(a, took);
+          return;
+        }
 
         const ans = a.answer;
         const card = el(
@@ -877,6 +918,135 @@
         output.append(card);
       }
 
+      // ---- fractional derivatives: one card per definition ---------------
+      const KIND = {
+        closed: ["Closed form", "proved"],
+        integral: ["Exact integral", "proved"],
+        limit: ["Limit of finite differences", "numeric"],
+        partial: ["Partly defined", "series"],
+        undefined: ["Not defined", "refused"],
+      };
+      const number = (v) =>
+        v === undefined || !Number.isFinite(v)
+          ? "—"
+          : Math.abs(v) >= 1e6 || (Math.abs(v) < 1e-4 && v !== 0)
+            ? v.toExponential(10)
+            : String(+v.toPrecision(12));
+
+      function renderFractional(a, took) {
+        const r = a.fractional;
+        const v = a.variableLatex;
+        // Where: the lower limit and the point.
+        const field = (label, key, fallback) => {
+          const input = el("input", {
+            class: "small-input",
+            value: state[key] ?? fallback,
+            size: "6",
+          });
+          input.addEventListener("change", () => {
+            state[key] = input.value.trim() || undefined;
+            renderCalculus();
+          });
+          return el("label", { class: "row-item" }, label, " ", input);
+        };
+        output.append(
+          el(
+            "div",
+            { class: "row" },
+            r.kind === "ordinary"
+              ? ""
+              : field("Lower limit a =", "fracLower", "0"),
+            field(`Evaluate at ${a.variable} =`, "fracPoint", "2")
+          )
+        );
+        // The values side by side: where the definitions disagree is the point.
+        const point = state.fracPoint ?? "2";
+        output.append(
+          el(
+            "table",
+            { class: "compare" },
+            el(
+              "tr",
+              {},
+              el("th", {}, "Definition"),
+              el("th", {}, `Value at ${a.variable} = ${point}`)
+            ),
+            r.answers.map((d) =>
+              el(
+                "tr",
+                {},
+                el("td", {}, d.name),
+                el(
+                  "td",
+                  {},
+                  d.kind === "undefined" ? "not defined" : number(d.value)
+                )
+              )
+            )
+          )
+        );
+        for (const d of r.answers) {
+          const [label, cls] = KIND[d.kind];
+          const card = el(
+            "div",
+            { class: "answer" },
+            el(
+              "div",
+              { class: "def-name" },
+              d.name,
+              " ",
+              el("span", { class: "verdict " + cls }, label)
+            ),
+            el("div", { class: "definition" }, math(d.definitionLatex, ""))
+          );
+          if (d.latex)
+            card.append(
+              el("div", { class: "result" }, math(`=${d.latex}`, ""))
+            );
+          if (d.value !== undefined && Number.isFinite(d.value))
+            card.append(
+              el(
+                "div",
+                { class: "decimal" },
+                `At ${a.variable} = ${point}: ${number(d.value)}`
+              )
+            );
+          if (d.notes.length)
+            card.append(
+              el(
+                "div",
+                { class: "notes" },
+                d.notes.map((n) => el("div", {}, prose(n)))
+              )
+            );
+          if (d.definitions.length)
+            card.append(
+              el(
+                "div",
+                { class: "notes" },
+                el("div", {}, "Defined in Desmos with the answer:"),
+                d.definitions.map((x) => el("div", {}, math(x, "")))
+              )
+            );
+          const add = el(
+            "button",
+            {
+              class: "primary",
+              onclick: () =>
+                addToGraph([
+                  ...d.definitions.map((x) => ({ latex: x })),
+                  { latex: `y=${d.graphLatex}` },
+                ]),
+            },
+            "Add to graph"
+          );
+          if (!d.graphLatex) add.disabled = true;
+          card.append(el("div", { class: "actions" }, add));
+          output.append(card);
+        }
+        output.append(el("div", { class: "decimal" }, `${took.toFixed(0)} ms`));
+      }
+
       let added = 0;
       function addToGraph(items) {
         const colors = [
@@ -897,6 +1067,24 @@
                 latex: g.slider,
                 sliderBounds: { min: -5, max: 5 },
               });
+          }
+          // A definition like \Gamma\left(z\right)=…, added once however
+          // many answers use it.
+          const isDefinition =
+            /^[^=]*\\left\([a-z,]+\\right\)=/.test(g.latex ?? "") &&
+            !g.latex.startsWith("y=");
+          if (isDefinition) {
+            const head = g.latex.slice(0, g.latex.indexOf("="));
+            const exists = calc
+              .getState()
+              .expressions.list.some((e) => e.latex?.startsWith(head + "="));
+            if (exists) continue;
+            calc.setExpression({
+              id: `def${added++}`,
+              latex: g.latex,
+              color: "#888",
+            });
+            continue;
           }
           if (g.latex)
             calc.setExpression({
