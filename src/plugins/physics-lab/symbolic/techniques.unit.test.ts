@@ -384,6 +384,18 @@ describe("trigonometric substitution, and coming back from it", () => {
   });
 });
 
+describe("k/(x√(ax²+bx)), the derivative of √Q/x backwards", () => {
+  test("the roadmap's example, without the half-angle detour", () => {
+    check(
+      div(
+        number(1),
+        mul(x, fn("sqrt", add(pow(x, number(2)), mul(number(2), x))))
+      ),
+      "-\\frac{\\sqrt{x^{2}+2x}}{x}"
+    );
+  });
+});
+
 describe("a trigonometric quotient that divides exactly", () => {
   const sin = fn("sin", x);
   const cos = fn("cos", x);

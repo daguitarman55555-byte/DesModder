@@ -75,6 +75,51 @@ export function byConjugate(node: Node, variable: string): Node | undefined {
 }
 
 /**
+ * `k/(x√(ax² + bx))`, a root of a quadratic with no constant term over x:
+ * `−2k√(ax² + bx)/(bx)`. Differentiating `√Q/x` gives
+ * `(xQ′ − 2Q)/(2x²√Q) = −b/(2x√Q)`, which is the whole proof. Without it
+ * `1/(x√(x²+2x))` came back through completing the square and a half-angle
+ * substitution as `−1/tan(arccos(1/(x+1))/2)`: right, and not `−√(x²+2x)/x`
+ * (UPGRADE_ROADMAP, integrals still refused).
+ */
+export function reciprocalXRoot(
+  node: Node,
+  variable: string
+): Node | undefined {
+  const factors: { node: Node; inNumerator: boolean }[] = [];
+  quotientFactors(node, true, factors);
+  const top = factors.filter((f) => f.inNumerator);
+  const bottom = factors.filter((f) => !f.inNumerator);
+  if (bottom.length !== 2) return undefined;
+  if (top.some((f) => dependsOn(f.node, variable))) return undefined;
+  const root = bottom.find(
+    (f) =>
+      f.node.type === "FunctionCall" &&
+      f.node.callee.symbol === "sqrt" &&
+      f.node.args.length === 1
+  );
+  const other = bottom.find((f) => f !== root);
+  if (root === undefined || other === undefined) return undefined;
+  if (root.node.type !== "FunctionCall") return undefined;
+  if (other.node.type !== "Identifier" || other.node.symbol !== variable)
+    return undefined;
+  const quadratic = asQPoly(root.node.args[0], variable);
+  if (
+    quadratic === undefined ||
+    quadratic.length !== 3 ||
+    !Q.isZero(quadratic[0]) ||
+    Q.isZero(quadratic[1])
+  )
+    return undefined;
+  const k = top.reduce<Node>((a, f) => multiply(a, f.node), number(1));
+  // −2/b as one exact fraction, so the sign lands on the coefficient.
+  const coefficient = rationalNode(Q.divide(Q.rational(-2n), quadratic[1]));
+  return fold(
+    divide(multiply(multiply(coefficient, k), root.node), id(variable))
+  );
+}
+
+/**
  * `(x² − c)/((x² + c)√(x⁴ + bx² + c²))` integrated through
  * `u = √(x⁴ + bx² + c²)/x`, for rational `b` and `c > 0`; undefined for any
  * other shape. Valid on each side of 0, where u has its pole.

@@ -63,6 +63,7 @@ import { exactSignChanges, rootsOfSquares } from "./signChanges";
 import {
   byConjugate,
   reciprocalQuartic,
+  reciprocalXRoot,
   reversedProductRule,
 } from "./specialForms";
 import {
@@ -133,6 +134,7 @@ export const TECHNIQUES = {
   rootOfSquare: "√(g²) = |g|",
   conjugate: "Multiplying by the conjugate",
   reciprocalQuartic: "Substitution u = √(x⁴ + bx² + c²)/x",
+  reciprocalXRoot: "The derivative of √(ax² + bx)/x, read backwards",
   reversedProduct: "The product rule backwards: (e^{ax}H)′ = e^{ax}(aH + H′)",
   halfAngle: "Tangent half-angle substitution",
   liouville: "Solving y′ + g′y = f for y·e^g (Liouville)",
@@ -940,6 +942,12 @@ function byRewrite(
 
   const substituted = bySubstitution(node, variable, depth);
   if (substituted !== undefined) return substituted;
+
+  // k/(x√(ax²+bx)) has a one-line answer, which completing the square below
+  // would turn into a half-angle detour.
+  const overX = reciprocalXRoot(node, variable);
+  if (overX !== undefined)
+    return recorded(TECHNIQUES.reciprocalXRoot, () => overX);
 
   // A root of a quadratic with a middle term, moved so the middle term is
   // gone: √(x² + 4x + 13) is √(w² + 9) with w = x + 2. Completing the square

@@ -12282,6 +12282,34 @@ var CalcEngine = (() => {
       return void 0;
     return fold(divide(multiply(node.left, subtract(first, second)), square4));
   }
+  function reciprocalXRoot(node, variable) {
+    const factors = [];
+    quotientFactors(node, true, factors);
+    const top = factors.filter((f) => f.inNumerator);
+    const bottom = factors.filter((f) => !f.inNumerator);
+    if (bottom.length !== 2)
+      return void 0;
+    if (top.some((f) => dependsOn(f.node, variable)))
+      return void 0;
+    const root2 = bottom.find(
+      (f) => f.node.type === "FunctionCall" && f.node.callee.symbol === "sqrt" && f.node.args.length === 1
+    );
+    const other = bottom.find((f) => f !== root2);
+    if (root2 === void 0 || other === void 0)
+      return void 0;
+    if (root2.node.type !== "FunctionCall")
+      return void 0;
+    if (other.node.type !== "Identifier" || other.node.symbol !== variable)
+      return void 0;
+    const quadratic2 = asQPoly(root2.node.args[0], variable);
+    if (quadratic2 === void 0 || quadratic2.length !== 3 || !isZero(quadratic2[0]) || isZero(quadratic2[1]))
+      return void 0;
+    const k = top.reduce((a, f) => multiply(a, f.node), number2(1));
+    const coefficient = rationalNode2(divide5(rational(-2n), quadratic2[1]));
+    return fold(
+      divide(multiply(multiply(coefficient, k), root2.node), id3(variable))
+    );
+  }
   function reciprocalQuartic(node, variable) {
     const factors = [];
     quotientFactors(node, true, factors);
@@ -12434,6 +12462,7 @@ var CalcEngine = (() => {
     rootOfSquare: "\u221A(g\xB2) = |g|",
     conjugate: "Multiplying by the conjugate",
     reciprocalQuartic: "Substitution u = \u221A(x\u2074 + bx\xB2 + c\xB2)/x",
+    reciprocalXRoot: "The derivative of \u221A(ax\xB2 + bx)/x, read backwards",
     reversedProduct: "The product rule backwards: (e^{ax}H)\u2032 = e^{ax}(aH + H\u2032)",
     halfAngle: "Tangent half-angle substitution",
     liouville: "Solving y\u2032 + g\u2032y = f for y\xB7e^g (Liouville)",
@@ -12912,6 +12941,9 @@ var CalcEngine = (() => {
     const substituted = bySubstitution(node, variable, depth2);
     if (substituted !== void 0)
       return substituted;
+    const overX = reciprocalXRoot(node, variable);
+    if (overX !== void 0)
+      return recorded(TECHNIQUES.reciprocalXRoot, () => overX);
     const shifted = squareCompletingShift(node, variable);
     for (const integrand of shifted?.integrands ?? []) {
       try {
