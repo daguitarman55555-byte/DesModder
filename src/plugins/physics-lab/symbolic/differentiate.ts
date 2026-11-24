@@ -62,6 +62,7 @@
  */
 import { Aug, AugBuilders, type Config } from "../../../../text-mode-core";
 import {
+  cancelPowers,
   dependsOn,
   fold as simplify,
   rebuildSum,
@@ -495,7 +496,9 @@ export function differentiate(
 ): Derivation {
   const { derivative, step } = derive(cfg, node, variable);
   return {
-    result: simplify(derivative),
+    // cancelPowers after the fold: the quotient rule leaves √u above the bar
+    // and u^{3/2} below it, which only it reads as the same base.
+    result: cancelPowers(simplify(derivative)),
     raw: derivative,
     root: step,
     domain: gatherDomain(step),

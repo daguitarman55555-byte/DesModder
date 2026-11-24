@@ -36,6 +36,7 @@
  * honest and enough.
  */
 export { fold } from "./fold";
+export { cancelPowers } from "./radicals";
 export {
   differentiate,
   implicitDerivative,
