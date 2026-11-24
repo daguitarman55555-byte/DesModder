@@ -24,6 +24,7 @@ import type { BuiltinName, Chain, Expr, StrictProgram } from "./strictParse";
 import type { StrictOptions } from "./strictEvaluate";
 import { MAX_RATIONAL_DENOMINATOR } from "./strictEvaluate";
 import { emitBuiltinGLSL, glslParamName, GLSL_PRELUDE } from "../latexToGLSL";
+import { SPECIAL_GLSL_FUNCTIONS } from "../specialGLSL";
 
 /** Emitted once per shader that contains strict geometry. */
 export const STRICT_GLSL_PRELUDE = `
@@ -287,6 +288,14 @@ class Body {
         return this.guarded(
           [base, exponent],
           (ok) => `vsPow(${base.v}, ${exponent.v}, ${ok})`
+        );
+      }
+      case "special": {
+        // The visual compiler's float versions. Each returns NaN where the
+        // function is undefined, and the strict sampler reads NaN as outside.
+        const args = node.args.map((arg) => this.expr(arg));
+        return this.value(args, () =>
+          SPECIAL_GLSL_FUNCTIONS[node.fn].emit(args.map((x) => x.v))
         );
       }
       case "call":

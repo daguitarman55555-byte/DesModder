@@ -140,43 +140,53 @@ float vtChi(float z) {
   }
   return VT_EULER + log(z) + sum;
 }
-// Si and Ci: Simpson's rule up to 16, the asymptotic expansion beyond it,
-// where its next term is below 3e-6.
-float vtSincInt(float z) {
-  float h = z / 128.0;
-  float sum = 1.0 + sin(z) / z;
-  for (int i = 1; i < 128; i++) {
-    float t = h * float(i);
-    sum += (mod(float(i), 2.0) < 0.5 ? 2.0 : 4.0) * sin(t) / t;
-  }
-  return sum * h / 3.0;
+vec2 vtCMul(vec2 a, vec2 b) {
+  return vec2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
 }
-float vtCosInt(float z) {
-  float h = z / 128.0;
-  float sum = (cos(z) - 1.0) / z;
-  for (int i = 1; i < 128; i++) {
-    float t = h * float(i);
-    sum += (mod(float(i), 2.0) < 0.5 ? 2.0 : 4.0) * (cos(t) - 1.0) / t;
+vec2 vtCInv(vec2 b) { return vec2(b.x, -b.y) / dot(b, b); }
+// Ci and Si together, as (Ci, Si), for t > 0: the series below 2, where
+// no term is above 2, and above it E1(it) by the complex continued
+// fraction (modified Lentz), which takes 25 steps at 2 and 4 at 30. Both
+// hold to about 2e-7, at any size; the Simpson's rule this replaced took
+// 128 sines and lost its accuracy past 16.
+vec2 vtCiSi(float t) {
+  if (t > 2.0) {
+    vec2 b = vec2(1.0, t);
+    vec2 c = vec2(1e30, 0.0);
+    vec2 d = vtCInv(b);
+    vec2 h = d;
+    for (int i = 2; i < 100; i++) {
+      float a = -float((i - 1) * (i - 1));
+      b.x += 2.0;
+      d = vtCInv(a * d + b);
+      c = b + a * vtCInv(c);
+      vec2 del = vtCMul(c, d);
+      h = vtCMul(h, del);
+      if (abs(del.x - 1.0) + abs(del.y) < 1e-7) break;
+    }
+    h = vtCMul(vec2(cos(t), -sin(t)), h);
+    return vec2(-h.x, VT_PI / 2.0 + h.y);
   }
-  return sum * h / 3.0;
+  float si = 0.0;
+  float ci = 0.0;
+  float term = 1.0;
+  for (int k = 1; k < 40; k++) {
+    term *= t / float(k);
+    float add = term / float(k);
+    // k odd feeds Si, k even feeds Ci, each with signs + - + - ...
+    if (mod(float(k), 2.0) > 0.5) si += mod(float(k - 1), 4.0) < 0.5 ? add : -add;
+    else ci += mod(float(k), 4.0) > 1.5 ? -add : add;
+    if (add < 1e-8) break;
+  }
+  return vec2(VT_EULER + log(t) + ci, si);
 }
 float vtSi(float z) {
   if (z == 0.0) return 0.0;
-  float a = abs(z);
-  float s = sign(z);
-  if (a <= 16.0) return s * vtSincInt(a);
-  float r = 1.0 / (a * a);
-  float f = (1.0 - 2.0 * r + 24.0 * r * r) / a;
-  float g = r * (1.0 - 6.0 * r + 120.0 * r * r);
-  return s * (VT_PI / 2.0 - f * cos(a) - g * sin(a));
+  return sign(z) * vtCiSi(abs(z)).y;
 }
 float vtCi(float z) {
   if (z <= 0.0) return vtUndefined();
-  if (z <= 16.0) return VT_EULER + log(z) + vtCosInt(z);
-  float r = 1.0 / (z * z);
-  float f = (1.0 - 2.0 * r + 24.0 * r * r) / z;
-  float g = r * (1.0 - 6.0 * r + 120.0 * r * r);
-  return f * sin(z) - g * cos(z);
+  return vtCiSi(z).x;
 }
 // Li2: the series inside |z| <= 1/2, and the reflection and inversion
 // identities to bring every z <= 1 there.
@@ -207,37 +217,66 @@ float vtLi2(float z) {
     : -vtLi2Series(w / (w - 1.0)) - 0.5 * log(1.0 - w) * log(1.0 - w);
   return -VT_PI * VT_PI / 6.0 - 0.5 * l * l - inner;
 }
-// Fresnel: Simpson's rule up to 4, the asymptotic expansion beyond.
-float vtFresnel(float z, bool sine) {
-  float a = abs(z);
+// Fresnel C and S together, as (C, S): the series below 1.5, and above it
+// the complex continued fraction for erfc, which takes 13 steps at 1.5 and
+// 3 at 8. About 2e-7 everywhere; Simpson's rule here took 257 steps.
+vec2 vtFresnelCS(float z) {
+  float t = abs(z);
   float s = sign(z);
-  if (a <= 4.0) {
-    float h = a / 256.0;
-    float sum = 0.0;
-    for (int i = 0; i <= 256; i++) {
-      float t = h * float(i);
-      float w = (i == 0 || i == 256) ? 1.0 : (mod(float(i), 2.0) < 0.5 ? 2.0 : 4.0);
-      float arg = VT_PI * t * t / 2.0;
-      sum += w * (sine ? sin(arg) : cos(arg));
+  if (t < 1.5) {
+    float p = VT_PI / 2.0 * t * t;
+    float sc = 0.0;
+    float ss = 0.0;
+    float term = t;
+    for (int k = 0; k < 40; k++) {
+      if (k > 0) term *= p / float(k);
+      float add = term / float(2 * k + 1);
+      // k = 0, 1, 2, 3 ... gives +C, +S, -C, -S, then repeats.
+      float sgn = mod(float(k), 4.0) < 1.5 ? 1.0 : -1.0;
+      if (mod(float(k), 2.0) < 0.5) sc += sgn * add;
+      else ss += sgn * add;
+      if (add < 1e-9) break;
     }
-    return s * sum * h / 3.0;
+    return s * vec2(sc, ss);
   }
-  float x = VT_PI * a * a / 2.0;
-  float q = 1.0 / (VT_PI * VT_PI * a * a * a * a);
-  float f = (1.0 - 3.0 * q) / (VT_PI * a);
-  float g = (1.0 - 15.0 * q) / (VT_PI * VT_PI * a * a * a);
-  return s * (sine ? 0.5 - f * cos(x) - g * sin(x) : 0.5 + f * sin(x) - g * cos(x));
+  float pt2 = VT_PI * t * t;
+  vec2 b = vec2(1.0, -pt2);
+  vec2 c = vec2(1e30, 0.0);
+  vec2 d = vtCInv(b);
+  vec2 h = d;
+  float n = -1.0;
+  for (int k = 2; k < 100; k++) {
+    n += 2.0;
+    float a = -n * (n + 1.0);
+    b.x += 4.0;
+    d = vtCInv(a * d + b);
+    c = b + a * vtCInv(c);
+    vec2 del = vtCMul(c, d);
+    h = vtCMul(h, del);
+    if (abs(del.x - 1.0) + abs(del.y) < 1e-7) break;
+  }
+  h = vtCMul(vec2(t, -t), h);
+  vec2 e = vec2(cos(0.5 * pt2), sin(0.5 * pt2));
+  return s * vtCMul(vec2(0.5, 0.5), vec2(1.0, 0.0) - vtCMul(e, h));
 }
-// Bessel's integral, for whole orders, by Simpson's rule.
+float vtFresnel(float z, bool sine) {
+  vec2 cs = vtFresnelCS(z);
+  return sine ? cs.y : cs.x;
+}
+// Bessel's integral, for whole orders. The integrand is even and 2pi
+// periodic, so the trapezoid rule converges geometrically once its N
+// passes |z|: 16 + |z| points (at most 64) hold to 2e-7 where Simpson's
+// rule took 129 and did worse.
 float vtBesselJ(float n, float z) {
-  float h = VT_PI / 128.0;
-  float sum = 0.0;
-  for (int i = 0; i <= 128; i++) {
+  float N = clamp(ceil(abs(z)) + 16.0, 16.0, 64.0);
+  float h = VT_PI / N;
+  float sum = 0.5 * (1.0 + cos(n * VT_PI));
+  for (int i = 1; i < 64; i++) {
+    if (float(i) >= N) break;
     float u = h * float(i);
-    float w = (i == 0 || i == 128) ? 1.0 : (mod(float(i), 2.0) < 0.5 ? 2.0 : 4.0);
-    sum += w * cos(n * u - z * sin(u));
+    sum += cos(n * u - z * sin(u));
   }
-  return sum * h / (3.0 * VT_PI);
+  return sum * h / VT_PI;
 }
 // W0 by Halley's iteration; near -1/e it starts from the branch-point series.
 float vtW0(float z) {

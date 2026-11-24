@@ -26,6 +26,7 @@
  * they occur.
  */
 
+import { specialFunction } from "../../symbolic/special";
 import type { BuiltinName, Chain, Expr, StrictProgram } from "./strictParse";
 
 /** What a compiled tree reads at evaluation time. */
@@ -231,6 +232,13 @@ export function compileExpression(
         const base = build(node.base, locals);
         const exponent = build(node.exponent, locals);
         return (s, l) => desmosPow(base(s, l), exponent(s, l));
+      }
+      case "special": {
+        // Defined in `symbolic/special.ts`, which the parser has already
+        // checked the name and arity against.
+        const fn = specialFunction(node.fn)!;
+        const args = node.args.map((arg) => build(arg, locals));
+        return (s, l) => fn.evaluate(...args.map((arg) => arg(s, l)));
       }
       case "call":
         return builtin(

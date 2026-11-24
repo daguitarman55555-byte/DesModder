@@ -356,8 +356,24 @@ const SPECIAL_CASES: [
     (_, y) => [y - 0.5],
     1e-5,
   ],
+  // Beyond the old Simpson's-rule ranges (16 for Si and Ci, 4 for Fresnel),
+  // where the continued fractions now take over.
+  [R`\operatorname{Si}\left(20x+5\right)`, "Si", (x) => [20 * x + 5], 1e-5],
+  [R`\operatorname{Ci}\left(20x+25\right)`, "Ci", (x) => [20 * x + 25], 1e-5],
   [R`\operatorname{FresnelS}\left(2x\right)`, "FresnelS", (x) => [2 * x], 1e-4],
   [R`\operatorname{FresnelC}\left(x\right)`, "FresnelC", (x) => [x], 1e-4],
+  [
+    R`\operatorname{FresnelC}\left(4x+3\right)`,
+    "FresnelC",
+    (x) => [4 * x + 3],
+    1e-5,
+  ],
+  [
+    R`\operatorname{BesselJ}\left(5,10y\right)`,
+    "BesselJ",
+    (_, y) => [5, 10 * y],
+    1e-5,
+  ],
   [
     R`\operatorname{BesselJ}\left(2,3x\right)`,
     "BesselJ",
@@ -396,20 +412,46 @@ testWithPageAndOpts(
         mismatches.push(`${latex}: GPU ${gpu.error}`);
         continue;
       }
+      // A fluid's solid reads the same call through the strict compiler:
+      // special.ts itself on the CPU, the same GLSL with a validity flag
+      // on the GPU.
+      const parsed = parseStrictExpression(latex, env);
+      if (!parsed.ok) {
+        mismatches.push(`${latex}: solid refused, ${parsed.error}`);
+        continue;
+      }
+      const cpu = compileExpression(parsed.expr, parsed.program, {
+        degreeMode: false,
+      });
+      const strict = await gpuValues(
+        driver,
+        "solid(p, ok)",
+        emitExpressionGLSL(
+          parsed.expr,
+          parsed.program,
+          { degreeMode: false },
+          "solid"
+        ),
+        STRICT_GLSL_PRELUDE
+      );
+      if (!Array.isArray(strict)) {
+        mismatches.push(`${latex}: solid GPU ${strict.error}`);
+        continue;
+      }
       const f = specialFunction(symbol)!;
+      const close = (value: number, expected: number, tol: number) =>
+        (Number.isNaN(expected) && Number.isNaN(value)) ||
+        Math.abs(value - expected) <= tol * Math.max(1, Math.abs(expected));
       POINTS.forEach(([x, y], k) => {
         const expected = f.evaluate(...args(x, y));
-        const value = gpu[k];
-        if (Number.isNaN(expected) && Number.isNaN(value)) return;
-        if (
-          !(
-            Math.abs(value - expected) <=
-            tolerance * Math.max(1, Math.abs(expected))
-          )
-        )
-          mismatches.push(
-            `${latex} at (${x}, ${y}): special.ts ${expected}, GPU ${value}`
-          );
+        const at = `${latex} at (${x}, ${y}): special.ts ${expected}`;
+        if (!close(gpu[k], expected, tolerance))
+          mismatches.push(`${at}, GPU ${gpu[k]}`);
+        if (!close(strict[k], expected, tolerance))
+          mismatches.push(`${at}, solid GPU ${strict[k]}`);
+        const onCpu = cpu({ x, y, time: 0, params: new Map() }, []);
+        if (!close(onCpu, expected, 1e-12))
+          mismatches.push(`${at}, solid CPU ${onCpu}`);
       });
     }
     expect(mismatches).toEqual([]);

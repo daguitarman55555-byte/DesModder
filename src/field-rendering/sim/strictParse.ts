@@ -26,6 +26,7 @@ import {
   type FunctionDefinition,
   type Token,
 } from "../latexToGLSL";
+import { SPECIAL_GLSL_FUNCTIONS } from "../specialGLSL";
 
 export type CompareOp = "<" | "<=" | ">" | ">=" | "=";
 
@@ -37,6 +38,8 @@ export type Expr =
   | { kind: "bin"; op: "+" | "-" | "*" | "/"; a: Expr; b: Expr }
   | { kind: "pow"; base: Expr; exponent: Expr }
   | { kind: "call"; fn: BuiltinName; args: Expr[] }
+  /** Γ, Ei, Li₂ and the rest Desmos lacks (`symbolic/special.ts`). */
+  | { kind: "special"; fn: string; args: Expr[] }
   | { kind: "user"; name: string; args: Expr[] }
   | { kind: "piecewise"; branches: PiecewiseBranch[]; otherwise?: Expr };
 
@@ -727,6 +730,18 @@ class Parser {
       } else {
         power = this.parseGroupOrAtom();
       }
+    }
+    if (!isBuiltin(name) && name in SPECIAL_GLSL_FUNCTIONS) {
+      const args = this.parseCallArguments(name);
+      const { arity } = SPECIAL_GLSL_FUNCTIONS[name];
+      if (!arity.includes(args.length))
+        throw new CompileError(
+          `"${name}" takes ${arity.join(" or ")} argument${arity[0] === 1 ? "" : "s"}, but was given ${args.length}.`
+        );
+      const call: Expr = { kind: "special", fn: name, args };
+      return power === undefined
+        ? call
+        : { kind: "pow", base: call, exponent: power };
     }
     if (!isBuiltin(name)) {
       throw new CompileError(

@@ -228,11 +228,41 @@ describe("what is not a solid says why", () => {
     [String.raw`y=x^{2}`, /equation draws a curve/],
     [String.raw`x^{2}+y^{2}`, /not a region/],
     [String.raw`y<a`, /"a" is not defined/],
-    [String.raw`y<\operatorname{zeta}(x)`, /"zeta" is not supported/],
+    [String.raw`y<\operatorname{potato}(x)`, /"potato" is not supported/],
+    [String.raw`y<\operatorname{BesselJ}(x)`, /"BesselJ" takes 2 arguments/],
     [String.raw`y<x!`, /"!" is not supported/],
     [String.raw`\left\{x>0\right\}`, /needs an inequality in front/],
   ])("%s", (latex, message) => {
     expect(error(latex)).toMatch(message);
+  });
+});
+
+describe("a solid can use the special functions Desmos lacks", () => {
+  const value = (latex: string, x: number) => {
+    const parsed = parseStrictExpression(latex, EMPTY_ENVIRONMENT);
+    if (!parsed.ok) throw new Error(`${latex}: ${parsed.error}`);
+    return compileExpression(parsed.expr, parsed.program, {
+      degreeMode: false,
+    })({ x, y: 0, time: 0, params: new Map() }, []);
+  };
+
+  test.each([
+    [String.raw`\Gamma\left(x\right)`, 0.5, Math.sqrt(Math.PI)],
+    [String.raw`\operatorname{Ei}(x)`, 2, 4.954234356001891],
+    [String.raw`\operatorname{BesselJ}\left(2,x\right)`, 1.5, 0.2320876721],
+    [String.raw`\operatorname{Li}_{2}(x)`, 1, Math.PI ** 2 / 6],
+    [String.raw`\operatorname{erfc}^{2}(x)`, 0, 1],
+    [String.raw`W_{0}(x)`, Math.E, 1],
+  ])("%s at %d", (latex, x, expected) => {
+    expect(value(latex, x)).toBeCloseTo(expected, 8);
+  });
+
+  test("a Gamma-shaped wall rasterizes, and its poles are not solid", () => {
+    const grid = { xMin: -2, xMax: 4, yMin: -3, yMax: 3, nx: 60, ny: 60 };
+    const scope = { time: 0, params: new Map<string, number>() };
+    const wall = obstacle(String.raw`y<\Gamma\left(x\right)`);
+    const { solidCount } = rasterizeObstacles([wall], grid, scope);
+    expect(solidCount).toBeGreaterThan(0);
   });
 });
 
