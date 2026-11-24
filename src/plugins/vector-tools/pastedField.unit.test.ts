@@ -50,18 +50,21 @@ describe("splitting a pasted vector", () => {
 });
 
 describe("the rewrites Desmos needs", () => {
-  test("Γ(z) is (z−1)!, and Γ(n+1) is n!", () => {
-    expect(
-      importPastedField(String.raw`\Gamma\left(x\right)`).components[0]
-    ).toBe(String.raw`\left(x-1\right)!`);
-    expect(
-      importPastedField(String.raw`\Gamma\left(2 j - \pi + 1\right)`)
-        .components[0]
-    ).toBe(String.raw`\left(2 j - \pi\right)!`);
+  test("Γ is a function now, so it passes through, braces dropped", () => {
+    for (const latex of [
+      String.raw`\Gamma\left(x\right)`,
+      // Half-typed, as the slot sees it on each keystroke.
+      String.raw`\Gamma\left(\right)`,
+      String.raw`\Gamma\left(2 j - \pi + 1\right)`,
+    ])
+      expect(importPastedField(latex)).toEqual({
+        components: [latex],
+        notes: [],
+      });
     expect(
       importPastedField(String.raw`\Gamma{\left(\Gamma\left(x\right)\right)}`)
         .components[0]
-    ).toBe(String.raw`\left(\left(x-1\right)!-1\right)!`);
+    ).toBe(String.raw`\Gamma\left(\Gamma\left(x\right)\right)`);
   });
 
   test("an infinite sum stops at a last term the user can see", () => {
@@ -96,10 +99,10 @@ describe("the sympy field of 2026-10-14", () => {
   test("splits into P and Q with nothing Desmos would misread", () => {
     expect(imported.components).toHaveLength(2);
     for (const part of imported.components) {
-      expect(part).not.toMatch(/\\Gamma|\\infty|\\langle|\\rangle/);
-      expect(part).not.toMatch(/\\(sin|cos)\{/);
+      expect(part).not.toMatch(/\\infty|\\langle|\\rangle/);
+      expect(part).not.toMatch(/\\(sin|cos|Gamma)\{/);
     }
-    expect(imported.notes).toHaveLength(3);
+    expect(imported.notes).toHaveLength(2);
   });
 
   test("both components compile for the GPU", () => {

@@ -2,6 +2,7 @@ import { testWithPage } from "./puppeteer-utils";
 import type { Calc as CalcType } from "#globals";
 
 declare let Calc: CalcType;
+declare let DSM: Window["DSM"];
 
 /**
  * Γ, Ei and the rest are switched on by whichever plugin uses them
@@ -109,4 +110,31 @@ testWithPage(
     await driver.waitForSync();
   },
   90000
+);
+
+testWithPage(
+  "special functions type as one name in Vector Tools' own field inputs",
+  async (driver) => {
+    await driver.disablePlugin("physics-lab");
+    await driver.enablePlugin("vector-tools");
+    await driver.setBlank();
+    await driver.click(VECTOR_BUTTON);
+    await driver.click(".dsm-vector-tools-math-input .dcg-mq-editable-field");
+    await driver.keyboard.down("Control");
+    await driver.keyboard.press("a");
+    await driver.keyboard.up("Control");
+    await driver.keyboard.press("Backspace");
+    for (const key of "Ei(x)+Gamma(y") await driver.keyboard.type(key);
+    await pause(500);
+    const config = await driver.evaluate(() =>
+      JSON.stringify(DSM.vectorTools!.getConfig())
+    );
+    expect(config).toContain(
+      String.raw`\\operatorname{Ei}\\left(x\\right)+\\Gamma\\left(y\\right)`
+    );
+    await driver.keyboard.press("Escape");
+    await driver.disablePlugin("vector-tools");
+    await driver.setBlank();
+  },
+  60000
 );

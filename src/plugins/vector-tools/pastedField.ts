@@ -7,9 +7,10 @@
  *
  * - `\left\langle P, Q \right\rangle` is an "unrecognized symbol". A whole
  *   vector pasted into one slot is split across P and Q (and R).
- * - `\Gamma\left(z\right)` is **silently wrong**: Desmos has no gamma
- *   function, reads Γ as a variable, and offers to make it a slider. Desmos's
- *   factorial is already the gamma function at every z, so Γ(z) is (z−1)!.
+ * - `\Gamma\left(z\right)` was rewritten as `\left(z-1\right)!` while Desmos
+ *   had no Γ. It has one now (a definition in the locked folder,
+ *   `symbolic/special.ts`), so Γ passes through. The rewrite ran on every
+ *   keystroke, and Γ typed by hand broke half-way into `(−1)!y`.
  * - `\sum_{j=0}^{\infty}` is refused outright ("infinite bound"). Desmos, like
  *   a shader, has to stop somewhere, so ∞ becomes a last term the user can see
  *   in the slot and change — {@link INFINITE_SUM_LAST}, said so in a note.
@@ -47,17 +48,10 @@ export function importPastedField(latex: string): ImportedField {
     notes.push(
       `Split the pasted vector into ${["P and Q", "P, Q and R"][parts.length - 2]}.`
     );
-  const rewrite = { gamma: false, infinite: [] as string[] };
+  const rewrite = { infinite: [] as string[] };
   const components = parts.map((part) =>
-    replaceInfiniteBounds(
-      rewriteGamma(unbraceArguments(part.trim()), rewrite),
-      rewrite
-    )
+    replaceInfiniteBounds(unbraceArguments(part.trim()), rewrite)
   );
-  if (rewrite.gamma)
-    notes.push(
-      "Desmos has no Γ, so Γ(z) is written (z−1)!, which is the same function."
-    );
   for (const index of rewrite.infinite)
     notes.push(
       `Desmos cannot sum to ∞, so the sum now stops at ${index} = ${INFINITE_SUM_LAST}. Change the ${INFINITE_SUM_LAST} for more terms or fewer.`
@@ -261,36 +255,6 @@ function unbraceArguments(latex: string): string {
       unbraceArguments(content);
     last = close;
     pattern.lastIndex = close;
-  }
-  return out + latex.slice(last);
-}
-
-/** `\Gamma\left(z\right)` as `\left(z-1\right)!`, nested ones included. */
-function rewriteGamma(latex: string, found: { gamma: boolean }): string {
-  const pattern = /\\Gamma(?![A-Za-z])\s*/g;
-  let out = "";
-  let last = 0;
-  for (let match; (match = pattern.exec(latex)) !== null; ) {
-    let at = match.index + match[0].length;
-    const braced = latex[at] === "{";
-    if (braced) at++;
-    const bracket = tokenAt(latex, at, ["\\left(", "("]);
-    if (bracket === undefined) continue;
-    const close = closeOf(latex, at + bracket.length);
-    const closer = latex.startsWith("\\right)", close - 7) ? 7 : 1;
-    let inner = rewriteGamma(
-      latex.slice(at + bracket.length, close - closer),
-      found
-    ).trim();
-    // Γ(n + 1) is n!, and sympy writes it that way round constantly.
-    const plusOne = /\s*\+\s*1$/.exec(inner);
-    inner = plusOne ? inner.slice(0, plusOne.index) : `${inner}-1`;
-    let end = close;
-    if (braced && latex[end] === "}") end++;
-    out += latex.slice(last, match.index) + `\\left(${inner}\\right)!`;
-    last = end;
-    pattern.lastIndex = end;
-    found.gamma = true;
   }
   return out + latex.slice(last);
 }
