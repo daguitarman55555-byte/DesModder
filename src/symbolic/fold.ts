@@ -920,6 +920,15 @@ function foldKnownValue(name: string, args: Node[]): Node | undefined {
   // as `e^{x²}/\ln e`.
   const symbol = args[0].type === "Identifier" ? args[0].symbol : undefined;
   if (name === "ln" && symbol === "e") return number(1);
+  // floor and ceil of a fraction are whole numbers, exactly: ⌊3/2⌋ is 1.
+  const whole =
+    name === "floor" || name === "ceil" ? rationalOf(args[0]) : undefined;
+  if (whole !== undefined && whole.d > 0)
+    return number(
+      name === "floor"
+        ? Math.floor(whole.n / whole.d)
+        : Math.ceil(whole.n / whole.d)
+    );
   // √(p/q) of a fraction: √(9/4) is 3/2, √(3/4) is √3/2, and √(3/2) is
   // √6/2, the root kept above the bar. Completing a square divides by 4a, so
   // these arrive whenever the coefficient on x² is not 1.

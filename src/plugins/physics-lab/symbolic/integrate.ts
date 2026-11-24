@@ -128,6 +128,7 @@ export const TECHNIQUES = {
   expSubstitution: "Substitution u = e^{kx}",
   hyperbolic: "Hyperbolic functions as exponentials",
   absolute: "Splitting at the corner of |u|",
+  periodicAbs: "Counting whole humps of |sin u|, each of area 2",
   rootOfSquare: "√(g²) = |g|",
   conjugate: "Multiplying by the conjugate",
   reciprocalQuartic: "Substitution u = √(x⁴ + bx² + c²)/x",
@@ -353,7 +354,52 @@ const FUNCTION_INTEGRALS: Record<string, (u: Node) => Node> = {
       multiply(number(2), power(u, divide(number(3), number(2)))),
       number(3)
     ),
+  // Step functions: the area under the staircase so far, continuous at every
+  // step, so the fundamental theorem holds across the jumps. On [n, n+1)
+  // floor is n, and u⌊u⌋ − ⌊u⌋(⌊u⌋+1)/2 has slope n there and meets the
+  // previous piece at u = n. Ceiling is the same staircase moved up one.
+  floor: (u) =>
+    subtract(
+      multiply(u, call("floor", u)),
+      divide(
+        multiply(call("floor", u), add(call("floor", u), number(1))),
+        number(2)
+      )
+    ),
+  ceil: (u) =>
+    subtract(
+      multiply(u, call("ceil", u)),
+      divide(
+        multiply(call("ceil", u), subtract(call("ceil", u), number(1))),
+        number(2)
+      )
+    ),
 };
+
+/**
+ * `|sin u|` and `|cos u|` for a linear u: a hump of area 2 every π, so the
+ * antiderivative is 2 per hump already passed plus the part of this one.
+ * With k = ⌊u/π⌋, ∫|sin u| du = 2k − cos(u − kπ), continuous where one hump
+ * meets the next; |cos u| is |sin| moved by π/2, so k = ⌊u/π + 1/2⌋ and the
+ * part of the hump is sin(u − kπ). The 1/a for u = ax + b is the caller's.
+ */
+function periodicAbsIntegral(argument: Node): Node | undefined {
+  if (argument.type !== "FunctionCall" || argument.args.length !== 1)
+    return undefined;
+  const kind = argument.callee.symbol;
+  if (kind !== "sin" && kind !== "cos") return undefined;
+  const [u] = argument.args;
+  const pi = id("pi");
+  const over = divide(u, pi);
+  const k = call(
+    "floor",
+    kind === "sin" ? over : add(over, divide(number(1), number(2)))
+  );
+  const within = subtract(u, multiply(k, pi));
+  const hump =
+    kind === "sin" ? negative(call("cos", within)) : call("sin", within);
+  return add(multiply(number(2), k), hump);
+}
 
 const square = (node: Node) => power(node, number(2));
 
@@ -2801,6 +2847,14 @@ function functionIntegral(
     );
   }
   const [argument] = node.args;
+  if (name === "abs") {
+    const periodic = periodicAbsIntegral(argument);
+    const inner =
+      argument.type === "FunctionCall" ? argument.args[0] : undefined;
+    const linear = inner && linearIn(inner, variable);
+    if (periodic !== undefined && linear !== undefined)
+      return recorded(TECHNIQUES.periodicAbs, () => divide(periodic, linear.a));
+  }
   const rule = FUNCTION_INTEGRALS[name];
   if (rule === undefined) {
     throw new IntegrationError(`The integral of ${name} is not known.`);

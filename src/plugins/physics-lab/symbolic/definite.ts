@@ -314,6 +314,16 @@ function special(name: string, v: X.ExactValue): X.ExactValue | undefined {
       return X.power(v, Q.rational(1n, 2n));
     case "abs":
       return X.toNumber(v) < 0 ? X.negate(v) : v;
+    case "floor":
+    case "ceil": {
+      // A whole number exactly, when the value is one or is safely between
+      // two; at a hair from a whole number a double cannot say which side.
+      const r = X.asRational(v);
+      if (r !== undefined && r.d === 1n) return v;
+      const x = X.toNumber(v);
+      if (Math.abs(x - Math.round(x)) < 1e-9) return undefined;
+      return X.fromInteger(name === "floor" ? Math.floor(x) : Math.ceil(x));
+    }
     case "exp":
       return exponential(v);
     case "ln":
@@ -1004,6 +1014,31 @@ function functionLimit(
       record("one-sided");
       return { kind: "infinite", sign: s };
     }
+  }
+  // floor and ceil at a point: the whole number below or above, and at a
+  // whole number itself the side the argument arrives from decides. These
+  // are what make ∫₀^{5.5}⌊x⌋dx and ∫₀^{10}|sin x|dx (whose antiderivatives
+  // count steps and humps) come out exactly.
+  if (name === "floor" || name === "ceil") {
+    const v = X.toNumber(inner.value);
+    const r = X.asRational(inner.value);
+    const whole = r !== undefined && r.d === 1n;
+    if (!whole && Math.abs(v - Math.round(v)) < 1e-9) return undefined;
+    if (!whole) {
+      record("substitution");
+      return {
+        kind: "finite",
+        value: X.fromInteger(name === "floor" ? Math.floor(v) : Math.ceil(v)),
+      };
+    }
+    const n = Number(r.n);
+    const offset = evaluate(node.args[0], { [variable]: near(approach) }) - v;
+    if (!Number.isFinite(offset)) return undefined;
+    record("one-sided");
+    const below = offset < 0;
+    const above = offset > 0;
+    const k = name === "floor" ? (below ? n - 1 : n) : above ? n + 1 : n;
+    return { kind: "finite", value: X.fromInteger(k) };
   }
   if (inner.value.length === 0) {
     if (name === "ln") {
@@ -1733,24 +1768,40 @@ function breakPoints(
       if (giveUp || child.type !== "FunctionCall" || child.args.length !== 1)
         return;
       const name = child.callee.symbol;
-      // Where cos is zero for tan and sec, where sin is zero for cot and csc.
-      const offset =
-        name === "tan" || name === "sec"
-          ? Q.rational(1n, 2n)
-          : name === "cot" || name === "csc"
-            ? Q.ZERO
-            : undefined;
+      // Each family is u = period·(offset + k) for a linear u: where cos is
+      // zero for tan and sec, where sin is zero for cot and csc, the whole
+      // numbers where floor and ceil step, and the zeros of sin or cos
+      // inside bars, where |sin u| and |cos u| have a corner. The quadrature
+      // that confirms each cell needs the corners and steps as cell edges.
+      let [argument] = child.args;
+      let offset: Q.Rational | undefined;
+      let byPi = true;
+      if (name === "tan" || name === "sec") offset = Q.rational(1n, 2n);
+      else if (name === "cot" || name === "csc") offset = Q.ZERO;
+      else if (name === "floor" || name === "ceil") {
+        offset = Q.ZERO;
+        byPi = false;
+      } else if (
+        name === "abs" &&
+        argument.type === "FunctionCall" &&
+        argument.args.length === 1 &&
+        (argument.callee.symbol === "sin" || argument.callee.symbol === "cos")
+      ) {
+        offset = argument.callee.symbol === "cos" ? Q.rational(1n, 2n) : Q.ZERO;
+        [argument] = argument.args;
+      }
       if (offset === undefined) return;
-      const linear = linearIn(child.args[0], variable);
+      const linear = linearIn(argument, variable);
       if (linear === undefined) return;
-      const slope = X.asRational(exactConstant(linear.a) ?? []);
+      const slope = exactConstant(linear.a);
       const shift = exactConstant(linear.b);
-      if (slope === undefined || Q.isZero(slope) || shift === undefined) {
+      const s = slope === undefined ? NaN : X.toNumber(slope);
+      if (slope === undefined || !(s !== 0) || shift === undefined) {
         giveUp = true;
         return;
       }
-      // u = slope·x + shift = π(offset + k), so x = (π(offset + k) - shift)/slope.
-      const s = Q.toNumber(slope);
+      // u = slope·x + shift = period(offset + k), so
+      // x = (period(offset + k) − shift)/slope.
       const shiftValue = X.toNumber(shift);
       const u1 = s * a + shiftValue;
       const u2 = s * b + shiftValue;
@@ -1760,19 +1811,18 @@ function breakPoints(
         giveUp = true;
         return;
       }
+      const period = byPi ? Math.PI : 1;
       const o = Q.toNumber(offset);
-      const kFrom = Math.ceil(low / Math.PI - o) - 1;
-      const kTo = Math.floor(high / Math.PI - o) + 1;
+      const kFrom = Math.ceil(low / period - o) - 1;
+      const kTo = Math.floor(high / period - o) + 1;
       if (kTo - kFrom > MAX_BREAKS) {
         giveUp = true;
         return;
       }
       for (let k = kFrom; k <= kTo; k += 1) {
-        const angle = X.multiply(
-          X.PI_VALUE,
-          X.fromRational(Q.add(offset, Q.rational(BigInt(k))))
-        );
-        const x = X.divide(X.subtract(angle, shift), X.fromRational(slope));
+        const step = X.fromRational(Q.add(offset, Q.rational(BigInt(k))));
+        const target = byPi ? X.multiply(X.PI_VALUE, step) : step;
+        const x = X.divide(X.subtract(target, shift), slope);
         if (x !== undefined) consider(x);
       }
     });

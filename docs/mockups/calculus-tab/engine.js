@@ -12254,6 +12254,7 @@ var CalcEngine = (() => {
     expSubstitution: "Substitution u = e^{kx}",
     hyperbolic: "Hyperbolic functions as exponentials",
     absolute: "Splitting at the corner of |u|",
+    periodicAbs: "Counting whole humps of |sin u|, each of area 2",
     rootOfSquare: "\u221A(g\xB2) = |g|",
     conjugate: "Multiplying by the conjugate",
     reciprocalQuartic: "Substitution u = \u221A(x\u2074 + bx\xB2 + c\xB2)/x",
@@ -12388,8 +12389,43 @@ var CalcEngine = (() => {
     sqrt: (u) => divide(
       multiply(number2(2), power2(u, divide(number2(3), number2(2)))),
       number2(3)
+    ),
+    // Step functions: the area under the staircase so far, continuous at every
+    // step, so the fundamental theorem holds across the jumps. On [n, n+1)
+    // floor is n, and u⌊u⌋ − ⌊u⌋(⌊u⌋+1)/2 has slope n there and meets the
+    // previous piece at u = n. Ceiling is the same staircase moved up one.
+    floor: (u) => subtract(
+      multiply(u, call("floor", u)),
+      divide(
+        multiply(call("floor", u), add(call("floor", u), number2(1))),
+        number2(2)
+      )
+    ),
+    ceil: (u) => subtract(
+      multiply(u, call("ceil", u)),
+      divide(
+        multiply(call("ceil", u), subtract(call("ceil", u), number2(1))),
+        number2(2)
+      )
     )
   };
+  function periodicAbsIntegral(argument) {
+    if (argument.type !== "FunctionCall" || argument.args.length !== 1)
+      return void 0;
+    const kind = argument.callee.symbol;
+    if (kind !== "sin" && kind !== "cos")
+      return void 0;
+    const [u] = argument.args;
+    const pi = id3("pi");
+    const over = divide(u, pi);
+    const k = call(
+      "floor",
+      kind === "sin" ? over : add(over, divide(number2(1), number2(2)))
+    );
+    const within = subtract(u, multiply(k, pi));
+    const hump = kind === "sin" ? negative2(call("cos", within)) : call("sin", within);
+    return add(multiply(number2(2), k), hump);
+  }
   var square3 = (node) => power2(node, number2(2));
   function integrate2(node, variable) {
     return integrateWithMethod(node, variable).value;
@@ -14009,6 +14045,16 @@ var CalcEngine = (() => {
       );
     }
     const [argument] = node.args;
+    if (name === "abs") {
+      const periodic = periodicAbsIntegral(argument);
+      const inner = argument.type === "FunctionCall" ? argument.args[0] : void 0;
+      const linear3 = inner && linearIn(inner, variable);
+      if (periodic !== void 0 && linear3 !== void 0)
+        return recorded(
+          TECHNIQUES.periodicAbs,
+          () => divide(periodic, linear3.a)
+        );
+    }
     const rule2 = FUNCTION_INTEGRALS[name];
     if (rule2 === void 0) {
       throw new IntegrationError(`The integral of ${name} is not known.`);
@@ -15815,6 +15861,16 @@ var CalcEngine = (() => {
         return power5(v, rational(1n, 2n));
       case "abs":
         return toNumber2(v) < 0 ? negate2(v) : v;
+      case "floor":
+      case "ceil": {
+        const r = asRational(v);
+        if (r !== void 0 && r.d === 1n)
+          return v;
+        const x = toNumber2(v);
+        if (Math.abs(x - Math.round(x)) < 1e-9)
+          return void 0;
+        return fromInteger(name === "floor" ? Math.floor(x) : Math.ceil(x));
+      }
       case "exp":
         return exponential2(v);
       case "ln":
@@ -16279,6 +16335,29 @@ var CalcEngine = (() => {
         record2("one-sided");
         return { kind: "infinite", sign: s };
       }
+    }
+    if (name === "floor" || name === "ceil") {
+      const v = toNumber2(inner.value);
+      const r = asRational(inner.value);
+      const whole = r !== void 0 && r.d === 1n;
+      if (!whole && Math.abs(v - Math.round(v)) < 1e-9)
+        return void 0;
+      if (!whole) {
+        record2("substitution");
+        return {
+          kind: "finite",
+          value: fromInteger(name === "floor" ? Math.floor(v) : Math.ceil(v))
+        };
+      }
+      const n = Number(r.n);
+      const offset = evaluate(node.args[0], { [variable]: near(approach) }) - v;
+      if (!Number.isFinite(offset))
+        return void 0;
+      record2("one-sided");
+      const below = offset < 0;
+      const above = offset > 0;
+      const k = name === "floor" ? below ? n - 1 : n : above ? n + 1 : n;
+      return { kind: "finite", value: fromInteger(k) };
     }
     if (inner.value.length === 0) {
       if (name === "ln") {
@@ -16777,19 +16856,32 @@ var CalcEngine = (() => {
         if (giveUp || child.type !== "FunctionCall" || child.args.length !== 1)
           return;
         const name = child.callee.symbol;
-        const offset = name === "tan" || name === "sec" ? rational(1n, 2n) : name === "cot" || name === "csc" ? ZERO : void 0;
+        let argument = child.args[0];
+        let offset;
+        let byPi = true;
+        if (name === "tan" || name === "sec")
+          offset = rational(1n, 2n);
+        else if (name === "cot" || name === "csc")
+          offset = ZERO;
+        else if (name === "floor" || name === "ceil") {
+          offset = ZERO;
+          byPi = false;
+        } else if (name === "abs" && argument.type === "FunctionCall" && argument.args.length === 1 && (argument.callee.symbol === "sin" || argument.callee.symbol === "cos")) {
+          offset = argument.callee.symbol === "cos" ? rational(1n, 2n) : ZERO;
+          [argument] = argument.args;
+        }
         if (offset === void 0)
           return;
-        const linear2 = linearIn(child.args[0], variable);
+        const linear2 = linearIn(argument, variable);
         if (linear2 === void 0)
           return;
-        const slope = asRational(exactConstant(linear2.a) ?? []);
+        const slope = exactConstant(linear2.a);
         const shift = exactConstant(linear2.b);
-        if (slope === void 0 || isZero(slope) || shift === void 0) {
+        const s = slope === void 0 ? NaN : toNumber2(slope);
+        if (slope === void 0 || !(s !== 0) || shift === void 0) {
           giveUp = true;
           return;
         }
-        const s = toNumber(slope);
         const shiftValue = toNumber2(shift);
         const u1 = s * a + shiftValue;
         const u2 = s * b + shiftValue;
@@ -16799,19 +16891,18 @@ var CalcEngine = (() => {
           giveUp = true;
           return;
         }
+        const period = byPi ? Math.PI : 1;
         const o = toNumber(offset);
-        const kFrom = Math.ceil(low / Math.PI - o) - 1;
-        const kTo = Math.floor(high / Math.PI - o) + 1;
+        const kFrom = Math.ceil(low / period - o) - 1;
+        const kTo = Math.floor(high / period - o) + 1;
         if (kTo - kFrom > MAX_BREAKS) {
           giveUp = true;
           return;
         }
         for (let k = kFrom; k <= kTo; k += 1) {
-          const angle = multiply5(
-            PI_VALUE,
-            fromRational(add4(offset, rational(BigInt(k))))
-          );
-          const x = divide7(subtract4(angle, shift), fromRational(slope));
+          const step = fromRational(add4(offset, rational(BigInt(k))));
+          const target = byPi ? multiply5(PI_VALUE, step) : step;
+          const x = divide7(subtract4(target, shift), slope);
           if (x !== void 0)
             consider(x);
         }

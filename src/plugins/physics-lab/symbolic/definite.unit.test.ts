@@ -158,6 +158,31 @@ describe("breaks inside the interval, located exactly", () => {
   });
 });
 
+describe("step functions and |sin|, whose antiderivatives count", () => {
+  // Each antiderivative is continuous, so F(b) − F(a) is right as it stands;
+  // the cells are cut at every step and corner only so that the quadrature
+  // confirming each one integrates something smooth.
+  test("floor and ceil", () => {
+    exactly(fn("floor", x), n(0), n(5.5), "\\frac{25}{2}");
+    exactly(fn("floor", x), n(0), n(3), "3");
+    exactly(fn("ceil", mul(number(2), x)), n(-1), n(2.5), "7");
+  });
+
+  test("|sin| and |cos|, a hump of 2 every π", () => {
+    const twoPi = finite(mul(number(2), pi), 2 * Math.PI);
+    exactly(fn("abs", fn("cos", x)), n(0), twoPi, "4");
+    exactly(
+      fn("abs", fn("sin", mul(number(3), x))),
+      n(0),
+      finite(pi, Math.PI),
+      "2"
+    );
+    // Not a whole number of humps: three, and part of a fourth.
+    const result = definite(fn("abs", fn("sin", x)), n(0), n(10));
+    expect(result.value).toBeCloseTo(7 - Math.cos(10 - 3 * Math.PI), 12);
+  });
+});
+
 describe("what it refuses rather than getting wrong", () => {
   test("a symbolic parameter", () => {
     expect(() =>
