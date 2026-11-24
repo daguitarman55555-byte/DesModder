@@ -46,6 +46,7 @@ import {
   call,
   constantValue,
   exceedsNodeCount,
+  identifiersIn,
   mapChildNodes,
   nodeCount,
   number,
@@ -99,7 +100,11 @@ function rewrite(node: Node): Node {
     inner.type === "BinaryOperator" &&
     (inner.name === "Add" || inner.name === "Subtract")
   ) {
-    const pulled = pullOutOfSum(inner);
+    // A sum on its own gives a factor up only when that moves a negative
+    // power below the bar: √u − x²u^{-1/2} is (u − x²)/√u, a real
+    // simplification, while √u·a + √u·b against √u(a + b) is taste, and
+    // `condense` is where taste is asked for.
+    const pulled = pullOutOfSum(inner, true);
     if (pulled !== undefined)
       return cancelInProduct(pulled) ?? normalized(pulled);
   }
@@ -124,7 +129,10 @@ function asPower(node: Node): Power {
     return compose(asPower(node.args[0]), q(1, 2));
   if (node.type === "BinaryOperator" && node.name === "Exponent") {
     const r = rationalOf(node.right);
-    if (r !== undefined && r.d !== 0 && constantValue(node.left) === undefined)
+    // A number to a whole power is arithmetic, which fold does; to a
+    // fractional one it is a root, and 3^{-1/2} cancels against √3.
+    const numeric = constantValue(node.left) !== undefined;
+    if (r !== undefined && r.d > 0 && (!numeric || r.d > 1))
       return compose(asPower(node.left), q(r.n, r.d));
   }
   return { base: node, exponent: q(1) };
@@ -197,8 +205,19 @@ function cancelInProduct(node: Node): Node | undefined {
     quotientFactors(out, entry.inNumerator, opened);
   }
   const { powers, constants, merged } = collect(opened);
-  if (!merged && !pulled) return undefined;
+  if (!merged && !pulled && !reducible(constants)) return undefined;
   return rebuild(powers, constants);
+}
+
+/** Whole numbers on both sides of the bar that share a factor: 45/90. */
+function reducible(constants: readonly { node: Node; inNumerator: boolean }[]) {
+  const side = (inNumerator: boolean) =>
+    constants
+      .filter((c) => c.inNumerator === inNumerator)
+      .map((c) => constantValue(c.node))
+      .filter((v): v is number => v !== undefined && Number.isInteger(v))
+      .reduce((a, b) => a * b, 1);
+  return gcd(Math.abs(side(true)), Math.abs(side(false))) > 1;
 }
 
 function rebuild(
@@ -207,8 +226,18 @@ function rebuild(
 ): Node {
   const top: Node[] = [];
   const bottom: Node[] = [];
-  for (const { node, inNumerator } of constants)
-    (inNumerator ? top : bottom).push(node);
+  // Whole-number constants become one reduced coefficient: 45/90 is 1/2.
+  let coefficient = q(1);
+  for (const { node, inNumerator } of constants) {
+    const value = constantValue(node);
+    if (value !== undefined && Number.isInteger(value) && value !== 0)
+      coefficient = inNumerator
+        ? qMul(coefficient, q(value))
+        : qMul(coefficient, q(1, value));
+    else (inNumerator ? top : bottom).push(node);
+  }
+  if (coefficient.n !== 1) top.unshift(number(coefficient.n));
+  if (coefficient.d !== 1) bottom.unshift(number(coefficient.d));
   // A plain variable and its powers before anything compound, as written by
   // hand: 3x√(x²+1), not 3√(x²+1)x. Stable, so nothing else moves.
   const simple = (p: Power) => (p.base.type === "Identifier" ? 0 : 1);
@@ -243,7 +272,7 @@ const isSum = (node: Node) =>
  * A sum with a root-like base in every term, as that base's smallest power
  * times what is left: `u^{3/2} − 3x²√u` is `√u·(u − 3x²)`.
  */
-function pullOutOfSum(sum: Node): Node | undefined {
+function pullOutOfSum(sum: Node, onlyNegative = false): Node | undefined {
   const terms = topLevelTerms(sum);
   if (terms.length < 2) return undefined;
   const read = terms.map(({ term, negated }) => {
@@ -252,6 +281,8 @@ function pullOutOfSum(sum: Node): Node | undefined {
     return { ...collect(entries), negated };
   });
   for (const candidate of read[0].powers) {
+    // √2 is a number: taking it out of a sum changes nothing that cancels.
+    if (identifiersIn(candidate.base).length === 0) continue;
     const exponents: Rational[] = [];
     for (const term of read) {
       const match = term.powers.find((p) => sameTree(p.base, candidate.base));
@@ -261,6 +292,7 @@ function pullOutOfSum(sum: Node): Node | undefined {
     if (exponents.length !== read.length) continue;
     if (exponents.every(isWhole)) continue;
     const least = exponents.reduce((a, b) => (qLess(b, a) ? b : a));
+    if (onlyNegative && least.n >= 0) continue;
     const rest = read.map((term, i) => ({
       value: rebuild(
         term.powers.map((p) =>

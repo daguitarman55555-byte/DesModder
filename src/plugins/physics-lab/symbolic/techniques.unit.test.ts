@@ -336,6 +336,52 @@ describe("trigonometric substitution, and coming back from it", () => {
       "\\frac{\\sqrt{x^{2}+1}x+\\ln\\left|x+\\sqrt{x^{2}+1}\\right|}{2}"
     );
   });
+
+  // A coefficient on x², which the substitution now takes itself:
+  // √(m x² + k) is √m·√(x² + a²) with a² = k/m, kept exact.
+  test("a coefficient on the square, after completing it", () => {
+    // 4x² + 4x + 2 is 4w² + 1 with w = x + 1/2, the roadmap's example.
+    const four = (node: Node) => mul(number(4), node);
+    check(
+      fn("sqrt", add(add(four(pow(x, number(2))), four(x)), number(2))),
+      "\\frac{2\\sqrt{4x^{2}+4x+2}\\left(x+\\frac{1}{2}\\right)+\\ln\\left|2x+\\sqrt{4x^{2}+4x+2}+1\\right|}{4}"
+    );
+  });
+
+  test("the sine case with a coefficient", () => {
+    check(
+      fn("sqrt", sub(number(1), mul(number(9), pow(x, number(2))))),
+      "\\frac{x\\sqrt{-9x^{2}+1}}{2}+\\frac{\\arcsin\\left(3x\\right)}{6}"
+    );
+  });
+
+  test("a coefficient that is not a perfect square", () => {
+    // Right, and checked; not yet tidy. The substitution's √3 ends up
+    // outside a sum whose terms carry 3^{-1/2}, and cancelling them would
+    // need the sum distributed first (UPGRADE_ROADMAP, simplification).
+    const integrand = fn(
+      "sqrt",
+      add(mul(number(3), pow(x, number(2))), number(5))
+    );
+    const result = integrate(integrand, "x");
+    expect(
+      agreesOnSamples(
+        (bindings) => numericDerivative(result, "x", bindings),
+        (bindings) => evaluate(integrand, bindings),
+        SAMPLES
+      )
+    ).toBe(true);
+  });
+
+  test("the table's arcsine with a fractional scale is exact", () => {
+    check(
+      div(
+        number(1),
+        fn("sqrt", sub(number(9), mul(number(4), pow(x, number(2)))))
+      ),
+      "\\frac{\\arcsin\\left(\\frac{2x}{3}\\right)}{2}"
+    );
+  });
 });
 
 describe("what it still refuses, and says so", () => {

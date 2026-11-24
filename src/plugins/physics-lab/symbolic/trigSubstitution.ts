@@ -51,6 +51,8 @@ import {
   multiply,
   number,
   power,
+  rationalNode,
+  rationalOf,
   replaceIdentifier,
   replaceSubtree,
   subtract,
@@ -62,9 +64,28 @@ import {
 interface Form {
   /** The root as it appears in the integrand. */
   root: Node;
-  /** `a`, where the constant under the root is `a²`. */
+  /** `a`, where the root is `√m·√(a² ± x²)`. */
   scale: Node;
+  /** `√m`, the square root of the coefficient on x²; 1 for a bare square. */
+  coefficient: Node;
   kind: "sine" | "tangent" | "secant";
+}
+
+const isOne = (node: Node) => constantValue(node) === 1;
+
+/** `√r` for a positive rational, exact: 1/2 for 1/4, √3/2 for 3/4. */
+function exactRoot({ n, d }: { n: number; d: number }): Node {
+  const whole = (k: number) => Math.round(Math.sqrt(k)) ** 2 === k;
+  if (whole(n) && whole(d))
+    return rationalNode({
+      n: Math.round(Math.sqrt(n)),
+      d: Math.round(Math.sqrt(d)),
+    });
+  if (whole(d))
+    return fold(
+      divide(call("sqrt", number(n)), number(Math.round(Math.sqrt(d))))
+    );
+  return fold(divide(call("sqrt", number(n * d)), number(d)));
 }
 
 export interface TrigSubstitution {
@@ -93,26 +114,33 @@ export function findTrigSubstitution(
   if (form === undefined) return undefined;
   const name = freshName(node, ["\\theta", "t", "w"]);
   const angle = id(name);
-  const { scale, root, kind } = form;
+  const { scale, root, kind, coefficient } = form;
 
   const a = scale;
   const sin = call("sin", angle);
   const cos = call("cos", angle);
   const tan = call("tan", angle);
   const sec = call("sec", angle);
+  // √(m x² + k) is √m·√(x² + a²) with a² = k/m, so the root picks up √m.
+  const scaled = (node: Node) =>
+    isOne(coefficient) ? node : multiply(coefficient, node);
 
   const substitution =
     kind === "sine"
-      ? { x: multiply(a, sin), root: multiply(a, cos), dx: multiply(a, cos) }
+      ? {
+          x: multiply(a, sin),
+          root: scaled(multiply(a, cos)),
+          dx: multiply(a, cos),
+        }
       : kind === "tangent"
         ? {
             x: multiply(a, tan),
-            root: multiply(a, sec),
+            root: scaled(multiply(a, sec)),
             dx: multiply(a, power(sec, number(2))),
           }
         : {
             x: multiply(a, sec),
-            root: multiply(a, tan),
+            root: scaled(multiply(a, tan)),
             dx: multiply(a, multiply(sec, tan)),
           };
 
@@ -203,15 +231,18 @@ function asForm(node: Node, variable: string): Form | undefined {
   // which side the minus sign is on.
   const parts = splitSquare(inside, variable);
   if (parts === undefined) return undefined;
-  const { constant, squareSign, constantSign } = parts;
-  const value = constantValue(fold(constant));
-  if (value === undefined || value <= 0) return undefined;
-  const scale = fold(call("sqrt", number(value)));
+  const { constant, squareSign, constantSign, m } = parts;
+  const k = rationalOf(fold(constant));
+  if (k === undefined || k.n <= 0 || k.d <= 0) return undefined;
+  // a² = k/m, kept exact: √(4x² + 1) is 2√(x² + 1/4), so a = 1/2.
+  const scale = exactRoot({ n: k.n * m.d, d: k.d * m.n });
+  const coefficient = exactRoot(m);
 
   // Three shapes, told apart by which of the two terms carries the minus sign.
-  if (squareSign < 0) return { root: node, scale, kind: "sine" };
-  if (constantSign > 0) return { root: node, scale, kind: "tangent" };
-  return { root: node, scale, kind: "secant" };
+  const form = { root: node, scale, coefficient };
+  if (squareSign < 0) return { ...form, kind: "sine" };
+  if (constantSign > 0) return { ...form, kind: "tangent" };
+  return { ...form, kind: "secant" };
 }
 
 /** `\sqrt{...}` or `(...)^{1/2}`, as whatever is underneath. */
@@ -238,29 +269,59 @@ function squareRootArgument(node: Node): Node | undefined {
 }
 
 /**
- * `k ± x²` or `x² - k` taken apart, as the constant and the sign on the square.
+ * `k ± m x²` or `m x² − k` taken apart, as the constant, the sign on the
+ * square and its coefficient m.
  *
- * Only the bare variable squared. A coefficient on it would be a scaling, and
- * the ordinary substitution search reaches that first.
+ * A coefficient on x² is a scaling that a substitution u = √m·x would also
+ * clear. The search does not find that one when m is not a perfect square,
+ * and `√(4x²+4x+2)` arrives here as `√(4w²+1)` after completing the square,
+ * so the substitution takes the scaling itself: `x = (a)tanθ` with a² = k/m.
  */
 function splitSquare(
   node: Node,
   variable: string
-): { constant: Node; squareSign: number; constantSign: number } | undefined {
+):
+  | {
+      constant: Node;
+      squareSign: number;
+      constantSign: number;
+      m: { n: number; d: number };
+    }
+  | undefined {
   if (node.type !== "BinaryOperator") return undefined;
   if (node.name !== "Add" && node.name !== "Subtract") return undefined;
   const sign = node.name === "Add" ? 1 : -1;
-  const leftIsSquare = isBareSquare(node.left, variable);
-  const rightIsSquare = isBareSquare(node.right, variable);
-  if (leftIsSquare && !dependsOn(node.right, variable)) {
-    // x² ± k: the tangent case when the constant is added and the secant
+  const left = squareCoefficient(node.left, variable);
+  const right = squareCoefficient(node.right, variable);
+  if (left !== undefined && !dependsOn(node.right, variable)) {
+    // m x² ± k: the tangent case when the constant is added and the secant
     // case when it is taken away.
-    return { constant: node.right, squareSign: 1, constantSign: sign };
+    return { constant: node.right, squareSign: 1, constantSign: sign, m: left };
   }
-  if (rightIsSquare && !dependsOn(node.left, variable)) {
-    // k ± x². A positive constant with the square taken away is the sine
+  if (right !== undefined && !dependsOn(node.left, variable)) {
+    // k ± m x². A positive constant with the square taken away is the sine
     // case; with the square added it is the tangent case again.
-    return { constant: node.left, squareSign: sign, constantSign: 1 };
+    return { constant: node.left, squareSign: sign, constantSign: 1, m: right };
+  }
+  return undefined;
+}
+
+/** m for `x²` (1) or `m·x²` with m a positive rational, else undefined. */
+function squareCoefficient(
+  node: Node,
+  variable: string
+): { n: number; d: number } | undefined {
+  if (isBareSquare(node, variable)) return { n: 1, d: 1 };
+  if (
+    node.type === "BinaryOperator" &&
+    (node.name === "Multiply" || node.name === "CrossMultiply")
+  ) {
+    const [k, square] = isBareSquare(node.right, variable)
+      ? [node.left, node.right]
+      : [node.right, node.left];
+    if (!isBareSquare(square, variable)) return undefined;
+    const m = rationalOf(fold(k));
+    return m !== undefined && m.n > 0 && m.d > 0 ? m : undefined;
   }
   return undefined;
 }
@@ -289,7 +350,9 @@ function backSubstitute(
   form: Form
 ): Node {
   const x = id(variable);
-  const { scale: a, root, kind } = form;
+  const { scale: a, kind, coefficient } = form;
+  // The table is for √(a² ± x²); the root in the integrand is √m times it.
+  const root = isOne(coefficient) ? form.root : divide(form.root, coefficient);
   const table: Record<string, Node> =
     kind === "sine"
       ? {

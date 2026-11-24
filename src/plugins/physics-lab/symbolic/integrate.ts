@@ -24,6 +24,7 @@
  */
 import { Aug } from "../../../../text-mode-core";
 import {
+  cancelPowers,
   collectLikeTerms,
   constantValue,
   differentiate,
@@ -384,6 +385,17 @@ export function integrateWithMethod(
   node: Node,
   variable: string
 ): IntegrationResult {
+  const result = integrateUntidied(node, variable);
+  // Roots cancelled against powers of the same base, when that is shorter:
+  // a trigonometric substitution with a coefficient on x² comes back with
+  // √3·3^{-1/2} in it, which is 1.
+  const tidied = fold(cancelPowers(result.value));
+  return nodeCount(tidied) < nodeCount(result.value)
+    ? { ...result, value: tidied }
+    : result;
+}
+
+function integrateUntidied(node: Node, variable: string): IntegrationResult {
   // Simplified going in as well as coming out. The rules below match on shape,
   // so an integrand that has not been folded first gets refused for the shape
   // it happens to have been written in rather than for what it is: `(x+1)(x+1)`

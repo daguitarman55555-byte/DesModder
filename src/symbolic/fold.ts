@@ -920,6 +920,28 @@ function foldKnownValue(name: string, args: Node[]): Node | undefined {
   // as `e^{x²}/\ln e`.
   const symbol = args[0].type === "Identifier" ? args[0].symbol : undefined;
   if (name === "ln" && symbol === "e") return number(1);
+  // √(p/q) of a fraction: √(9/4) is 3/2, √(3/4) is √3/2, and √(3/2) is
+  // √6/2, the root kept above the bar. Completing a square divides by 4a, so
+  // these arrive whenever the coefficient on x² is not 1.
+  let ratio = name === "sqrt" ? rationalOf(args[0]) : undefined;
+  if (ratio !== undefined && ratio.d > 1 && ratio.n > 0) {
+    if (!Number.isInteger(Math.sqrt(ratio.d)))
+      ratio = { n: ratio.n * ratio.d, d: ratio.d * ratio.d };
+    const top = foldKnownValue("sqrt", [number(ratio.n)]);
+    const bottom = foldKnownValue("sqrt", [number(ratio.d)]);
+    if (bottom !== undefined && bottom.type === "Constant")
+      return fold(
+        binop(
+          "Divide",
+          top ?? {
+            type: "FunctionCall",
+            callee: id("sqrt"),
+            args: [number(ratio.n)],
+          },
+          bottom
+        )
+      );
+  }
   const argument = constantValue(args[0]);
   if (name === "log" && argument === 10) return number(1);
   if (argument === undefined) return undefined;

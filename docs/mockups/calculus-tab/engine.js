@@ -4044,6 +4044,25 @@ var CalcEngine = (() => {
     const symbol = args[0].type === "Identifier" ? args[0].symbol : void 0;
     if (name === "ln" && symbol === "e")
       return number2(1);
+    let ratio = name === "sqrt" ? rationalOf(args[0]) : void 0;
+    if (ratio !== void 0 && ratio.d > 1 && ratio.n > 0) {
+      if (!Number.isInteger(Math.sqrt(ratio.d)))
+        ratio = { n: ratio.n * ratio.d, d: ratio.d * ratio.d };
+      const top = foldKnownValue("sqrt", [number2(ratio.n)]);
+      const bottom = foldKnownValue("sqrt", [number2(ratio.d)]);
+      if (bottom !== void 0 && bottom.type === "Constant")
+        return fold(
+          binop2(
+            "Divide",
+            top ?? {
+              type: "FunctionCall",
+              callee: id3("sqrt"),
+              args: [number2(ratio.n)]
+            },
+            bottom
+          )
+        );
+    }
     const argument = constantValue(args[0]);
     if (name === "log" && argument === 10)
       return number2(1);
@@ -4351,18 +4370,25 @@ var CalcEngine = (() => {
     if (inner.type === "BinaryOperator" && (inner.name === "Multiply" || inner.name === "Divide"))
       return cancelInProduct(inner) ?? inner;
     if (inner.type === "BinaryOperator" && (inner.name === "Add" || inner.name === "Subtract")) {
-      const pulled = pullOutOfSum(inner);
+      const pulled = pullOutOfSum(inner, true);
       if (pulled !== void 0)
-        return cancelInProduct(pulled) ?? pulled;
+        return cancelInProduct(pulled) ?? normalized(pulled);
     }
     return inner;
+  }
+  function normalized(node) {
+    const entries = [];
+    quotientFactors(node, true, entries);
+    const { powers, constants } = collect(entries);
+    return rebuild(powers, constants);
   }
   function asPower(node) {
     if (node.type === "FunctionCall" && node.callee.symbol === "sqrt" && node.args.length === 1)
       return compose(asPower(node.args[0]), q(1, 2));
     if (node.type === "BinaryOperator" && node.name === "Exponent") {
       const r = rationalOf(node.right);
-      if (r !== void 0 && r.d !== 0 && constantValue(node.left) === void 0)
+      const numeric = constantValue(node.left) !== void 0;
+      if (r !== void 0 && r.d > 0 && (!numeric || r.d > 1))
         return compose(asPower(node.left), q(r.n, r.d));
     }
     return { base: node, exponent: q(1) };
@@ -4423,15 +4449,29 @@ var CalcEngine = (() => {
       quotientFactors(out, entry.inNumerator, opened2);
     }
     const { powers, constants, merged } = collect(opened2);
-    if (!merged && !pulled)
+    if (!merged && !pulled && !reducible(constants))
       return void 0;
     return rebuild(powers, constants);
+  }
+  function reducible(constants) {
+    const side = (inNumerator) => constants.filter((c) => c.inNumerator === inNumerator).map((c) => constantValue(c.node)).filter((v) => v !== void 0 && Number.isInteger(v)).reduce((a, b) => a * b, 1);
+    return gcd(Math.abs(side(true)), Math.abs(side(false))) > 1;
   }
   function rebuild(powers, constants) {
     const top = [];
     const bottom = [];
-    for (const { node, inNumerator } of constants)
-      (inNumerator ? top : bottom).push(node);
+    let coefficient = q(1);
+    for (const { node, inNumerator } of constants) {
+      const value = constantValue(node);
+      if (value !== void 0 && Number.isInteger(value) && value !== 0)
+        coefficient = inNumerator ? qMul(coefficient, q(value)) : qMul(coefficient, q(1, value));
+      else
+        (inNumerator ? top : bottom).push(node);
+    }
+    if (coefficient.n !== 1)
+      top.unshift(number2(coefficient.n));
+    if (coefficient.d !== 1)
+      bottom.unshift(number2(coefficient.d));
     const simple = (p) => p.base.type === "Identifier" ? 0 : 1;
     const ordered = [...powers].sort((a, b) => simple(a) - simple(b));
     for (const power8 of ordered) {
@@ -4452,7 +4492,7 @@ var CalcEngine = (() => {
     return fold(result);
   }
   var isSum = (node) => node.type === "BinaryOperator" && (node.name === "Add" || node.name === "Subtract");
-  function pullOutOfSum(sum3) {
+  function pullOutOfSum(sum3, onlyNegative = false) {
     const terms = topLevelTerms(sum3);
     if (terms.length < 2)
       return void 0;
@@ -4462,6 +4502,8 @@ var CalcEngine = (() => {
       return { ...collect(entries), negated };
     });
     for (const candidate of read[0].powers) {
+      if (identifiersIn(candidate.base).length === 0)
+        continue;
       const exponents = [];
       for (const term2 of read) {
         const match = term2.powers.find((p) => sameTree(p.base, candidate.base));
@@ -4474,6 +4516,8 @@ var CalcEngine = (() => {
       if (exponents.every(isWhole))
         continue;
       const least = exponents.reduce((a, b) => qLess(b, a) ? b : a);
+      if (onlyNegative && least.n >= 0)
+        continue;
       const rest = read.map((term2, i) => ({
         value: rebuild(
           term2.powers.map(
@@ -10735,6 +10779,20 @@ var CalcEngine = (() => {
   }
 
   // src/plugins/physics-lab/symbolic/trigSubstitution.ts
+  var isOne3 = (node) => constantValue(node) === 1;
+  function exactRoot({ n, d }) {
+    const whole = (k) => Math.round(Math.sqrt(k)) ** 2 === k;
+    if (whole(n) && whole(d))
+      return rationalNode({
+        n: Math.round(Math.sqrt(n)),
+        d: Math.round(Math.sqrt(d))
+      });
+    if (whole(d))
+      return fold(
+        divide(call("sqrt", number2(n)), number2(Math.round(Math.sqrt(d))))
+      );
+    return fold(divide(call("sqrt", number2(n * d)), number2(d)));
+  }
   function findTrigSubstitution(node, variable) {
     node = asRootPowers(node);
     const form = firstForm(node, variable);
@@ -10742,19 +10800,24 @@ var CalcEngine = (() => {
       return void 0;
     const name = freshName(node, ["\\theta", "t", "w"]);
     const angle = id3(name);
-    const { scale, root: root2, kind } = form;
+    const { scale, root: root2, kind, coefficient } = form;
     const a = scale;
     const sin2 = call("sin", angle);
     const cos2 = call("cos", angle);
     const tan2 = call("tan", angle);
     const sec = call("sec", angle);
-    const substitution2 = kind === "sine" ? { x: multiply(a, sin2), root: multiply(a, cos2), dx: multiply(a, cos2) } : kind === "tangent" ? {
+    const scaled2 = (node2) => isOne3(coefficient) ? node2 : multiply(coefficient, node2);
+    const substitution2 = kind === "sine" ? {
+      x: multiply(a, sin2),
+      root: scaled2(multiply(a, cos2)),
+      dx: multiply(a, cos2)
+    } : kind === "tangent" ? {
       x: multiply(a, tan2),
-      root: multiply(a, sec),
+      root: scaled2(multiply(a, sec)),
       dx: multiply(a, power2(sec, number2(2)))
     } : {
       x: multiply(a, sec),
-      root: multiply(a, tan2),
+      root: scaled2(multiply(a, tan2)),
       dx: multiply(a, multiply(sec, tan2))
     };
     const withoutRoot = replaceSubtree(node, root2, substitution2.root);
@@ -10820,16 +10883,18 @@ var CalcEngine = (() => {
     const parts = splitSquare(inside, variable);
     if (parts === void 0)
       return void 0;
-    const { constant: constant3, squareSign, constantSign } = parts;
-    const value = constantValue(fold(constant3));
-    if (value === void 0 || value <= 0)
+    const { constant: constant3, squareSign, constantSign, m } = parts;
+    const k = rationalOf(fold(constant3));
+    if (k === void 0 || k.n <= 0 || k.d <= 0)
       return void 0;
-    const scale = fold(call("sqrt", number2(value)));
+    const scale = exactRoot({ n: k.n * m.d, d: k.d * m.n });
+    const coefficient = exactRoot(m);
+    const form = { root: node, scale, coefficient };
     if (squareSign < 0)
-      return { root: node, scale, kind: "sine" };
+      return { ...form, kind: "sine" };
     if (constantSign > 0)
-      return { root: node, scale, kind: "tangent" };
-    return { root: node, scale, kind: "secant" };
+      return { ...form, kind: "tangent" };
+    return { ...form, kind: "secant" };
   }
   function squareRootArgument(node) {
     if (node.type === "FunctionCall" && node.callee.symbol === "sqrt" && node.args.length === 1) {
@@ -10849,13 +10914,25 @@ var CalcEngine = (() => {
     if (node.name !== "Add" && node.name !== "Subtract")
       return void 0;
     const sign3 = node.name === "Add" ? 1 : -1;
-    const leftIsSquare = isBareSquare(node.left, variable);
-    const rightIsSquare = isBareSquare(node.right, variable);
-    if (leftIsSquare && !dependsOn(node.right, variable)) {
-      return { constant: node.right, squareSign: 1, constantSign: sign3 };
+    const left = squareCoefficient(node.left, variable);
+    const right = squareCoefficient(node.right, variable);
+    if (left !== void 0 && !dependsOn(node.right, variable)) {
+      return { constant: node.right, squareSign: 1, constantSign: sign3, m: left };
     }
-    if (rightIsSquare && !dependsOn(node.left, variable)) {
-      return { constant: node.left, squareSign: sign3, constantSign: 1 };
+    if (right !== void 0 && !dependsOn(node.left, variable)) {
+      return { constant: node.left, squareSign: sign3, constantSign: 1, m: right };
+    }
+    return void 0;
+  }
+  function squareCoefficient(node, variable) {
+    if (isBareSquare(node, variable))
+      return { n: 1, d: 1 };
+    if (node.type === "BinaryOperator" && (node.name === "Multiply" || node.name === "CrossMultiply")) {
+      const [k, square4] = isBareSquare(node.right, variable) ? [node.left, node.right] : [node.right, node.left];
+      if (!isBareSquare(square4, variable))
+        return void 0;
+      const m = rationalOf(fold(k));
+      return m !== void 0 && m.n > 0 && m.d > 0 ? m : void 0;
     }
     return void 0;
   }
@@ -10864,7 +10941,8 @@ var CalcEngine = (() => {
   }
   function backSubstitute(answer, name, variable, form) {
     const x = id3(variable);
-    const { scale: a, root: root2, kind } = form;
+    const { scale: a, kind, coefficient } = form;
+    const root2 = isOne3(coefficient) ? form.root : divide(form.root, coefficient);
     const table3 = kind === "sine" ? {
       sin: divide(x, a),
       cos: divide(root2, a),
@@ -12317,6 +12395,11 @@ var CalcEngine = (() => {
     return integrateWithMethod(node, variable).value;
   }
   function integrateWithMethod(node, variable) {
+    const result = integrateUntidied(node, variable);
+    const tidied = fold(cancelPowers(result.value));
+    return nodeCount(tidied) < nodeCount(result.value) ? { ...result, value: tidied } : result;
+  }
+  function integrateUntidied(node, variable) {
     const folded = fold(implicitProducts2(node, variable));
     const direct2 = attempt(folded, variable);
     const opened2 = fold(expand(folded).node);
@@ -18500,7 +18583,7 @@ var CalcEngine = (() => {
       return void 0;
     const part = (n) => limitOf(n, variable, approach);
     const isZero4 = (l) => l?.kind === "finite" && certainlyZero(l.value) === true;
-    const isOne3 = (l) => l?.kind === "finite" && certainlyZero(subtract4(l.value, fromInteger(1))) === true;
+    const isOne4 = (l) => l?.kind === "finite" && certainlyZero(subtract4(l.value, fromInteger(1))) === true;
     const isInfinite = (l) => l?.kind === "infinite";
     switch (node.name) {
       case "Divide": {
@@ -18534,7 +18617,7 @@ var CalcEngine = (() => {
           return void 0;
         const base2 = part(node.left);
         const exponent2 = part(node.right);
-        if (isOne3(base2) && isInfinite(exponent2))
+        if (isOne4(base2) && isInfinite(exponent2))
           return "1^inf";
         if (isZero4(base2) && isZero4(exponent2))
           return "0^0";
@@ -20160,9 +20243,9 @@ var CalcEngine = (() => {
     const common = top.reduce((g, a) => gcd7(g, abs2(a)), abs2(divisor));
     divisor /= common;
     top = top.map((a) => a / common);
-    const isOne3 = (n) => n.type === "Constant" && n.value === 1;
-    const order = basis.map((node, i) => ({ node, coefficient: top[i] })).filter((t) => t.coefficient !== 0n).sort((a, b) => Number(isOne3(b.node)) - Number(isOne3(a.node)));
-    const termOf = (coefficient, node) => isOne3(node) ? number2(Number(abs2(coefficient))) : abs2(coefficient) === 1n ? node : multiply(number2(Number(abs2(coefficient))), node);
+    const isOne4 = (n) => n.type === "Constant" && n.value === 1;
+    const order = basis.map((node, i) => ({ node, coefficient: top[i] })).filter((t) => t.coefficient !== 0n).sort((a, b) => Number(isOne4(b.node)) - Number(isOne4(a.node)));
+    const termOf = (coefficient, node) => isOne4(node) ? number2(Number(abs2(coefficient))) : abs2(coefficient) === 1n ? node : multiply(number2(Number(abs2(coefficient))), node);
     const join3 = (terms) => terms.reduce((total, { node, coefficient }) => {
       const term2 = termOf(coefficient, node);
       if (total === void 0)
