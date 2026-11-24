@@ -127,6 +127,7 @@ export type RuleName =
   | "hyperbolic"
   | "root"
   | "absolute"
+  | "step"
   | "logarithmic-differentiation"
   | "implicit";
 
@@ -471,6 +472,27 @@ const FUNCTION_RULES: Record<string, FunctionRule> = {
     "Derivative of absolute value",
     (u) => call("sign", u),
     "|u| differentiates to sign(u), undefined where u is 0"
+  ),
+  // Flat between their jumps. The derivative is 0 wherever it exists and
+  // does not exist at a jump, which the prose says as abs's does: a 0 shown
+  // with no word about the jumps would claim the staircase is smooth.
+  floor: rule(
+    "step",
+    "Derivative of a step function",
+    () => number(0),
+    "⌊u⌋ is flat between its steps, so it differentiates to 0, undefined where u is a whole number"
+  ),
+  ceil: rule(
+    "step",
+    "Derivative of a step function",
+    () => number(0),
+    "⌈u⌉ is flat between its steps, so it differentiates to 0, undefined where u is a whole number"
+  ),
+  sign: rule(
+    "step",
+    "Derivative of a step function",
+    () => number(0),
+    "sign(u) is flat on each side of 0, so it differentiates to 0, undefined where u is 0"
   ),
 };
 

@@ -164,6 +164,15 @@ describe("every function in the table differentiates to something true", () => {
     checkValue(fn("arccos", mul(number(0.5), x)));
   });
 
+  test("step functions are 0 between their jumps, and say so", () => {
+    for (const name of ["floor", "ceil", "sign"]) {
+      const { result, root } = derive(fn(name, mul(number(2), x)));
+      expect(emit(result)).toBe("0");
+      const said = JSON.stringify(root);
+      expect(said).toContain("undefined where u is");
+    }
+  });
+
   test("the inverse functions whose domain starts above 1", () => {
     const big = [{ x: 1.4 }, { x: 1.9 }, { x: 2.6 }, { x: 3.3 }];
     for (const name of ["arcsec", "arccsc", "arccosh"]) {

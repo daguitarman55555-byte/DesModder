@@ -4044,6 +4044,11 @@ var CalcEngine = (() => {
     const symbol = args[0].type === "Identifier" ? args[0].symbol : void 0;
     if (name === "ln" && symbol === "e")
       return number2(1);
+    const whole = name === "floor" || name === "ceil" ? rationalOf(args[0]) : void 0;
+    if (whole !== void 0 && whole.d > 0)
+      return number2(
+        name === "floor" ? Math.floor(whole.n / whole.d) : Math.ceil(whole.n / whole.d)
+      );
     let ratio = name === "sqrt" ? rationalOf(args[0]) : void 0;
     if (ratio !== void 0 && ratio.d > 1 && ratio.n > 0) {
       if (!Number.isInteger(Math.sqrt(ratio.d)))
@@ -8382,6 +8387,27 @@ var CalcEngine = (() => {
       "Derivative of absolute value",
       (u) => call2("sign", u),
       "|u| differentiates to sign(u), undefined where u is 0"
+    ),
+    // Flat between their jumps. The derivative is 0 wherever it exists and
+    // does not exist at a jump, which the prose says as abs's does: a 0 shown
+    // with no word about the jumps would claim the staircase is smooth.
+    floor: rule(
+      "step",
+      "Derivative of a step function",
+      () => number3(0),
+      "\u230Au\u230B is flat between its steps, so it differentiates to 0, undefined where u is a whole number"
+    ),
+    ceil: rule(
+      "step",
+      "Derivative of a step function",
+      () => number3(0),
+      "\u2308u\u2309 is flat between its steps, so it differentiates to 0, undefined where u is a whole number"
+    ),
+    sign: rule(
+      "step",
+      "Derivative of a step function",
+      () => number3(0),
+      "sign(u) is flat on each side of 0, so it differentiates to 0, undefined where u is 0"
     )
   };
   function rule(name, title, derivative4, says) {
@@ -14050,10 +14076,7 @@ var CalcEngine = (() => {
       const inner = argument.type === "FunctionCall" ? argument.args[0] : void 0;
       const linear3 = inner && linearIn(inner, variable);
       if (periodic !== void 0 && linear3 !== void 0)
-        return recorded(
-          TECHNIQUES.periodicAbs,
-          () => divide(periodic, linear3.a)
-        );
+        return recorded(TECHNIQUES.periodicAbs, () => divide(periodic, linear3.a));
     }
     const rule2 = FUNCTION_INTEGRALS[name];
     if (rule2 === void 0) {
@@ -16856,7 +16879,7 @@ var CalcEngine = (() => {
         if (giveUp || child.type !== "FunctionCall" || child.args.length !== 1)
           return;
         const name = child.callee.symbol;
-        let argument = child.args[0];
+        let [argument] = child.args;
         let offset;
         let byPi = true;
         if (name === "tan" || name === "sec")
