@@ -25,6 +25,7 @@ import {
   add,
   call,
   dependsOn,
+  differentiate,
   divide,
   evaluate,
   fold,
@@ -42,6 +43,8 @@ export interface SpecialAntiderivative {
   value: Node;
   /** The special functions it is written with, by symbol. */
   uses: string[];
+  /** Set when one integration by parts came first. */
+  byParts?: boolean;
 }
 
 /** `a` when the node is `a·x + b`, with `b`; numbers only. */
@@ -240,6 +243,66 @@ function shape(
  * passed in so this module does not import it.
  */
 export function specialAntiderivative(
+  node: Node,
+  variable: string,
+  elementary: (term: Node) => Node | undefined
+): SpecialAntiderivative | undefined {
+  return (
+    termByTerm(node, variable, elementary) ??
+    byPartsOnce(node, variable, elementary)
+  );
+}
+
+/** Factors whose derivative is simpler than they are: the u of LIATE. */
+const PARTS_U = new Set(["ln", "log", "arctan", "arcsin", "arccos"]);
+
+/**
+ * One integration by parts, with the integral that is left done by the
+ * shapes above: ∫e^{−x} ln x dx = −e^{−x} ln x + ∫e^{−x}/x dx, and the last
+ * is Ei(−x). Without it the integrand was refused as a quotient it is not,
+ * because nothing elementary finishes it (UPGRADE_ROADMAP, the refusal that
+ * names the wrong reason).
+ *
+ * u is a logarithm or inverse trigonometric factor, dv the rest, which must
+ * integrate elementarily; ∫v du must then be a special shape (or elementary
+ * term by term with at least one special). The caller checks the answer by
+ * differentiating it back.
+ */
+function byPartsOnce(
+  node: Node,
+  variable: string,
+  elementary: (term: Node) => Node | undefined
+): SpecialAntiderivative | undefined {
+  const factors: { node: Node; inNumerator: boolean }[] = [];
+  quotientFactors(fold(node), true, factors);
+  const at = factors.findIndex(
+    (f) =>
+      f.inNumerator &&
+      f.node.type === "FunctionCall" &&
+      PARTS_U.has(f.node.callee.symbol) &&
+      dependsOn(f.node, variable)
+  );
+  if (at < 0) return undefined;
+  const u = factors[at].node;
+  let dv: Node = number(1);
+  factors.forEach((f, i) => {
+    if (i === at) return;
+    dv = f.inNumerator ? multiply(dv, f.node) : divide(dv, f.node);
+  });
+  if (!dependsOn(dv, variable)) return undefined;
+  const v = elementary(fold(dv));
+  if (v === undefined) return undefined;
+  const du = differentiate(u, variable);
+  const rest = termByTerm(fold(multiply(v, du)), variable, elementary);
+  if (rest === undefined) return undefined;
+  return {
+    value: fold(add(multiply(u, v), negative(rest.value))),
+    uses: rest.uses,
+    byParts: true,
+  };
+}
+
+function termByTerm(
   node: Node,
   variable: string,
   elementary: (term: Node) => Node | undefined

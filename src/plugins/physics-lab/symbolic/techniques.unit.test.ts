@@ -384,6 +384,26 @@ describe("trigonometric substitution, and coming back from it", () => {
   });
 });
 
+describe("a trigonometric quotient that divides exactly", () => {
+  const sin = fn("sin", x);
+  const cos = fn("cos", x);
+  const twoX = mul(number(2), x);
+  test("cos 2x/(sin x + cos x) is cos x − sin x", () => {
+    check(
+      div(fn("cos", twoX), add(sin, cos)),
+      "\\sin\\left(x\\right)+\\cos\\left(x\\right)"
+    );
+  });
+  test("sin 2x/sin x is 2 cos x", () => {
+    check(div(fn("sin", twoX), sin), "2\\sin\\left(x\\right)");
+  });
+  test("one that does not divide is left to the other routes", () => {
+    // 1/(sin x + cos x) has a remainder, so the half-angle route answers it.
+    const result = integrate(div(number(1), add(sin, cos)), "x");
+    expect(emit(result)).toContain("\\tan");
+  });
+});
+
 describe("what it still refuses, and says so", () => {
   test("an integrand with no elementary antiderivative", () => {
     expect(() => integrate(fn("sin", pow(x, number(2))), "x")).toThrow(

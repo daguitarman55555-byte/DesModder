@@ -909,7 +909,7 @@ function integralAnswer(
       return {
         latex,
         verdict: "Proved, checked by differentiating back",
-        method: `No elementary antiderivative${special ? ` (${special})` : ""}, so it is written with ${named.uses.map((u) => specialFunction(u)?.name ?? u).join(" and ")}.`,
+        method: `No elementary antiderivative${special && !named.byParts ? ` (${special})` : ""}, so it is written with ${named.uses.map((u) => specialFunction(u)?.name ?? u).join(" and ")}${named.byParts ? ", after one integration by parts" : ""}.`,
         steps: [],
         notes: named.uses
           .map((u) => specialFunction(u))

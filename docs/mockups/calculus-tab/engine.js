@@ -15,9 +15,9 @@ var CalcEngine = (() => {
   };
   var __copyProps = (to, from, except, desc) => {
     if (from && typeof from === "object" || typeof from === "function") {
-      for (let key of __getOwnPropNames(from))
-        if (!__hasOwnProp.call(to, key) && key !== except)
-          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+      for (let key2 of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key2) && key2 !== except)
+          __defProp(to, key2, { get: () => from[key2], enumerable: !(desc = __getOwnPropDesc(from, key2)) || desc.enumerable });
     }
     return to;
   };
@@ -119,10 +119,10 @@ var CalcEngine = (() => {
           var keys = Object.getOwnPropertyNames(object);
           var result = [];
           for (var i = 0; i < keys.length; i++) {
-            var key = keys[i];
-            var thing = object[key];
+            var key2 = keys[i];
+            var thing = object[key2];
             var rules2 = [].concat(thing);
-            if (key === "include") {
+            if (key2 === "include") {
               for (var j = 0; j < rules2.length; j++) {
                 result.push({ include: rules2[j] });
               }
@@ -132,15 +132,15 @@ var CalcEngine = (() => {
             rules2.forEach(function(rule2) {
               if (isObject(rule2)) {
                 if (match.length)
-                  result.push(ruleOptions(key, match));
-                result.push(ruleOptions(key, rule2));
+                  result.push(ruleOptions(key2, match));
+                result.push(ruleOptions(key2, rule2));
                 match = [];
               } else {
                 match.push(rule2);
               }
             });
             if (match.length)
-              result.push(ruleOptions(key, match));
+              result.push(ruleOptions(key2, match));
           }
           return result;
         }
@@ -181,9 +181,9 @@ var CalcEngine = (() => {
             type: null,
             shouldThrow: false
           };
-          for (var key in obj) {
-            if (hasOwnProperty.call(obj, key)) {
-              options[key] = obj[key];
+          for (var key2 in obj) {
+            if (hasOwnProperty.call(obj, key2)) {
+              options[key2] = obj[key2];
             }
           }
           if (typeof options.type === "string" && type !== options.type) {
@@ -301,23 +301,23 @@ var CalcEngine = (() => {
             start = keys[0];
           var ruleMap = /* @__PURE__ */ Object.create(null);
           for (var i = 0; i < keys.length; i++) {
-            var key = keys[i];
-            ruleMap[key] = toRules(states[key]).concat(all);
+            var key2 = keys[i];
+            ruleMap[key2] = toRules(states[key2]).concat(all);
           }
           for (var i = 0; i < keys.length; i++) {
-            var key = keys[i];
-            var rules2 = ruleMap[key];
+            var key2 = keys[i];
+            var rules2 = ruleMap[key2];
             var included = /* @__PURE__ */ Object.create(null);
             for (var j = 0; j < rules2.length; j++) {
               var rule2 = rules2[j];
               if (!rule2.include)
                 continue;
               var splice = [j, 1];
-              if (rule2.include !== key && !included[rule2.include]) {
+              if (rule2.include !== key2 && !included[rule2.include]) {
                 included[rule2.include] = true;
                 var newRules = ruleMap[rule2.include];
                 if (!newRules) {
-                  throw new Error("Cannot include nonexistent state '" + rule2.include + "' (in state '" + key + "')");
+                  throw new Error("Cannot include nonexistent state '" + rule2.include + "' (in state '" + key2 + "')");
                 }
                 for (var k = 0; k < newRules.length; k++) {
                   var newRule = newRules[k];
@@ -332,8 +332,8 @@ var CalcEngine = (() => {
           }
           var map = /* @__PURE__ */ Object.create(null);
           for (var i = 0; i < keys.length; i++) {
-            var key = keys[i];
-            map[key] = compileRules(ruleMap[key], true);
+            var key2 = keys[i];
+            map[key2] = compileRules(ruleMap[key2], true);
           }
           for (var i = 0; i < keys.length; i++) {
             var name = keys[i];
@@ -2229,10 +2229,10 @@ var CalcEngine = (() => {
     let cnt = 0;
     let id8;
     for (const {
-      property: { value: key },
+      property: { value: key2 },
       expr
     } of style.entries) {
-      if (key === "id") {
+      if (key2 === "id") {
         cnt++;
         if (cnt > 1) {
           ps.pushError("Duplicate id field", expr.pos);
@@ -2270,7 +2270,7 @@ var CalcEngine = (() => {
           pos: pos(token, close)
         };
       }
-      const key = ps.consumeType(["id", "keyword"]);
+      const key2 = ps.consumeType(["id", "keyword"]);
       ps.consume(":");
       const expr = parseMain(ps, Power.seq);
       if (!isExpression(expr) && expr.type !== "StyleMapping")
@@ -2279,11 +2279,11 @@ var CalcEngine = (() => {
         type: "MappingEntry",
         property: {
           type: "String",
-          value: key.value,
-          pos: pos(key)
+          value: key2.value,
+          pos: pos(key2)
         },
         expr,
-        pos: pos(key, expr)
+        pos: pos(key2, expr)
       });
       if (ps.peek().value !== "}")
         ps.consume(",");
@@ -2405,8 +2405,8 @@ var CalcEngine = (() => {
   function relopDir(symbol) {
     return symbol === "=" ? 0 : symbol.startsWith("<") ? 1 : -1;
   }
-  function consequentParselet(bindingPower, parse2) {
-    return { bindingPower, parse: parse2 };
+  function consequentParselet(bindingPower, parse3) {
+    return { bindingPower, parse: parse3 };
   }
   function binaryParselet(bp, op, { rightAssociative } = {}) {
     return consequentParselet(bp, (ps, left, token) => {
@@ -3193,8 +3193,8 @@ var CalcEngine = (() => {
     });
   }
   function forEachChild(node, on) {
-    for (const key in node) {
-      const value = node[key];
+    for (const key2 in node) {
+      const value = node[key2];
       if (typeof value !== "object" || value === null)
         continue;
       if (Array.isArray(value)) {
@@ -3230,8 +3230,8 @@ var CalcEngine = (() => {
   function sameTree(a, b) {
     return deepEqual(a, b);
   }
-  function isBracketMark(node, key) {
-    return key === "parenWrapped" && node.type === "FunctionCall";
+  function isBracketMark(node, key2) {
+    return key2 === "parenWrapped" && node.type === "FunctionCall";
   }
   function deepEqual(a, b) {
     if (a === b)
@@ -3251,16 +3251,16 @@ var CalcEngine = (() => {
     const left = a;
     const right = b;
     let keys = 0;
-    for (const key in left) {
-      if (isBracketMark(left, key))
+    for (const key2 in left) {
+      if (isBracketMark(left, key2))
         continue;
       keys += 1;
-      if (!deepEqual(left[key], right[key]))
+      if (!deepEqual(left[key2], right[key2]))
         return false;
     }
     let otherKeys = 0;
-    for (const key in right) {
-      if (isBracketMark(right, key))
+    for (const key2 in right) {
+      if (isBracketMark(right, key2))
         continue;
       otherKeys += 1;
     }
@@ -4009,8 +4009,8 @@ var CalcEngine = (() => {
     const root2 = (radicand) => fold({ type: "FunctionCall", callee: id3("sqrt"), args: [radicand] });
     const oneMinus = () => root2(binop2("Subtract", number2(1), square4()));
     const onePlus = () => root2(binop2("Add", square4(), number2(1)));
-    const key = `${name} ${inner.callee.symbol}`;
-    switch (key) {
+    const key2 = `${name} ${inner.callee.symbol}`;
+    switch (key2) {
       case "sin arcsin":
       case "cos arccos":
       case "tan arctan":
@@ -4119,10 +4119,10 @@ var CalcEngine = (() => {
   function dedupe(notes) {
     const seen = /* @__PURE__ */ new Set();
     return notes.filter((note) => {
-      const key = `${note.text}|${note.latex}|${JSON.stringify(note.factor)}`;
-      if (seen.has(key))
+      const key2 = `${note.text}|${note.latex}|${JSON.stringify(note.factor)}`;
+      if (seen.has(key2))
         return false;
-      seen.add(key);
+      seen.add(key2);
       return true;
     });
   }
@@ -4817,10 +4817,10 @@ var CalcEngine = (() => {
   function dedupe2(notes) {
     const seen = /* @__PURE__ */ new Set();
     return notes.filter((note) => {
-      const key = `${note.text}|${note.latex}|${JSON.stringify(note.factor)}`;
-      if (seen.has(key))
+      const key2 = `${note.text}|${note.latex}|${JSON.stringify(note.factor)}`;
+      if (seen.has(key2))
         return false;
-      seen.add(key);
+      seen.add(key2);
       return true;
     });
   }
@@ -8846,6 +8846,156 @@ var CalcEngine = (() => {
     }
   }
 
+  // src/plugins/physics-lab/symbolic/trigCancel.ts
+  var key = (c, s) => `${c},${s}`;
+  var parse2 = (k) => k.split(",").map(Number);
+  function plus(a, b, sign3 = 1) {
+    const out = new Map(a);
+    for (const [k, v] of b) {
+      const next = (out.get(k) ?? 0) + sign3 * v;
+      if (Math.abs(next) < 1e-12)
+        out.delete(k);
+      else
+        out.set(k, next);
+    }
+    return out;
+  }
+  function times(a, b) {
+    let out = /* @__PURE__ */ new Map();
+    for (const [ka, va] of a)
+      for (const [kb, vb] of b) {
+        const [ca, sa] = parse2(ka);
+        const [cb, sb] = parse2(kb);
+        out = plus(out, /* @__PURE__ */ new Map([[key(ca + cb, sa + sb), va * vb]]));
+      }
+    return out;
+  }
+  var constantPoly = (v) => v === 0 ? /* @__PURE__ */ new Map() : /* @__PURE__ */ new Map([[key(0, 0), v]]);
+  function leading(p) {
+    let best;
+    for (const [k, v] of p) {
+      const [c, s] = parse2(k);
+      if (best === void 0 || c > best[0] || c === best[0] && s > best[1])
+        best = [c, s, v];
+    }
+    return best;
+  }
+  function divideExactly(n, d) {
+    const lead = leading(d);
+    if (lead === void 0)
+      return void 0;
+    let rest = n;
+    let quotient = /* @__PURE__ */ new Map();
+    for (let guard = 0; guard < 64 && rest.size > 0; guard++) {
+      const top = leading(rest);
+      const c = top[0] - lead[0];
+      const s = top[1] - lead[1];
+      if (c < 0 || s < 0)
+        return void 0;
+      const term2 = /* @__PURE__ */ new Map([[key(c, s), top[2] / lead[2]]]);
+      quotient = plus(quotient, term2);
+      rest = plus(rest, times(term2, d), -1);
+    }
+    return rest.size === 0 ? quotient : void 0;
+  }
+  function toPoly(node, u) {
+    const value = constantValue(node);
+    if (value !== void 0)
+      return constantPoly(value);
+    switch (node.type) {
+      case "Negative": {
+        const inner = toPoly(node.arg, u);
+        return inner && plus(/* @__PURE__ */ new Map(), inner, -1);
+      }
+      case "FunctionCall": {
+        if (node.args.length !== 1)
+          return void 0;
+        const name = node.callee.symbol;
+        if (name !== "sin" && name !== "cos")
+          return void 0;
+        const [arg] = node.args;
+        const s = /* @__PURE__ */ new Map([[key(0, 1), 1]]);
+        const c = /* @__PURE__ */ new Map([[key(1, 0), 1]]);
+        if (sameTree(fold(arg), u))
+          return name === "sin" ? s : c;
+        if (sameTree(fold(arg), fold(multiply(number2(2), u))))
+          return name === "sin" ? times(constantPoly(2), times(s, c)) : plus(times(c, c), times(s, s), -1);
+        return void 0;
+      }
+      case "BinaryOperator": {
+        if (node.name === "Exponent") {
+          const n = constantValue(node.right);
+          if (n === void 0 || !Number.isInteger(n) || n < 0 || n > 8)
+            return void 0;
+          const base2 = toPoly(node.left, u);
+          if (base2 === void 0)
+            return void 0;
+          let out = constantPoly(1);
+          for (let i = 0; i < n; i++)
+            out = times(out, base2);
+          return out;
+        }
+        const left = toPoly(node.left, u);
+        const right = toPoly(node.right, u);
+        if (left === void 0 || right === void 0)
+          return void 0;
+        if (node.name === "Add")
+          return plus(left, right);
+        if (node.name === "Subtract")
+          return plus(left, right, -1);
+        if (node.name === "Multiply" || node.name === "CrossMultiply")
+          return times(left, right);
+        return void 0;
+      }
+      default:
+        return void 0;
+    }
+  }
+  function fromPoly(p, u) {
+    let out = number2(0);
+    for (const [k, v] of p) {
+      const [c, s] = parse2(k);
+      let term2 = number2(v);
+      if (c > 0)
+        term2 = multiply(
+          term2,
+          c === 1 ? call("cos", u) : power2(call("cos", u), number2(c))
+        );
+      if (s > 0)
+        term2 = multiply(
+          term2,
+          s === 1 ? call("sin", u) : power2(call("sin", u), number2(s))
+        );
+      out = add(out, term2);
+    }
+    return fold(out);
+  }
+  function cancelTrigQuotient(node) {
+    const factors = [];
+    quotientFactors(fold(node), true, factors);
+    const below = factors.filter((f) => !f.inNumerator);
+    if (below.length === 0)
+      return void 0;
+    const angles = [];
+    visit(node, (child) => {
+      if (child.type === "FunctionCall" && (child.callee.symbol === "sin" || child.callee.symbol === "cos") && child.args.length === 1 && !angles.some((a) => sameTree(a, fold(child.args[0]))))
+        angles.push(fold(child.args[0]));
+    });
+    const product = (list2) => list2.reduce((a, f) => multiply(a, f.node), number2(1));
+    for (const u of angles) {
+      const n = toPoly(product(factors.filter((f) => f.inNumerator)), u);
+      const d = toPoly(product(below), u);
+      if (n === void 0 || d === void 0)
+        continue;
+      if (d.size === 1 && d.has(key(0, 0)))
+        return void 0;
+      const q2 = divideExactly(n, d);
+      if (q2 !== void 0)
+        return fromPoly(q2, u);
+    }
+    return void 0;
+  }
+
   // src/plugins/physics-lab/symbolic/substitute.ts
   var MINIMUM_CANDIDATE_NODES = 2;
   var MAX_CANDIDATES = 24;
@@ -9562,12 +9712,12 @@ var CalcEngine = (() => {
   function dividePolynomials(numerator, denominator) {
     const remainder = [...numerator];
     const degree3 = denominator.length - 1;
-    const leading = denominator[degree3];
+    const leading2 = denominator[degree3];
     const quotient = new Array(
       Math.max(0, remainder.length - degree3)
     ).fill(0);
     for (let i = remainder.length - 1; i >= degree3; i -= 1) {
-      const factor = remainder[i] / leading;
+      const factor = remainder[i] / leading2;
       if (factor === 0)
         continue;
       quotient[i - degree3] = factor;
@@ -10151,14 +10301,14 @@ var CalcEngine = (() => {
     const remainder = [...trim3(F, a)];
     const divisor = trim3(F, b);
     const d = degreeOf2(F, divisor);
-    const leading = divisor[d];
+    const leading2 = divisor[d];
     const quotient = new Array(
       Math.max(1, remainder.length - d)
     ).fill(F.zero);
     for (let i = remainder.length - 1; i >= d; i -= 1) {
       if (F.isZero(remainder[i]))
         continue;
-      const factor = F.divide(remainder[i], leading);
+      const factor = F.divide(remainder[i], leading2);
       quotient[i - d] = factor;
       for (let j = 0; j <= d; j += 1) {
         remainder[i - d + j] = F.subtract(
@@ -10174,8 +10324,8 @@ var CalcEngine = (() => {
     let y = trim3(F, b);
     while (!isZeroPoly(F, y))
       [x, y] = [y, polyDivide(F, x, y).remainder];
-    const leading = x[degreeOf2(F, x)];
-    return x.map((value) => F.divide(value, leading));
+    const leading2 = x[degreeOf2(F, x)];
+    return x.map((value) => F.divide(value, leading2));
   }
   function evaluatePoly(F, poly, at2) {
     let total = F.zero;
@@ -10198,8 +10348,8 @@ var CalcEngine = (() => {
     const degree3 = degreeOf2(F, current);
     if (degree3 < 1 || degree3 > MAX_DEGREE)
       return void 0;
-    const leading = current[degree3];
-    current = current.map((value) => divide5(value, leading));
+    const leading2 = current[degree3];
+    current = current.map((value) => divide5(value, leading2));
     const roots = [];
     while (degreeOf2(F, current) > 2) {
       const root2 = rationalRoot(current);
@@ -10248,13 +10398,13 @@ var CalcEngine = (() => {
         ([b, c]) => [liftInto(G, b), liftInto(G, c)]
       )
     ];
-    return assemble(G, leading, roots, pairs, poly);
+    return assemble(G, leading2, roots, pairs, poly);
   }
   function liftInto(G, value) {
     const v = value;
     return typeof v.n === "bigint" && typeof v.d === "bigint" ? G.of(value) : value;
   }
-  function assemble(F, leading, roots, pairs, original) {
+  function assemble(F, leading2, roots, pairs, original) {
     const factors = [];
     const addFactor = (factor) => {
       const existing = factors.find((other) => sameFactor(F, other, factor));
@@ -10284,7 +10434,7 @@ var CalcEngine = (() => {
         });
       }
     }
-    let product = [F.of(leading)];
+    let product = [F.of(leading2)];
     for (const factor of factors) {
       for (let i = 0; i < factor.multiplicity; i += 1)
         product = polyMultiply(F, product, factorPoly(F, factor));
@@ -10296,7 +10446,7 @@ var CalcEngine = (() => {
       return void 0;
     return {
       field: F,
-      leading: F.of(leading),
+      leading: F.of(leading2),
       factors
     };
   }
@@ -10450,9 +10600,9 @@ var CalcEngine = (() => {
     if (isZero(cleared[0]))
       return ZERO;
     const constant3 = cleared[0].n < 0n ? -cleared[0].n : cleared[0].n;
-    const leading = cleared[degree3].n < 0n ? -cleared[degree3].n : cleared[degree3].n;
+    const leading2 = cleared[degree3].n < 0n ? -cleared[degree3].n : cleared[degree3].n;
     for (const p of divisors(constant3)) {
-      for (const q2 of divisors(leading)) {
+      for (const q2 of divisors(leading2)) {
         for (const sign3 of [1n, -1n]) {
           const candidate = rational(sign3 * p, q2);
           if (isZero(evaluatePoly(RATIONALS, cleared, candidate)))
@@ -10560,9 +10710,9 @@ var CalcEngine = (() => {
       if (pivot < 0)
         return void 0;
       [rows[column3], rows[pivot]] = [rows[pivot], rows[column3]];
-      const leading = rows[column3][column3];
+      const leading2 = rows[column3][column3];
       for (let i = column3; i <= size; i += 1) {
-        rows[column3][i] = F.divide(rows[column3][i], leading);
+        rows[column3][i] = F.divide(rows[column3][i], leading2);
       }
       for (let row = 0; row < size; row += 1) {
         if (row === column3 || F.isZero(rows[row][column3]))
@@ -10613,9 +10763,9 @@ var CalcEngine = (() => {
     return fold(whole === void 0 ? rest : add(whole, rest));
   }
   function integrateFactored(factored, top, bottom, variable) {
-    const { field: F, leading } = factored;
-    const monic2 = lift(F, bottom).map((value) => F.divide(value, leading));
-    const scaled2 = lift(F, top).map((value) => F.divide(value, leading));
+    const { field: F, leading: leading2 } = factored;
+    const monic2 = lift(F, bottom).map((value) => F.divide(value, leading2));
+    const scaled2 = lift(F, top).map((value) => F.divide(value, leading2));
     const pieces = decompose(F, scaled2, factored.factors, monic2);
     if (pieces === void 0)
       return void 0;
@@ -12148,14 +12298,14 @@ var CalcEngine = (() => {
     if (root2.node.type !== "FunctionCall")
       return void 0;
     const numerator = asQPoly(top[0].node, variable);
-    const plus = asQPoly(other.node, variable);
+    const plus2 = asQPoly(other.node, variable);
     const quartic = asQPoly(root2.node.args[0], variable);
-    if (numerator === void 0 || plus === void 0 || quartic === void 0)
+    if (numerator === void 0 || plus2 === void 0 || quartic === void 0)
       return void 0;
     const shape2 = (p) => p.length === 3 && isZero(p[1]) && isOne(p[2]);
-    if (!shape2(numerator) || !shape2(plus))
+    if (!shape2(numerator) || !shape2(plus2))
       return void 0;
-    const [c] = plus;
+    const [c] = plus2;
     if (!equals(numerator[0], negate(c)) || !(c.n > 0n))
       return void 0;
     if (quartic.length !== 5 || !isZero(quartic[1]) || !isZero(quartic[3]) || !isOne(quartic[4]) || !equals(quartic[0], multiply3(c, c)))
@@ -12701,6 +12851,19 @@ var CalcEngine = (() => {
       const signed = bySign(node, variable, depth2);
       if (signed !== void 0)
         return signed;
+      const divided = cancelTrigQuotient(node);
+      if (divided !== void 0) {
+        try {
+          return recorded(
+            TECHNIQUES.trigIdentity,
+            () => antiderivative(divided, variable, depth2 + 1)
+          );
+        } catch (error2) {
+          if (!(error2 instanceof IntegrationError))
+            throw error2;
+          trace.length = mark;
+        }
+      }
     }
     try {
       return byRule(node, variable, depth2);
@@ -14112,8 +14275,8 @@ var CalcEngine = (() => {
 
   // src/plugins/physics-lab/symbolic/specialConstants.ts
   var cache = /* @__PURE__ */ new Map();
-  function cached(key, digits, run) {
-    const id8 = `${key} ${digits}`;
+  function cached(key2, digits, run) {
+    const id8 = `${key2} ${digits}`;
     let value = cache.get(id8);
     if (value === void 0) {
       value = run();
@@ -14241,21 +14404,21 @@ var CalcEngine = (() => {
   var OPAQUE = /* @__PURE__ */ new Map();
   var isOpaque = (atom) => atom.startsWith("@");
   function opaque(node, value, latex) {
-    const key = `@${JSON.stringify(node)}`;
-    if (!OPAQUE.has(key))
-      OPAQUE.set(key, { node, value, latex });
-    return [term(ONE, /* @__PURE__ */ new Map([[key, ONE]]))];
+    const key2 = `@${JSON.stringify(node)}`;
+    if (!OPAQUE.has(key2))
+      OPAQUE.set(key2, { node, value, latex });
+    return [term(ONE, /* @__PURE__ */ new Map([[key2, ONE]]))];
   }
   function lnPrime(p) {
-    const key = `@ln:${p}`;
-    if (!OPAQUE.has(key)) {
-      OPAQUE.set(key, {
+    const key2 = `@ln:${p}`;
+    if (!OPAQUE.has(key2)) {
+      OPAQUE.set(key2, {
         node: functionCall4(id5("ln"), number4(Number(p))),
         value: Math.log(Number(p)),
         latex: `\\ln\\left(${p}\\right)`
       });
     }
-    return [term(ONE, /* @__PURE__ */ new Map([[key, ONE]]))];
+    return [term(ONE, /* @__PURE__ */ new Map([[key2, ONE]]))];
   }
   function logarithm(q2) {
     if (!(q2.n > 0n))
@@ -14340,10 +14503,10 @@ var CalcEngine = (() => {
     for (const t of terms) {
       if (t === void 0 || isZero(t.coeff))
         continue;
-      const key = factorKey(t.factors);
-      const existing = merged.get(key);
+      const key2 = factorKey(t.factors);
+      const existing = merged.get(key2);
       merged.set(
-        key,
+        key2,
         existing === void 0 ? t : term(add4(existing.coeff, t.coeff), new Map(t.factors))
       );
     }
@@ -14777,16 +14940,16 @@ var CalcEngine = (() => {
         const piSquared = power5(PI_VALUE, rational(2n));
         if (piSquared === void 0)
           return void 0;
-        const times2 = (c) => multiply5(fromRational(c), piSquared);
+        const times3 = (c) => multiply5(fromRational(c), piSquared);
         if (isZero(q2))
           return ZERO2;
         if (isOne(q2))
-          return times2(rational(1n, 6n));
+          return times3(rational(1n, 6n));
         if (equals(q2, rational(-1n)))
-          return times2(rational(-1n, 12n));
+          return times3(rational(-1n, 12n));
         if (equals(q2, half))
           return subtract4(
-            times2(rational(1n, 12n)),
+            times3(rational(1n, 12n)),
             multiply5(fromRational(half), multiply5(ln2(), ln2()))
           );
         return void 0;
@@ -15338,10 +15501,10 @@ var CalcEngine = (() => {
       variable,
       add(approach.node, divide(number2(approach.side), t))
     );
-    const key = `${variable} ${JSON.stringify(moved)}`;
-    if (inProgress.has(key) || depth >= MAX_DEPTH)
+    const key2 = `${variable} ${JSON.stringify(moved)}`;
+    if (inProgress.has(key2) || depth >= MAX_DEPTH)
       return void 0;
-    inProgress.add(key);
+    inProgress.add(key2);
     try {
       const size = sizeOf(moved, variable);
       if (size === void 0)
@@ -15351,7 +15514,7 @@ var CalcEngine = (() => {
         record2("growth");
       return found;
     } finally {
-      inProgress.delete(key);
+      inProgress.delete(key2);
     }
   }
   var limitAtInfinity = (node, variable) => limitOf(node, variable, AT_INFINITY);
@@ -15372,7 +15535,7 @@ var CalcEngine = (() => {
   }
   var constant2 = (c) => ({ c, a: ZERO, b: ZERO });
   var ONE2 = () => constant2(fromInteger(1));
-  function times(p, q2, variable) {
+  function times2(p, q2, variable) {
     const size = {
       c: multiply5(p.c, q2.c),
       a: add4(p.a, q2.a),
@@ -15465,13 +15628,13 @@ var CalcEngine = (() => {
           case "CrossMultiply": {
             const p = sizeOf(node.left, variable);
             const q2 = p && sizeOf(node.right, variable);
-            return p && q2 && times(p, q2, variable);
+            return p && q2 && times2(p, q2, variable);
           }
           case "Divide": {
             const p = sizeOf(node.left, variable);
             const q2 = p && sizeOf(node.right, variable);
             const inverse = q2 && raised(q2, rational(-1n));
-            return p && inverse && times(p, inverse, variable);
+            return p && inverse && times2(p, inverse, variable);
           }
           case "Add":
           case "Subtract":
@@ -15507,7 +15670,7 @@ var CalcEngine = (() => {
       return limitOfSize(known, variable)?.kind === "infinite" ? known : void 0;
     }
     const inverse = raised(q2, rational(-1n));
-    const ratio = inverse && times(p, inverse, variable);
+    const ratio = inverse && times2(p, inverse, variable);
     if (ratio === void 0)
       return void 0;
     const to = limitOfSize(ratio, variable);
@@ -15556,7 +15719,7 @@ var CalcEngine = (() => {
     if (p === void 0 || q2 === void 0)
       return void 0;
     const inverse = raised(q2, rational(-1n));
-    const ratio = inverse && times(p, inverse, variable);
+    const ratio = inverse && times2(p, inverse, variable);
     const to = ratio && limitOfSize(ratio, variable);
     if (to === void 0)
       return void 0;
@@ -15629,7 +15792,7 @@ var CalcEngine = (() => {
         const inner = logarithm2(arg, variable);
         const ln10 = exactConstant(call("ln", number2(10)));
         const scale = ln10 && divide7(fromInteger(1), ln10);
-        return inner && scale && times(inner, constant2(scale), variable);
+        return inner && scale && times2(inner, constant2(scale), variable);
       }
       case "abs": {
         const inner = sizeOf(arg, variable);
@@ -15685,9 +15848,9 @@ var CalcEngine = (() => {
   var DefiniteError = class extends Error {
   };
   var PI_OVER = (n, d) => multiply5(PI_VALUE, fromRational(rational(BigInt(n), BigInt(d))));
-  var root = (n, over, times2 = 1) => multiply5(
+  var root = (n, over, times3 = 1) => multiply5(
     power5(fromInteger(n), rational(1n, 2n)) ?? ZERO2,
-    fromRational(rational(BigInt(times2), BigInt(over)))
+    fromRational(rational(BigInt(times3), BigInt(over)))
   );
   function sineAt(twelfths) {
     const k = (twelfths % 24 + 24) % 24;
@@ -17127,7 +17290,7 @@ var CalcEngine = (() => {
     const terms = topLevelTerms(f.left);
     if (terms.length !== 2 || terms[0].negated === terms[1].negated)
       return void 0;
-    const [plus, minus] = terms[0].negated ? [terms[1], terms[0]] : terms;
+    const [plus2, minus] = terms[0].negated ? [terms[1], terms[0]] : terms;
     const read = (term2) => {
       if (term2.type === "FunctionCall" && term2.args.length === 1) {
         const entry = FRULLANI_TABLE[term2.callee.symbol];
@@ -17148,7 +17311,7 @@ var CalcEngine = (() => {
       }
       return void 0;
     };
-    const p = read(plus.term);
+    const p = read(plus2.term);
     const m = read(minus.term);
     if (p === void 0 || m === void 0 || p.key !== m.key)
       return void 0;
@@ -17586,6 +17749,40 @@ var CalcEngine = (() => {
     return void 0;
   }
   function specialAntiderivative(node, variable, elementary) {
+    return termByTerm(node, variable, elementary) ?? byPartsOnce(node, variable, elementary);
+  }
+  var PARTS_U = /* @__PURE__ */ new Set(["ln", "log", "arctan", "arcsin", "arccos"]);
+  function byPartsOnce(node, variable, elementary) {
+    const factors = [];
+    quotientFactors(fold(node), true, factors);
+    const at2 = factors.findIndex(
+      (f) => f.inNumerator && f.node.type === "FunctionCall" && PARTS_U.has(f.node.callee.symbol) && dependsOn(f.node, variable)
+    );
+    if (at2 < 0)
+      return void 0;
+    const u = factors[at2].node;
+    let dv = number2(1);
+    factors.forEach((f, i) => {
+      if (i === at2)
+        return;
+      dv = f.inNumerator ? multiply(dv, f.node) : divide(dv, f.node);
+    });
+    if (!dependsOn(dv, variable))
+      return void 0;
+    const v = elementary(fold(dv));
+    if (v === void 0)
+      return void 0;
+    const du = differentiate(u, variable);
+    const rest = termByTerm(fold(multiply(v, du)), variable, elementary);
+    if (rest === void 0)
+      return void 0;
+    return {
+      value: fold(add(multiply(u, v), negative2(rest.value))),
+      uses: rest.uses,
+      byParts: true
+    };
+  }
+  function termByTerm(node, variable, elementary) {
     const terms = topLevelTerms(fold(node));
     let total = number2(0);
     const uses = /* @__PURE__ */ new Set();
@@ -18864,8 +19061,8 @@ var CalcEngine = (() => {
     );
     const rounds = method.lhopital.length;
     if (rounds > 0) {
-      const times2 = rounds === 1 ? "" : rounds === 2 ? ", applied twice" : `, applied ${rounds} times`;
-      listed.unshift(`L'H\xF4pital's rule${times2}`);
+      const times3 = rounds === 1 ? "" : rounds === 2 ? ", applied twice" : `, applied ${rounds} times`;
+      listed.unshift(`L'H\xF4pital's rule${times3}`);
       if (substantial.length === 0)
         listed.splice(1);
     }
@@ -20501,11 +20698,11 @@ var CalcEngine = (() => {
   }
   var cache2 = /* @__PURE__ */ new Map();
   function valueOf(node, precision) {
-    const key = `${precision} ${JSON.stringify(node)}`;
-    let value = cache2.get(key);
+    const key2 = `${precision} ${JSON.stringify(node)}`;
+    let value = cache2.get(key2);
     if (value === void 0) {
       value = valueAt(node, precision);
-      cache2.set(key, value);
+      cache2.set(key2, value);
     }
     return value;
   }
@@ -21231,7 +21428,7 @@ var CalcEngine = (() => {
         return {
           latex,
           verdict: "Proved, checked by differentiating back",
-          method: `No elementary antiderivative${special2 ? ` (${special2})` : ""}, so it is written with ${named2.uses.map((u) => specialFunction(u)?.name ?? u).join(" and ")}.`,
+          method: `No elementary antiderivative${special2 && !named2.byParts ? ` (${special2})` : ""}, so it is written with ${named2.uses.map((u) => specialFunction(u)?.name ?? u).join(" and ")}${named2.byParts ? ", after one integration by parts" : ""}.`,
           steps: [],
           notes: named2.uses.map((u) => specialFunction(u)).filter((f) => f?.domain !== void 0).map((f) => `${f.name}: defined in Desmos for ${f.domain}.`),
           graph: [

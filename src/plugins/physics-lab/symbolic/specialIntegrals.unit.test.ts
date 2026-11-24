@@ -73,3 +73,15 @@ describe("special-function antiderivatives", () => {
     check(sub(div(pow(id("e"), x), x), div(number(1), x)), "Ei");
   });
 });
+
+describe("one integration by parts first", () => {
+  test("e^{−x} ln x = Ei(−x) − e^{−x} ln x", () => {
+    const integrand = mul(pow(id("e"), neg(x)), fn("ln", x));
+    check(integrand, "Ei");
+    expect(specialAntiderivative(integrand, "x", elementary)?.byParts).toBe(
+      true
+    );
+  });
+  test("eˣ ln x = eˣ ln x − Ei(x)", () =>
+    check(mul(pow(id("e"), x), fn("ln", x)), "Ei"));
+});

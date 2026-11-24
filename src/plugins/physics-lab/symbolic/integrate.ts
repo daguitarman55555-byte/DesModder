@@ -23,6 +23,7 @@
  * u-substitution keeps the result in the form a student would write.
  */
 import { Aug } from "../../../../text-mode-core";
+import { cancelTrigQuotient } from "./trigCancel";
 import {
   cancelPowers,
   collectLikeTerms,
@@ -857,6 +858,20 @@ function antiderivative(node: Node, variable: string, depth = 0): Node {
     }
     const signed = bySign(node, variable, depth);
     if (signed !== undefined) return signed;
+    // A trigonometric quotient that divides exactly is divided first:
+    // cos 2x/(sin x + cos x) is cos x − sin x, which every other route
+    // reaches only through a half-angle substitution a page long.
+    const divided = cancelTrigQuotient(node);
+    if (divided !== undefined) {
+      try {
+        return recorded(TECHNIQUES.trigIdentity, () =>
+          antiderivative(divided, variable, depth + 1)
+        );
+      } catch (error) {
+        if (!(error instanceof IntegrationError)) throw error;
+        trace.length = mark;
+      }
+    }
   }
   try {
     return byRule(node, variable, depth);
