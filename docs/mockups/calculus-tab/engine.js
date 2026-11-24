@@ -9739,8 +9739,8 @@ var CalcEngine = (() => {
     if (top.length >= bottom.length) {
       const { quotient, remainder } = dividePolynomials(top, bottom);
       const whole = recurse(polynomialOf(quotient, variable));
-      const isZero4 = remainder.every((value) => value === 0);
-      if (isZero4)
+      const isZero5 = remainder.every((value) => value === 0);
+      if (isZero5)
         return whole;
       const rest = properIntegral(remainder, bottom, denominator, variable);
       if (rest === void 0)
@@ -9974,7 +9974,7 @@ var CalcEngine = (() => {
     const make = (a, b) => ({ a, b });
     const zero = make(ZERO, ZERO);
     const one2 = make(ONE, ZERO);
-    const isZero4 = (x) => isZero(x.a) && isZero(x.b);
+    const isZero5 = (x) => isZero(x.a) && isZero(x.b);
     const qSign = (q2) => q2.n < 0n ? -1 : q2.n > 0n ? 1 : 0;
     const sign3 = (x) => {
       const sa = qSign(x.a);
@@ -10009,11 +10009,11 @@ var CalcEngine = (() => {
         return make(divide5(top.a, norm), divide5(top.b, norm));
       },
       negate: (x) => make(negate(x.a), negate(x.b)),
-      isZero: isZero4,
+      isZero: isZero5,
       equals: (x, y) => equals(x.a, y.a) && equals(x.b, y.b),
       sign: sign3,
       sqrt: (x) => {
-        if (isZero4(x))
+        if (isZero5(x))
           return zero;
         if (sign3(x) < 0)
           return void 0;
@@ -14930,7 +14930,7 @@ var CalcEngine = (() => {
   function specialValue(name, args) {
     const r = args.map((a) => asRational(a));
     const [q2] = r;
-    const isZero4 = (i) => args[i]?.length === 0;
+    const isZero5 = (i) => args[i]?.length === 0;
     switch (name) {
       case "Gamma":
         return q2 === void 0 ? void 0 : gammaAt(q2);
@@ -14963,9 +14963,9 @@ var CalcEngine = (() => {
       case "Shi":
       case "FresnelS":
       case "FresnelC":
-        return isZero4(0) ? ZERO2 : void 0;
+        return isZero5(0) ? ZERO2 : void 0;
       case "erfc":
-        return isZero4(0) ? fromInteger(1) : void 0;
+        return isZero5(0) ? fromInteger(1) : void 0;
       case "Li_2": {
         if (q2 === void 0)
           return void 0;
@@ -14989,10 +14989,10 @@ var CalcEngine = (() => {
       case "W_0":
         return args[0] === void 0 ? void 0 : lambertAt(args[0]);
       case "EllipticK":
-        return isZero4(0) ? multiply5(PI_VALUE, fromRational(half)) : void 0;
+        return isZero5(0) ? multiply5(PI_VALUE, fromRational(half)) : void 0;
       case "BesselJ": {
         const [n] = r;
-        if (n === void 0 || !isInteger(n) || !isZero4(1))
+        if (n === void 0 || !isInteger(n) || !isZero5(1))
           return void 0;
         return fromInteger(n.n === 0n ? 1 : 0);
       }
@@ -15001,7 +15001,7 @@ var CalcEngine = (() => {
         const [, , z] = r;
         if (a === void 0 || b === void 0)
           return void 0;
-        if (isZero4(2)) {
+        if (isZero5(2)) {
           const g = gammaAt(b);
           return g === void 0 ? void 0 : divide7(fromInteger(1), g);
         }
@@ -18925,14 +18925,14 @@ var CalcEngine = (() => {
     if (node.type !== "BinaryOperator")
       return void 0;
     const part = (n) => limitOf(n, variable, approach);
-    const isZero4 = (l) => l?.kind === "finite" && certainlyZero(l.value) === true;
+    const isZero5 = (l) => l?.kind === "finite" && certainlyZero(l.value) === true;
     const isOne4 = (l) => l?.kind === "finite" && certainlyZero(subtract4(l.value, fromInteger(1))) === true;
     const isInfinite = (l) => l?.kind === "infinite";
     switch (node.name) {
       case "Divide": {
         const top = part(node.left);
         const bottom = part(node.right);
-        if (isZero4(top) && isZero4(bottom))
+        if (isZero5(top) && isZero5(bottom))
           return "0/0";
         if (isInfinite(top) && isInfinite(bottom))
           return "inf/inf";
@@ -18942,7 +18942,7 @@ var CalcEngine = (() => {
       case "CrossMultiply": {
         const a = part(node.left);
         const b = part(node.right);
-        if (isZero4(a) && isInfinite(b) || isInfinite(a) && isZero4(b))
+        if (isZero5(a) && isInfinite(b) || isInfinite(a) && isZero5(b))
           return "0*inf";
         return void 0;
       }
@@ -18962,9 +18962,9 @@ var CalcEngine = (() => {
         const exponent2 = part(node.right);
         if (isOne4(base2) && isInfinite(exponent2))
           return "1^inf";
-        if (isZero4(base2) && isZero4(exponent2))
+        if (isZero5(base2) && isZero5(exponent2))
           return "0^0";
-        if (base2?.kind === "infinite" && base2.sign > 0 && isZero4(exponent2))
+        if (base2?.kind === "infinite" && base2.sign > 0 && isZero5(exponent2))
           return "inf^0";
         return void 0;
       }
@@ -19110,6 +19110,103 @@ var CalcEngine = (() => {
     ).join(", then ");
   }
 
+  // src/plugins/physics-lab/symbolic/limitRewrites.ts
+  var NOT_PARAMETERS = /* @__PURE__ */ new Set(["e", "pi", "tau"]);
+  function parametersOf(node, variable) {
+    const callees = /* @__PURE__ */ new Set();
+    visit(node, (child) => {
+      if (child.type === "FunctionCall")
+        callees.add(child.callee.symbol);
+    });
+    return [...new Set(identifiersIn(node))].filter(
+      (name) => name !== variable && !NOT_PARAMETERS.has(name) && !callees.has(name)
+    );
+  }
+  var isZero3 = (node) => constantValue(fold(node)) === 0;
+  var SAMPLES3 = [2, -3, 5, 0.5];
+  function parametricLimit(node, variable, at2, side) {
+    if (at2.kind !== "finite")
+      return void 0;
+    const parameters = parametersOf(node, variable);
+    if (parameters.length === 0 || parameters.length > 3)
+      return void 0;
+    const ratio = asRatio(fold(node));
+    let top = ratio.numerator;
+    let bottom = ratio.denominator;
+    const atPoint = (n) => fold(replaceIdentifier(n, variable, at2.node));
+    let applications = 0;
+    let value;
+    let condition;
+    for (; applications <= 3; applications++) {
+      const t = atPoint(top);
+      const b = atPoint(bottom);
+      if (isZero3(t) && isZero3(b)) {
+        if (applications === 3)
+          return void 0;
+        top = differentiate(top, variable);
+        bottom = differentiate(bottom, variable);
+        continue;
+      }
+      if (isZero3(b) || dependsOn(t, variable) || dependsOn(b, variable))
+        return void 0;
+      value = fold(divide(t, b));
+      if (constantValue(b) === void 0)
+        condition = b;
+      break;
+    }
+    if (value === void 0 || applications === 0)
+      return void 0;
+    const checkedAt = [];
+    for (let i = 0; i < SAMPLES3.length; i++) {
+      const bindings = {};
+      parameters.forEach((p, j) => {
+        bindings[p] = SAMPLES3[(i + j) % SAMPLES3.length];
+      });
+      const expected = evaluate(value, bindings);
+      if (!Number.isFinite(expected))
+        continue;
+      let numeric = node;
+      for (const p of parameters)
+        numeric = replaceIdentifier(numeric, p, {
+          type: "Constant",
+          value: bindings[p]
+        });
+      const found = findLimit(numeric, variable, at2, side).answer;
+      if (found.kind !== "value" || found.limit.kind !== "finite")
+        continue;
+      const got = toNumber2(found.limit.value);
+      if (Math.abs(got - expected) > 1e-9 * Math.max(1, Math.abs(expected)))
+        return void 0;
+      checkedAt.push(bindings);
+    }
+    if (checkedAt.length < 2)
+      return void 0;
+    return { value, parameters, applications, condition, checkedAt };
+  }
+  function logSubstitution(node, variable, at2, side) {
+    let target;
+    if (at2.kind === "infinite" && at2.sign > 0)
+      target = { kind: "infinite", sign: 1 };
+    else if (at2.kind === "finite" && at2.value === 0 && side === "right")
+      target = { kind: "infinite", sign: -1 };
+    else
+      return void 0;
+    const name = freshName(node, ["t", "u", "s"]);
+    const replaced = fold(
+      replaceSubtree(node, call("ln", id3(variable)), id3(name))
+    );
+    if (dependsOn(replaced, variable) || !dependsOn(replaced, name))
+      return void 0;
+    let nested = false;
+    visit(replaced, (child) => {
+      if (child.type === "FunctionCall" && child.args.some((arg) => dependsOn(arg, name)))
+        nested = true;
+    });
+    if (!nested)
+      return void 0;
+    return { node: replaced, name, at: target };
+  }
+
   // src/plugins/physics-lab/symbolic/ode.ts
   var { number: number5, binop: binop5, id: id6, negative: negative5 } = augBuilders_exports;
   var add6 = (a, b) => binop5("Add", a, b);
@@ -19124,7 +19221,7 @@ var CalcEngine = (() => {
     const emit2 = (node) => toLatex(cfg2, node);
     f = resolveImplicitCalls(f, [independent, dependent]);
     const asAffine = linearIn(f, dependent);
-    if (asAffine !== void 0 && isZero3(asAffine.a)) {
+    if (asAffine !== void 0 && isZero4(asAffine.a)) {
       return direct(emit2, f, independent, dependent);
     }
     if (asAffine !== void 0) {
@@ -19268,7 +19365,7 @@ var CalcEngine = (() => {
       replaceName(replaceName(f, dependent, id6(v)), independent, number5(1))
     );
     const denominator = fold(subtract5(F, id6(v)));
-    if (isZero3(denominator))
+    if (isZero4(denominator))
       return void 0;
     const ratio = asRatio(denominator);
     let left;
@@ -19386,7 +19483,7 @@ var CalcEngine = (() => {
   function affine(emit2, f, parts, independent, dependent) {
     const { a, b } = parts;
     const aHasX = dependsOn(a, independent);
-    const bIsZero = isZero3(b);
+    const bIsZero = isZero4(b);
     let antiderivativeOfA;
     try {
       antiderivativeOfA = withoutLogBars(integrate2(a, independent));
@@ -19453,11 +19550,11 @@ var CalcEngine = (() => {
     if (coefficients === void 0 || coefficients.length !== 3)
       return void 0;
     const [constant3, linear2, quadratic2] = coefficients.map((c) => fold(c));
-    if (!isZero3(constant3))
+    if (!isZero4(constant3))
       return void 0;
-    if (isZero3(quadratic2))
+    if (isZero4(quadratic2))
       return void 0;
-    if (isZero3(linear2))
+    if (isZero4(linear2))
       return void 0;
     if (dependsOn(linear2, independent) || dependsOn(quadratic2, independent))
       return void 0;
@@ -19707,7 +19804,7 @@ var CalcEngine = (() => {
       return { ok: false, error: error2.message };
     throw error2;
   }
-  function isZero3(node) {
+  function isZero4(node) {
     return node.type === "Constant" && node.value === 0;
   }
   function distribute2(factor, sum3) {
@@ -21664,14 +21761,49 @@ var CalcEngine = (() => {
         };
       case "no-approach":
         return { ...base2, latex: "", verdict: "Refused", method: a.reason };
-      case "unknown":
+      case "unknown": {
+        const rewritten = rewrittenLimit(node, variable, at2, side);
+        if (rewritten !== void 0)
+          return { ...base2, ...rewritten };
         return {
           ...base2,
           latex: "",
           verdict: "Not decided",
           method: "None of the methods could decide it."
         };
+      }
     }
+  }
+  function rewrittenLimit(node, variable, at2, side) {
+    const parametric = parametricLimit(node, variable, at2, side);
+    if (parametric !== void 0) {
+      const names = parametric.parameters.map(latexOfName).join(", ");
+      const checked = parametric.checkedAt.map(
+        (b) => Object.entries(b).map(([k, v]) => `${latexOfName(k)} = ${v}`).join(", ")
+      ).join("; ");
+      return {
+        latex: emit(parametric.value),
+        verdict: "Proved",
+        method: `L'H\xF4pital's rule ${parametric.applications === 1 ? "once" : `${parametric.applications} times`}, with ${names} left as ${parametric.parameters.length > 1 ? "letters" : "a letter"}: numerator and denominator are both 0 at the point whatever the value${parametric.parameters.length > 1 ? "s" : ""} of ${names}.`,
+        notes: [
+          parametric.condition === void 0 ? `This holds for every value of ${names}.` : `This holds wherever \\(${emit(parametric.condition)}\\neq0\\).`,
+          `Checked against the limit proved with numbers in place of the letters: ${checked}.`
+        ]
+      };
+    }
+    const log3 = logSubstitution(node, variable, at2, side);
+    if (log3 !== void 0) {
+      const found = findLimit(log3.node, log3.name, log3.at, "both").answer;
+      if (found.kind === "value")
+        return {
+          latex: limitLatex(found.limit),
+          decimal: limitDecimal(found.limit),
+          verdict: "Proved",
+          method: `Substituting ${latexOfName(log3.name)} = ln ${latexOfName(variable)}, which goes to ${log3.at.kind === "infinite" && log3.at.sign > 0 ? "\u221E" : "\u2212\u221E"}; then ${describeLimitMethod(found.method)}`,
+          notes: [`In ${latexOfName(log3.name)}: \\(${emit(log3.node)}\\).`]
+        };
+    }
+    return void 0;
   }
   function odeAnswer(request, variable) {
     const dep = request.dependent ?? "y";

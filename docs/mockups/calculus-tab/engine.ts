@@ -48,6 +48,10 @@ import {
   describeLimitMethod,
   findLimit,
 } from "../../../src/plugins/physics-lab/symbolic/limit";
+import {
+  logSubstitution,
+  parametricLimit,
+} from "../../../src/plugins/physics-lab/symbolic/limitRewrites";
 import { solveFirstOrder } from "../../../src/plugins/physics-lab/symbolic/ode";
 import {
   resolvePrimes,
@@ -1161,14 +1165,67 @@ function limitAnswer(
       };
     case "no-approach":
       return { ...base, latex: "", verdict: "Refused", method: a.reason };
-    case "unknown":
+    case "unknown": {
+      const rewritten = rewrittenLimit(node, variable, at, side);
+      if (rewritten !== undefined) return { ...base, ...rewritten };
       return {
         ...base,
         latex: "",
         verdict: "Not decided",
         method: "None of the methods could decide it.",
       };
+    }
   }
+}
+
+/**
+ * The two rewrites of limitRewrites.ts, tried once the engine cannot decide:
+ * a parameter, by L'Hôpital's rule on the tree, and x only through ln x, by
+ * t = ln x.
+ */
+function rewrittenLimit(
+  node: Node,
+  variable: string,
+  at: Bound,
+  side: "both" | "left" | "right"
+):
+  | Pick<Answer, "latex" | "decimal" | "verdict" | "method" | "notes">
+  | undefined {
+  const parametric = parametricLimit(node, variable, at, side);
+  if (parametric !== undefined) {
+    const names = parametric.parameters.map(latexOfName).join(", ");
+    const checked = parametric.checkedAt
+      .map((b) =>
+        Object.entries(b)
+          .map(([k, v]) => `${latexOfName(k)} = ${v}`)
+          .join(", ")
+      )
+      .join("; ");
+    return {
+      latex: emit(parametric.value),
+      verdict: "Proved",
+      method: `L'Hôpital's rule ${parametric.applications === 1 ? "once" : `${parametric.applications} times`}, with ${names} left as ${parametric.parameters.length > 1 ? "letters" : "a letter"}: numerator and denominator are both 0 at the point whatever the value${parametric.parameters.length > 1 ? "s" : ""} of ${names}.`,
+      notes: [
+        parametric.condition === undefined
+          ? `This holds for every value of ${names}.`
+          : `This holds wherever \\(${emit(parametric.condition)}\\neq0\\).`,
+        `Checked against the limit proved with numbers in place of the letters: ${checked}.`,
+      ],
+    };
+  }
+  const log = logSubstitution(node, variable, at, side);
+  if (log !== undefined) {
+    const found = findLimit(log.node, log.name, log.at, "both").answer;
+    if (found.kind === "value")
+      return {
+        latex: limitLatex(found.limit),
+        decimal: limitDecimal(found.limit),
+        verdict: "Proved",
+        method: `Substituting ${latexOfName(log.name)} = ln ${latexOfName(variable)}, which goes to ${log.at.kind === "infinite" && log.at.sign > 0 ? "∞" : "−∞"}; then ${describeLimitMethod(found.method)}`,
+        notes: [`In ${latexOfName(log.name)}: \\(${emit(log.node)}\\).`],
+      };
+  }
+  return undefined;
 }
 
 function odeAnswer(request: Parsed, variable: string): Answer {
