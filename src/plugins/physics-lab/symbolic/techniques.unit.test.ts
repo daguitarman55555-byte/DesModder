@@ -409,6 +409,15 @@ describe("a trigonometric quotient that divides exactly", () => {
   test("sin 2x/sin x is 2 cos x", () => {
     check(div(fn("sin", twoX), sin), "2\\sin\\left(x\\right)");
   });
+  test("a quotient coefficient stays a fraction, not 0.5", () => {
+    const result = integrate(
+      div(fn("cos", twoX), add(mul(number(2), sin), mul(number(2), cos))),
+      "x"
+    );
+    expect(emit(result)).not.toMatch(/0\.5/);
+    expect(emit(result)).toContain("\\frac");
+  });
+
   test("one that does not divide is left to the other routes", () => {
     // 1/(sin x + cos x) has a remainder, so the half-angle route answers it.
     const result = integrate(div(number(1), add(sin, cos)), "x");

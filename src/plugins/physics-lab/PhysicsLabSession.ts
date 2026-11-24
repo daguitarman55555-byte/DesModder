@@ -76,6 +76,7 @@ import {
   type Bound,
   type Limit,
 } from "./symbolic/definite";
+import { logSubstitution, parametricLimit } from "./symbolic/limitRewrites";
 import {
   findLimit,
   numericEvidence,
@@ -2522,6 +2523,77 @@ export default class PhysicsLabSession {
         };
       }
       case "unknown": {
+        // The two rewrites the engine does not make itself (limitRewrites.ts).
+        const parametric = parametricLimit(node, variable, at, side);
+        if (parametric !== undefined) {
+          const names = parametric.parameters.join(", ");
+          const shown = approachLatex(side);
+          return {
+            status: "value",
+            statementLatex: `\\lim_{${shown}}${fLatex}`,
+            approachLatex: shown,
+            bodyLatex: fLatex,
+            valueLatex: emit(parametric.value),
+            decimal: "",
+            finite: true,
+            caption: "",
+            formLatex,
+            routes: [
+              {
+                id: "parametric",
+                name: "L'Hôpital's rule, with letters",
+                steps: [
+                  {
+                    say: `Top and bottom are both 0 at the point whatever ${names} is, so L'Hôpital's rule applies${parametric.applications > 1 ? `, ${parametric.applications} times` : ""}, with ${names} kept as ${parametric.parameters.length > 1 ? "letters" : "a letter"}.`,
+                    lines: [
+                      {
+                        kind: "limit",
+                        approachLatex: shown,
+                        latex: fLatex,
+                        equals: false,
+                      },
+                      {
+                        kind: "math",
+                        approachLatex: "",
+                        latex: emit(parametric.value),
+                        equals: true,
+                      },
+                    ],
+                    why:
+                      parametric.condition === undefined
+                        ? `It holds for every value of ${names}.`
+                        : `It holds wherever ${emit(parametric.condition)} ≠ 0.`,
+                    proof: `Each zero at the point is structural, the same for every value of ${names}. The formula was also checked against the limit proved with numbers put in for ${names}, at ${parametric.checkedAt.length} sets of values.`,
+                  },
+                ],
+              },
+            ],
+            route: "parametric",
+            check: "consistent",
+            digits: 0,
+            note: "",
+            endpoint: false,
+          };
+        }
+        const log = logSubstitution(node, variable, at, side);
+        if (log !== undefined) {
+          const inner = this.computeLimit(
+            emit(log.node),
+            log.name,
+            log.at.kind === "infinite" && log.at.sign < 0
+              ? "-\\infty"
+              : "\\infty",
+            "both"
+          );
+          if (inner.status === "value")
+            return {
+              ...inner,
+              statementLatex: `\\lim_{${approachLatex(side)}}${fLatex}`,
+              approachLatex: approachLatex(side),
+              bodyLatex: fLatex,
+              note: `With ${log.name} = ln ${variable}, which goes to ${log.at.kind === "infinite" && log.at.sign < 0 ? "−∞" : "∞"}, this is the limit of ${emit(log.node)}.`,
+            };
+        }
         // Functions are names too, and `sin` needs no value from anybody.
         const called = new Set<string>();
         visitTree(node, (child) => {

@@ -2871,16 +2871,22 @@ testWithPage(
     });
     expect(state.source).toBe("components");
     expect(state.p).toMatch(/^\\sum_\{j=0\}\^\{20\}/);
-    // MathQuill hands the paste over in its own spelling, spaces gone.
-    expect(state.q).toContain(String.raw`\left(2-\pi-1\right)!`);
+    // MathQuill hands the paste over in its own spelling, spaces gone. Γ is
+    // kept as Γ since 2026-11-24: it is a function in the graph now (the
+    // locked folder), where it used to be rewritten as a factorial.
+    expect(state.q).toContain(String.raw`\Gamma\left(2-\pi\right)`);
     for (const part of [state.p, state.q])
-      expect(part).not.toMatch(/\\Gamma|\\infty|\\langle/);
+      expect(part).not.toMatch(/\\infty|\\langle/);
     expect(state.message).toContain("Split the pasted vector");
     expect(state.flow).toBe(true);
 
     // Desmos reads both definitions it was given, at the value it should:
     // P(1,1) is what live Desmos gave for this sum on 2026-10-14.
     await driver.click(GENERATE);
+    await driver.waitForSync();
+    // Γ's definition joins the locked folder a moment after the field that
+    // uses it (graphInstall.ts debounces its watcher).
+    await new Promise((resolve) => setTimeout(resolve, 1200));
     await driver.waitForSync();
     const errors = await driver.evaluate(() =>
       ["p", "q"].map(

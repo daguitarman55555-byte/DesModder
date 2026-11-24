@@ -22,6 +22,7 @@ import {
   number,
   power,
   quotientFactors,
+  rationalNode,
   sameTree,
   visit,
   type Node,
@@ -133,11 +134,27 @@ function toPoly(node: Node, u: Node): Poly | undefined {
   }
 }
 
-function fromPoly(p: Poly, u: Node): Node {
+/**
+ * A coefficient as an exact fraction. Division by a leading coefficient of 2
+ * gives 0.5, and an answer must never carry a decimal; every coefficient
+ * here is a ratio of the small integers the input was written with.
+ */
+function exactCoefficient(v: number): Node | undefined {
+  for (let d = 1; d <= 1000; d++) {
+    const n = Math.round(v * d);
+    if (Math.abs(n / d - v) < 1e-12 * Math.max(1, Math.abs(v)))
+      return rationalNode({ n, d });
+  }
+  return undefined;
+}
+
+function fromPoly(p: Poly, u: Node): Node | undefined {
   let out: Node = number(0);
   for (const [k, v] of p) {
     const [c, s] = parse(k);
-    let term: Node = number(v);
+    const coefficient = exactCoefficient(v);
+    if (coefficient === undefined) return undefined;
+    let term: Node = coefficient;
     if (c > 0)
       term = multiply(
         term,

@@ -337,6 +337,10 @@ float vtMittagLeffler(float a, float b, float z) {
       term = sgn * exp(float(k) * lz - vtLnGammaLarge(arg));
     } else term = vtPow(z, float(k)) * vtRGamma(arg);
     sum += term;
+    // Past the last pole of 1/Γ (arg > 2) the terms only shrink once they
+    // are small, so a negligible one ends the sum: 101 terms took 8.9 ms a
+    // 1024² draw on Iris Xe, the slowest of all 21.
+    if (arg > 2.0 && abs(term) <= 1e-9 * abs(sum)) break;
   }
   return sum;
 }

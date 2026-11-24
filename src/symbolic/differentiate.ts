@@ -93,6 +93,16 @@ function derivative(node: Node, variable: string): Node {
     case "BinaryOperator":
       return binaryDerivative(node, variable);
     case "FunctionCall":
+      // A call with no variable in it is a constant, whatever the function:
+      // Γ(2−π) in a pasted sympy field has derivative 0, and refusing it
+      // for not knowing Γ′ would refuse the whole field.
+      // Not when the callee is the variable itself: x(y−1) is a product the
+      // parser could not see, and is refused rather than guessed.
+      if (
+        node.callee.symbol !== variable &&
+        !node.args.some((arg) => dependsOn(arg, variable))
+      )
+        return number(0);
       return functionCallDerivative(node, variable);
     case "Factorial":
       // z! is Γ(z+1), whose derivative needs the digamma function, which

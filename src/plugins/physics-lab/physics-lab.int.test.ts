@@ -1813,7 +1813,8 @@ testWithPage(
     await driver.waitForSync();
 
     // A name with no value: there is nothing to approach, and it says which.
-    await setLimit(driver, String.raw`\frac{\sin\left(ax\right)}{x}`, "0");
+    // (sin(ax)/x is decided now, with a as a letter; a/x is not 0/0.)
+    await setLimit(driver, String.raw`\frac{a}{x}`, "0");
     await driver.assertSelectorEventually(LIMIT_REFUSAL);
     expect(await text(driver, LIMIT_REFUSAL)).toContain("uses a");
 
@@ -1938,6 +1939,26 @@ testWithPage(
 
     await driver.setBlank();
     await driver.disablePlugin("physics-lab");
+  },
+  60000
+);
+
+testWithPage(
+  "the Limit tab decides a limit with a letter in it, and one through t = ln x",
+  async (driver) => {
+    await openPanel(driver);
+    await openTab(driver, "limit");
+    // limitRewrites.ts: L'Hôpital's rule with a kept as a letter.
+    await setLimit(driver, String.raw`\frac{\sin\left(ax\right)}{x}`, "0");
+    await driver.assertSelectorEventually(LIMIT);
+    expect(await latexOf(driver, LIMIT)).toBe("a");
+    await setLimit(
+      driver,
+      String.raw`\frac{\ln\left(\ln\left(x\right)\right)}{\ln\left(x\right)}`,
+      String.raw`\infty`
+    );
+    await driver.assertSelectorEventually(LIMIT);
+    expect(await latexOf(driver, LIMIT)).toBe("0");
   },
   60000
 );
